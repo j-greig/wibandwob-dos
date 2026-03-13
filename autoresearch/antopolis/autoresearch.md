@@ -100,3 +100,8 @@ From microapp-sdk.js (already imported or importable):
 - #4 keep (7.4): per-district border colours (yellow/green/cyan/magenta), 8 seed events
 - #5 discard (7.4): subtitle row — informative but no score improvement
 - #6 keep (8.2): visual overhaul — 2-char ant glyphs, 4-row buildings, distinct terrain per district, subtitle row
+- #7 keep (8.4): ant trails (fading footprints), colour-coded Colony Log (white/yellow/red)
+- #8 keep (8.6): dotted paths between buildings (L-shaped road network)
+- #9 keep (8.8): shorter district labels, pipe separators in resource bar
+- #10 discard (8.8): static terrain + focus mode — no score improvement (auto-reverted but changes preserved)
+- #11 keep (9.0): static terrain, focus mode [z], hide figlet in focus, 3fr:1fr ratio — ALL AXES AT 9
