@@ -1,0 +1,10 @@
+{
+  "name": "flexoki-theme",
+  "version": "1.0.0",
+  "description": "Flexoki paper-ink theme for WibWob-DOS",
+  "type": "theme",
+  "entry": "theme.ts",
+  "provides": {
+    "theme": "flexoki-paper"
+  }
+}
