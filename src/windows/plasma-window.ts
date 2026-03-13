@@ -173,6 +173,12 @@ export function openPlasmaWindow(
         key("p", player.paused ? "resume" : "pause"),
         key("s", "save capture"),
         key("f", "fullscreen"),
+        sep,
+        label("\u2261", "ABOUT"),
+        `  ${A.gry}Procedural colour-field${A.r}`,
+        `  ${A.gry}animation engine with${A.r}`,
+        `  ${A.gry}displacement blur and${A.r}`,
+        `  ${A.gry}phase-shifted waves.${A.r}`,
       ];
       infoText = infoLines.join("\n");
       (infoBlock.node as any).setContent(infoText);
