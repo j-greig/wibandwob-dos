@@ -94,6 +94,7 @@ export interface AppMenuActions {
   openMonsterCam: () => void;
   // ── Window control (by id — agent/API use) ────────────
   closeWindowById: (args?: Record<string, unknown>) => void;
+  setWindowChrome: (args?: Record<string, unknown>) => void;
   focusWindowById: (args?: Record<string, unknown>) => void;
   moveWindowById: (args?: Record<string, unknown>) => void;
   resizeWindowById: (args?: Record<string, unknown>) => void;
@@ -653,6 +654,20 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "closeWindowById",
     api: true,
     agent: true,
+  },
+  {
+    id: "window.set_chrome",
+    label: "Set Window Chrome",
+    description: "Set window chrome mode. Args: { id: number, mode: 'standard' | 'none' }. Mode 'none' removes all borders, title bar, and shadow — pure floating content.",
+    group: "focus",
+    actionKey: "setWindowChrome",
+    api: true,
+    agent: true,
+    returns: "void",
+    params: z.object({
+      id: z.number().describe("Window ID"),
+      mode: z.enum(["standard", "none"]).describe("Chrome mode: standard (default) or none (frameless)"),
+    })
   },
   {
     id: "window.focus",

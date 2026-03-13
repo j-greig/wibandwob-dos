@@ -1834,6 +1834,13 @@ export class TsTuiMvpApp {
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
       closeWindowById: (args) => { this.windowManager.closeWindow(Number(args?.id)); },
+      setWindowChrome: (args) => {
+        const id = Number(args?.id);
+        const mode = String(args?.mode ?? "standard") as "standard" | "none";
+        if (!this.windowManager.setWindowChrome(id, mode)) {
+          return { ok: false, error: `Window ${id} not found` };
+        }
+      },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
       moveWindowById: (args) => {
         const x = args?.x ?? args?.left;

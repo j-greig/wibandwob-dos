@@ -345,6 +345,48 @@ export class WindowManager implements WindowFacade {
     return true;
   }
 
+  setWindowChrome(id: number, mode: "standard" | "none"): boolean {
+    const record = this.getWindowById(id);
+    if (!record) return false;
+
+    if (mode === "none") {
+      // Hide chrome elements
+      if (record.shadow) { record.shadow.hide(); }
+      if (record.titleBar) { record.titleBar.hide(); }
+      if (record.closeHint) { record.closeHint.hide(); }
+      if (record.resizeGrip) { record.resizeGrip.hide(); }
+      // Remove border, expand body
+      (record.frame as any).border = undefined;
+      record.frame.style = { ...(record.frame.style as any), border: undefined };
+      record.body.top = 0;
+      record.body.left = 0;
+      record.body.right = 0;
+      record.body.bottom = 0;
+      (record as any).chromeless = true;
+    } else {
+      // Restore chrome
+      if (record.shadow) { record.shadow.show(); }
+      if (record.titleBar) { record.titleBar.show(); }
+      if (record.closeHint) { record.closeHint.show(); }
+      if (record.resizeGrip) { record.resizeGrip.show(); }
+      (record.frame as any).border = "line";
+      record.frame.style = {
+        ...(record.frame.style as any),
+        border: theme().windowBorderUnfocused
+      };
+      record.body.top = 1;
+      record.body.left = 2;
+      record.body.right = 2;
+      record.body.bottom = 1;
+      (record as any).chromeless = false;
+    }
+
+    record.refresh?.();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
+    return true;
+  }
+
   focusWindowById(id: number): boolean {
     const record = this.getWindowById(id);
     if (!record) {

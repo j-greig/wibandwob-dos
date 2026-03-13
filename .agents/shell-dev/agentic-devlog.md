@@ -1128,3 +1128,36 @@ wibwob cmd figlet.open --text "GAME OVER" --font doom
 WID=$(wibwob windows | jq -r '.[-1].id')
 wibwob window.resize --id $WID --width 60 --height 14
 ```
+
+---
+
+## 2026-03-13: v3 creative tooling session — breed.py, fx commands, chromeless, pinball
+
+### What shipped
+- `scripts/fx/breed` — 5-mode character-level ASCII art breeding (xor, density, blend, random, interleave)
+- `scripts/fx/{shear,glitch,flip,mirror,crop,repeat}` — stdin→stdout Unix pipe filters
+- `scripts/fx/{liquid-shear,lava-lamp,tui-acid,kaleidoscope,upside-down,zoo,pinball}.sh` — orchestration scripts
+- `fx.glitch`, `fx.shear`, `fx.breed`, `fx.flip` — registered in command catalog with Zod schemas
+- `window.set_chrome --mode none` — per-window chromeless mode, strips borders/title/shadow
+- `scripts/fx/jgsbreeder.sh` — breeds two Joan Stark pieces through all modes
+- `_apiCall` guard on primer.open, editor.open, figlet.open, markdown.open — prevents interactive prompts via API
+- v4 backlog planned: multi-instance discovery & targeting (tmux-style -t flag)
+
+### Key design decisions
+- FX are stdin→stdout filters, not framework plugins. They compose with `|`.
+- `wibwob screenshot | glitch 0.6 | shear 3 > art.txt` — the TouchDesigner-for-terminals pattern
+- Unix socket vs HTTP ports: both needed. Socket for local (like Docker), HTTP for remote/server.
+- Per-window chromeless + desktop.toggle_chrome = fully frameless floating ASCII art
+
+### Outstanding for next session
+- v3 at 7/10 (graduation threshold) but needs clean commit + push
+- v1 53/53 passes when desktop is clear (transient failures from leftover windows)
+- A1 (Zod coverage) at 16% — needs batch schema pass on remaining commands
+- A2/A3 (socket/FUSE) deferred — socket goes to v4 with multi-instance
+- Figlet windows too small for long text via API (devlog'd, not yet fixed)
+- Multi-instance CLI targeting (v4 BACKLOG.md written, tmux -t pattern)
+
+### Transport architecture note (for next agent)
+Unix sockets = primary for local CLI/agent (fast, no port conflicts, discovery via ls *.sock).
+HTTP ports = keep for remote access, server deployments, xterm.js, PartyKit bridges.
+CLI should try socket first, fall back to HTTP. Same pattern as Docker daemon.

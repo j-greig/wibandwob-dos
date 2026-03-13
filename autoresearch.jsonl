@@ -11,3 +11,4 @@
 {"type":"config","name":"Unix Control v3 — Infra + Creative Tooling","metricName":"completion_count","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"590da41","metric":2,"metrics":{},"status":"keep","description":"v3 baseline: 2/10 (A4 _apiCall guard + B4 screenshot region already work). Scaffolding complete.","timestamp":1773442188106,"segment":0}
 {"run":2,"commit":"47c74d9","metric":6,"metrics":{},"status":"checks_failed","description":"6/10 (B1 breed, B2 mosaic, B5 fx commands, B7 jgsbreeder all pass) but v1 regression gate failed due to leftover windows. Fixed checks to clear desktop first.","timestamp":1773443169055,"segment":0}
+{"run":3,"commit":"e9ad815","metric":6,"metrics":{},"status":"keep","description":"B1 breed.py, B2 mosaic (zoo.sh), B5 fx commands (4 registered: glitch/shear/breed/flip), B7 jgsbreeder — all pass. Fixed checks to clear desktop before v1 regression gate. 6/10.","timestamp":1773443210410,"segment":0}
