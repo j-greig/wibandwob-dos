@@ -763,8 +763,9 @@ export function openFileManagerWindow(params: {
     const sizeStr = totalSize < 1024 ? `${totalSize}B`
       : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(0)}K`
       : `${(totalSize / 1048576).toFixed(1)}M`;
-    const macHints = isMac ? " spc:look o:finder" : "";
-    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr}) | \u21B5:open v:view c:copy${macHints} /:filter s:search`);
+    const macHints = isMac ? " SPC:look O:finder" : "";
+    const sortArrow = sortField === "name" ? "\u25B2 Name" : sortField === "size" ? "\u25B2 Size" : sortField === "modified" ? "\u25B2 Date" : "\u25B2 Type";
+    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr}) \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} /:filter S:search`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -889,7 +890,27 @@ export function openFileManagerWindow(params: {
   const updatePreview = (index: number) => {
     const entry = entries[index];
     if (!entry) {
-      previewRawContent = EMPTY_FILE_SELECTED;
+      previewRawContent = [
+        "",
+        "       {bold}\u2302 WibWob File Manager{/bold}",
+        "",
+        "       Select a file to preview",
+        "       or press {bold}S{/bold} to search",
+        "",
+        "       {gray-fg}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{/gray-fg}",
+        "",
+        "       {gray-fg}Keys:{/gray-fg}",
+        "       {bold}\u21B5{/bold}  Open in editor",
+        "       {bold}V{/bold}  View file",
+        "       {bold}SPC{/bold} Quick Look",
+        "       {bold}C{/bold}  Copy path",
+        "       {bold}O{/bold}  Reveal in Finder",
+        "       {bold}/{/bold}  Filter files",
+        "       {bold}S{/bold}  Search contents",
+        "       {bold}TAB{/bold} Toggle icon view",
+        "",
+        "       {gray-fg}Right-click for menu{/gray-fg}",
+      ].join("\n");
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
@@ -1162,7 +1183,7 @@ export function openFileManagerWindow(params: {
     currentPath = directoryPath;
     allEntries = buildEntries(directoryPath);
     const dirName = path.basename(directoryPath) || directoryPath;
-    frame.frame.setLabel(` File Manager - ${dirName} `);
+    frame.frame.setLabel(` \u2302 ${dirName} `);
     // Show breadcrumb with file type summary
     const bc = renderBreadcrumb();
     pathLabel.setContent(` ${bc}`);
@@ -1177,9 +1198,8 @@ export function openFileManagerWindow(params: {
       activeSearchProcess = null;
     }
     searchActive = false;
-    // Restore title
     const dirName = path.basename(currentPath) || currentPath;
-    frame.frame.setLabel(` File Manager - ${dirName} `);
+    frame.frame.setLabel(` \u2302 ${dirName} `);
   };
 
   const showSearchResults = () => {
@@ -1207,7 +1227,7 @@ export function openFileManagerWindow(params: {
       list.select(0);
       updatePreviewForSearchResult(searchResults[0]);
       // Update preview header with search info
-      frame.frame.setLabel(` Search: "${searchQuery}" - ${searchResults.length} results `);
+      frame.frame.setLabel(` \u2315 "${searchQuery}" - ${searchResults.length} results `);
     }
     renderStatusBar();
     params.screen.render();
@@ -1267,7 +1287,7 @@ export function openFileManagerWindow(params: {
 
     // Show "searching..." immediately
     list.setItems(["  {yellow-fg}Searching...{/yellow-fg}"]);
-    frame.frame.setLabel(` Search: "${query}" `);
+    frame.frame.setLabel(` \u2315 "${query}" `);
     previewRawContent = `{bold}Searching for "${query.replace(/\{/g, "\\{")}"{/bold}\n\n  Directory: ${path.basename(currentPath)}/\n  Engine: ripgrep (rg)\n\n  {gray-fg}Results will appear as they are found...{/gray-fg}`;
     setViewportContent(preview, previewRawContent);
     params.screen.render();
