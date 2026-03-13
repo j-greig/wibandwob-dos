@@ -1,2 +1,3 @@
 {"type":"config","name":"Unix Control v2 — Backlog Completion","metricName":"completion_count","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"c1af670","metric":2,"metrics":{},"status":"keep","description":"Baseline: 2/10 backlog items complete (naming hygiene, event streaming). Set up v2 autoresearch with test script, checks, brief, ideas, and symlinks.","timestamp":1773440223679,"segment":0}
+{"run":2,"commit":"f4dd15a","metric":3,"metrics":{},"status":"keep","description":"Item 9: Rewrote SURFACE_PARITY_ARCHITECTURE.md to reflect reality — wibwob not ww, pure HTTP approach, single file design. 3/10.","timestamp":1773440292741,"segment":0}
