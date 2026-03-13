@@ -7,11 +7,12 @@ the original's rendering pipeline, map data, sprites, meshes, and gameplay.
 
 ## Reference Materials
 - **C++ source**: `/tmp/asciicker/` — 136K lines (cloned from github, MIT)
-- **Gameplay GIF**: `/Users/james/Repos/wibandwob-dos/asciicker-gameplay-animted.gif`
-  — animated recording of actual gameplay. Extract frames with ffmpeg to study
+- **Gameplay GIF**: `asciicker-gameplay-animted.gif` (repo root)
+  — 26s at 16.67fps, 391 frames, 800x600. Actual gameplay recording.
+- **Extracted frames**: `autoresearch/asciicker/reference-frames/`
+  — 15 PNGs evenly spaced through the GIF (~1.7s apart). Study these for
   water reflections, 3D camera rotation, mesh rendering, sprite animation,
-  lighting, and the fg+bg dithering in action. Invaluable visual reference.
-  `ffmpeg -i asciicker-gameplay-animted.gif -vf "select=eq(n\,N)" -frames:v 1 /tmp/frame.png`
+  lighting, cliff faces, and the fg+bg dithering technique in action.
 
 ## Reference Codebase
 
@@ -202,6 +203,13 @@ Current: RENDER:8.7 WORLD:8.2 CONTROLS:8.1 BEAUTY:8.1 CRAFT:8.9 = **8.4**
 - Import only from blessed and `../../src/services/microapp-sdk.js`
 - Reference data files copied to `modules/asciicker/data/`
 - All lifecycle hooks maintained in index.ts
+
+## Testing Notes
+- **Always maximize the window before scoring/screenshots.** The renderer
+  fills available space — a small window makes everything look cramped and
+  loses detail. Maximize via API before capture:
+  `curl -s -X POST http://127.0.0.1:8099/windows/maximize -H 'Content-Type: application/json' -d '{"id":ID}'`
+- Current MVP screenshot: `autoresearch/asciicker/shots/mvp-current.png`
 
 ## Reload Pattern
 ```bash

@@ -1,1 +1,1 @@
-autoresearch/code-editor/autoresearch.sh
+autoresearch/asciicker/autoresearch.sh

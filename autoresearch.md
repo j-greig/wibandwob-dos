@@ -1,1 +1,1 @@
-autoresearch/code-editor/autoresearch.md
+autoresearch/asciicker/autoresearch.md
