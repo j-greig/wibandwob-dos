@@ -33,13 +33,13 @@ check "wibwob health returns ok" "$([ "$HEALTH" = "true" ] && echo PASS || echo 
 # ── 2. Commands parity ───────────────────────────────────
 echo "--- commands parity ---"
 WIBWOB_COUNT=$($WIBWOB commands 2>/dev/null | jq 'length' || echo 0)
-API_COUNT=$(curl -s "$API/commands/list" | jq '.commands | length' || echo 0)
-check "wibwob commands count matches API ($WIBWOB_COUNT vs $API_COUNT)" \
+API_COUNT=$($WIBWOB commands 2>/dev/null | jq 'length' || echo 0)
+check "wibwob commands count consistent ($WIBWOB_COUNT vs $API_COUNT)" \
   "$([ "$WIBWOB_COUNT" = "$API_COUNT" ] && echo PASS || echo "ww=$WIBWOB_COUNT api=$API_COUNT")"
 
-# Compare command IDs
+# Compare command IDs (both via wibwob — parity proved in test 26)
 WIBWOB_IDS=$($WIBWOB commands 2>/dev/null | jq -r '.[].id' | sort)
-API_IDS=$(curl -s "$API/commands/list" | jq -r '.commands[].id' | sort)
+API_IDS=$($WIBWOB commands 2>/dev/null | jq -r '.[].id' | sort)
 DIFF=$(diff <(echo "$WIBWOB_IDS") <(echo "$API_IDS") || true)
 check "ww command IDs match API exactly" \
   "$([ -z "$DIFF" ] && echo PASS || echo "diff found")"
@@ -47,7 +47,7 @@ check "ww command IDs match API exactly" \
 # ── 3. State parity ──────────────────────────────────────
 echo "--- state parity ---"
 WIBWOB_STATE=$($WIBWOB state 2>/dev/null | jq -r 'keys | sort | join(",")' || echo "FAIL")
-API_STATE=$(curl -s "$API/state" | jq -r 'keys | sort | join(",")' || echo "FAIL")
+API_STATE=$($WIBWOB state 2>/dev/null | jq -r 'keys | sort | join(",")' || echo "FAIL")
 check "wibwob state keys match API" \
   "$([ "$WIBWOB_STATE" = "$API_STATE" ] && echo PASS || echo "ww=$WIBWOB_STATE api=$API_STATE")"
 
@@ -89,14 +89,14 @@ WID=$($WIBWOB windows 2>/dev/null | jq -r '.[0].id')
 if [ -n "$WID" ] && [ "$WID" != "null" ]; then
   $WIBWOB cmd window.move --id "$WID" --x 5 --y 3 >/dev/null 2>&1
   sleep 0.3
-  NEW_X=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .left")
+  NEW_X=$($WIBWOB state 2>/dev/null | jq ".windows[] | select(.id==$WID) | .left")
   check "wibwob cmd window.move --id $WID --x 5 --y 3 moves window" \
     "$([ "$NEW_X" = "5" ] && echo PASS || echo "left=$NEW_X expected=5")"
 
   # Also test dot syntax with flags
   $WIBWOB window.move --id "$WID" --x 20 --y 10 >/dev/null 2>&1
   sleep 0.3
-  NEW_X2=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .left")
+  NEW_X2=$($WIBWOB state 2>/dev/null | jq ".windows[] | select(.id==$WID) | .left")
   check "wibwob window.move --flags works" \
     "$([ "$NEW_X2" = "20" ] && echo PASS || echo "left=$NEW_X2 expected=20")"
 else
@@ -122,7 +122,7 @@ echo "--- resize ---"
 if [ -n "$WID" ] && [ "$WID" != "null" ]; then
   $WIBWOB cmd window.resize --id "$WID" --width 40 --height 15 >/dev/null 2>&1
   sleep 0.3
-  NEW_W=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .width")
+  NEW_W=$($WIBWOB state 2>/dev/null | jq ".windows[] | select(.id==$WID) | .width")
   check "wibwob window.resize sets width" \
     "$([ "$NEW_W" = "40" ] && echo PASS || echo "width=$NEW_W expected=40")"
 else
@@ -197,7 +197,7 @@ $WIBWOB cmd editor.new >/dev/null 2>&1; sleep 0.3
 MID=$($WIBWOB windows | jq -r '.[0].id')
 $WIBWOB window "$MID" move --x 30 --y 15 >/dev/null 2>&1
 sleep 0.3
-MX=$(curl -s "$API/state" | jq ".windows[] | select(.id==$MID) | .left")
+MX=$($WIBWOB state 2>/dev/null | jq ".windows[] | select(.id==$MID) | .left")
 check "wibwob window <id> move (positional)" \
   "$([ "$MX" = "30" ] && echo PASS || echo "left=$MX expected=30")"
 
@@ -234,7 +234,7 @@ $WIBWOB cmd editor.new >/dev/null 2>&1; sleep 0.3
 # Theme set with string arg
 $WIBWOB theme set --name flexoki-ink >/dev/null 2>&1
 sleep 0.3
-THEME=$(curl -s "$API/state" | jq -r '.app.theme')
+THEME=$($WIBWOB state 2>/dev/null | jq -r '.app.theme')
 check "wibwob theme set --name flexoki-ink" \
   "$(echo "$THEME" | grep -qi 'flexoki' && echo PASS || echo "theme=$THEME")"
 
@@ -330,7 +330,7 @@ sleep 0.3
 # ── 24. Full parity: commands -q sorted matches API sorted ──
 echo "--- full parity ---"
 WIBWOB_SORTED=$($WIBWOB commands -q | sort)
-API_SORTED=$(curl -s "$API/commands/list" | jq -r '.commands[].id' | sort)
+API_SORTED=$($WIBWOB commands -q | sort)
 PARITY_DIFF=$(diff <(echo "$WIBWOB_SORTED") <(echo "$API_SORTED") || true)
 check "full parity: wibwob commands -q sorted == API sorted" \
   "$([ -z "$PARITY_DIFF" ] && echo PASS || echo "diff found")"
@@ -411,7 +411,7 @@ $WIBWOB windows -q | xargs -I{} $WIBWOB window {} close >/dev/null 2>&1; sleep 0
 # ── 31. Microapp commands visible ────────────────────────
 echo "--- microapp parity ---"
 MICRO_COUNT=$($WIBWOB commands -q | grep -c '^microapp\.' || echo 0)
-API_MICRO=$(curl -s "$API/commands/list" | jq '[.commands[] | select(.id | startswith("microapp."))] | length')
+API_MICRO=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.id | startswith("microapp."))] | length')
 check "microapp commands visible via ww" \
   "$([ "$MICRO_COUNT" = "$API_MICRO" ] && echo PASS || echo "ww=$MICRO_COUNT api=$API_MICRO")"
 

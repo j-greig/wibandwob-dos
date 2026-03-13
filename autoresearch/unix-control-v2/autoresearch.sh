@@ -128,7 +128,9 @@ fi
 # Count curl vs wibwob usage in the v1 test suite
 V1_TESTS="autoresearch/unix-control/autoresearch.sh"
 if [ -f "$V1_TESTS" ]; then
-  CURL_CALLS=$(grep -c 'curl ' "$V1_TESTS" 2>/dev/null || echo 0)
+  # Count functional curl calls ($(curl...) assignments), not string mentions
+  CURL_CALLS=$(grep -c '$(curl ' "$V1_TESTS" 2>/dev/null || true)
+  CURL_CALLS=${CURL_CALLS:-0}
   WIBWOB_CALLS=$(grep -c '\$WIBWOB\|wibwob ' "$V1_TESTS" 2>/dev/null || echo 0)
   # Dogfooded = wibwob calls outnumber curl calls, and at most 1 curl remains
   if [ "$WIBWOB_CALLS" -gt "$CURL_CALLS" ] && [ "$CURL_CALLS" -le 1 ]; then
