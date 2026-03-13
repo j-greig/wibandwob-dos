@@ -692,6 +692,28 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
     grid.push(row);
   }
 
+  // Render paths between buildings (connect nearest pairs)
+  const distBuildings = world.buildings.filter(b => b.district === districtId);
+  for (let i = 0; i < distBuildings.length; i++) {
+    for (let j = i + 1; j < distBuildings.length; j++) {
+      const a = distBuildings[i]!, b = distBuildings[j]!;
+      const ax = Math.floor(a.x * (w - 6)), ay = Math.floor(a.y * (h - 4)) + 3;
+      const bx = Math.floor(b.x * (w - 6)), by = Math.floor(b.y * (h - 4)) + 3;
+      // Simple horizontal then vertical path
+      const pathChar = "·";
+      const midX = Math.floor((ax + bx) / 2);
+      for (let px = Math.min(ax, midX); px <= Math.max(ax, midX); px++) {
+        if (px >= 0 && px < w && ay >= 0 && ay < h && grid[ay]![px] === " ") grid[ay]![px] = pathChar;
+      }
+      for (let py = Math.min(ay, by); py <= Math.max(ay, by); py++) {
+        if (midX >= 0 && midX < w && py >= 0 && py < h && grid[py]![midX] === " ") grid[py]![midX] = pathChar;
+      }
+      for (let px = Math.min(midX, bx); px <= Math.max(midX, bx); px++) {
+        if (px >= 0 && px < w && by >= 0 && by < h && grid[by]![px] === " ") grid[by]![px] = pathChar;
+      }
+    }
+  }
+
   // Render ant trails (fading footprints)
   const TRAIL_CHARS = [",", ".", " "];
   for (const trail of world.trails.filter(t => t.district === districtId)) {
