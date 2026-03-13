@@ -1,1 +1,2 @@
 {"type":"config","name":"Code Editor (slap-editor) UI","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"e491b8b","metric":4.4,"metrics":{"layout":6,"readability":5,"aesthetic":3,"coherence":5,"character":3},"status":"keep","description":"Baseline: monochrome code editor with gutter, text area, minimal status bar. No syntax highlighting, no current-line highlight, no header bar. Looks like nano.","timestamp":1773412919686,"segment":0}

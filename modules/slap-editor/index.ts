@@ -1,13 +1,15 @@
 /**
- * Slap Editor — Sublime-like code editor microapp for WibWob-DOS.
+ * Slap Editor — code editor microapp for WibWob-DOS.
  *
  * Pure blessed rendering, no native addons.
- * Features: gutter, cursor, selection, undo/redo, find, save, clipboard.
+ * Features: gutter, cursor, selection, undo/redo, find, save, clipboard,
+ * ANSI syntax highlighting, current-line highlight, vim keybindings.
  */
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { EditorEngine, type EditorTheme } from "./editor-engine.js";
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/syntax-highlight.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -36,11 +38,86 @@ function getTheme(host: MicroappHost): EditorTheme {
   };
 }
 
-/** blessed.escape is unreliable — do it ourselves */
-function esc(s: string): string {
-  return s.replace(/\{/g, "{open}").replace(/\}/g, "{close}");
-  // blessed tags: {open} and {close} aren't real tags, so let's use a
-  // different approach — encode then decode
+/** Detect language from file extension for syntax highlighting */
+function detectLang(filePath: string | null): string {
+  if (!filePath) return "plain";
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    ts: "ts", tsx: "tsx", js: "js", jsx: "jsx",
+    py: "python", rs: "rust", go: "go", c: "c", cpp: "c++", h: "c",
+    sh: "bash", zsh: "bash", bash: "bash",
+    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+    md: "markdown", css: "css", html: "html", xml: "xml",
+  };
+  return map[ext] ?? "plain";
+}
+
+/** File type icon (borrowed from File Manager pattern) */
+function fileIcon(filePath: string | null): string {
+  if (!filePath) return "\u2022";
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const icons: Record<string, string> = {
+    ts: "TS", tsx: "TS", js: "JS", jsx: "JS", py: "PY",
+    rs: "RS", go: "GO", c: "C", cpp: "C+", h: "H",
+    md: "MD", json: "{}", yaml: "::", yml: "::", toml: "::",
+    sh: "$>", bash: "$>", zsh: "$>",
+    css: "##", html: "<>", xml: "<>",
+    txt: "\u2261",
+  };
+  return icons[ext] ?? "\u2022";
+}
+
+// ANSI escape helpers
+const A = {
+  r: "\x1b[0m",
+  b: "\x1b[1m",
+  d: "\x1b[2m",
+  i: "\x1b[3m",
+  rev: "\x1b[7m",
+  // Colours by index — we resolve theme colours to ANSI 256 below
+} as const;
+
+/** Map blessed colour name to ANSI 256 fg code */
+function ansiColour(name: string): string {
+  const map: Record<string, string> = {
+    black: "\x1b[30m", red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m",
+    blue: "\x1b[34m", magenta: "\x1b[35m", cyan: "\x1b[36m", white: "\x1b[37m",
+    gray: "\x1b[90m", grey: "\x1b[90m",
+    "light-red": "\x1b[91m", "light-green": "\x1b[92m", "light-yellow": "\x1b[93m",
+    "light-blue": "\x1b[94m", "light-magenta": "\x1b[95m", "light-cyan": "\x1b[96m",
+    "light-white": "\x1b[97m",
+  };
+  if (map[name]) return map[name];
+  // Try #hex or raw number
+  if (name.startsWith("#")) {
+    const n = parseInt(name.slice(1), 16);
+    const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    return `\x1b[38;2;${r};${g};${b}m`;
+  }
+  return "\x1b[37m"; // fallback white
+}
+
+function ansiBgColour(name: string): string {
+  const map: Record<string, string> = {
+    black: "\x1b[40m", red: "\x1b[41m", green: "\x1b[42m", yellow: "\x1b[43m",
+    blue: "\x1b[44m", magenta: "\x1b[45m", cyan: "\x1b[46m", white: "\x1b[47m",
+    gray: "\x1b[100m", grey: "\x1b[100m",
+    "light-red": "\x1b[101m", "light-green": "\x1b[102m", "light-yellow": "\x1b[103m",
+    "light-blue": "\x1b[104m", "light-magenta": "\x1b[105m", "light-cyan": "\x1b[106m",
+    "light-white": "\x1b[107m",
+  };
+  if (map[name]) return map[name];
+  if (name.startsWith("#")) {
+    const n = parseInt(name.slice(1), 16);
+    const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    return `\x1b[48;2;${r};${g};${b}m`;
+  }
+  return "\x1b[40m";
+}
+
+/** Strip all ANSI escape sequences from a string */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 async function openEditor(host: MicroappHost, filePath?: string) {
@@ -63,27 +140,38 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   let statusMessage = "";
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Blessed widgets ---
-  // Use two separate boxes: gutter (no tags) and text area (no tags).
-  // For cursor/selection we'll use tags only on the text box.
+  const lang = detectLang(filePath ?? null);
+  const langLabel = lang === "plain" ? "Plain Text" : lang.toUpperCase();
+  const hasHighlight = HIGHLIGHTED_LANGUAGES.has(lang);
 
-  const gutterBox = blessed.box({
+  // --- Blessed widgets ---
+  // Header bar (breadcrumb)
+  const headerBar = blessed.box({
     parent: win.body,
     top: 0,
     left: 0,
-    width: 5, // updated dynamically
+    right: 0,
+    height: 1,
+    style: { fg: theme.statusFg, bg: theme.statusBg },
+  });
+
+  const gutterBox = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: 0,
+    width: 5,
     bottom: 1,
     style: { fg: theme.gutterFg, bg: theme.gutterBg },
   });
 
   const textBox = blessed.box({
     parent: win.body,
-    top: 0,
-    left: 5, // updated dynamically
+    top: 1,
+    left: 5,
     right: 0,
     bottom: 1,
     style: { fg: theme.fg, bg: theme.bg },
-    tags: true,
+    tags: false, // ANSI mode — raw escape codes, no blessed tags
   });
 
   const statusBar = blessed.box({
@@ -107,82 +195,202 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     render();
   }
 
+  // Cached highlighted lines
+  let highlightedLines: string[] = [];
+  let highlightDirty = true;
+
+  function rehighlight() {
+    if (hasHighlight) {
+      highlightedLines = highlightCode(engine.text, lang);
+    } else {
+      highlightedLines = engine.lines.map(l => l);
+    }
+    highlightDirty = false;
+  }
+
   function render() {
     const totalWidth = (win.body as any).width as number || 80;
-    const height = ((win.body as any).height as number || 20) - 1; // minus status bar
-    const gutterW = engine.gutterWidth();
+    const viewHeight = ((win.body as any).height as number || 20) - 2; // minus header + status
+    const gutterW = engine.gutterWidth() + 1; // extra space for padding
 
     // Update gutter width
     gutterBox.width = gutterW;
     textBox.left = gutterW;
 
-    const textWidth = totalWidth - gutterW;
-    engine.ensureCursorVisible(textWidth, height);
+    const textWidth = Math.max(1, totalWidth - gutterW);
+    engine.ensureCursorVisible(textWidth, viewHeight);
+
+    if (highlightDirty) rehighlight();
 
     const selRange = engine.getSelectionRange();
+    const cursorRow = engine.cursor.row;
+    const cursorCol = engine.cursor.col;
 
-    // Gutter content
+    // ANSI colour codes from theme
+    const gutterAccent = ansiColour(theme.gutterFg);
+    const gutterActive = `${A.b}${ansiColour(theme.cursorBg)}`;
+    const cursorAnsi = `${ansiBgColour(theme.cursorBg)}${ansiColour(theme.cursorFg)}`;
+    const selAnsi = `${ansiBgColour(theme.selectionBg)}${ansiColour(theme.selectionFg)}`;
+
     const gutterLines: string[] = [];
     const textLines: string[] = [];
 
-    for (let y = 0; y < height; y++) {
+    for (let y = 0; y < viewHeight; y++) {
       const row = engine.scroll.row + y;
       if (row >= engine.lineCount) {
-        gutterLines.push(" ".repeat(gutterW));
+        gutterLines.push(`${A.d}${gutterAccent}${"~".padStart(gutterW - 1)} ${A.r}`);
         textLines.push("");
         continue;
       }
 
-      // Gutter
-      gutterLines.push(String(row + 1).padStart(gutterW - 1) + " ");
+      // Gutter — active line in bold accent
+      const isCurrentLine = row === cursorRow;
+      const lineNum = String(row + 1).padStart(gutterW - 1);
+      if (isCurrentLine) {
+        gutterLines.push(`${gutterActive}${lineNum} ${A.r}`);
+      } else {
+        gutterLines.push(`${gutterAccent}${lineNum} ${A.r}`);
+      }
 
-      // Text — build with blessed tags for cursor and selection
-      const fullLine = engine.lines[row];
-      let lineStr = "";
+      // Text — start from highlighted line, overlay cursor/selection
+      const rawLine = engine.lines[row] ?? "";
+      const hlLine = highlightedLines[row] ?? rawLine;
 
+      // We need to map visual columns to positions in the ANSI string
+      // Strategy: for cursor/selection, build char-by-char with ANSI overlays
+      const scrollCol = engine.scroll.col;
+      let lineOut = "";
+
+      // Strip the highlighted line to get per-char ANSI spans
+      // Simpler approach: render plain chars with per-char styling
       for (let x = 0; x < textWidth; x++) {
-        const col = engine.scroll.col + x;
-        const rawCh = col < fullLine.length ? fullLine[col] : " ";
-        // Escape blessed tag chars — blessed uses {open} and {close}
-        const ch = rawCh === "{" ? "{open}" : rawCh === "}" ? "{close}" : rawCh;
+        const col = scrollCol + x;
+        const ch = col < rawLine.length ? rawLine[col] : " ";
 
-        const isCursor = row === engine.cursor.row && col === engine.cursor.col;
+        const isCursor = isCurrentLine && col === cursorCol;
         const isSelected = selRange !== null && isInSelection(row, col, selRange);
 
         if (isCursor) {
-          lineStr += `{${theme.cursorFg}-fg}{${theme.cursorBg}-bg}${ch}{/}`;
+          lineOut += `${cursorAnsi}${ch}${A.r}`;
         } else if (isSelected) {
-          lineStr += `{${theme.selectionFg}-fg}{${theme.selectionBg}-bg}${ch}{/}`;
+          lineOut += `${selAnsi}${ch}${A.r}`;
         } else {
-          lineStr += ch;
+          lineOut += ch;
         }
       }
 
-      textLines.push(lineStr);
+      // If we have syntax highlighting AND no selection/cursor on this line,
+      // use the pre-highlighted version for much better performance
+      if (hasHighlight && !isCurrentLine && selRange === null) {
+        // Use highlighted line, sliced to viewport
+        const plain = stripAnsi(hlLine);
+        if (scrollCol === 0 && plain.length <= textWidth) {
+          lineOut = hlLine + " ".repeat(Math.max(0, textWidth - plain.length));
+        }
+        // Otherwise fall through to per-char render above
+      } else if (hasHighlight) {
+        // For the current line or lines with selection, we need per-char render
+        // but with syntax colour per character
+        // Re-highlight just this line and extract per-char colours
+        const singleHL = highlightCode(rawLine, lang)[0] ?? rawLine;
+        lineOut = "";
+        // Walk the ANSI string to extract colour per source char
+        const charColours = extractCharColours(singleHL, rawLine.length);
+        for (let x = 0; x < textWidth; x++) {
+          const col = scrollCol + x;
+          const ch = col < rawLine.length ? rawLine[col] : " ";
+          const isCursor = isCurrentLine && col === cursorCol;
+          const isSelected = selRange !== null && isInSelection(row, col, selRange);
+
+          if (isCursor) {
+            lineOut += `${cursorAnsi}${ch}${A.r}`;
+          } else if (isSelected) {
+            lineOut += `${selAnsi}${ch}${A.r}`;
+          } else if (col < charColours.length && charColours[col]) {
+            lineOut += `${charColours[col]}${ch}${A.r}`;
+          } else {
+            lineOut += ch;
+          }
+        }
+      }
+
+      textLines.push(lineOut);
     }
 
     gutterBox.setContent(gutterLines.join("\n"));
     textBox.setContent(textLines.join("\n"));
 
-    // Status bar
+    // Header bar — breadcrumb
+    const icon = fileIcon(engine.filePath);
+    const fname = engine.filePath?.split("/").pop() ?? "untitled";
+    const dirPath = engine.filePath
+      ? engine.filePath.split("/").slice(-3, -1).join("/")
+      : "";
+    const breadcrumb = dirPath ? `${dirPath}/${fname}` : fname;
+    const dirtyMark = engine.dirty ? " \u25CF" : "";
+    headerBar.setContent(` ${icon} ${breadcrumb}${dirtyMark}`);
+
+    // Status bar — rich info
     const desc = engine.describe();
-    let status = "";
+    let statusLeft = "";
+    let statusRight = "";
     if (findMode) {
-      status = ` Find: ${findInput}_ `;
+      statusLeft = ` Find: ${findInput}_ `;
       if (engine.findMatches.length > 0) {
-        status += `(${engine.findIndex + 1}/${engine.findMatches.length})`;
+        statusLeft += `(${engine.findIndex + 1}/${engine.findMatches.length})`;
       } else if (findInput) {
-        status += "(no matches)";
+        statusLeft += "(no matches)";
       }
     } else if (statusMessage) {
-      status = ` ${statusMessage}`;
+      statusLeft = ` ${statusMessage}`;
     } else {
-      const fname = desc.filePath?.split("/").pop() ?? "untitled";
-      status = ` ${fname}${desc.dirty ? " [+]" : ""} | Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1} | ${desc.lines} lines`;
+      statusLeft = ` Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1}`;
     }
-    statusBar.setContent(status);
+    const scrollPct = engine.lineCount > 1
+      ? Math.round((engine.scroll.row / Math.max(1, engine.lineCount - viewHeight)) * 100)
+      : 100;
+    statusRight = `${langLabel}  UTF-8  2 spaces  ${desc.lines} lines  ${Math.min(100, Math.max(0, scrollPct))}% `;
+    // Pad status bar
+    const totalStatus = totalWidth;
+    const gap = Math.max(1, totalStatus - statusLeft.length - statusRight.length);
+    statusBar.setContent(statusLeft + " ".repeat(gap) + statusRight);
 
     host.screen.render();
+  }
+
+  /** Extract per-character ANSI colour codes from a highlighted line */
+  function extractCharColours(hlLine: string, srcLen: number): string[] {
+    const colours: string[] = new Array(srcLen).fill("");
+    let srcIdx = 0;
+    let currentColour = "";
+    let i = 0;
+    while (i < hlLine.length && srcIdx < srcLen) {
+      if (hlLine[i] === "\x1b") {
+        // Read full escape sequence
+        let seq = "\x1b";
+        i++;
+        while (i < hlLine.length && hlLine[i] !== "m") {
+          seq += hlLine[i];
+          i++;
+        }
+        if (i < hlLine.length) {
+          seq += "m";
+          i++;
+        }
+        if (seq === A.r) {
+          currentColour = "";
+        } else {
+          currentColour = seq;
+        }
+      } else {
+        if (srcIdx < srcLen) {
+          colours[srcIdx] = currentColour;
+        }
+        srcIdx++;
+        i++;
+      }
+    }
+    return colours;
   }
 
   function isInSelection(
@@ -242,9 +450,9 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         showStatus(ok ? `Saved ${engine.filePath}` : "No file path");
       });
     } else if (ctrl && key.name === "z") {
-      engine.undo();
+      engine.undo(); highlightDirty = true;
     } else if (ctrl && key.name === "y") {
-      engine.redo();
+      engine.redo(); highlightDirty = true;
     } else if (ctrl && key.name === "f") {
       findMode = true;
       findInput = "";
@@ -260,22 +468,22 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       const text = engine.getSelectedText();
       if (text) {
         host.screen.copyToClipboard(text);
-        engine.deleteSelection();
+        engine.deleteSelection(); highlightDirty = true;
         showStatus(`Cut ${text.length} chars`);
       }
     } else if (ctrl && key.name === "g") {
       findMode = true;
       findInput = ":";
     }
-    // Editing
+    // Editing (mark highlight dirty)
     else if (key.name === "return" || key.name === "enter") {
-      engine.insertNewline();
+      engine.insertNewline(); highlightDirty = true;
     } else if (key.name === "backspace") {
-      engine.backspace();
+      engine.backspace(); highlightDirty = true;
     } else if (key.name === "delete") {
-      engine.deleteForward();
+      engine.deleteForward(); highlightDirty = true;
     } else if (key.name === "tab") {
-      engine.insertTab();
+      engine.insertTab(); highlightDirty = true;
     }
     // Regular character
     else if (
@@ -285,14 +493,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       !meta &&
       ch.charCodeAt(0) >= 32
     ) {
-      engine.insertText(ch);
+      engine.insertText(ch); highlightDirty = true;
     }
 
     render();
   }
 
   function height(): number {
-    return ((win.body as any).height as number || 20) - 1;
+    return ((win.body as any).height as number || 20) - 2; // minus header + status
   }
 
   function handleFindKey(
@@ -372,6 +580,7 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     gutterBox.style = { fg: theme.gutterFg, bg: theme.gutterBg };
     textBox.style = { fg: theme.fg, bg: theme.bg };
     statusBar.style = { fg: theme.statusFg, bg: theme.statusBg };
+    headerBar.style = { fg: theme.statusFg, bg: theme.statusBg };
     render();
   });
 

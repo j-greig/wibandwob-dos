@@ -2,31 +2,39 @@
 
 ## Objective
 Transform the bare-bones code editor into a polished VSCode-like editing experience.
-Files in scope: `modules/slap-editor/index.ts` (~388 lines), `modules/slap-editor/editor-engine.ts` (~478 lines).
+Files in scope: `modules/slap-editor/index.ts`, `modules/slap-editor/editor-engine.ts`.
 
-## Current State (baseline)
-- Gutter: plain line numbers, no current-line highlight
-- Text area: monochrome, no syntax highlighting, no current-line highlight
-- Status bar: "untitled | Ln 1, Col 1 | 1 lines" — minimal
-- Empty state: completely blank with just "1" line number — no welcome content
-- No header/breadcrumb bar
-- No language detection
-- No scroll position indicator
+## Reusable Components from Codebase
+- `src/services/syntax-highlight.ts` — ANSI syntax highlighting for TS/JS/Python/Bash.
+  Uses `highlightCode(code, lang)` returning ANSI-styled lines. Already battle-tested.
+- `src/windows/browser-windows.ts` File Manager patterns:
+  - `fileIcon()` — icon per file extension (ts, js, py, md, json, etc.)
+  - Toolbar with path label + right-aligned action buttons with hover effects
+  - `createSelectableList` for file tree sidebar
+  - Breadcrumb builder from path
+  - Vertical divider between panes
+- `src/core/ui-parts.ts` — createHeaderBar, createStatusBar, createRow, createStack, createRule
 
-## Target Features (VSCode-inspired)
-1. Welcome screen when no file loaded (keyboard shortcuts, logo, tips)
-2. Rich status bar: language, encoding, indent style, scroll %, dirty indicator
-3. Current line highlight (subtle background change on active line)
-4. Better gutter: active line number highlighted in accent colour
-5. Header bar showing file path / breadcrumb
-6. Syntax-aware file type detection (by extension)
+## Target Features (priority order)
+1. SYNTAX HIGHLIGHTING — import highlightCode, render ANSI lines with tags:false
+2. CURRENT LINE HIGHLIGHT — accent gutter number, subtle bg on active line
+3. RICH STATUS BAR — language, encoding, indent, Ln:Col, scroll %, dirty marker
+4. HEADER/BREADCRUMB BAR — file path with folder structure
+5. FILE TREE SIDEBAR — left pane with createSelectableList, Space to open in Finder
+6. TOOLBAR — action buttons like File Manager (Save, Find, Go-to-line)
+7. VIM/NANO KEYBINDINGS — hjkl nav, gg/G jump, w/b word, dd delete line, :w save
+
+## Rendering Strategy
+- textBox: tags:false, use raw ANSI from syntax-highlight.ts
+- gutterBox: tags:false, ANSI for current-line number accent
+- Cursor/selection: overlay ANSI escape codes on highlighted output
+- This matches the proven pattern from Terrain Lab, Plasma, TR-808
 
 ## Rubric
 5-axis: LAYOUT, READABILITY, AESTHETIC, COHERENCE, CHARACTER — each 1-10, averaged.
 
 ## Constraints
 - Only modify files in `modules/slap-editor/`
+- Can import from `src/services/syntax-highlight.ts` (existing, tested)
 - Must pass `bun run typecheck`
-- Module reload (not full restart) should suffice: POST /commands/run {"id":"modules.reload"}
-- Use host.theme() for colours, never hardcode
-- ANSI escape codes work via blessed tags: true on textBox
+- RESTART required after changes (src/services import change)
