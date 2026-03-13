@@ -1637,6 +1637,7 @@ export class TsTuiMvpApp {
         const filePath =
           typeof args?.filePath === "string" ? args.filePath : undefined;
         if (!filePath) {
+          if (args?._apiCall) return { ok: false, error: "primer.open requires filePath arg when called via API" };
           this.promptForPrimer();
           return;
         }
@@ -1688,13 +1689,15 @@ export class TsTuiMvpApp {
           // Path B: open an unsaved buffer with title/initial content
           const title =
             typeof args?.title === "string" ? args.title : undefined;
+          // (fall through to existing logic)
           const initial =
             typeof args?.initial === "string" ? args.initial : undefined;
           const onSave = typeof args?.onSave === "function" ? args.onSave as (content: string) => void : undefined;
           const win = this.editor.openWindow(undefined, title, initial);
           if (win && onSave) win.onSave = onSave;
         } else {
-          // Path C: interactive file picker
+          // Path C: interactive file picker (skip for API calls)
+          if (args?._apiCall) return { ok: false, error: "editor.open requires filePath, title, or initial arg when called via API" };
           this.editor.openPicker();
         }
       },
@@ -1731,6 +1734,7 @@ export class TsTuiMvpApp {
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
+        if (!filePath && args?._apiCall) return { ok: false, error: "markdown.open requires filePath arg when called via API" };
         this.openMarkdownViewerWindow(filePath, undefined);
       },
       toggleMarkdownFiglet: () => {
@@ -1881,6 +1885,7 @@ export class TsTuiMvpApp {
           const font = (args?.font as string) || getDefaultFigletFont();
           this.openFigletWindow(text, font);
         } else {
+          if (args?._apiCall) return { ok: false, error: "figlet.open requires text arg when called via API" };
           this.promptForFigletText();
         }
       },
