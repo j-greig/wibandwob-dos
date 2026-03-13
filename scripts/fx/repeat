@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# repeat — Tile text horizontally and/or vertically
+# Usage: cat file.txt | repeat [cols] [rows]
+#   cols — number of horizontal repeats (default: 2)
+#   rows — number of vertical repeats (default: 1)
+set -uo pipefail
+COLS=${1:-2}
+ROWS=${2:-1}
+
+TMP=$(mktemp)
+cat > "$TMP"
+
+# Horizontal tiling: paste N copies side by side
+HTMP=$(mktemp)
+if [ "$COLS" -eq 1 ]; then
+  cp "$TMP" "$HTMP"
+else
+  ARGS=()
+  for i in $(seq 1 "$COLS"); do ARGS+=("$TMP"); done
+  paste -d'' "${ARGS[@]}" > "$HTMP"
+fi
+
+# Vertical tiling
+for i in $(seq 1 "$ROWS"); do
+  cat "$HTMP"
+done
+
+rm -f "$TMP" "$HTMP"

@@ -191,6 +191,58 @@ Outputs a gallery of hybrids.
 
 Depends on B1 (breed.py).
 
+### B8. /proc × breed × backrooms loop
+
+**Status:** Speculative — depends on A3 spike + B1
+**Impact:** Very high (conceptual) — the ouroboros becomes autonomous
+**Effort:** Unknown (emerges from A3 + B1 + backrooms integration)
+
+The convergence point where virtual filesystem, breeding, and backrooms
+generation form a closed creative loop:
+
+```
+/wibwob/
+  breed/
+    3+7/
+      xor       → cat = live XOR of windows 3 and 7 (computed on read)
+      density   → cat = live density merge
+      braille   → cat = live braille OR
+  backrooms/
+    current_frame  → whatever backrooms TV is currently rendering
+    screenshot_in  → write here = backrooms uses this as primer source
+```
+
+The breed outputs are **computed views**, not stored files. `cat /wibwob/breed/3+7/xor`
+recomputes on every read from live window state. Standard Unix pipes become the
+composition engine:
+
+```bash
+cat /wibwob/breed/3+7/xor | python3 smear.py --mode bloom > hybrid.txt
+watch -n 0.5 cat /wibwob/breed/3+7/density   # live-updating breed view
+```
+
+**The backrooms loop:** If backrooms reads `/wibwob/screenshot` as its primer
+source, it dreams about the current desktop. If that dream is bred with
+existing window content and opened as a new primer, the desktop changes,
+which changes what `/wibwob/screenshot` returns, which changes what the
+backrooms dreams about next...
+
+```
+desktop → /proc/screenshot → backrooms input → dream output →
+  → /proc/backrooms/current_frame → breed with window → new primer →
+    → desktop changes → /proc/screenshot changes → ...
+```
+
+The ouroboros becomes autonomous. The system breeds its own dreams back into
+itself without human intervention.
+
+This is also the codification of backrooms creative practice: for a year,
+Wib & Wob used pseudo-CLI syntax (`cat /proc/spawn_matrix | grep coral`)
+as performative fiction. Now the real /proc filesystem makes those fake
+commands executable. The aesthetic became the mechanism.
+
+See: RECURSIVE_OUROBOROS_BRIEF.md § Addendum: The Breeding Loop
+
 ---
 
 ## Priority order

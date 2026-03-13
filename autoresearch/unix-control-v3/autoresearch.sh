@@ -107,7 +107,8 @@ fi
 
 # ── B3: Per-window chromeless mode ──────────────────────
 # Test by trying the command
-CHROME_RESULT=$($WIBWOB commands -q 2>/dev/null | grep -c 'window.set_chrome' || echo 0)
+CHROME_RESULT=$($WIBWOB commands -q 2>/dev/null | grep -c 'window.set_chrome' || true)
+CHROME_RESULT=${CHROME_RESULT:-0}
 if [ "$CHROME_RESULT" -ge 1 ]; then
   check "B3" "Per-window chromeless command" "PASS"
 else
@@ -123,7 +124,8 @@ else
 fi
 
 # ── B5: ascii-fx as commands ────────────────────────────
-FX_COUNT=$($WIBWOB commands -q 2>/dev/null | grep -c '^fx\.' || echo 0)
+FX_COUNT=$($WIBWOB commands -q 2>/dev/null | grep -c '^fx\.' || true)
+FX_COUNT=${FX_COUNT:-0}
 if [ "$FX_COUNT" -ge 3 ]; then
   check "B5" "ascii-fx commands ($FX_COUNT registered)" "PASS"
 else
