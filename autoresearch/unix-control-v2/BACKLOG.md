@@ -190,6 +190,24 @@ Exclude `WW_API` env var — that stays as-is (it's the API config, not the CLI 
 
 ---
 
+## 9. Update SURFACE_PARITY_ARCHITECTURE.md to reflect reality
+
+**Status:** Not started
+**Impact:** Medium — the doc is now wrong about how the CLI works
+**Effort:** 30 mins
+
+The architecture doc still says:
+- CLI imports the catalog directly (it doesn't — pure HTTP)
+- Three files needed (one file suffices)
+- Zod schemas are a prerequisite (they're a nice-to-have)
+- CLI name is `ww` (now `wibwob`)
+
+Update to reflect what was actually built and why the simpler
+approach won. Keep the Zod schema section as "future improvement"
+not "missing prerequisite."
+
+---
+
 ## Priority order
 
 1. Zod schemas (#1) — unlocks #5, improves #6, makes the whole system typed
