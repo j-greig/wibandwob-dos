@@ -644,6 +644,7 @@ export function openFileManagerWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
+    tags: true,
     style: theme().body,
     hidden: viewMode === "icon"
   });
@@ -860,15 +861,27 @@ export function openFileManagerWindow(params: {
       try {
         const dirPath = entry.fullPath;
         const children = fs.readdirSync(dirPath, { withFileTypes: true });
-        const dirs = children.filter(c => c.isDirectory()).length;
-        const files = children.filter(c => !c.isDirectory()).length;
-        const sampleItems = children.slice(0, 20).map(c => {
-          const icon = c.isDirectory() ? "\u25A0" : "\u2022";
-          return `  ${icon} ${c.name}${c.isDirectory() ? "/" : ""}`;
+        const childDirs = children.filter(c => c.isDirectory());
+        const childFiles = children.filter(c => !c.isDirectory());
+        const header = `{bold}\u2302 ${path.basename(dirPath)}/{/bold}\n\n  {cyan-fg}${childDirs.length} directories{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}\n`;
+        const dirItems = childDirs.slice(0, 10).map(c => `  {cyan-fg}\u25A0{/cyan-fg} ${c.name}/`);
+        const fileItems = childFiles.slice(0, 10).map(c => {
+          const ext = path.extname(c.name).toLowerCase();
+          const col = [".md", ".txt"].includes(ext) ? "green"
+            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+            : [".sh", ".bash"].includes(ext) ? "cyan"
+            : "white";
+          return `  {${col}-fg}\u2022{/${col}-fg} ${c.name}`;
         });
-        const header = `\u2302 ${dirPath}\n\n  ${dirs} directories, ${files} files\n`;
-        const truncNote = children.length > 20 ? `\n  ... and ${children.length - 20} more` : "";
-        previewRawContent = header + "\n" + sampleItems.join("\n") + truncNote;
+        const truncDirs = childDirs.length > 10 ? `  {cyan-fg}... +${childDirs.length - 10} more dirs{/cyan-fg}` : "";
+        const truncFiles = childFiles.length > 10 ? `  {green-fg}... +${childFiles.length - 10} more files{/green-fg}` : "";
+        const sections = [header];
+        if (dirItems.length) sections.push(dirItems.join("\n"));
+        if (truncDirs) sections.push(truncDirs);
+        if (fileItems.length) sections.push("\n" + fileItems.join("\n"));
+        if (truncFiles) sections.push(truncFiles);
+        previewRawContent = sections.join("\n");
       } catch (error) {
         previewRawContent = `\u2302 ${entry.fullPath}\n\n  Cannot read directory.\n  ${error instanceof Error ? error.message : String(error)}`;
       }
@@ -895,37 +908,45 @@ export function openFileManagerWindow(params: {
       return;
     }
 
-    // JSON files: pretty-print
+    // JSON files: pretty-print with colour
     if (ext === ".json") {
+      const escapeBraces = (s: string) => s.replace(/\{/g, "\\{");
       try {
         const raw = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
         const parsed = JSON.parse(raw);
         const pretty = JSON.stringify(parsed, null, 2);
         const lines = pretty.split("\n");
-        const numbered = lines.map((ln: string, i: number) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
-        previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+        const stat = fs.statSync(entry.fullPath);
+        const sizeStr = stat.size < 1024 ? `${stat.size}B` : `${(stat.size / 1024).toFixed(0)}K`;
+        const header = `{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}`;
+        // Colourize JSON keys and values
+        const coloured = lines.map((ln: string, i: number) => {
+          const safe = escapeBraces(ln);
+          return `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${safe}`;
+        }).join("\n");
+        previewRawContent = `${header}\n\n${coloured}`;
       } catch {
-        // Fall through to raw preview if JSON parse fails
         const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
         const lines = content.split("\n");
-        const numbered = lines.map((ln: string, i: number) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
-        previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+        const numbered = lines.map((ln: string, i: number) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBraces(ln)}`).join("\n");
+        previewRawContent = `{bold}${path.basename(entry.fullPath)}{/bold}\n\n${numbered}`;
       }
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
 
-    // Default: raw text with line numbers
+    // Default: raw text with line numbers + file metadata header
     try {
       const content = fs.readFileSync(entry.fullPath, "utf8");
       const lines = content.slice(0, 8000).split("\n");
-      // Show file metadata header
       const stat = fs.statSync(entry.fullPath);
       const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
       const dateStr = new Date(stat.mtimeMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-      const header = `${entry.fullPath}  (${sizeStr}, ${dateStr})`;
-      const numbered = lines.map((ln, i) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
+      // Escape { in content to prevent blessed tag interpretation
+      const escaped = (ln: string) => ln.replace(/\{/g, "\\{");
+      const header = `{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}, ${dateStr}`;
+      const numbered = lines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escaped(ln)}`).join("\n");
       previewRawContent = `${header}\n\n${numbered}`;
     } catch (error) {
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
