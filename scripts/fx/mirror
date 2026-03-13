@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# mirror — Kaleidoscope: paste original + reversed side by side
+# Usage: wibwob screenshot | mirror [h|v|quad]
+#   h    — left|right mirror
+#   v    — top|bottom mirror  
+#   quad — 4-quadrant kaleidoscope
+set -uo pipefail
+MODE=${1:-h}
+TMP=$(mktemp)
+cat > "$TMP"
+
+case "$MODE" in
+  h)
+    paste -d'' "$TMP" <(rev "$TMP")
+    ;;
+  v)
+    cat "$TMP"
+    tail -r "$TMP"
+    ;;
+  quad)
+    HALF=$(( $(wc -l < "$TMP") / 2 ))
+    TOP=$(mktemp); head -"$HALF" "$TMP" > "$TOP"
+    paste -d'' "$TOP" <(rev "$TOP")
+    paste -d'' <(tail -r "$TOP") <(tail -r "$TOP" | rev)
+    rm -f "$TOP"
+    ;;
+  *) echo "Usage: mirror [h|v|quad]" >&2; exit 1 ;;
+esac
+rm -f "$TMP"

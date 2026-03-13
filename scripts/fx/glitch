@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# glitch — Random character displacement filter
+# Usage: wibwob screenshot | glitch [intensity] [seed]
+#        cat file.txt | glitch 0.5 42
+set -uo pipefail
+INTENSITY=${1:-0.5}
+SEED=${2:-$RANDOM}
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+TMP=$(mktemp)
+cat > "$TMP"
+python3 "$REPO/.pi/skills/vj-timeline/scripts/smear.py" "$TMP" --mode glitch --intensity "$INTENSITY" --seed "$SEED" --out /dev/stdout 2>/dev/null
+rm -f "$TMP"

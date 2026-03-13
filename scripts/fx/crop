@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# crop — Cut a rectangular region from text
+# Usage: cat file.txt | crop [cols] [rows] [x_offset] [y_offset]
+#        wibwob screenshot | crop 40 20 10 5
+set -uo pipefail
+COLS=${1:-80}
+ROWS=${2:-24}
+X=${3:-0}
+Y=${4:-0}
+tail -n +"$((Y + 1))" | head -"$ROWS" | cut -c"$((X + 1))-$((X + COLS))"

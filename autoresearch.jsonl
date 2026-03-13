@@ -9,3 +9,4 @@
 {"run":8,"commit":"c4c6ff4","metric":9,"metrics":{},"status":"keep","description":"Item 4: Benchmark script — measures wall-clock time for CLI vs curl across state fetch, command list, editor open+close, plus token cost comparison. 9/10.","timestamp":1773441093191,"segment":0}
 {"run":9,"commit":"8f5379c","metric":10,"metrics":{},"status":"keep","description":"Item 6: Tab completion — wibwob completions --zsh/--bash generates shell completions from live command list. 10/10 — ALL BACKLOG ITEMS COMPLETE.","timestamp":1773441157230,"segment":0}
 {"type":"config","name":"Unix Control v3 — Infra + Creative Tooling","metricName":"completion_count","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"590da41","metric":2,"metrics":{},"status":"keep","description":"v3 baseline: 2/10 (A4 _apiCall guard + B4 screenshot region already work). Scaffolding complete.","timestamp":1773442188106,"segment":0}

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# flip — Vertical flip (tail -r), horizontal mirror (rev), or both (rotate 180)
+# Usage: wibwob screenshot | flip [v|h|both]
+set -uo pipefail
+MODE=${1:-v}
+case "$MODE" in
+  v|vertical)   tail -r ;;
+  h|horizontal) rev ;;
+  both|180)     tail -r | rev ;;
+  *) echo "Usage: flip [v|h|both]" >&2; exit 1 ;;
+esac

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# shear — Diagonal text displacement filter
+# Usage: wibwob screenshot | shear [skew]
+#        cat file.txt | shear 3
+set -uo pipefail
+SKEW=${1:-2}
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+TMP=$(mktemp)
+cat > "$TMP"
+python3 "$REPO/.pi/skills/vj-timeline/scripts/smear.py" "$TMP" --mode shear --skew "$SKEW" --out /dev/stdout 2>/dev/null
+rm -f "$TMP"
