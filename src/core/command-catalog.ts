@@ -7,6 +7,7 @@
 
 import type { AppType, MenuConfig, MenuItem } from "./types.js";
 import type { CapabilityKey } from "../services/capability-service.js";
+import { z } from "zod";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
 export interface AppMenuActions {
@@ -172,6 +173,8 @@ export interface AppCommandDefinition {
   agent?: boolean;
   /** Hint for CLI output formatting: json (pretty-print), text (raw), void (silent on success). */
   returns?: "json" | "text" | "void";
+  /** Zod schema for command arguments. Enables validation, --help generation, and OpenAPI accuracy. */
+  params?: z.ZodType;
 }
 
 interface MenuDefinition {
@@ -543,7 +546,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "system",
     actionKey: "setTheme",
     api: true,
-    agent: true
+    agent: true,
+    returns: "json",
+    params: z.object({
+      name: z.string().describe("Theme name"),
+    })
   },
   {
     id: "app.quit",
@@ -600,7 +607,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "moveWindowById",
     api: true,
     agent: true,
-    returns: "void"
+    returns: "void",
+    params: z.object({
+      id: z.number().describe("Window ID from GET /state"),
+      x: z.number().describe("Absolute X coordinate"),
+      y: z.number().describe("Absolute Y coordinate"),
+    })
   },
   {
     id: "window.resize",
@@ -610,7 +622,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "resizeWindowById",
     api: true,
     agent: true,
-    returns: "void"
+    returns: "void",
+    params: z.object({
+      id: z.number().describe("Window ID from GET /state"),
+      width: z.number().describe("New width in columns"),
+      height: z.number().describe("New height in rows"),
+    })
   },
   {
     id: "desktop.clear-all",
@@ -824,7 +841,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Figlet Banner" },
     api: true,
-    agent: true
+    agent: true,
+    returns: "json",
+    params: z.object({
+      text: z.string().describe("Text to render as FIGlet"),
+      font: z.string().optional().describe("FIGlet font name"),
+    })
   },
   {
     id: "figlet.fonts",
@@ -1092,6 +1114,11 @@ function byPlacementOrder(
 }
 
 /** Project static catalog data into normalised command descriptors. */
+/** Look up a raw command definition by id (includes params schema). */
+export function getCommandDefinition(id: string): AppCommandDefinition | undefined {
+  return APP_COMMANDS.find((c) => c.id === id);
+}
+
 export function listAppCommands(): AppCommandDescriptor[] {
   return APP_COMMANDS.map((command) => ({
     id: command.id,
