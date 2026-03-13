@@ -493,6 +493,7 @@ function renderScene(
   playerX: number, playerY: number,
   tick: number,
   worldObjs: WorldObj[],
+  npcList?: { x: number; y: number; sprite: { ch: string; fg: number; bg: number }[] }[],
 ): Sample[] {
   // Create depth buffer
   const buf: Sample[] = new Array(sw * sh);
@@ -781,6 +782,38 @@ function renderScene(
     }
   }
 
+  // ─── NPC sprites ──────────────────────────────────────
+  if (npcList) {
+    for (const npc of npcList) {
+      const ndx = npc.x - cam.x, ndy = npc.y - cam.y;
+      const nDist = Math.sqrt(ndx * ndx + ndy * ndy);
+      if (nDist > viewRange) continue;
+      const nh = getH(terrain, Math.floor(npc.x), Math.floor(npc.y));
+      const nz = nh / heightScale;
+      for (let row = 0; row < npc.sprite.length; row++) {
+        const cell = npc.sprite[row];
+        const rz = nz + (npc.sprite.length - row) * 1.5;
+        const proj = projectPoint(npc.x, npc.y, rz, cam, sw, sh);
+        for (let px = 0; px < 2; px++) {
+          const bx = proj.sx + px;
+          if (bx < 0 || bx >= sw || proj.sy < 0 || proj.sy >= sh) continue;
+          const bidx = proj.sy * sw + bx;
+          const yr2 = cam.yaw * Math.PI / 180;
+          const npcDepth = ndx * Math.sin(yr2) + ndy * Math.cos(yr2);
+          if (npcDepth > buf[bidx].depth) {
+            buf[bidx] = {
+              depth: npcDepth,
+              glyph: cell.ch,
+              fg: cell.fg,
+              bg: cell.bg === 16 ? buf[bidx].bg : cell.bg, // 16 = rgb6(0,0,0) = transparent
+              flags: 2,
+            };
+          }
+        }
+      }
+    }
+  }
+
   // ─── Minimap overlay — top-right corner ────────────────
   const mmSize = 16;
   const mmOx = sw - mmSize - 2, mmOy = 2;
@@ -919,6 +952,51 @@ function openAsciicker(host: MicroappHost) {
   const terrain = genTerrain(256, 256, worldSeed);
   const worldObjs = placeObjects(terrain, worldSeed);
 
+  // ─── NPC entities — patrol the terrain ────────────────
+  interface NPC {
+    x: number; y: number;
+    homeX: number; homeY: number;
+    dx: number; dy: number;
+    sprite: { ch: string; fg: number; bg: number }[];
+    name: string;
+    patrolRadius: number;
+  }
+
+  const npcs: NPC[] = [];
+  const npcSprites = [
+    { name: "Villager", ch: "☺", fg: rgb6(5, 4, 2), bg: rgb6(3, 2, 1), cells: [
+      { ch: "○", fg: rgb6(5, 4, 2), bg: rgb6(0, 0, 0) },
+      { ch: "╬", fg: rgb6(2, 2, 4), bg: rgb6(0, 0, 0) },
+      { ch: "∏", fg: rgb6(3, 2, 1), bg: rgb6(0, 0, 0) },
+    ]},
+    { name: "Guard", ch: "☻", fg: rgb6(4, 4, 4), bg: rgb6(2, 0, 0), cells: [
+      { ch: "▲", fg: rgb6(4, 4, 4), bg: rgb6(0, 0, 0) },
+      { ch: "╬", fg: rgb6(4, 0, 0), bg: rgb6(0, 0, 0) },
+      { ch: "∏", fg: rgb6(3, 2, 1), bg: rgb6(0, 0, 0) },
+    ]},
+    { name: "Merchant", ch: "$", fg: rgb6(5, 5, 0), bg: rgb6(3, 2, 0), cells: [
+      { ch: "♦", fg: rgb6(5, 5, 0), bg: rgb6(0, 0, 0) },
+      { ch: "╬", fg: rgb6(4, 3, 0), bg: rgb6(0, 0, 0) },
+      { ch: "∏", fg: rgb6(3, 2, 1), bg: rgb6(0, 0, 0) },
+    ]},
+  ];
+
+  // Place NPCs on grass/sand areas
+  for (let i = 0; i < 12; i++) {
+    const sx = Math.floor(hash2d(i * 97, worldSeed * 3, 77) * (terrain.w - 40)) + 20;
+    const sy = Math.floor(hash2d(worldSeed * 5, i * 61, 88) * (terrain.h - 40)) + 20;
+    const b = getBiome(terrain, sx, sy);
+    if (b !== Biome.GRASS && b !== Biome.SAND && b !== Biome.FOREST) continue;
+    const spriteType = npcSprites[i % npcSprites.length];
+    npcs.push({
+      x: sx, y: sy, homeX: sx, homeY: sy,
+      dx: (hash2d(i, worldSeed, 33) - 0.5) * 0.3,
+      dy: (hash2d(worldSeed, i, 44) - 0.5) * 0.3,
+      sprite: spriteType.cells, name: spriteType.name,
+      patrolRadius: 5 + Math.floor(hash2d(i * 7, worldSeed, 55) * 8),
+    });
+  }
+
   // Find grass starting position
   let startX = 128, startY = 128;
   outer: for (let r = 0; r < 30; r++) {
@@ -1002,8 +1080,28 @@ function openAsciicker(host: MicroappHost) {
     cam.y += (playerY - cam.y) * 0.15;
     cam.z += (targetZ - cam.z) * 0.1;
 
+    // Update NPCs — simple patrol AI
+    for (const npc of npcs) {
+      npc.x += npc.dx;
+      npc.y += npc.dy;
+      // Bounce off patrol radius
+      const distFromHome = Math.sqrt((npc.x - npc.homeX) ** 2 + (npc.y - npc.homeY) ** 2);
+      if (distFromHome > npc.patrolRadius) {
+        npc.dx = (npc.homeX - npc.x) * 0.05;
+        npc.dy = (npc.homeY - npc.y) * 0.05;
+      }
+      // Random direction change
+      if (hash2d(tick + npc.homeX, npc.homeY, 99) < 0.02) {
+        npc.dx = (hash2d(tick, npc.homeX, 11) - 0.5) * 0.3;
+        npc.dy = (hash2d(npc.homeY, tick, 22) - 0.5) * 0.3;
+      }
+      // Clamp to terrain
+      npc.x = Math.max(2, Math.min(terrain.w - 3, npc.x));
+      npc.y = Math.max(2, Math.min(terrain.h - 3, npc.y));
+    }
+
     // Render 3D scene
-    const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs);
+    const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs, npcs);
     const dayProg = (tick * 0.003) % 1;
     const sunElev = Math.sin(dayProg * Math.PI * 2) * 0.5 + 0.5;
     const ansi = bufferToAnsi(buf, w, h, tick, sunElev);
@@ -1062,6 +1160,8 @@ function openAsciicker(host: MicroappHost) {
       zoom: cam.zoom,
       worldSeed,
       worldSize: `${terrain.w}x${terrain.h}`,
+      npcCount: npcs.length,
+      objectCount: worldObjs.length,
       tick,
     };
   });
