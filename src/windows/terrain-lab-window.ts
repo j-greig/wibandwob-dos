@@ -36,6 +36,20 @@ import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
 
+// ANSI colour codes for sidebar
+const A = {
+  r:   "\x1b[0m",
+  b:   "\x1b[1m",
+  dim: "\x1b[2m",
+  cyn: "\x1b[96m",
+  grn: "\x1b[92m",
+  yel: "\x1b[93m",
+  wht: "\x1b[97m",
+  gry: "\x1b[90m",
+  mag: "\x1b[95m",
+  red: "\x1b[91m",
+} as const;
+
 export function openTerrainLabWindow(deps: BaseWindowDeps): void {
   const frame = deps.windowManager.createFrame("Terrain Lab", "terrain-lab");
 
@@ -90,34 +104,43 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
         right: `${modeIcon} ${s.mode.toUpperCase()}`,
       });
 
-      // Build rich info panel
-      const sep = "\u2500".repeat(18);
+      // Build rich info panel with ANSI colours
+      const sep = `${A.gry}${"─".repeat(20)}${A.r}`;
+      const label = (icon: string, text: string) => `  ${A.cyn}${icon} ${text}${A.r}`;
+      const val = (text: string) => `  ${A.wht}${text}${A.r}`;
+      const key = (k: string, desc: string) => `  ${A.yel}${k.padEnd(4)}${A.gry}${desc}${A.r}`;
+
+      // Mode colour
+      const modeCol = s.mode === "chaos" ? A.red : s.mode === "order" ? A.grn : A.mag;
+
       infoText = [
         "",
-        `  ${modeIcon} MODE`,
-        `  ${s.mode}`,
+        label(modeIcon, "MODE"),
+        `  ${modeCol}${A.b}${s.mode.toUpperCase()}${A.r}`,
         "",
         sep,
         "",
-        `  ${terrainIcon} TERRAIN`,
-        `  ${s.terrain}`,
+        label(terrainIcon, "TERRAIN"),
+        val(s.terrain),
         "",
         sep,
         "",
-        `  \u25A3 PARAMS`,
-        `  levels:  ${s.levels}`,
-        `  seed:    ${s.seed}`,
+        label("\u25A3", "PARAMS"),
+        `  ${A.gry}levels${A.r}  ${A.wht}${s.levels}${A.r}`,
+        `  ${A.gry}seed${A.r}    ${A.wht}${s.seed}${A.r}`,
         "",
         sep,
         "",
-        `  \u2328 KEYS`,
-        `  m   cycle mode`,
-        `  t   next terrain`,
-        `  r   reseed`,
-        `  +/- levels`,
-        `  s   save frame`,
+        label("\u2328", "KEYS"),
+        key("m", "cycle mode"),
+        key("t", "next terrain"),
+        key("r", "reseed"),
+        key("+/-", "levels"),
+        key("s", "save frame"),
       ].join("\n");
-      infoBlock.update({ text: infoText });
+
+      // Set content directly to preserve ANSI codes
+      (infoBlock.node as any).setContent(infoText);
       statusBar.update({
         left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
       });
