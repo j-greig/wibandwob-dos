@@ -90,9 +90,10 @@ function openStudio(host: MicroappHost) {
     const font = w >= 80 ? "slant" : undefined;
     try {
       const art = font ? renderFiglet("LLM ORCH", font) : "═══ LLM ORCH STUDIO ═══";
-      headerBox.setContent(art);
+      const subtitle = "  wib ↔ wob conversation orchestrator";
+      headerBox.setContent(art + "\n" + subtitle);
     } catch {
-      headerBox.setContent("═══ LLM ORCH STUDIO ═══");
+      headerBox.setContent("═══ LLM ORCH STUDIO ═══\n  wib ↔ wob conversation orchestrator");
     }
   }
 
@@ -214,7 +215,7 @@ function openStudio(host: MicroappHost) {
   ], { gap: 0 });
 
   const left = createStack(win.body, [
-    { key: "header", basis: 5, part: createNodePart(headerBox) },
+    { key: "header", basis: 6, part: createNodePart(headerBox) },
     { key: "topicControls", basis: 6, part: topicControls },
     { key: "banner", basis: 1, part: createNodePart(statusBanner) },
     { key: "actions", basis: 1, part: actionBar },
@@ -231,6 +232,12 @@ function openStudio(host: MicroappHost) {
     { key: "left", basis: "3fr", part: left },
     { key: "right", basis: "2fr", part: right },
   ], { gap: 1 });
+
+  // Seed idle state with atmospheric placeholder messages
+  convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
+  convoLog.append({ text: "Press ▶ RUN to start Wib & Wob talking.", severity: "info" });
+  stepsLog.append({ text: "─── orchestrator idle ───", severity: "info" });
+  stepsLog.append({ text: "Ready to launch cargo run --release", severity: "info" });
 
   refreshSettings();
   refreshHeader();
