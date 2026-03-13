@@ -155,6 +155,15 @@ bun run ww health
 alias ww='bun run /path/to/wibandwob-dos/src/cli/ww.ts'
 ```
 
+### Name conflicts
+
+`ww` has no PATH conflicts — no Homebrew formula, no common Unix tool,
+no man page. Package registries have squatted names (npm: abandoned
+promise lib, PyPI: Python builtins wrapper, crates.io: minimal) but
+none install a `ww` binary. Safe for local alias use.
+
+If publishing to npm, use a scoped name: `@wibwob/ww` or `wibwob-cli`.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -163,6 +172,43 @@ alias ww='bun run /path/to/wibandwob-dos/src/cli/ww.ts'
 | 1 | Error (API unreachable, command not found, server error) |
 
 Errors are JSON on stderr: `{"error": 404, "detail": {...}}`
+
+## Generating documentation
+
+The CLI is auto-built from the command catalog — it has no hardcoded
+command list. So its docs must also be generated from the live API.
+
+```bash
+# Full command reference (markdown table)
+ww commands | jq -r '
+  ["| Command | Description |", "| --- | --- |"] +
+  [.[] | "| `\(.id)` | \(.description // "-") |"]
+  | .[]'
+
+# Grouped by domain
+ww commands | jq -r '
+  group_by(.id | split(".")[0])[] |
+  "\n## \(.[0].id | split(".")[0])\n" +
+  ([.[] | "- `\(.id)` — \(.description // "-")"] | join("\n"))'
+
+# Just the IDs, for a quick cheatsheet
+ww commands -q | sort
+
+# Write a full reference to a file
+ww commands | jq -r '
+  "# ww command reference\n\nGenerated: \(now | todate)\n\n" +
+  "| Command | Description | Surfaces |\n| --- | --- | --- |\n" +
+  ([.[] | "| `\(.id)` | \(.description // "-") | \(.surfaces | join(", ")) |"] | join("\n"))
+  ' > src/cli/COMMANDS.md
+```
+
+The key insight: because `ww commands` returns everything the API knows
+(including dynamically registered module commands), the generated docs
+are always complete and current. No manual sync required.
+
+Future improvement: if commands gain Zod schemas for their args, the
+generated docs could include per-command flag tables with types and
+defaults. Until then, the `description` field is the only contract.
 
 ## Test suite
 
