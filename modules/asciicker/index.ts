@@ -76,7 +76,7 @@ const MATERIALS: Record<Biome, Material> = {
     bgLight: rgb6(5, 4, 2), bgDark: rgb6(4, 3, 1),
   },
   [Biome.GRASS]: {
-    topGlyphs: [".", ";", ",", "'", "\"", "`", ":", "∴"],
+    topGlyphs: [".", ";", ",", "'", "\"", "`", ":", "∴", "·", "⌂", "♠"],
     sideGlyphs: ["▒", "░", "▓", "█"],
     fgLight: rgb6(1, 4, 0), fgMid: rgb6(0, 3, 0), fgDark: rgb6(0, 2, 0),
     bgLight: rgb6(0, 3, 0), bgDark: rgb6(0, 2, 0),
@@ -306,6 +306,127 @@ function addStructures(t: Terrain, seed: number) {
   }
 }
 
+// ─── World objects (trees, bushes, rocks) ───────────────────
+
+const enum ObjKind { TREE = 0, PINE = 1, BUSH = 2, ROCK_OBJ = 3, HOUSE = 4 }
+
+interface WorldObj {
+  x: number; y: number;
+  kind: ObjKind;
+  size: number; // 0-1 scale factor
+}
+
+// Multi-cell sprite definitions for objects
+// Each row is bottom-to-top; cells have { ch, fg, bg } or null (transparent)
+interface ObjSprite {
+  rows: ({ ch: string; fg: number; bg: number } | null)[][];
+}
+
+function makeObjSprites(): Record<ObjKind, ObjSprite> {
+  const trunkFg = rgb6(3, 2, 0);
+  const trunkBg = rgb6(2, 1, 0);
+  const leafFg = rgb6(0, 4, 0);
+  const leafBg = rgb6(0, 3, 0);
+  const leafLt = rgb6(1, 5, 0);
+  const leafDk = rgb6(0, 2, 0);
+  const pineFg = rgb6(0, 3, 1);
+  const pineBg = rgb6(0, 2, 0);
+  const bushFg = rgb6(1, 4, 0);
+  const bushBg = rgb6(0, 3, 0);
+  const rockFg = grey(12);
+  const rockBg = grey(8);
+  const wallFg = rgb6(4, 3, 2);
+  const wallBg = rgb6(3, 2, 1);
+  const roofFg = rgb6(4, 1, 0);
+  const roofBg = rgb6(3, 1, 0);
+
+  const c = (ch: string, fg: number, bg: number) => ({ ch, fg, bg });
+  const _ = null;
+
+  return {
+    [ObjKind.TREE]: {
+      // 5 rows, 3 wide — bottom-to-top
+      rows: [
+        [_, c("║", trunkFg, trunkBg), _],                         // trunk base
+        [_, c("║", trunkFg, trunkBg), _],                         // trunk mid
+        [c("◣", leafDk, leafBg), c("♣", leafFg, leafBg), c("◢", leafDk, leafBg)], // canopy low
+        [c("▓", leafLt, leafBg), c("♠", leafFg, leafBg), c("▓", leafLt, leafBg)], // canopy mid
+        [_, c("▲", leafLt, leafFg), _],                           // canopy top
+      ],
+    },
+    [ObjKind.PINE]: {
+      rows: [
+        [_, c("│", trunkFg, trunkBg), _],
+        [c("░", pineFg, pineBg), c("▲", pineFg, pineBg), c("░", pineFg, pineBg)],
+        [_, c("▲", pineFg, pineBg), _],
+        [_, c("△", pineFg, pineBg), _],
+      ],
+    },
+    [ObjKind.BUSH]: {
+      rows: [
+        [c("░", bushFg, bushBg), c("♣", bushFg, bushBg), c("░", bushFg, bushBg)],
+        [_, c("•", bushFg, bushBg), _],
+      ],
+    },
+    [ObjKind.ROCK_OBJ]: {
+      rows: [
+        [c("▓", rockFg, rockBg), c("█", rockFg, rockBg), c("▓", rockFg, rockBg)],
+        [_, c("▲", rockFg, rockBg), _],
+      ],
+    },
+    [ObjKind.HOUSE]: {
+      rows: [
+        [c("▌", wallFg, wallBg), c("▐", wallFg, wallBg), c("▌", wallFg, wallBg)],
+        [c("█", wallFg, wallBg), c("░", wallFg, wallBg), c("█", wallFg, wallBg)],
+        [c("▓", roofFg, roofBg), c("▲", roofFg, roofBg), c("▓", roofFg, roofBg)],
+        [_, c("△", roofFg, roofBg), _],
+      ],
+    },
+  };
+}
+
+const OBJ_SPRITES = makeObjSprites();
+
+function placeObjects(t: Terrain, seed: number): WorldObj[] {
+  const objs: WorldObj[] = [];
+
+  for (let y = 3; y < t.h - 3; y += 2) {
+    for (let x = 3; x < t.w - 3; x += 2) {
+      const cell = t.cells[y * t.w + x];
+      const rng = hash2d(x * 17 + seed, y * 31 + seed, seed + 7);
+
+      if (cell.biome === Biome.FOREST) {
+        if (rng < 0.45) {
+          objs.push({ x, y, kind: rng < 0.25 ? ObjKind.TREE : ObjKind.PINE, size: 0.7 + rng * 0.6 });
+        }
+      } else if (cell.biome === Biome.GRASS) {
+        if (rng < 0.12) {
+          objs.push({ x, y, kind: ObjKind.TREE, size: 0.6 + rng * 0.5 });
+        } else if (rng < 0.2) {
+          objs.push({ x, y, kind: ObjKind.BUSH, size: 0.5 + rng * 0.5 });
+        }
+      } else if (cell.biome === Biome.ROCK || cell.biome === Biome.MOUNTAIN) {
+        if (rng < 0.08) {
+          objs.push({ x, y, kind: ObjKind.ROCK_OBJ, size: 0.8 + rng * 0.3 });
+        }
+      }
+    }
+  }
+
+  // Place houses near structures (use existing structure positions)
+  for (let y = 10; y < t.h - 10; y += 8) {
+    for (let x = 10; x < t.w - 10; x += 8) {
+      const cell = t.cells[y * t.w + x];
+      const rng = hash2d(x * 43 + seed, y * 67, seed + 99);
+      if ((cell.biome === Biome.GRASS || cell.biome === Biome.SAND) && rng < 0.04) {
+        objs.push({ x, y, kind: ObjKind.HOUSE, size: 1 });
+      }
+    }
+  }
+
+  return objs;
+}
+
 function getH(t: Terrain, x: number, y: number): number {
   if (x < 0 || x >= t.w || y < 0 || y >= t.h) return 0;
   return t.cells[y * t.w + x].height;
@@ -352,8 +473,9 @@ function projectPoint(
   const sin30 = 0.5;  // sin(30°)
   const cos30 = 0.866; // cos(30°)
 
-  const screenX = tx * cam.zoom;
-  const screenY = -ty * sin30 * cam.zoom - rz * cos30 * cam.zoom;
+  const scale = cam.zoom * 2; // base scale factor — each world unit = 2 screen columns
+  const screenX = tx * scale;
+  const screenY = -ty * sin30 * scale - rz * cos30 * scale;
   const depth = ty; // depth for z-sorting
 
   const sx = Math.round(sw / 2 + screenX);
@@ -370,6 +492,7 @@ function renderScene(
   sw: number, sh: number,
   playerX: number, playerY: number,
   tick: number,
+  worldObjs: WorldObj[],
 ): Sample[] {
   // Create depth buffer
   const buf: Sample[] = new Array(sw * sh);
@@ -378,7 +501,7 @@ function renderScene(
   }
 
   // Determine visible world range
-  const viewRange = Math.floor(18 / cam.zoom) + 6;
+  const viewRange = Math.floor(22 / cam.zoom) + 10;
   const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
   // Fog parameters — fade to grey at distance
@@ -438,11 +561,20 @@ function renderScene(
     const dot = (nx/nLen * lightX + ny/nLen * lightY + nz/nLen * lightZ);
     const diffuse = Math.max(0.15, Math.min(1, dot * 0.5 + 0.5));
 
-    // Choose colour based on lighting, then apply fog
+    // Choose colour based on lighting — use fg+bg dithering for texture
+    // Add per-cell variation to create the rich look of the original
+    const cellNoise = hash2d(wx * 7, wy * 13, 42);
     let fg: number, bg: number;
-    if (diffuse > 0.65) { fg = mat.fgLight; bg = mat.bgLight; }
-    else if (diffuse > 0.35) { fg = mat.fgMid; bg = mat.bgDark; }
-    else { fg = mat.fgDark; bg = mat.bgDark; }
+    if (diffuse > 0.65) {
+      fg = cellNoise > 0.5 ? mat.fgLight : mat.fgMid;
+      bg = cellNoise > 0.3 ? mat.bgLight : mat.bgDark;
+    } else if (diffuse > 0.35) {
+      fg = cellNoise > 0.5 ? mat.fgMid : mat.fgDark;
+      bg = mat.bgDark;
+    } else {
+      fg = mat.fgDark;
+      bg = cellNoise > 0.5 ? mat.bgDark : mat.bgLight;
+    }
     // Fog blend — lerp ANSI indices towards fog colour at distance
     if (fogT > 0.1) {
       fg = fogT > 0.8 ? fogColour : fg;
@@ -526,6 +658,56 @@ function renderScene(
     }
   }
 
+  // ─── Draw world objects (trees, bushes, etc.) ────────────
+  // Filter to visible objects and sort by depth (back to front)
+  const visibleObjs: { obj: WorldObj; depth: number; dist: number }[] = [];
+  for (const obj of worldObjs) {
+    const dx = obj.x - cam.x, dy = obj.y - cam.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > viewRange) continue;
+    const yr = cam.yaw * Math.PI / 180;
+    const depth = dx * Math.sin(yr) + dy * Math.cos(yr);
+    visibleObjs.push({ obj, depth, dist });
+  }
+  visibleObjs.sort((a, b) => b.depth - a.depth);
+
+  for (const { obj, depth: objDepth, dist } of visibleObjs) {
+    const sprite = OBJ_SPRITES[obj.kind];
+    if (!sprite) continue;
+    const fogT = dist <= fogStart ? 0 : dist >= fogEnd ? 1 : (dist - fogStart) / (fogEnd - fogStart);
+    if (fogT > 0.85) continue; // too fogged to see
+
+    const oh = getH(terrain, obj.x, obj.y);
+    const baseZ = oh / heightScale;
+
+    // Render each row of the sprite from bottom to top
+    for (let row = 0; row < sprite.rows.length; row++) {
+      const rowData = sprite.rows[row];
+      const rowZ = baseZ + (row + 1) * 2.2 * obj.size;
+      const proj = projectPoint(obj.x, obj.y, rowZ, cam, sw, sh);
+
+      for (let cx = 0; cx < rowData.length; cx++) {
+        const cell = rowData[cx];
+        if (!cell) continue;
+        const screenX = proj.sx + (cx - 1) * 2; // centre the 3-wide sprite, 2-wide columns
+        for (let px = 0; px < 2; px++) {
+          const bx = screenX + px;
+          if (bx < 0 || bx >= sw || proj.sy < 0 || proj.sy >= sh) continue;
+          const bidx = proj.sy * sw + bx;
+          if (objDepth > buf[bidx].depth) {
+            let fg = cell.fg, bg = cell.bg;
+            // Apply fog
+            if (fogT > 0.3) {
+              fg = fogT > 0.6 ? fogColour : fg;
+              bg = fogT > 0.5 ? fogColour : bg;
+            }
+            buf[bidx] = { depth: objDepth, glyph: cell.ch, fg, bg, flags: 1 };
+          }
+        }
+      }
+    }
+  }
+
   // Draw player sprite — multi-cell coloured character from asciicker
   const ph = getH(terrain, Math.floor(playerX), Math.floor(playerY));
   const pz = ph / heightScale + 4; // sprite floats above terrain
@@ -560,6 +742,37 @@ function renderScene(
       const si = shadowProj.sy * sw + shadowProj.sx;
       if (buf[si].flags !== 2) {
         buf[si] = { ...buf[si], glyph: "◦", fg: grey(3) };
+      }
+    }
+  }
+
+  // ─── Water reflections ────────────────────────────────────
+  // For each water cell, look "above" it in screen space for terrain
+  // and dim-copy it as a reflection
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const idx = y * sw + x;
+      const s = buf[idx];
+      if (s.flags !== 4) continue; // only water cells
+
+      // Look for the nearest terrain cell above this in screen space
+      for (let ry = 1; ry <= 6; ry++) {
+        const sourceY = y - ry * 2; // reflection source is above
+        if (sourceY < 0) break;
+        const sourceIdx = sourceY * sw + x;
+        const source = buf[sourceIdx];
+        if (source.flags === 1 || source.flags === 2) {
+          // Dim the reflection — shift colours toward water blue
+          const waterFg = rgb6(0, 1, 3);
+          const reflFg = (ry <= 2) ? source.fg : waterFg;
+          buf[idx] = {
+            ...s,
+            glyph: ry <= 3 ? source.glyph : s.glyph,
+            fg: reflFg,
+            bg: rgb6(0, 1, Math.max(2, 4 - ry)),
+          };
+          break;
+        }
       }
     }
   }
@@ -613,10 +826,9 @@ function bufferToAnsi(buf: Sample[], sw: number, sh: number, tick: number): stri
         line += s.glyph;
       }
     }
-    if (lastFg !== -1 || lastBg !== -1) line += "\x1b[0m";
     lines.push(line);
   }
-  return lines.join("\n");
+  return lines.join("\n") + "\x1b[0m";
 }
 
 // ─── Module setup ───────────────────────────────────────────
@@ -634,6 +846,8 @@ export default function setup(host: MicroappHost) {
 
 function openAsciicker(host: MicroappHost) {
   const win = host.createWindow({ title: "Asciicker", width: 80, height: 32 });
+  // Defer maximize — registration is async, need it to complete first
+  setTimeout(() => win.maximize(), 50);
   const timers = new Set<ReturnType<typeof setInterval>>();
 
   const canvas = blessed.box({
@@ -663,6 +877,7 @@ function openAsciicker(host: MicroappHost) {
   // World generation
   const worldSeed = Math.floor(Math.random() * 100000);
   const terrain = genTerrain(256, 256, worldSeed);
+  const worldObjs = placeObjects(terrain, worldSeed);
 
   // Find grass starting position
   let startX = 128, startY = 128;
@@ -681,7 +896,7 @@ function openAsciicker(host: MicroappHost) {
   let playerX = startX, playerY = startY;
   const cam: Camera = {
     x: startX, y: startY, z: getH(terrain, startX, startY) / 8,
-    yaw: 45, pitch: 30, zoom: 1.2,
+    yaw: 45, pitch: 30, zoom: 1.0,
   };
   let tick = 0;
   const keys = new Set<string>();
@@ -725,7 +940,7 @@ function openAsciicker(host: MicroappHost) {
     cam.z += (targetZ - cam.z) * 0.12;
 
     // Render 3D scene
-    const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick);
+    const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs);
     const ansi = bufferToAnsi(buf, w, h, tick);
     canvas.setContent(ansi);
 

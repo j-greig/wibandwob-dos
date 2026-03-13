@@ -1,0 +1,1 @@
+autoresearch/asciicker/autoresearch.md

@@ -176,6 +176,8 @@ export interface MicroappWindowHandle {
 
   focus(): void;
   close(): void;
+  /** Maximize the window to fill the desktop. */
+  maximize(): void;
   /** Redirect window focus to a specific child widget (e.g. a terminal emulator). */
   setFocusTarget(widget: blessed.Widgets.BlessedElement): void;
   /** Update the window's title bar text. */
@@ -283,6 +285,7 @@ function createMicroappHost(
           frame.focus();
         },
         close() { windowManager.closeWindow(frame.id); },
+        maximize() { windowManager.toggleMaximize(frame.id); },
         setFocusTarget(widget) { frame.setFocusTarget(widget as any); },
         setTitle(title) {
           frame.title = title;

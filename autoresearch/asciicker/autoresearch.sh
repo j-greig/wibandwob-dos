@@ -48,6 +48,11 @@ fi
 
 echo "Window ID: $SC_ID"
 
+# 3b. Maximize window for full resolution scoring
+curl -sf -X POST http://127.0.0.1:8099/windows/maximize \
+  -H 'Content-Type: application/json' -d "{\"id\":$SC_ID}" > /dev/null 2>&1
+sleep 0.5
+
 # 4. Wait for rendering then capture frames
 echo "--- capturing frames ---"
 sleep 4
