@@ -1,1 +1,1 @@
-autoresearch/code-editor/autoresearch.checks.sh
+autoresearch/contour-studio/autoresearch.checks.sh

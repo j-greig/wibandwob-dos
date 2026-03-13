@@ -1,1 +1,1 @@
-autoresearch/code-editor/autoresearch.md
+autoresearch/contour-studio/autoresearch.md
