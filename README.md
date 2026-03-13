@@ -20,6 +20,14 @@ An AI agent (Wib & Wob — a dual-voiced symbient) coinhabits the desktop as a n
 
 It is not a chat wrapper with a pretty face. It is a shared space.
 
+## Why does this exist?
+
+WibWob-DOS started as an experiment: what if an AI agent wasn't a sidebar or a chat bubble, but a full co-inhabitant of the same operating system as a human? Same windows, same menus, same desktop. Equal access.
+
+The result is something between an IDE, a demoscene, and a symbiosis experiment. There's a VJ timeline system that choreographs window layouts to music. There's a generative fiction engine (the Backrooms) that creates multi-turn AI narratives seeded by ASCII art. There's an IRC-backed multiplayer world chat. There's a cat.
+
+It runs in any terminal that supports 256 colours and mouse events. No Electron. No browser. Just text.
+
 ---
 
 ## The Apps
@@ -77,6 +85,30 @@ Plays MP3s with real-time visualisation driven by actual FFT analysis — not fa
 Draw UI mockups in the terminal. Boxes, text labels, lines, arrows, connectors, tables, modals — all placed with keyboard shortcuts on an infinite ASCII canvas. Export and share.
 
 ![Wiretext — TUI wireframing tool with component palette](screenshots/apps/wiretext.png)
+
+### And the rest
+
+The screenshots above are the polished ones. There are 22+ microapps in total:
+
+| App | What it is |
+|-----|-----------|
+| **Spore Clock** | A living mycelial timepiece — fungal colonies compete and grow as the hours pass |
+| **LLM Orch Studio** | Watch two LLM voices (Wib and Wob) converse live in a split-pane terminal |
+| **Symbient Twitter** | A fictional social media feed populated by AI-generated symbient posts |
+| **Tide Pool** | Five ASCII species competing in a bounded ecosystem simulation |
+| **Poetry Clock** | A clock that tells the time in AI-generated poems (plain, liminal, or scramble voice) |
+| **GlitchBox** | Symbient embodiment — a dancing figure with generative art backgrounds |
+| **Terrarium Life** | Four-biome ASCII ecosystem with weather, seasons, and species interactions |
+| **WibWobWorld** | Procedural terrain with 5 render modes, world chatspots, and multiplayer |
+| **World Chatroom** | IRC-backed chat rooms tied to world coordinates |
+| **Zine** | Canvas document viewer — panels from YAML rendered as sub-windows |
+| **§y² Chronicles** | Dense multi-panel narrative visualisation with genealogy |
+| **Terminal** | PTY-backed terminal emulator inside a WibWob-DOS window |
+| **Asciicker** | ASCII 3D world explorer |
+| **Backrooms TV** | Generative fiction engine — AI narratives seeded by ASCII art primers, rendered as TV channels |
+| **Monster Cam** | AI-powered webcam that describes what it sees as ASCII art |
+
+Plus demos: Heartbeat, Hello World, Patchbay Lab, TouchLab, layout stress tests.
 
 ---
 
