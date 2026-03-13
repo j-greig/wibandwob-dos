@@ -686,7 +686,7 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
   for (let y = 0; y < h; y++) {
     const row: string[] = [];
     for (let x = 0; x < w; x++) {
-      const seed = (x * 7 + y * 13 + world.tick) | 0;
+      const seed = (x * 7 + y * 13) | 0;
       row.push(district.bg[Math.abs(seed) % district.bg.length]!);
     }
     grid.push(row);
@@ -804,7 +804,7 @@ function renderStatus(world: World, w: number): string {
   const pauseStr = world.paused ? " || PAUSED" : "";
   const decree = world.decree !== "none" ? ` << ${DECREE_NAMES[world.decree]} >>` : "";
   const left = ` ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
-  const right = " [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
+  const right = " [z]oom [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
 }
@@ -889,6 +889,11 @@ function openAntopolis(host: MicroappHost) {
   const figletText = renderFiglet("ANTOPOLIS", "small");
   const figletH = figletText.split("\n").length;
 
+  // Focus mode: null = all districts, or a specific district ID
+  let focusDistrict: DistrictId | null = null;
+  const focusCycle: (DistrictId | null)[] = [null, "industrial", "residential", "plaza", "mines"];
+  let focusIdx = 0;
+
   const biomeGrid = createGrid(win.body, {
     rows: 2, columns: 2,
     templateRows: ["1fr", "1fr"],
@@ -900,11 +905,13 @@ function openAntopolis(host: MicroappHost) {
   biomeGrid.set({ key: "plaza",       row: 1, column: 0, part: createNodePart(districtBoxes.plaza) });
   biomeGrid.set({ key: "mines",       row: 1, column: 1, part: createNodePart(districtBoxes.mines) });
 
+
+
   const root = createStack(win.body, [
     { key: "figlet",    basis: figletH, part: createNodePart(figletBox) },
     { key: "subtitle",  basis: 1,       part: createNodePart(subtitleBox) },
     { key: "resources", basis: 1,       part: createNodePart(resourceBox) },
-    { key: "districts", basis: "4fr",   part: biomeGrid },
+    { key: "districts", basis: "3fr",   part: biomeGrid },
     { key: "status",    basis: 1,       part: createNodePart(statusBox) },
     { key: "log",       basis: "1fr",   part: createNodePart(logBox) },
   ]);
@@ -917,17 +924,23 @@ function openAntopolis(host: MicroappHost) {
 
     root.layout({ top: 0, left: 0, width: w, height: h });
 
-    // Figlet header
-    const pauseTag = world.paused ? "  || PAUSED" : "";
-    figletBox.setContent(figletText + pauseTag);
+    // Figlet header — hide in focus mode to maximize district space
+    if (focusDistrict) {
+      figletBox.hide();
+      subtitleBox.hide();
+    } else {
+      figletBox.show();
+      subtitleBox.show();
+      const pauseTag = world.paused ? "  || PAUSED" : "";
+      figletBox.setContent(figletText + pauseTag);
 
-    // Subtitle
-    const bldgCount = world.buildings.length;
-    const districtSummary = districtIds.map(id => {
-      const n = world.ants.filter(a => a.district === id).length;
-      return `${DISTRICTS[id].label.split(" ")[0]}:${n}`;
-    }).join("  ");
-    subtitleBox.setContent(` a micro-city for ants with ant technology  --  ${bldgCount} buildings  --  ${districtSummary}`);
+      const bldgCount = world.buildings.length;
+      const districtSummary = districtIds.map(id => {
+        const n = world.ants.filter(a => a.district === id).length;
+        return `${DISTRICTS[id].label.split(" ")[0]}:${n}`;
+      }).join("  ");
+      subtitleBox.setContent(` a micro-city for ants with ant technology  --  ${bldgCount} buildings  --  ${districtSummary}`);
+    }
 
     // Resources
     resourceBox.setContent(renderResources(world, w));
@@ -935,15 +948,52 @@ function openAntopolis(host: MicroappHost) {
     // Status
     statusBox.setContent(renderStatus(world, w));
 
-    // Districts
-    for (const id of districtIds) {
-      const box = districtBoxes[id];
-      const bw = Math.max(1, (Number(box.width) || 10) - 2);
-      const bh = Math.max(1, (Number(box.height) || 5) - 2);
-      box.setContent(renderDistrict(id, bw, bh, world));
-      const count = world.ants.filter(a => a.district === id).length;
-      const buildings = world.buildings.filter(b => b.district === id).length;
-      (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
+    // Districts — handle focus mode
+    if (focusDistrict) {
+      // Focus mode: hide non-focused, expand focused to fill grid area
+      const gridTop = Number(districtBoxes.industrial.top) || 0;
+      const gridLeft = Number(districtBoxes.industrial.left) || 0;
+      // Calculate the full grid area from the 2x2 positions
+      let gridW = w, gridH = h;
+      for (const id of districtIds) {
+        const box = districtBoxes[id];
+        const br = (Number(box.left) || 0) + (Number(box.width) || 0);
+        const bb = (Number(box.top) || 0) + (Number(box.height) || 0);
+        if (br > gridW) gridW = br;
+        if (bb > gridH) gridH = bb;
+      }
+
+      for (const id of districtIds) {
+        if (id === focusDistrict) {
+          const box = districtBoxes[id];
+          // Position to fill the entire grid area
+          box.top = gridTop;
+          box.left = gridLeft;
+          box.width = gridW - gridLeft;
+          box.height = gridH - gridTop;
+          box.show();
+          const bw = Math.max(1, (Number(box.width) || 10) - 2);
+          const bh = Math.max(1, (Number(box.height) || 5) - 2);
+          box.setContent(renderDistrict(id, bw, bh, world));
+          const count = world.ants.filter(a => a.district === id).length;
+          const buildings = world.buildings.filter(b => b.district === id).length;
+          (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ants, ${buildings} bldg] -- FOCUS [z] to cycle `);
+        } else {
+          districtBoxes[id].hide();
+        }
+      }
+    } else {
+      // Overview mode: show all, let grid handle layout
+      for (const id of districtIds) {
+        const box = districtBoxes[id];
+        box.show();
+        const bw = Math.max(1, (Number(box.width) || 10) - 2);
+        const bh = Math.max(1, (Number(box.height) || 5) - 2);
+        box.setContent(renderDistrict(id, bw, bh, world));
+        const count = world.ants.filter(a => a.district === id).length;
+        const buildings = world.buildings.filter(b => b.district === id).length;
+        (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
+      }
     }
 
     // Log with severity prefixes
@@ -1010,6 +1060,16 @@ function openAntopolis(host: MicroappHost) {
         evt(world, "Not enough crystals to build!", "warn");
       }
       render();
+    } else if (key.full === "z") {
+      // Cycle focus: all → industrial → residential → plaza → mines → all
+      focusIdx = (focusIdx + 1) % focusCycle.length;
+      focusDistrict = focusCycle[focusIdx]!;
+      if (focusDistrict) {
+        evt(world, `Zooming into ${DISTRICTS[focusDistrict].label}...`);
+      } else {
+        evt(world, "Overview mode restored.");
+      }
+      render();
     } else if (SPAWN_KEYS[key.full]) {
       const caste = SPAWN_KEYS[key.full]!;
       spawnAnt(world, caste);
@@ -1018,7 +1078,7 @@ function openAntopolis(host: MicroappHost) {
     }
   });
 
-  win.body.key(["p", "+", "=", "-", "_", "e", "b", "1", "2", "3", "4", "5"], () => {});
+  win.body.key(["p", "+", "=", "-", "_", "e", "b", "z", "1", "2", "3", "4", "5"], () => {});
 
   // ── Lifecycle ───────────────────────────────────────────────────────
 
@@ -1026,7 +1086,7 @@ function openAntopolis(host: MicroappHost) {
   win.onResize(render);
 
   win.describeState(() => ({
-    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
+    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${focusDistrict ? ` FOCUS:${DISTRICTS[focusDistrict].label}` : ""}${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
     population: world.ants.length,
     buildings: world.buildings.length,
     techLevel: world.techLevel,
