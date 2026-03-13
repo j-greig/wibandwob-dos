@@ -26,8 +26,8 @@ check() {
 
 # ── A1: Full Zod schema coverage ────────────────────────
 # Count api:true commands that accept args vs those with params schemas
-TOTAL_WITH_ARGS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.description | test("Args:|args:"; "i"))] | length' || echo 0)
-WITH_PARAMS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.params)] | length' || echo 0)
+TOTAL_WITH_ARGS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.description != null and (.description | test("Args:|args:"; "i")))] | length' || echo 0)
+WITH_PARAMS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.params != null)] | length' || echo 0)
 if [ "$TOTAL_WITH_ARGS" -gt 0 ]; then
   COVERAGE=$(( WITH_PARAMS * 100 / TOTAL_WITH_ARGS ))
 else
@@ -81,6 +81,7 @@ fi
 # ── B1: breed.py exists and works ───────────────────────
 BREED_SCRIPT=""
 [ -f scripts/breed.py ] && BREED_SCRIPT="scripts/breed.py"
+[ -f scripts/fx/breed ] && BREED_SCRIPT="scripts/fx/breed"
 [ -f .pi/skills/vj-timeline/scripts/breed.py ] && BREED_SCRIPT=".pi/skills/vj-timeline/scripts/breed.py"
 
 if [ -n "$BREED_SCRIPT" ]; then
@@ -99,7 +100,7 @@ else
 fi
 
 # ── B2: Window-as-pixel mosaic ──────────────────────────
-if [ -f scripts/mosaic.sh ] || [ -f scripts/mosaic.py ]; then
+if [ -f scripts/mosaic.sh ] || [ -f scripts/mosaic.py ] || [ -f scripts/fx/mosaic.sh ] || [ -f scripts/fx/zoo.sh ]; then
   check "B2" "Mosaic script exists" "PASS"
 else
   check "B2" "Mosaic script" "not found"
@@ -133,7 +134,7 @@ else
 fi
 
 # ── B7: JGSBREEDER pipeline ────────────────────────────
-if [ -f scripts/jgsbreeder.sh ] || [ -f scripts/jgsbreeder.py ]; then
+if [ -f scripts/jgsbreeder.sh ] || [ -f scripts/jgsbreeder.py ] || [ -f scripts/fx/jgsbreeder.sh ]; then
   check "B7" "JGSBREEDER pipeline script" "PASS"
 else
   check "B7" "JGSBREEDER pipeline script" "not found"

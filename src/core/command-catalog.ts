@@ -16,6 +16,10 @@ export interface AppMenuActions {
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
   listPrimers: () => unknown;
   smearTextSurface: (args?: Record<string, unknown>) => unknown;
+  fxGlitch: (args?: Record<string, unknown>) => unknown;
+  fxShear: (args?: Record<string, unknown>) => unknown;
+  fxBreed: (args?: Record<string, unknown>) => unknown;
+  fxFlip: (args?: Record<string, unknown>) => unknown;
   openTextFile: (args?: Record<string, unknown>) => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
@@ -367,6 +371,66 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     contextMenu: { windowKinds: ["primer", "reader", "editor"], order: 35 },
     api: true,
     agent: true
+  },
+  // ── FX commands — shell-based text transforms ─────────
+  {
+    id: "fx.glitch",
+    label: "FX: Glitch",
+    description: "Glitch a text file. Args: filePath (string), intensity (number 0-1, default 0.5), seed (number, optional). Opens result as primer.",
+    group: "edit",
+    actionKey: "fxGlitch",
+    api: true,
+    agent: true,
+    returns: "json",
+    params: z.object({
+      filePath: z.string().describe("Source text file path"),
+      intensity: z.number().min(0).max(1).optional().describe("Glitch intensity 0-1"),
+      seed: z.number().optional().describe("Random seed"),
+    })
+  },
+  {
+    id: "fx.shear",
+    label: "FX: Shear",
+    description: "Shear a text file diagonally. Args: filePath (string), skew (number, default 2). Opens result as primer.",
+    group: "edit",
+    actionKey: "fxShear",
+    api: true,
+    agent: true,
+    returns: "json",
+    params: z.object({
+      filePath: z.string().describe("Source text file path"),
+      skew: z.number().optional().describe("Shear displacement per row"),
+    })
+  },
+  {
+    id: "fx.breed",
+    label: "FX: Breed",
+    description: "Breed two text files at the character level. Args: file1 (string), file2 (string), mode (xor|density|blend|random|interleave, default xor), bias (number 0-1, default 0.5). Opens result as primer.",
+    group: "edit",
+    actionKey: "fxBreed",
+    api: true,
+    agent: true,
+    returns: "json",
+    params: z.object({
+      file1: z.string().describe("First source file"),
+      file2: z.string().describe("Second source file"),
+      mode: z.enum(["xor", "density", "blend", "random", "interleave"]).optional().describe("Breed mode"),
+      bias: z.number().min(0).max(1).optional().describe("Weight toward file2"),
+    })
+  },
+  {
+    id: "fx.flip",
+    label: "FX: Flip",
+    description: "Flip a text file. Args: filePath (string), direction (v|h|both, default v). Opens result as primer.",
+    group: "edit",
+    actionKey: "fxFlip",
+    api: true,
+    agent: true,
+    returns: "json",
+    params: z.object({
+      filePath: z.string().describe("Source text file path"),
+      direction: z.enum(["v", "h", "both"]).optional().describe("Flip direction"),
+    })
   },
   {
     id: "editor.open",
