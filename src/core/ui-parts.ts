@@ -11,11 +11,42 @@ import type { FramePlayer } from "../services/animation-service.js";
 import { theme } from "./theme/resolver.js";
 import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.js";
 
+// Re-export form controls
+export {
+  createButton, createCheckbox, createRadioGroup, createSelect,
+  createFilterableList, createFormField, createTextArea,
+} from "./ui-parts-forms.js";
+export type {
+  ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  RadioOption, RadioGroupOptions, RadioGroupHandle,
+  SelectOption, SelectOptions, SelectHandle,
+  ChangeEvent, SelectEvent,
+  FilterableItem, FilterableListOptions, FilterableListHandle,
+  FormFieldOptions, FormFieldHandle,
+  TextAreaOptions, TextAreaHandle,
+} from "./ui-parts-forms.js";
+
+// Re-export feedback components
+export { createProgressBar, createSpinner, createToast } from "./ui-parts-feedback.js";
+export type {
+  ProgressBarOptions, ProgressBarHandle,
+  SpinnerOptions, SpinnerHandle,
+  ToastSeverity, ToastOptions, ToastHandle,
+} from "./ui-parts-feedback.js";
+
+// Re-export data display components
+export { createKeyValuePanel, createLogView, createDataTable } from "./ui-parts-data.js";
+export type {
+  KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
+  LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+  DataColumn, DataTableOptions, DataTableHandle,
+} from "./ui-parts-data.js";
+
 /** @primitive */
 export type Rect = { top: number; left: number; width: number; height: number };
 
 /** @primitive */
-export type UiPart<Props = void> = {
+export type LayoutPart<Props = void> = {
   node: blessed.Widgets.BoxElement;
   layout(rect: Rect): void;
   update(props: Props): void;
@@ -24,11 +55,45 @@ export type UiPart<Props = void> = {
 };
 
 /** @primitive */
-export type StackChild = {
+export type FlexBasis = number | `${number}fr`;
+
+/** @primitive */
+export type TrackSize = number | `${number}fr`;
+
+/** @primitive — reserved for future use; not yet applied by layout functions. */
+export type AxisAlign = "start" | "center" | "end";
+
+/** @primitive — reserved for future use; not yet applied by layout functions. */
+export type Alignment = {
+  justify?: AxisAlign; // horizontal (not yet implemented)
+  align?: AxisAlign;   // vertical (not yet implemented)
+};
+
+/** @primitive */
+export type Gap = number | {
+  row?: number;
+  column?: number;
+};
+
+/** @primitive */
+export type FlexChild = {
   key: string;
-  basis: number | string;
-  part: UiPart<any>;
+  basis: FlexBasis;
+  part: LayoutPart<any>;
   visible?: () => boolean;
+  align?: Alignment;
+};
+
+/** @primitive */
+export type GridChild = {
+  key: string;
+  row: number;
+  column: number;
+  rowSpan?: number;
+  columnSpan?: number;
+  part: LayoutPart<any>;
+  visible?: () => boolean;
+  align?: Alignment;
 };
 
 type Axis = "vertical" | "horizontal";
@@ -49,11 +114,11 @@ export function applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void {
   node.height = clampSize(rect.height);
 }
 
-/** Wrap a raw blessed box as a UiPart so it can participate in createStack/createColumns layout. */
+/** Wrap a raw blessed box as a LayoutPart so it can participate in createStack/createRow layout. */
 export function createNodePart(
   node: blessed.Widgets.BoxElement,
   opts?: { restyle?: () => void }
-): UiPart<Record<string, never>> {
+): LayoutPart<Record<string, never>> {
   return {
     node,
     layout(rect) { applyRect(node, rect); },
@@ -150,11 +215,18 @@ function renderAlignedBar(left: string, right: string | undefined, width: number
   return padLine(`${clippedLeft}${" ".repeat(gap)}${right}`, width);
 }
 
+/** Options for createStack / createRow. */
+export interface LinearLayoutOptions {
+  /** Gap in character cells between children. Default 0. */
+  gap?: number;
+}
+
 function createLinearLayout(
   parent: blessed.Widgets.Node,
-  children: StackChild[],
-  axis: Axis
-): UiPart<void> {
+  children: FlexChild[],
+  axis: Axis,
+  opts?: LinearLayoutOptions,
+): LayoutPart<void> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -169,12 +241,8 @@ function createLinearLayout(
   }
 
   let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
-  let laying = false;
-
-  const relayout = () => { if (!laying) layoutChildren(lastRect); };
 
   const layoutChildren = (rect: Rect) => {
-    laying = true;
     lastRect = {
       top: rect.top,
       left: rect.left,
@@ -184,14 +252,16 @@ function createLinearLayout(
     applyRect(node, lastRect);
 
     const totalExtent = axis === "vertical" ? lastRect.height : lastRect.width;
+    const gap = opts?.gap ?? 0;
     const activeChildren = children.filter((child) => child.visible?.() !== false);
+    const totalGap = Math.max(0, activeChildren.length - 1) * gap;
     const fixedTotal = activeChildren.reduce((sum, child) => {
       return sum + (typeof child.basis === "number" ? Math.max(0, child.basis) : 0);
     }, 0);
     const totalFr = activeChildren.reduce((sum, child) => {
       return sum + (parseFractionBasis(child.basis) ?? 0);
     }, 0);
-    let remaining = Math.max(0, totalExtent - fixedTotal);
+    let remaining = Math.max(0, totalExtent - fixedTotal - totalGap);
     let remainingFr = totalFr;
     let cursor = 0;
 
@@ -228,13 +298,13 @@ function createLinearLayout(
           : { top: 0, left: cursor, width: cappedExtent, height: lastRect.height };
 
       child.part.layout(childRect);
-      cursor += cappedExtent;
+      cursor += cappedExtent + gap;
     }
-    laying = false;
   };
 
-  (node as blessed.Widgets.Node).on?.("resize", relayout);
-  parent.on?.("resize", relayout);
+  // NOTE: Internal resize listeners removed to prevent double-fire.
+  // Modules should call root.layout(...) from win.onResize() — that is
+  // the canonical pattern and avoids cascading relayouts.
 
   return {
     node,
@@ -258,20 +328,289 @@ function createLinearLayout(
 }
 
 /** @primitive */
-export function createStack(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
-  return createLinearLayout(parent, children, "vertical");
+export function createStack(parent: blessed.Widgets.Node, children: FlexChild[], opts?: LinearLayoutOptions): LayoutPart<void> {
+  return createLinearLayout(parent, children, "vertical", opts);
 }
 
 /** @primitive */
-export function createColumns(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
-  return createLinearLayout(parent, children, "horizontal");
+export function createRow(parent: blessed.Widgets.Node, children: FlexChild[], opts?: LinearLayoutOptions): LayoutPart<void> {
+  return createLinearLayout(parent, children, "horizontal", opts);
+}
+
+// ── Responsive helpers ────────────────────────────────────────────────────
+
+/** @primitive */
+export type BreakpointName = "xs" | "sm" | "md" | "lg" | "xl";
+
+/** @primitive */
+export type BreakpointEntry<T extends string = BreakpointName> = {
+  name: T;
+  minWidth: number;
+};
+
+/**
+ * Standard breakpoints for terminal layouts.
+ * Modules can use these directly or define custom entries.
+ */
+export const DEFAULT_BREAKPOINTS: BreakpointEntry[] = [
+  { name: "xs", minWidth: 0 },
+  { name: "sm", minWidth: 40 },
+  { name: "md", minWidth: 60 },
+  { name: "lg", minWidth: 80 },
+  { name: "xl", minWidth: 120 },
+];
+
+/**
+ * Pick the best matching breakpoint for a given width.
+ *
+ * Entries must be sorted ascending by minWidth (largest matching wins).
+ * Returns the name of the matched breakpoint.
+ *
+ * @example
+ * const mode = pickBreakpoint(width, [
+ *   { name: "sm", minWidth: 0 },
+ *   { name: "md", minWidth: 50 },
+ *   { name: "lg", minWidth: 80 },
+ * ]);
+ *
+ * @example
+ * // Using default breakpoints:
+ * const mode = pickBreakpoint(width);
+ *
+ * @primitive
+ */
+export function pickBreakpoint<T extends string>(
+  width: number,
+  entries?: BreakpointEntry<T>[],
+): T {
+  const bp = entries ?? (DEFAULT_BREAKPOINTS as BreakpointEntry<T>[]);
+  if (bp.length === 0) return (DEFAULT_BREAKPOINTS[0] as BreakpointEntry<T>).name;
+  let matched = bp[0]!.name;
+  for (const entry of bp) {
+    if (width >= entry.minWidth) {
+      matched = entry.name;
+    }
+  }
+  return matched;
+}
+
+// ── createGrid ────────────────────────────────────────────────────────────
+
+/** @primitive */
+export type GridOptions = {
+  rows: number;
+  columns: number;
+  templateRows?: TrackSize[];
+  templateColumns?: TrackSize[];
+  gap?: Gap;
+  align?: Alignment;
+};
+
+/** @primitive */
+export type GridHandle = LayoutPart<void> & {
+  set(child: GridChild): void;
+  remove(key: string): void;
+};
+
+/**
+ * Resolve an array of TrackSize values into pixel sizes for a given total extent.
+ * Fixed values are taken first, then remaining space is distributed among fr values.
+ */
+function resolveTrackSizes(templates: TrackSize[], count: number, total: number): number[] {
+  // Build effective template array padded/truncated to `count`
+  const specs: TrackSize[] = [];
+  for (let i = 0; i < count; i++) {
+    specs.push(templates[i] ?? "1fr");
+  }
+
+  let fixedTotal = 0;
+  let frTotal = 0;
+  for (const spec of specs) {
+    const fr = parseFractionBasis(spec);
+    if (fr !== null) {
+      frTotal += fr;
+    } else {
+      fixedTotal += typeof spec === "number" ? Math.max(0, spec) : 0;
+    }
+  }
+
+  let remaining = Math.max(0, total - fixedTotal);
+  let remainingFr = frTotal;
+  const sizes: number[] = [];
+
+  for (const spec of specs) {
+    const fr = parseFractionBasis(spec);
+    if (fr !== null) {
+      if (remainingFr <= 0 || fr <= 0) {
+        sizes.push(0);
+      } else if (fr === remainingFr) {
+        sizes.push(remaining);
+        remaining = 0;
+        remainingFr = 0;
+      } else {
+        const size = Math.floor((remaining * fr) / remainingFr);
+        sizes.push(size);
+        remaining -= size;
+        remainingFr -= fr;
+      }
+    } else {
+      sizes.push(typeof spec === "number" ? Math.max(0, spec) : 0);
+    }
+  }
+
+  return sizes;
+}
+
+function resolveGap(gap: Gap | undefined): { rowGap: number; columnGap: number } {
+  if (gap === undefined) return { rowGap: 0, columnGap: 0 };
+  if (typeof gap === "number") return { rowGap: gap, columnGap: gap };
+  return { rowGap: gap.row ?? 0, columnGap: gap.column ?? 0 };
+}
+
+/** @primitive */
+export function createGrid(
+  parent: blessed.Widgets.Node,
+  options: GridOptions,
+): GridHandle {
+  const { rows, columns, gap: gapOpt, align: gridAlign } = options;
+  const templateRows = options.templateRows ?? [];
+  const templateColumns = options.templateColumns ?? [];
+
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    style: theme().body,
+  });
+
+  const childrenMap = new Map<string, GridChild>();
+
+  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+
+  function layoutChildren(rect: Rect) {
+    lastRect = {
+      top: rect.top,
+      left: rect.left,
+      width: clampSize(rect.width),
+      height: clampSize(rect.height),
+    };
+    applyRect(node, lastRect);
+
+    const { rowGap, columnGap } = resolveGap(gapOpt);
+
+    // Total gaps
+    const totalRowGap = Math.max(0, (rows - 1) * rowGap);
+    const totalColGap = Math.max(0, (columns - 1) * columnGap);
+
+    // Resolve track sizes
+    const colSizes = resolveTrackSizes(templateColumns, columns, lastRect.width - totalColGap);
+    const rowSizes = resolveTrackSizes(templateRows, rows, lastRect.height - totalRowGap);
+
+    // Compute cumulative offsets
+    const colOffsets: number[] = [0];
+    for (let c = 0; c < columns; c++) {
+      colOffsets.push(colOffsets[c]! + colSizes[c]! + (c < columns - 1 ? columnGap : 0));
+    }
+    const rowOffsets: number[] = [0];
+    for (let r = 0; r < rows; r++) {
+      rowOffsets.push(rowOffsets[r]! + rowSizes[r]! + (r < rows - 1 ? rowGap : 0));
+    }
+
+    // Layout each child
+    for (const child of childrenMap.values()) {
+      const isVisible = child.visible?.() !== false;
+      if (!isVisible) {
+        child.part.node.hide();
+        child.part.layout({ top: 0, left: 0, width: 0, height: 0 });
+        continue;
+      }
+
+      child.part.node.show();
+
+      const r = clamp(child.row, 0, rows - 1);
+      const c = clamp(child.column, 0, columns - 1);
+      const rSpan = clamp(child.rowSpan ?? 1, 1, rows - r);
+      const cSpan = clamp(child.columnSpan ?? 1, 1, columns - c);
+
+      const cellTop = rowOffsets[r]!;
+      const cellLeft = colOffsets[c]!;
+      const cellWidth = (colOffsets[c + cSpan] ?? colOffsets[columns]!) - cellLeft -
+        (c + cSpan < columns ? columnGap : 0);
+      const cellHeight = (rowOffsets[r + rSpan] ?? rowOffsets[rows]!) - cellTop -
+        (r + rSpan < rows ? rowGap : 0);
+
+      // Apply alignment within the cell
+      const align = child.align ?? gridAlign;
+      let childLeft = cellLeft;
+      let childTop = cellTop;
+      let childWidth = Math.max(0, cellWidth);
+      let childHeight = Math.max(0, cellHeight);
+
+      // Alignment only adjusts position, not size for grid cells
+      // (size fills the cell unless explicitly constrained — future enhancement)
+
+      child.part.layout({
+        top: childTop,
+        left: childLeft,
+        width: childWidth,
+        height: childHeight,
+      });
+    }
+  }
+
+  return {
+    node,
+    layout(rect) {
+      layoutChildren(rect);
+    },
+    update() {},
+    restyle() {
+      safeSetStyle(node, theme().body);
+      for (const child of childrenMap.values()) {
+        child.part.restyle();
+      }
+    },
+    destroy() {
+      for (const child of childrenMap.values()) {
+        child.part.destroy();
+      }
+      node.destroy();
+    },
+    set(child: GridChild) {
+      // Remove existing child with same key
+      const existing = childrenMap.get(child.key);
+      if (existing && existing.part !== child.part) {
+        existing.part.destroy();
+      }
+      childrenMap.set(child.key, child);
+      if (child.part.node.parent !== node) {
+        node.append(child.part.node);
+      }
+      // Re-layout if we have dimensions
+      if (lastRect.width > 0 || lastRect.height > 0) {
+        layoutChildren(lastRect);
+      }
+    },
+    remove(key: string) {
+      const child = childrenMap.get(key);
+      if (child) {
+        child.part.destroy();
+        childrenMap.delete(key);
+        if (lastRect.width > 0 || lastRect.height > 0) {
+          layoutChildren(lastRect);
+        }
+      }
+    },
+  };
 }
 
 /** @primitive */
 export function createHeaderBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
-): UiPart<{ left: string; right?: string }> {
+): LayoutPart<{ left: string; right?: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -313,7 +652,7 @@ export function createHeaderBar(
 export function createStatusBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
-): UiPart<{ left?: string; right?: string }> {
+): LayoutPart<{ left?: string; right?: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -355,12 +694,12 @@ export function createStatusBar(
 export function createTextBlock(
   parent: blessed.Widgets.Node,
   opts: { paddingLeft?: number; paddingTop?: number } = {}
-): UiPart<{ text: string }> {
+): LayoutPart<{ text: string }> {
   const node = blessed.box({
     parent,
     top: 0,
     left: 0,
-    width: 0,
+    width: 1,
     height: 0,
     tags: false,
     scrollable: true,
@@ -369,10 +708,12 @@ export function createTextBlock(
     style: scrollableStyle(theme().body),
   });
 
-  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+  let lastRect: Rect = { top: 0, left: 0, width: 1, height: 0 };
   let lastProps = { text: "" };
 
   const render = () => {
+    // Guard: blessed crashes if scrollable box has zero width
+    if (lastRect.width < 1) return;
     node.setContent(
       wrapIndentedText(lastProps.text, lastRect.width, opts.paddingLeft ?? 0, opts.paddingTop ?? 0)
     );
@@ -381,8 +722,9 @@ export function createTextBlock(
   return {
     node,
     layout(rect) {
-      lastRect = rect;
-      applyRect(node, rect);
+      // Clamp width to minimum 1 — blessed scrollable boxes crash at 0 width
+      lastRect = { ...rect, width: Math.max(1, rect.width) };
+      applyRect(node, lastRect);
       render();
     },
     update(props) {
@@ -408,7 +750,7 @@ export interface InputLineProps {
 export function createInputLine(
   screen: blessed.Widgets.Screen,
   onSubmit: (value: string) => void
-): UiPart<InputLineProps> {
+): LayoutPart<InputLineProps> {
   const node = blessed.textbox({
     parent: screen,
     top: 0,
@@ -471,7 +813,7 @@ export interface MessageHistoryProps {
 /** @primitive */
 export function createMessageHistory(
   screen: blessed.Widgets.Screen
-): UiPart<MessageHistoryProps> {
+): LayoutPart<MessageHistoryProps> {
   const node = blessed.list({
     parent: screen,
     top: 0,
@@ -512,7 +854,7 @@ export function createMessageHistory(
 export function createRule(
   parent: blessed.Widgets.Node,
   opts: { axis: "horizontal" | "vertical"; inset?: number }
-): UiPart<{ visible: boolean }> {
+): LayoutPart<{ visible: boolean }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -569,7 +911,7 @@ export function createRule(
 export function createFigletDisplay(
   parent: blessed.Widgets.Node,
   opts: { renderText: (value: string) => string; leftInset?: number }
-): UiPart<{ value: string }> {
+): LayoutPart<{ value: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -615,7 +957,7 @@ export function createFigletDisplay(
 export function createAnimatedPanel(
   parent: blessed.Widgets.Node,
   opts: { player: FramePlayer }
-): UiPart<void> {
+): LayoutPart<void> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -659,7 +1001,7 @@ export function createAnimatedPanel(
  * bar.update({ leftText: hintText, activeId: currentMode });
  */
 export type ButtonBarPart<Id extends string> =
-  UiPart<{ leftText: string; activeId: Id }> & {
+  LayoutPart<{ leftText: string; activeId: Id }> & {
     /** Mutate a button's displayed label in place. */
     updateLabel(id: Id, label: string): void;
   };
@@ -748,6 +1090,162 @@ export function createButtonBar<Id extends string>(
   };
 }
 
+// ── Scroll viewport ───────────────────────────────────────────────────────────
+
+/** @primitive */
+export type ScrollViewportOptions = {
+  /** Fixed header height in rows (0 = no header). */
+  headerHeight?: number;
+  /** Fixed footer height in rows (0 = no footer). */
+  footerHeight?: number;
+};
+
+/** @primitive */
+export type ScrollViewportHandle = LayoutPart<void> & {
+  /** The fixed header region (if headerHeight > 0). Attach header content here. */
+  header: blessed.Widgets.BoxElement | null;
+  /** The scrollable middle viewport. Attach scrollable content here. */
+  viewport: blessed.Widgets.BoxElement;
+  /** The fixed footer region (if footerHeight > 0). Attach footer content here. */
+  footer: blessed.Widgets.BoxElement | null;
+  /** Scroll to the bottom of the viewport. */
+  scrollToBottom(): void;
+  /** Scroll to the top of the viewport. */
+  scrollToTop(): void;
+  /** Current scroll position as percentage (0-100). */
+  scrollPercent(): number;
+};
+
+/**
+ * Creates a scrollable viewport with optional fixed header and footer.
+ *
+ * The viewport is the scrollable middle region. Content appended to it
+ * can grow beyond the visible height and will scroll with mouse wheel
+ * and arrow keys (blessed default key/mouse handling).
+ *
+ * @primitive
+ */
+export function createScrollViewport(
+  parent: blessed.Widgets.Node,
+  options?: ScrollViewportOptions,
+): ScrollViewportHandle {
+  const headerHeight = options?.headerHeight ?? 0;
+  const footerHeight = options?.footerHeight ?? 0;
+
+  const container = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    style: theme().body,
+  });
+
+  const headerNode = headerHeight > 0
+    ? blessed.box({
+        parent: container,
+        top: 0,
+        left: 0,
+        width: "100%" as any,
+        height: headerHeight,
+        style: theme().header,
+      })
+    : null;
+
+  const viewport = blessed.box({
+    parent: container,
+    top: headerHeight,
+    left: 0,
+    width: "100%" as any,
+    height: 0,
+    mouse: true,
+    keys: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(theme().body),
+  });
+
+  const footerNode = footerHeight > 0
+    ? blessed.box({
+        parent: container,
+        bottom: 0,
+        left: 0,
+        width: "100%" as any,
+        height: footerHeight,
+        style: theme().header,
+      })
+    : null;
+
+  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+
+  function layoutInternal(rect: Rect) {
+    lastRect = rect;
+    applyRect(container, rect);
+
+    const totalHeight = clampSize(rect.height);
+    const viewportHeight = Math.max(0, totalHeight - headerHeight - footerHeight);
+
+    if (headerNode) {
+      headerNode.top = 0;
+      headerNode.left = 0;
+      headerNode.width = rect.width;
+      headerNode.height = headerHeight;
+    }
+
+    viewport.top = headerHeight;
+    viewport.left = 0;
+    viewport.width = rect.width;
+    viewport.height = viewportHeight;
+
+    if (footerNode) {
+      footerNode.top = headerHeight + viewportHeight;
+      footerNode.left = 0;
+      footerNode.width = rect.width;
+      footerNode.height = footerHeight;
+    }
+  }
+
+  return {
+    node: container,
+    header: headerNode,
+    viewport,
+    footer: footerNode,
+
+    layout(rect) {
+      layoutInternal(rect);
+    },
+
+    update() {},
+
+    restyle() {
+      safeSetStyle(container, theme().body);
+      if (headerNode) safeSetStyle(headerNode, theme().header);
+      safeSetStyle(viewport, scrollableStyle(theme().body));
+      if (footerNode) safeSetStyle(footerNode, theme().header);
+    },
+
+    destroy() {
+      if (headerNode) headerNode.destroy();
+      viewport.destroy();
+      if (footerNode) footerNode.destroy();
+      container.destroy();
+    },
+
+    scrollToBottom() {
+      viewport.setScrollPerc(100);
+    },
+
+    scrollToTop() {
+      viewport.setScrollPerc(0);
+    },
+
+    scrollPercent() {
+      return (viewport as any).getScrollPerc?.() ?? 0;
+    },
+  };
+}
+
 // ── Border styles ─────────────────────────────────────────────────────────────
 
 export type BorderStyle = "single" | "double" | "bold" | "thin";
@@ -767,7 +1265,7 @@ export interface BorderedPanelOpts {
   activeStyle?: BorderStyle;
 }
 
-export type BorderedPanelHandle = UiPart<void> & {
+export type BorderedPanelHandle = LayoutPart<void> & {
   /** The inner content node — attach child widgets here */
   content: blessed.Widgets.BoxElement;
   /** Switch active/inactive border style and theme colour */
@@ -775,7 +1273,7 @@ export type BorderedPanelHandle = UiPart<void> & {
 };
 
 /**
- * A UiPart with a manually-drawn border that switches style on setActive().
+ * A LayoutPart with a manually-drawn border that switches style on setActive().
  *
  * Key implementation notes:
  * - wrap:false on outer box prevents blessed wrapping the border line
@@ -896,7 +1394,7 @@ export interface CollapsibleBlockProps {
 }
 
 /** @primitive */
-export type CollapsibleBlockHandle = UiPart<CollapsibleBlockProps> & {
+export type CollapsibleBlockHandle = LayoutPart<CollapsibleBlockProps> & {
   toggle(): void;
   setCollapsed(collapsed: boolean): void;
   isCollapsed(): boolean;

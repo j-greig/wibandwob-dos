@@ -20,10 +20,10 @@ Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
 
 | Tier | Module | What it shows |
 |------|--------|--------------|
-| Static | `modules/hello-world/` | Responsive figlet, onResize, no timers |
-| Animated | `modules/heartbeat/` | createTimer, cleanup, structured describeState |
-| Persistent | `modules/wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
-| SDK sampler | `modules/e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
+| Static | `modules/demo-hello-world/` | Responsive figlet, onResize, no timers |
+| Animated | `modules/demo-heartbeat/` | createTimer, cleanup, structured describeState |
+| Persistent | `modules/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
+| SDK sampler | `modules/demo-e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
 
 Full examples guide: `.agents/module-dev/examples-by-tier.md`
 
@@ -278,7 +278,8 @@ Scripts and skills that exist to help agents work are **agent tooling**. When ag
 | **smoke** | Manual or scripted run through key surfaces (menus, windows, API) |
 | **restart** | `bash scripts/restart.sh` — clean SIGTERM → wait → launch → poll `/health` |
 | **API parity** | `/state` response matches what is visually on screen |
-| **screenshot** | `./scripts/screenshot-window.sh "Title"` — capture a window |
+| **screenshot** | `./scripts/screenshot-window.sh "Title"` — TEXT crop of a window (not PNG) |
+| **system-png** | `./scripts/capture-tui-png.sh --display 2` — macOS display PNG (valid only when WibWob is visibly attached there) |
 | **minimap** | `./scripts/minimap.sh` — spatial overview of all open windows |
 | **overlap-check** | `./scripts/overlap-check.sh` — detect overlapping windows |
 | **handover** | `bun run handover` — generate session handover doc from live state |
@@ -296,7 +297,7 @@ Files: point at the script(s) to improve.
 
 Good candidates for Codex tooling improvement:
 - `scripts/restart.sh` — if it reports ready with the same session ID (old process still alive)
-- `scripts/smoke-test.sh` — if smoke targets grow stale
+- `.pi/skills/tui-smoke-test/scripts/smoke-test.sh` — if smoke targets grow stale
 - `.pi/skills/*` — if a skill's instructions cause agents to make repeated mistakes
 - `scripts/handover.sh` — if the epic table or todo list goes stale
 

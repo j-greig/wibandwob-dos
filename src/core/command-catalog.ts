@@ -37,6 +37,10 @@ export interface AppMenuActions {
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
   openBackroomsLogBrowser: () => void;
+  backroomsPickerInfo: () => unknown;
+  backroomsPickerSelect: (args?: Record<string, unknown>) => unknown;
+  backroomsPickerConfirm: () => unknown;
+  backroomsPickerCancel: () => unknown;
   tileWindows: () => void;
   cascadeWindows: () => void;
   toggleMaximizeFocused: (args?: Record<string, unknown>) => void;
@@ -44,6 +48,7 @@ export interface AppMenuActions {
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
   openFigletBanner: (args?: Record<string, unknown>) => void;
+  listFigletFonts: () => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
@@ -90,6 +95,13 @@ export interface AppMenuActions {
   // ── Canvas documents ───────────────────────────────────
   loadCanvas: (args?: Record<string, unknown>) => void;
   exportCanvas: (args?: Record<string, unknown>) => void;
+  // ── Menu ──────────────────────────────────────────────
+  closeMenus: () => void;
+  // ── Overlay ───────────────────────────────────────────
+  overlayConfirm: () => unknown;
+  overlayCancel: () => unknown;
+  overlaySelect: (args?: Record<string, unknown>) => unknown;
+  overlayInfo: () => unknown;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -193,6 +205,20 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "help", label: "Help", key: "h", left: 55 }
 ];
 
+/**
+ * ── Command ID Naming Canon ─────────────────────────────────────────
+ *
+ * Format:  <domain>.<verb>  or  <domain>.<noun>
+ * Separator: dot between domain and action, kebab-case within segments.
+ *
+ * Legacy underscore IDs (e.g. window.close_focused) are kept for backward
+ * compatibility. Kebab-case aliases are registered in LEGACY_COMMAND_ALIASES
+ * in command-registry.ts so both forms work.
+ *
+ * Microapp commands are auto-prefixed: microapp.<moduleId>.<commandId>
+ *
+ * Labels: use plain names, not "Open ..." prefix (majority convention).
+ */
 const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.browse",
@@ -601,6 +627,56 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
 
   {
+    id: "menu.close",
+    label: "Close Menus",
+    description: "Close any open dropdown menu (File, Edit, View, etc.) or popup context menu.",
+    group: "focus",
+    actionKey: "closeMenus",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.confirm",
+    label: "Confirm Overlay",
+    description: "Confirm the active modal overlay (equivalent to OK/Enter). Returns ok:false if no overlay is active.",
+    group: "focus",
+    actionKey: "overlayConfirm",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.cancel",
+    label: "Cancel Overlay",
+    description: "Cancel the active modal overlay (equivalent to Cancel/Escape). Returns ok:false if no overlay is active.",
+    group: "focus",
+    actionKey: "overlayCancel",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.select",
+    label: "Select Overlay Index",
+    description: "Select an item index in the active overlay when supported (browser/list/file-browser). Args: index (number).",
+    group: "focus",
+    actionKey: "overlaySelect",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.info",
+    label: "Overlay Info",
+    description: "Check if a modal overlay is active and its type. Returns { active: true/false, type? }.",
+    group: "inspect",
+    actionKey: "overlayInfo",
+    api: true,
+    agent: true,
+  },
+
+  {
     id: "backrooms.open",
     label: "Backrooms: Live TV",
     description: "Open Backrooms TV with an interactive channel picker.",
@@ -611,6 +687,42 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 0 },
     api: true,
     agent: true
+  },
+  {
+    id: "backrooms.picker.info",
+    label: "Backrooms Picker Info",
+    description: "Inspect Backrooms primer picker state (active, selected index, selected primers).",
+    group: "inspect",
+    actionKey: "backroomsPickerInfo",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.select",
+    label: "Backrooms Picker Select",
+    description: "Select an index in Backrooms primer picker. Args: index (number).",
+    group: "focus",
+    actionKey: "backroomsPickerSelect",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.confirm",
+    label: "Backrooms Picker Confirm",
+    description: "Confirm Backrooms primer picker and continue to run options prompts.",
+    group: "focus",
+    actionKey: "backroomsPickerConfirm",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.cancel",
+    label: "Backrooms Picker Cancel",
+    description: "Cancel and close Backrooms primer picker.",
+    group: "focus",
+    actionKey: "backroomsPickerCancel",
+    api: true,
+    agent: true,
   },
   {
     id: "backrooms_logs.open",
@@ -703,6 +815,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Figlet Banner" },
+    api: true,
+    agent: true
+  },
+  {
+    id: "figlet.fonts",
+    label: "Figlet Fonts",
+    description: "List available FIGlet fonts with default and metadata. Useful for API-driven figlet flows that skip interactive prompts.",
+    group: "inspect",
+    actionKey: "listFigletFonts",
+    requires: ["bin.figlet"],
     api: true,
     agent: true
   },

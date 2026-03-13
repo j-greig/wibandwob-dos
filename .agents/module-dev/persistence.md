@@ -78,7 +78,7 @@ win.describeState(() => ({
 
 ## Canonical example
 
-`modules/wibwob-poetry-clock/index.ts` — serializes `mode` and `voice`,
+`modules/demo-wibwob-poetry-clock/index.ts` — serializes `mode` and `voice`,
 restores by calling its own `open` command with those values. The pattern:
 snapshot minimal semantic state, restore through the same public opening path.
 

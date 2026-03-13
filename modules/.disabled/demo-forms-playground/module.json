@@ -1,0 +1,20 @@
+{
+  "name": "demo-forms-playground",
+  "version": "0.1.0",
+  "description": "Forms Playground microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.forms-playground",
+    "title": "Forms Playground",
+    "description": "Forms Playground microapp scaffold.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 95, "label": "Forms Playground" }
+    ],
+    "palette": { "order": 95, "label": "Open Forms Playground" },
+    "agent": true,
+    "api": true
+  }
+}

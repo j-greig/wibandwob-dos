@@ -1,0 +1,10 @@
+{
+  "name": "flexoki-ink-theme",
+  "version": "1.0.0",
+  "description": "Flexoki ink-dark theme for WibWob-DOS",
+  "type": "theme",
+  "entry": "theme.ts",
+  "provides": {
+    "theme": "flexoki-ink"
+  }
+}

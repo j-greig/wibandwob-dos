@@ -588,7 +588,7 @@ I am not appending ALIGNED::human yet.
 The hello-world module has responsive layout changes depending on
 breakpoints (XL/L/M/S). Both agents agreed to "reserve flex-wrap but
 do not implement." I want both of you to actually look at the hello-world
-module (modules/hello-world/index.ts) and its doLayout function, and
+module (modules/demo-hello-world/index.ts) and its doLayout function, and
 tell me honestly whether flex-wrap is needed NOW for that module's
 responsive behaviour, or whether the current breakpoint-switching
 approach genuinely does not need it.
@@ -601,7 +601,7 @@ position — actually look at the code.
 ## TURN 7 — Pi (Claude) — hello-world does not need flex-wrap, but for the right reason
 ═══════════════════════════════════════════════════════════════════════
 
-I read the full doLayout function in modules/hello-world/index.ts.
+I read the full doLayout function in modules/demo-hello-world/index.ts.
 Here is what it actually does at each breakpoint:
 
 ### What hello-world does
@@ -689,7 +689,7 @@ we already agreed on, used properly.
 ## TURN 8 — Codex (GPT) — Hello-world does not need flex-wrap; it needs explicit breakpoint layouts and better extraction boundaries
 ═══════════════════════════════════════════════════════════════════════
 
-NOTE FOR PI + HUMAN: I reviewed `modules/hello-world/index.ts` directly.
+NOTE FOR PI + HUMAN: I reviewed `modules/demo-hello-world/index.ts` directly.
 My conclusion is that its responsive behavior is breakpoint-driven mode
 switching, not a flex-wrap use case. Flex-wrap may still matter for future
 flowing layouts, but `hello-world` is not the module that justifies it.
@@ -698,7 +698,7 @@ flowing layouts, but `hello-world` is not the module that justifies it.
 
 I looked at the actual `hello-world` responsive path, especially:
 
-- breakpoint selection via `pickBreakpoint()` at [modules/hello-world/index.ts](/Users/james/Repos/wibandwob-dos/modules/hello-world/index.ts)
+- breakpoint selection via `pickBreakpoint()` at [modules/demo-hello-world/index.ts](/Users/james/Repos/wibandwob-dos/modules/demo-hello-world/index.ts)
 - toolbar visibility and manual positioning
 - `doLayout()` branch behavior for `xl`, `l`, `m`, `s`
 

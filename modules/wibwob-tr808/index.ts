@@ -34,17 +34,17 @@ const KEY_TO_INSTRUMENT: Record<string, InstrumentId | "accent"> = {
 type MicroappStateDetails = { summary?: string; [key: string]: unknown };
 type Rect = { top: number; left: number; width: number; height: number };
 type UiNode = { on?(event: string, handler: () => void): void };
-type UiPart<Props = void> = {
+type LayoutPart<Props = void> = {
   node: UiNode;
   layout(rect: Rect): void;
   update(props: Props): void;
   restyle(): void;
   destroy(): void;
 };
-type StackChild = {
+type FlexChild = {
   key: string;
   basis: number | string;
-  part: UiPart<unknown>;
+  part: LayoutPart<unknown>;
   visible?: () => boolean;
 };
 

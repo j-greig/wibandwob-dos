@@ -259,7 +259,7 @@ These features exist only in the TypeScript version and were never in the C++ ve
 | **Jailed Coding Tools** (read/write/edit/bash/grep/find/ls) | Agent development tools |
 | **Desktop State Injection** (transformContext) | Agent awareness |
 | **Session Persistence / Resume** | Agent session management |
-| **Composable UI Parts** (createStack/createColumns/etc.) | Layout engine |
+| **Composable UI Parts** (createStack/createRow/etc.) | Layout engine |
 | **Microapp Module System** (drop-in TypeScript modules) | Extensibility |
 | **Semantic Theme Tokens** (5 themes + dynamic loading) | Advanced theming |
 | **Double-Click Maximize** | Window management |

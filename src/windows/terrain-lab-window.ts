@@ -20,7 +20,7 @@ import { theme } from "../core/theme/resolver.js";
 import {
   createRestyleBundle,
   createStack,
-  createColumns,
+  createRow,
   createNodePart,
   createHeaderBar,
   createStatusBar,
@@ -88,7 +88,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     restyle: () => { contourBox.style = theme().body; },
   });
 
-  const bodyColumns = createColumns(frame.body, [
+  const bodyColumns = createRow(frame.body, [
     { key: "map", basis: "3fr", part: contourPart },
     { key: "divider", basis: 1, part: divider },
     { key: "info", basis: "1fr", part: infoBlock },

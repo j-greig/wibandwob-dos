@@ -19,8 +19,8 @@ import type {
   MicroappHost,
   MicroappSnapshotWindow,
   Rect,
-  StackChild,
-  UiPart,
+  FlexChild,
+  LayoutPart,
 } from "../../src/services/microapp-sdk.js";
 import {
   applyRect,
@@ -265,7 +265,7 @@ export default function setup(host: MicroappHost) {
       },
     );
 
-    const body: UiPart<void> = {
+    const body: LayoutPart<void> = {
       node: bodyNode,
       layout(rect) {
         applyRect(bodyNode, rect);

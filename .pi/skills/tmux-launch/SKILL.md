@@ -154,7 +154,7 @@ state-service both use `mkdirSync(..., { recursive: true })`).
 Start before launching any IRC-enabled instance:
 
 ```bash
-nohup bun run scripts/dev-irc-server.ts > scratch/logs/irc-server.log 2>&1 &
+nohup bun run .agents/skills/ww-room-chat/scripts/dev-irc-server.ts > scratch/logs/irc-server.log 2>&1 &
 tail -f scratch/logs/irc-server.log   # should see "dev-irc listening on 127.0.0.1:6667"
 ```
 
@@ -162,7 +162,7 @@ Kill and restart IRC server:
 
 ```bash
 pkill -f dev-irc-server.ts
-nohup bun run scripts/dev-irc-server.ts > scratch/logs/irc-server.log 2>&1 &
+nohup bun run .agents/skills/ww-room-chat/scripts/dev-irc-server.ts > scratch/logs/irc-server.log 2>&1 &
 ```
 
 The irc-framework client reconnects automatically (auto_reconnect_max_retries=9999,

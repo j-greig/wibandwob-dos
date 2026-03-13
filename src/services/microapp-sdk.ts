@@ -15,7 +15,7 @@ import {
   applyRect,
   createNodePart,
 } from "../core/ui-parts.js";
-import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
+import type { Rect, LayoutPart, FlexChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap, LinearLayoutOptions } from "../core/ui-parts.js";
 import type { BrowserEntry, GalleryTab } from "../core/types.js";
 import {
   createContourPlayer,
@@ -81,6 +81,58 @@ export function createAnimationClock(fps: number): AnimationClock {
   };
 }
 
+export type LayoutRegionRect = { top: number; left: number; width: number; height: number };
+
+export interface LayoutRegionSnapshot {
+  visible: boolean;
+  attached: boolean;
+  collapsed: boolean;
+  rect: LayoutRegionRect;
+}
+
+export interface LayoutReport {
+  schema: "wibwob.layout-report/v1";
+  viewport: { width: number; height: number };
+  regions: Record<string, LayoutRegionSnapshot>;
+}
+
+export interface LayoutReporter {
+  snapshot(viewport: { width: number; height: number }): LayoutReport;
+}
+
+export function createLayoutReporter(regions: Record<string, blessed.Widgets.BoxElement>): LayoutReporter {
+  const rectOf = (node: blessed.Widgets.BoxElement): LayoutRegionRect => {
+    if (!node.parent) return { top: 0, left: 0, width: 0, height: 0 };
+    return {
+      top: Number(node.top) || 0,
+      left: Number(node.left) || 0,
+      width: Number(node.width) || 0,
+      height: Number(node.height) || 0,
+    };
+  };
+
+  return {
+    snapshot(viewport) {
+      const out: Record<string, LayoutRegionSnapshot> = {};
+      for (const [name, node] of Object.entries(regions)) {
+        const rect = rectOf(node);
+        const attached = !!node.parent;
+        out[name] = {
+          visible: !!node.visible,
+          attached,
+          collapsed: !attached || (!node.visible && rect.width === 0 && rect.height === 0),
+          rect,
+        };
+      }
+      return {
+        schema: "wibwob.layout-report/v1",
+        viewport,
+        regions: out,
+      };
+    },
+  };
+}
+
 // Canonical type-only import surface for module authors.
 // Runtime capabilities still flow through the host object itself.
 export type {
@@ -88,8 +140,15 @@ export type {
   MicroappSnapshotWindow,
   MicroappWindowHandle,
   Rect,
-  UiPart,
-  StackChild,
+  LayoutPart,
+  FlexChild,
+  LinearLayoutOptions,
+  GridChild,
+  FlexBasis,
+  TrackSize,
+  AxisAlign,
+  Alignment,
+  Gap,
   LazyMountedPlayer,
   SavedTerrainArtifact,
   TerrainBiome,
@@ -134,7 +193,11 @@ export {
 export {
   clamp,
   createStack,
-  createColumns,
+  createRow,
+  createGrid,
+  createScrollViewport,
+  pickBreakpoint,
+  DEFAULT_BREAKPOINTS,
   createHeaderBar,
   createStatusBar,
   createTextBlock,
@@ -201,6 +264,15 @@ export type {
   // Tabs
   TabDef,
   TabbedContainerHandle,
+  // Grid
+  GridOptions,
+  GridHandle,
+  // Responsive
+  BreakpointName,
+  BreakpointEntry,
+  // Scroll viewport
+  ScrollViewportOptions,
+  ScrollViewportHandle,
   // Patterns
   PatternGenerator,
 } from "../core/ui-parts.js";
@@ -211,6 +283,37 @@ export type {
 
 // Timers — use instead of raw setInterval for proper cleanup
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
+
+// Scroll helpers — use with scrollable blessed boxes
+export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
+
+// Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
+export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
+export type {
+  ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  RadioOption, RadioGroupOptions, RadioGroupHandle,
+  SelectOption, SelectOptions, SelectHandle,
+  ChangeEvent, SelectEvent,
+  FilterableItem, FilterableListOptions, FilterableListHandle,
+  FormFieldOptions, FormFieldHandle,
+  TextAreaOptions, TextAreaHandle,
+} from "../core/ui-parts-forms.js";
+
+// Feedback components — progress bars, spinners, toasts
+export { createProgressBar, createSpinner, createToast } from "../core/ui-parts-feedback.js";
+export type {
+  ProgressBarOptions, ProgressBarHandle,
+  SpinnerOptions, SpinnerHandle,
+  ToastSeverity, ToastOptions, ToastHandle,
+} from "../core/ui-parts-feedback.js";
+
+// Data display components — key-value panels, log views, data tables
+export { createKeyValuePanel, createLogView, createDataTable } from "../core/ui-parts-data.js";
+export type {
+  KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
+  LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+  DataColumn, DataTableOptions, DataTableHandle,
+} from "../core/ui-parts-data.js";
 
 // Motion / tween — animate values, window position and size smoothly
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";

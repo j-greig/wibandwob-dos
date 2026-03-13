@@ -807,6 +807,23 @@ export class TsTuiMvpApp {
     return win?.finder ?? null;
   }
 
+  private getBackroomsPickerApi(): {
+    info?: () => unknown;
+    select?: (index: number) => unknown;
+    confirm?: () => unknown;
+    cancel?: () => unknown;
+  } | null {
+    const win = this.findWindowByAppType("backrooms-primer-picker");
+    if (!win) return null;
+    const dyn = win as unknown as Record<string, unknown>;
+    return {
+      info: typeof dyn._backroomsPickerInfo === "function" ? (dyn._backroomsPickerInfo as () => unknown) : undefined,
+      select: typeof dyn._backroomsPickerSelect === "function" ? (dyn._backroomsPickerSelect as (index: number) => unknown) : undefined,
+      confirm: typeof dyn._backroomsPickerConfirm === "function" ? (dyn._backroomsPickerConfirm as () => unknown) : undefined,
+      cancel: typeof dyn._backroomsPickerCancel === "function" ? (dyn._backroomsPickerCancel as () => unknown) : undefined,
+    };
+  }
+
   private openFileManagerWindow(
     restore?: FileManagerRestore,
   ): WindowRecord | undefined {
@@ -1745,8 +1762,16 @@ export class TsTuiMvpApp {
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
       closeWindowById: (args) => { this.windowManager.closeWindow(Number(args?.id)); },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
-      moveWindowById: (args) => { this.windowManager.moveWindow(Number(args?.id), Number(args?.x), Number(args?.y)); },
-      resizeWindowById: (args) => { this.windowManager.resizeWindow(Number(args?.id), Number(args?.w), Number(args?.h)); },
+      moveWindowById: (args) => {
+        const x = args?.x ?? args?.left;
+        const y = args?.y ?? args?.top;
+        this.windowManager.moveWindow(Number(args?.id), Number(x), Number(y));
+      },
+      resizeWindowById: (args) => {
+        const w = args?.w ?? args?.width;
+        const h = args?.h ?? args?.height;
+        this.windowManager.resizeWindow(Number(args?.id), Number(w), Number(h));
+      },
       clearDesktop: () => {
         const windows = this.windowManager.getWindows();
         for (const w of windows) {
@@ -1756,6 +1781,29 @@ export class TsTuiMvpApp {
         }
       },
       toggleDesktopChrome: () => this.toggleDesktopChrome(),
+      closeMenus: () => this.closeMenus(),
+      overlayConfirm: () => {
+        const confirmed = this.overlays.confirmActiveOverlay();
+        return confirmed ? { confirmed: true } : { confirmed: false, error: "No active overlay" };
+      },
+      overlayCancel: () => {
+        const cancelled = this.overlays.cancelActiveOverlay();
+        return cancelled ? { cancelled: true } : { cancelled: false, error: "No active overlay" };
+      },
+      overlaySelect: (args) => {
+        const index = Number(args?.index);
+        if (!Number.isFinite(index)) {
+          return { selected: false, error: "index must be a number" };
+        }
+        const result = this.overlays.selectActiveOverlayIndex(index);
+        return result.ok
+          ? { selected: true, index: result.index, count: result.count }
+          : { selected: false, error: result.error ?? "Selection failed", count: result.count };
+      },
+      overlayInfo: () => {
+        const info = this.overlays.getActiveOverlayInfo();
+        return info ? { active: true, ...info } : { active: false };
+      },
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =
@@ -1779,6 +1827,28 @@ export class TsTuiMvpApp {
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
       openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
+      backroomsPickerInfo: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.info) return { active: false, error: "Backrooms picker not active" };
+        return api.info();
+      },
+      backroomsPickerSelect: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.select) return { selected: false, error: "Backrooms picker not active" };
+        const index = Number(args?.index);
+        if (!Number.isFinite(index)) return { selected: false, error: "index must be a number" };
+        return api.select(index);
+      },
+      backroomsPickerConfirm: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.confirm) return { confirmed: false, error: "Backrooms picker not active" };
+        return api.confirm();
+      },
+      backroomsPickerCancel: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.cancel) return { cancelled: false, error: "Backrooms picker not active" };
+        return api.cancel();
+      },
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       toggleMaximizeFocused: (args?: Record<string, unknown>) => {
@@ -1811,6 +1881,19 @@ export class TsTuiMvpApp {
         } else {
           this.promptForFigletText();
         }
+      },
+      listFigletFonts: () => {
+        const catalogue = getFigletCatalogue();
+        return {
+          defaultFont: getDefaultFigletFont(),
+          favourites: catalogue.favourites,
+          count: catalogue.allFontsSorted.length,
+          fonts: catalogue.allFontsSorted.map((font) => ({
+            name: font,
+            favourite: catalogue.favourites.includes(font),
+            meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
+          })),
+        };
       },
       openMusicPlayer: (args) => {
         const filePath =

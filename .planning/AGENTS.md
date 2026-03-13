@@ -42,7 +42,7 @@ Epic status: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
 Full canon: `.planning/README.md`
 
 Running devlog (friction, fixes, lessons from live agent work):
-`.planning/spikes/spk-agentic-tui-runtime-roadmap/agentic-devlog.md`
+`.agents/shell-dev/agentic-devlog.md`
 
 ## GitHub kanban board
 

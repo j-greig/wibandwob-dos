@@ -12,7 +12,12 @@ interface StateServiceOptions {
   statePath: string;
   instanceLabel?: string;
   sessionId: string;
-  getControlApiStatus?: () => { enabled: boolean; port?: number };
+  getControlApiStatus?: () => {
+    enabled: boolean;
+    port?: number;
+    host?: string;
+    baseUrl?: string;
+  };
 }
 
 interface StateDependencies {
@@ -89,6 +94,8 @@ export class StateService {
     const focused = this.dependencies.getFocusedWindow();
     const openMenuLabel = this.dependencies.getOpenMenuLabel();
 
+    const controlApi = this.options.getControlApiStatus?.();
+
     return {
       timestamp: new Date().toISOString(),
       app: {
@@ -99,8 +106,10 @@ export class StateService {
         instanceLabel: this.options.instanceLabel,
         sessionId: this.options.sessionId,
         deployProfile: process.env.WIBWOB_DEPLOY_PROFILE ?? null,
-        controlApiEnabled: this.options.getControlApiStatus?.().enabled,
-        controlApiPort: this.options.getControlApiStatus?.().port,
+        controlApiEnabled: controlApi?.enabled,
+        controlApiPort: controlApi?.port,
+        controlApiHost: controlApi?.host,
+        controlApiBaseUrl: controlApi?.baseUrl,
         theme: themeName(),
         capabilities: capabilityService.snapshot()
       },

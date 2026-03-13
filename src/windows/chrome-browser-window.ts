@@ -464,7 +464,7 @@ export function openChromeBrowserWindow(params: {
     `    h       Toggle figlet headings\n` +
     `    j/k     Scroll\n\n` +
     `  Requires Chrome with --remote-debugging-port=9222\n` +
-    `  Run: browser-start.js  (from badlogic/browser-tools)\n\n` +
+    `  Run: src/services/browser-start.sh\n\n` +
     `  Loading home page...`
   );
   screen.render();

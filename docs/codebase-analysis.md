@@ -277,7 +277,7 @@ Layered sinusoidal colour-field screensaver. **8 moods**: `circuit`, `void`, `ch
 - `emoji`: colour-square emoji (🟥🟦🟩)
 - `ansi`: `▀` half-block + truecolour ANSI sequences (double vertical resolution)
 
-Composable layout using `createStack` + `createColumns` + `createInfoBlock` + `createHeaderBar` + `createStatusBar`. Info panel shows mood, render mode, speed, displacement, FPS, and key bindings. Can also be opened with a primer text input for "primer-smear" mode (displaces chars based on primer content). Keys: `m` = cycle mood, `r` = cycle render mode, `p` = pause, `s` = save frame to `scratch/captures/`.
+Composable layout using `createStack` + `createRow` + `createInfoBlock` + `createHeaderBar` + `createStatusBar`. Info panel shows mood, render mode, speed, displacement, FPS, and key bindings. Can also be opened with a primer text input for "primer-smear" mode (displaces chars based on primer content). Keys: `m` = cycle mood, `r` = cycle render mode, `p` = pause, `s` = save frame to `scratch/captures/`.
 
 ---
 
@@ -1039,7 +1039,7 @@ REST calls to `https://api.search.brave.com/res/v1/web/search`. Requires `BRAVE_
 | `OverlayManager` | `src/core/overlay-manager.ts` | Flash, value prompt, list prompt, shared browsers |
 | `AppearanceService` | `src/core/appearance-service.ts` | Appearance mode (system/light/dark — currently always dark) |
 | `ThemeResolver` | `src/core/theme/resolver.ts` | Active theme variant getter, live switching |
-| `UIParts` | `src/core/ui-parts.ts` | Composable layout primitives: `createStack`, `createColumns`, `createHeaderBar`, `createStatusBar`, `createTextBlock`, `createRule`, `createFigletDisplay`, `createAnimatedPanel` |
+| `LayoutParts` | `src/core/ui-parts.ts` | Composable layout primitives: `createStack`, `createRow`, `createHeaderBar`, `createStatusBar`, `createTextBlock`, `createRule`, `createFigletDisplay`, `createAnimatedPanel` |
 | `UIPartsSlim` | `src/core/ui-primitives.ts` | `createScrollbar`, `safeSetStyle` |
 | `ContextMenuItems` | `src/core/context-menu-items.ts` | File-path context menu item factories |
 | `EditorCoordinator` | `src/core/editor-coordinator.ts` | Intercepts key events for all editor windows |
@@ -1142,7 +1142,7 @@ Built from all `AppCommandDefinition` entries with a `palettePlacement` field. ~
 
 A layout engine built on top of blessed that provides:
 - `createStack(parent, children[])` — vertical or horizontal distribution with `basis` (px, fr, %)
-- `createColumns(parent, children[])` — horizontal column distribution
+- `createRow(parent, children[])` — horizontal column distribution
 - `createNodePart(node)` — wraps an existing blessed node as a layout part
 - `createHeaderBar(parent)` — themed header with left/right text fields
 - `createStatusBar(parent)` — themed status bar

@@ -40,6 +40,8 @@ DesktopState (types.ts:192) — returned by GET /state and tui_get_state:
     theme?: string
     controlApiEnabled?: boolean
     controlApiPort?: number
+    controlApiHost?: string
+    controlApiBaseUrl?: string
   screen:
     width: number
     height: number
@@ -246,3 +248,5 @@ When adding a control API endpoint:
 | 2026-03-11 | correction | control-api | /windows/batch now accepts canonical left/top/width/height fields (x/y/w/h still accepted as fallback) | E033 S05 |
 | 2026-03-11 | correction | control-api | Added missing descriptions to all POST endpoint catalogue entries | E033 S05 |
 | 2026-03-11 | invariant | control-api | GET /runtime/stats endpoint added for structured telemetry | E033 S08 |
+| 2026-03-12 | correction | control-api | Interactive list/file-browser overlays were not fully automatable with confirm/cancel only: no index control → added `overlay.select` endpoint/command and selectedIndex/count in `overlay.info` | Applications API sweep (primer/plasma interactive blockers) |
+| 2026-03-12 | gotcha | control-api | Some interstitials are module-local windows, not shared overlays: `overlay.*` won’t drive them → expose module/window picker commands (`*.picker.info/select/confirm/cancel`) until migrated to OverlayManager | Backrooms and Zine picker automation |

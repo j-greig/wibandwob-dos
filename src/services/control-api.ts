@@ -96,11 +96,13 @@ const ENDPOINT_CATALOGUE = [
   // All dispatch through the command registry. Prefer /commands/run for new integrations.
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Open primer viewer. Alias: primer.open" },
   { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" }, description: "Open figlet banner. Alias: figlet.open" },
+  { method: "GET",  path: "/view/figlet/fonts",             description: "List figlet fonts, default font, and metadata. Alias: figlet.fonts" },
+  { method: "POST", path: "/view/figlet/open-default",      body: { text: "string (optional, default 'WIB WOB')", font: "string (optional, default catalogue favourite)" }, description: "Open figlet banner without interactive prompts." },
   { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Open text editor. Alias: editor.open" },
-  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Start backrooms session. Alias: backrooms.run" },
+  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Start backrooms session. Alias: backrooms.open" },
   { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Open document reader. Alias: markdown.open" },
   { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Open generative art. Alias: art.open" },
-  { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Open Monster Cam. Alias: monster_cam.open" },
+  { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Open Monster Cam. Alias: monster-cam.open" },
   { method: "POST", path: "/view/agent/open",               body: {}, description: "Open Wib&Wob Agent. Alias: agent.open" },
   { method: "POST", path: "/view/companion/open",           body: {}, description: "Open Scramble companion (floating). Alias: companion.open" },
   { method: "POST", path: "/view/companion/compact",        body: {}, description: "Open Scramble companion (popup). Alias: companion.smol" },
@@ -118,10 +120,12 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/view/music-player/open",        body: { filePath: "string (optional)" }, description: "Open music player. Alias: music-player.open" },
   { method: "POST", path: "/view/primer-browser/open",      body: {}, description: "Open primer browser. Alias: primer.browse" },
   { method: "POST", path: "/view/file-manager/open",        body: {}, description: "Open file manager. Alias: finder.open" },
-  { method: "POST", path: "/view/primer-gallery/open",      body: {}, description: "Open primer gallery. Alias: primer_gallery.open" },
+  { method: "POST", path: "/view/primer-gallery/open",      body: {}, description: "Open primer gallery. Alias: primer-gallery.open" },
   { method: "POST", path: "/view/workspace/open",           body: {}, description: "Open workspace manager. Alias: workspace.manage" },
   { method: "POST", path: "/view/palette/open",             body: {}, description: "Open command palette. Alias: palette.open" },
   { method: "POST", path: "/view/inspector/open",           body: {}, description: "Open state inspector. Alias: inspector.open" },
+  { method: "GET",  path: "/view/zine/canvases",            description: "List selectable Zine canvases. Alias: microapp.wibwob.zine.list-canvases" },
+  { method: "POST", path: "/view/zine/open",                body: { filePath: "string (optional)", index: "number (optional, from /view/zine/canvases)" }, description: "Open Zine canvas without interactive picker." },
   // ── Window operations ──
   { method: "POST", path: "/windows/focus",                 body: { id: "number" }, description: "Focus a window by id" },
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" }, description: "Move a window to absolute coordinates" },
@@ -133,6 +137,11 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label)" }, description: "Send a message to the Wib&Wob Agent window" },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional)" }, description: "Export window text content to scratch/captures/" },
   { method: "POST", path: "/windows/editor/write",          body: { id: "number", content: "string" }, description: "Write content to an editor window buffer" },
+  // ── Overlay control ──
+  { method: "GET",  path: "/overlay/info",                  description: "Check if a modal overlay is active. Returns { active, type?, selectedIndex?, count? }." },
+  { method: "POST", path: "/overlay/confirm",               body: {}, description: "Confirm the active modal overlay (OK/Enter). Returns ok:false if no overlay." },
+  { method: "POST", path: "/overlay/cancel",                body: {}, description: "Cancel the active modal overlay (Cancel/Escape). Returns ok:false if no overlay." },
+  { method: "POST", path: "/overlay/select",                body: { index: "number (required)" }, description: "Select item index in active overlay when supported (browser/list/file-browser)." },
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
@@ -232,10 +241,14 @@ export class ControlApiService {
     this.enabled = false;
   }
 
-  getStatus(): { enabled: boolean; port?: number } {
+  getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string } {
+    const host = "127.0.0.1";
+    const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
       enabled: this.enabled,
       port: this.actualPort,
+      host: this.enabled ? host : undefined,
+      baseUrl,
     };
   }
 
@@ -439,6 +452,52 @@ export class ControlApiService {
       }
     }
 
+    if (request.method === "GET" && url.pathname === "/view/figlet/fonts") {
+      const result = this.handlers.runCommand("figlet.fonts");
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/view/figlet/open-default") {
+      const text = typeof (body as any).text === "string" && (body as any).text.trim()
+        ? (body as any).text.trim()
+        : "WIB WOB";
+      const font = typeof (body as any).font === "string" && (body as any).font.trim()
+        ? (body as any).font.trim()
+        : undefined;
+      const result = this.handlers.runCommand("figlet.open", font ? { text, font } : { text });
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
+
+    if (request.method === "GET" && url.pathname === "/view/zine/canvases") {
+      const result = this.handlers.runCommand("microapp.wibwob.zine.list-canvases");
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/view/zine/open") {
+      const filePath = typeof (body as any).filePath === "string" && (body as any).filePath.trim()
+        ? (body as any).filePath.trim()
+        : undefined;
+      let args: Record<string, unknown> | undefined;
+      if (filePath) {
+        args = { filePath };
+      } else if (typeof (body as any).index === "number") {
+        const listed = this.handlers.runCommand("microapp.wibwob.zine.list-canvases");
+        if (!listed.ok) {
+          return Response.json(listed, { status: 404 });
+        }
+        const files = (listed.result as any)?.files;
+        const picked = Array.isArray(files) ? files.find((f: any) => Number(f?.index) === Number((body as any).index)) : undefined;
+        if (!picked?.filePath) {
+          return Response.json({ ok: false, error: "Invalid zine canvas index" }, { status: 400 });
+        }
+        args = { filePath: picked.filePath };
+      } else {
+        return Response.json({ ok: false, error: "filePath or index required" }, { status: 400 });
+      }
+      const result = this.handlers.runCommand("microapp.wibwob.zine.open", args);
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
+
     // ── View endpoints — all dispatch through command registry ──
     // Routes kept for backward compat; each is a thin shim over /commands/run.
     const viewRoutes: Record<string, { id: string; argsMapper?: (b: any) => Record<string, unknown> | undefined }> = {
@@ -604,8 +663,41 @@ export class ControlApiService {
     // ── Backrooms + workspace — also dispatch through command registry ──
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
       const channel = normalizeBackroomsChannel(body);
-      const result = this.handlers.runCommand("backrooms.run", channel as unknown as Record<string, unknown>);
+      const result = this.handlers.runCommand("backrooms.open", channel as unknown as Record<string, unknown>);
       return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
+    }
+    // ── Overlay control ──
+    if (request.method === "GET" && url.pathname === "/overlay/info") {
+      const result = this.handlers.runCommand("overlay.info");
+      return Response.json(result);
+    }
+    if (request.method === "POST" && url.pathname === "/overlay/confirm") {
+      const result = this.handlers.runCommand("overlay.confirm");
+      const inner = (result as any).result;
+      if (inner && !inner.confirmed) {
+        return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
+      }
+      return Response.json(result);
+    }
+    if (request.method === "POST" && url.pathname === "/overlay/cancel") {
+      const result = this.handlers.runCommand("overlay.cancel");
+      const inner = (result as any).result;
+      if (inner && !inner.cancelled) {
+        return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
+      }
+      return Response.json(result);
+    }
+    if (request.method === "POST" && url.pathname === "/overlay/select") {
+      const index = Number((body as any).index);
+      if (!Number.isFinite(index)) {
+        return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
+      }
+      const result = this.handlers.runCommand("overlay.select", { index });
+      const inner = (result as any).result;
+      if (inner && !inner.selected) {
+        return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
+      }
+      return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
       const name = String((body as any).name ?? "default");

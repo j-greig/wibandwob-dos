@@ -29,9 +29,9 @@ add the re-export to `microapp-sdk.ts`.
 
 Start from:
 
-- `modules/hello-world/` — minimal static module
-- `modules/heartbeat/` — animated with timers
-- `modules/wibwob-poetry-clock/` — persistent, AI-integrated
+- `modules/demo-hello-world/` — minimal static module
+- `modules/demo-heartbeat/` — animated with timers
+- `modules/demo-wibwob-poetry-clock/` — persistent, AI-integrated
 - `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` — fresh scaffold
 
 ## Private modules

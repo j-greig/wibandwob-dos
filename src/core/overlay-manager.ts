@@ -22,15 +22,68 @@ interface BrowserPromptItem {
   isDirectory?: boolean;
 }
 
+/** Active overlay descriptor for API-driven confirm/cancel. */
+interface ActiveOverlay {
+  type: "value" | "path" | "list" | "centered-list" | "browser" | "file-browser";
+  confirm: () => void;
+  cancel: () => void;
+  selectIndex?: (index: number) => { ok: boolean; index?: number; count?: number; error?: string };
+  info?: () => Record<string, unknown>;
+}
+
 /** Shared transient-UI manager for prompts, browsers, pickers, and notifications. */
 export class OverlayManager {
   /** Default toast position for flash notifications. */
   private toastPosition: ModalPosition = "s";
+  /** Currently active overlay, if any. */
+  private activeOverlay: ActiveOverlay | null = null;
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
     private readonly restoreWindowFocus: () => void
   ) {}
+
+  /** Check if an overlay is currently active. */
+  hasActiveOverlay(): boolean {
+    return this.activeOverlay !== null;
+  }
+
+  /** Get info about the active overlay, or null if none. */
+  getActiveOverlayInfo(): Record<string, unknown> | null {
+    if (!this.activeOverlay) return null;
+    return {
+      type: this.activeOverlay.type,
+      ...(this.activeOverlay.info ? this.activeOverlay.info() : {}),
+    };
+  }
+
+  /** Confirm the active overlay (equivalent to pressing OK/Enter). Returns true if an overlay was confirmed. */
+  confirmActiveOverlay(): boolean {
+    if (!this.activeOverlay) return false;
+    this.activeOverlay.confirm();
+    return true;
+  }
+
+  /** Cancel the active overlay (equivalent to pressing Cancel/Escape). Returns true if an overlay was cancelled. */
+  cancelActiveOverlay(): boolean {
+    if (!this.activeOverlay) return false;
+    this.activeOverlay.cancel();
+    return true;
+  }
+
+  /** Select an index in the active overlay when supported (browser/list/file-browser). */
+  selectActiveOverlayIndex(index: number): { ok: boolean; index?: number; count?: number; error?: string } {
+    if (!this.activeOverlay) return { ok: false, error: "No active overlay" };
+    if (!this.activeOverlay.selectIndex) {
+      return { ok: false, error: `Overlay type '${this.activeOverlay.type}' does not support index selection` };
+    }
+    return this.activeOverlay.selectIndex(index);
+  }
+
+  /** Clear the active overlay reference (called by overlay close handlers). */
+  private clearActiveOverlay(): void {
+    this.activeOverlay = null;
+  }
 
   /** Set the default compass position for flash/toast notifications. */
   setToastPosition(position: ModalPosition): void {
@@ -75,6 +128,7 @@ export class OverlayManager {
     });
 
     const closePrompt = () => {
+      this.clearActiveOverlay();
       buttonBar.destroy();
       modal.destroy();
       this.restoreWindowFocus();
@@ -110,6 +164,13 @@ export class OverlayManager {
         buttonBar.focus(0);
       }
     });
+
+    // Register as active overlay for API control
+    this.activeOverlay = {
+      type: "value",
+      confirm: submitValue,
+      cancel: closePrompt,
+    };
 
     this.screen.render();
     input.focus();
@@ -162,6 +223,7 @@ export class OverlayManager {
     });
 
     const closePrompt = () => {
+      this.clearActiveOverlay();
       input.removeAllListeners("submit");
       input.removeAllListeners("cancel");
       input.removeAllListeners("keypress");
@@ -206,6 +268,13 @@ export class OverlayManager {
         closePrompt();
       }
     });
+
+    // Register as active overlay for API control
+    this.activeOverlay = {
+      type: "path",
+      confirm: submitValue,
+      cancel: closePrompt,
+    };
 
     this.screen.render();
     input.focus();
@@ -285,6 +354,7 @@ export class OverlayManager {
         return;
       }
       closed = true;
+      this.clearActiveOverlay();
       list.removeAllListeners("select");
       list.removeAllListeners("keypress");
       modal.destroy();
@@ -318,6 +388,25 @@ export class OverlayManager {
         applySelection();
       }
     });
+
+    // Register as active overlay for API control
+    this.activeOverlay = {
+      type: "centered-list",
+      confirm: applySelection,
+      cancel: () => closePrompt(true),
+      selectIndex: (requestedIndex) => {
+        const count = items.length;
+        if (count <= 0) return { ok: false, error: "No selectable items", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: list.selected ?? 0,
+        count: items.length,
+      }),
+    };
 
     list.focus();
     this.screen.render();
@@ -403,6 +492,7 @@ export class OverlayManager {
     let filteredItems = [...items];
 
     const closePrompt = () => {
+      this.clearActiveOverlay();
       searchBox.removeAllListeners("submit");
       searchBox.removeAllListeners("keypress");
       list.removeAllListeners("select");
@@ -410,6 +500,16 @@ export class OverlayManager {
       modal.destroy();
       this.restoreWindowFocus();
       this.screen.render();
+    };
+
+    /** Apply the current selection (used by API confirm). */
+    const applySelection = () => {
+      const index = (list as List & { selected: number }).selected ?? 0;
+      const item = filteredItems[index];
+      if (item) {
+        closePrompt();
+        onSubmit(item, index);
+      }
     };
 
     const renderList = (selectedIndex = 0) => {
@@ -528,6 +628,27 @@ export class OverlayManager {
     });
 
     renderList(Math.max(0, Math.min(initialIndex, Math.max(0, items.length - 1))));
+
+    // Register as active overlay for API control
+    this.activeOverlay = {
+      type: "browser",
+      confirm: applySelection,
+      cancel: closePrompt,
+      selectIndex: (requestedIndex) => {
+        const count = filteredItems.length;
+        if (count <= 0) return { ok: false, error: "No selectable items", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        updatePreview(index);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        count: filteredItems.length,
+      }),
+    };
+
     list.focus();
   }
 
@@ -616,6 +737,7 @@ export class OverlayManager {
     let visibleEntries: BrowserPromptItem[] = [];
 
     const closePrompt = () => {
+      this.clearActiveOverlay();
       searchBox.removeAllListeners("submit");
       searchBox.removeAllListeners("keypress");
       list.removeAllListeners("select");
@@ -623,6 +745,19 @@ export class OverlayManager {
       modal.destroy();
       this.restoreWindowFocus();
       this.screen.render();
+    };
+
+    /** Apply the current selection (used by API confirm). */
+    const applySelection = () => {
+      const index = (list as List & { selected: number }).selected ?? 0;
+      const entry = visibleEntries[index];
+      if (!entry) return;
+      if (entry.isDirectory) {
+        loadDirectory(entry.value);
+        return;
+      }
+      closePrompt();
+      onSubmit(entry.value);
     };
 
     const buildPreview = (entry: BrowserPromptItem | undefined) => {
@@ -775,6 +910,28 @@ export class OverlayManager {
     });
 
     loadDirectory(currentDirectory);
+
+    // Register as active overlay for API control
+    this.activeOverlay = {
+      type: "file-browser",
+      confirm: applySelection,
+      cancel: closePrompt,
+      selectIndex: (requestedIndex) => {
+        const count = visibleEntries.length;
+        if (count <= 0) return { ok: false, error: "No selectable entries", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        buildPreview(visibleEntries[index]);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        count: visibleEntries.length,
+        currentDirectory,
+      }),
+    };
+
     list.focus();
   }
 }

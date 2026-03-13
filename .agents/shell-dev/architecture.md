@@ -15,7 +15,7 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 - `src/core/window-manager.ts` — z-order, focus, drag, resize, tile, cascade, close; implements WindowFacade
 - `src/core/desktop-geometry.ts` — canonical terminal geometry snapshot; exposes `{width, height, cellAspect}`
 - `src/core/window-chrome.ts` — maps content size to window size; chrome offsets live here, never inline in window code
-- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers
+- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers. Tracks active overlay with confirm/cancel callbacks for API-driven modal control (`overlay.confirm`, `overlay.cancel`, `overlay.info` commands).
 - `src/core/theme/resolver.ts` — runtime theme state, cycle, external theme registration with token fallback fill
 
 ### Services
@@ -111,7 +111,7 @@ Two concrete implementations:
 - `IrcWorldChatTransport` — backed by `irc-framework` (kiwiirc); handles protocol,
   PING/PONG, and auto-reconnect. Activated by `WIBWOB_CHAT_TRANSPORT=irc`.
 
-**Dev IRC server** — `scripts/dev-irc-server.ts`
+**Dev IRC server** — `.agents/skills/ww-room-chat/scripts/dev-irc-server.ts`
 Hand-rolled Bun TCP server. Minimal command set: NICK, USER, JOIN, PRIVMSG, PING, QUIT.
 Port 6667. Start with `bun run dev-irc-server`. No TLS, no auth, local dev only.
 
