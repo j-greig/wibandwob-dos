@@ -614,6 +614,8 @@ export function openFileManagerWindow(params: {
     bottom: 1,
   });
   const list = listHandle.node;
+  // Enable blessed tags for coloured file type indicators
+  (list as any).parseTags = true;
 
   // Left pane: icon grid (icon view) — full width, toggled via hidden
   const iconGrid = blessed.box({
@@ -1000,16 +1002,38 @@ export function openFileManagerWindow(params: {
     return `${(bytes / 1048576).toFixed(1)}M`;
   };
 
+  /** Get colour for a file type */
+  const fileColour = (entry: { isDirectory: boolean; label: string }): string => {
+    if (entry.isDirectory) return "cyan";
+    const ext = path.extname(entry.label).toLowerCase();
+    if ([".ts", ".tsx"].includes(ext)) return "yellow";
+    if ([".js", ".jsx"].includes(ext)) return "yellow";
+    if ([".md"].includes(ext)) return "green";
+    if ([".txt", ".doc", ".rtf"].includes(ext)) return "green";
+    if ([".json"].includes(ext)) return "magenta";
+    if ([".yaml", ".yml", ".toml"].includes(ext)) return "magenta";
+    if ([".sh", ".bash", ".zsh"].includes(ext)) return "cyan";
+    if ([".css", ".scss"].includes(ext)) return "blue";
+    if ([".png", ".jpg", ".gif", ".svg"].includes(ext)) return "red";
+    if ([".lock"].includes(ext)) return "gray";
+    return "white";
+  };
+
   const formatListItem = (e: typeof entries[0]): string => {
     const icon = fileIcon(e);
+    const col = fileColour(e);
     const listW = Math.max(1, Number(list.width) || 40);
+    // Escape { in filenames
+    const safeName = e.label.replace(/\{/g, "\\{");
     if (e.isDirectory) {
-      return ` ${icon} ${e.label}`;
+      return ` {${col}-fg}${icon}{/${col}-fg} ${safeName}`;
     }
     const size = formatSize(e.size);
-    const nameSpace = Math.max(10, listW - icon.length - size.length - 5);
-    const name = e.label.length > nameSpace ? e.label.slice(0, nameSpace - 2) + ".." : e.label.padEnd(nameSpace);
-    return ` ${icon} ${name} ${size}`;
+    // Calculate visual width (icon may be 2 chars like "ts" or 1 char)
+    const iconVisualLen = icon.length;
+    const nameSpace = Math.max(10, listW - iconVisualLen - size.length - 5);
+    const name = safeName.length > nameSpace ? safeName.slice(0, nameSpace - 2) + ".." : safeName.padEnd(nameSpace);
+    return ` {${col}-fg}${icon}{/${col}-fg} ${name} {gray-fg}${size}{/gray-fg}`;
   };
 
   const applyFilter = (selectedIndex = 0) => {
