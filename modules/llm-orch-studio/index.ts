@@ -100,7 +100,7 @@ function openStudio(host: MicroappHost) {
   // ── Topic input ───────────────────────────────────────────────────
   const topicInput = createTextArea({
     value: topic,
-    rows: 2,
+    rows: 1,
     onChange: (event) => {
       topic = event.value;
       refreshSettings();
@@ -108,7 +108,7 @@ function openStudio(host: MicroappHost) {
   });
   const topicField = createFormField({
     label: "Topic",
-    help: "Wib (Haiku) vs Wob (Sonnet). ASCII in each turn.",
+    help: "Wib (Haiku) vs Wob (Sonnet)",
     child: topicInput,
   });
 
@@ -210,22 +210,22 @@ function openStudio(host: MicroappHost) {
 
   // ── Layout tree ───────────────────────────────────────────────────
   const topicControls = createStack(win.body, [
-    { key: "topic", basis: 5, part: topicField },
+    { key: "topic", basis: 4, part: topicField },
     { key: "preset", basis: 1, part: presetSelect },
   ], { gap: 0 });
 
   const left = createStack(win.body, [
     { key: "header", basis: 6, part: createNodePart(headerBox) },
-    { key: "topicControls", basis: 6, part: topicControls },
+    { key: "topicControls", basis: 5, part: topicControls },
     { key: "banner", basis: 1, part: createNodePart(statusBanner) },
     { key: "actions", basis: 1, part: actionBar },
     { key: "convo", basis: "1fr", part: convoLog },
-    { key: "turns", basis: 5, part: turnsTable },
   ], { gap: 0 });
 
   const right = createStack(win.body, [
-    { key: "settings", basis: 10, part: settingsPanel },
+    { key: "settings", basis: 8, part: settingsPanel },
     { key: "steps", basis: "1fr", part: stepsLog },
+    { key: "turns", basis: 5, part: turnsTable },
   ], { gap: 1 });
 
   const root = createRow(win.body, [
