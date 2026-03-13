@@ -1066,3 +1066,39 @@ New modules require a full app restart to be discovered (module-loader scans at
 startup). But code changes to an existing module's `index.ts` only need the window
 closed and reopened — the module is re-evaluated on window creation. The autoresearch
 reload pattern (close window → reopen) works for code changes but NOT for new modules.
+
+---
+
+## 2026-03-13: _apiCall guard — interactive prompts no longer hijack the TUI
+
+**Human note:** FINALLY! some workarounds to this painful bug thats been bugging me for ages
+
+Commands like `primer.open`, `editor.open`, `figlet.open`, and `markdown.open`
+have a dual personality: called from a menu with no args, they open an interactive
+file picker overlay. Called via the API with no args... they also open an interactive
+file picker overlay. The API returns `{ok: true}` immediately, but the picker takes
+over the entire screen, blocking the TUI until dismissed by keyboard. Agents and CLI
+users have no way to dismiss it.
+
+The fix: when a command is run via the API (`/commands/run`), inject `_apiCall: true`
+into the args. Then in each action handler, when `_apiCall` is set and required args
+are missing, return an error instead of opening an interactive prompt:
+
+```typescript
+// control-api.ts — /commands/run handler
+const apiArgs = { ...(args ?? {}), _apiCall: true };
+
+// app-controller.ts — primer.open handler
+if (!filePath) {
+  if (args?._apiCall) return { ok: false, error: "primer.open requires filePath arg when called via API" };
+  this.promptForPrimer();  // only reached from menu/palette
+  return;
+}
+```
+
+Commands guarded: `primer.open`, `editor.open`, `markdown.open`, `figlet.open`.
+All now return `{ok: false, error: "..."}` instead of hijacking the TUI.
+
+The `_apiCall` marker is minimal and non-invasive — doesn't change menu/palette
+behaviour at all. Only affects the API path, which is the only path where
+interactive prompts are wrong.

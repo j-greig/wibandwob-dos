@@ -465,7 +465,9 @@ export class ControlApiService {
         args = result.data;
       }
       try {
-        const result = this.handlers.runCommand(id, args);
+        // Mark as API call so action handlers can skip interactive prompts
+        const apiArgs = { ...(args ?? {}), _apiCall: true };
+        const result = this.handlers.runCommand(id, apiArgs);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
