@@ -199,8 +199,8 @@ export default function setup(host: MicroappHost) {
 
     const desktopWidth = Math.max(40, Math.floor(host.geometry.width));
     const desktopHeight = Math.max(16, Math.floor(host.geometry.height));
-    const initialWidth = clamp(desktopWidth - 6, 40, 118);
-    const initialHeight = clamp(desktopHeight - 4, 16, 34);
+    const initialWidth = Math.max(40, desktopWidth - 6);
+    const initialHeight = Math.max(16, desktopHeight - 4);
 
     const win = host.createWindow({
       title: "WibWobWorld",

@@ -130,17 +130,36 @@ function fpAutoCamera(map: TerrainMap, peak: { x: number; y: number }): { x: num
   return { x: cx, y: cy };
 }
 
-// Object glyph/colour for first-person rendering
-const FP_OBJECT_GLYPHS: Record<string, string> = {
-  tree: "♣", pine: "▲", house: "⌂", rock: "●", flower: "*", boat: "⛵", bush: "♠",
+// ── First-person object rendering data ──────────────────────────────────
+
+// Multi-row sprites for near objects (bottom row first = base)
+const FP_OBJ_SPRITE_NEAR: Record<string, string[][]> = {
+  // Each sub-array: [glyph, colour] pairs from TOP to BOTTOM
+  tree:   [["♣", "green"], ["♣", "green"], ["♣", "light-green"], ["│", "yellow"], ["│", "yellow"]],
+  pine:   [["▲", "light-green"], ["▲", "green"], ["▲", "green"], ["│", "yellow"], ["│", "yellow"]],
+  house:  [["▲", "red"], ["█", "yellow"], ["█", "yellow"], ["█", "yellow"]],
+  rock:   [["●", "white"], ["▓", "light-black"]],
+  flower: [["✿", "magenta"]],
+  boat:   [["⛵", "light-white"]],
+  bush:   [["♠", "light-green"], ["♠", "green"]],
 };
-const FP_OBJECT_COLORS: Record<string, string> = {
-  tree: "green", pine: "light-green", house: "yellow", rock: "white",
-  flower: "magenta", boat: "light-white", bush: "light-green",
+const FP_OBJ_SPRITE_MID: Record<string, string[][]> = {
+  tree:   [["♣", "green"], ["│", "light-black"]],
+  pine:   [["▲", "green"], ["│", "light-black"]],
+  house:  [["▲", "light-black"], ["█", "light-black"]],
+  rock:   [["●", "light-black"]],
+  flower: [["*", "light-black"]],
+  boat:   [["⛵", "light-black"]],
+  bush:   [["♠", "light-black"]],
 };
-const FP_OBJECT_COLORS_FAR: Record<string, string> = {
-  tree: "light-black", pine: "light-black", house: "light-black", rock: "light-black",
-  flower: "light-black", boat: "light-black", bush: "light-black",
+const FP_OBJ_SPRITE_FAR: Record<string, string[][]> = {
+  tree:   [[":", "light-black"]],
+  pine:   [["^", "light-black"]],
+  house:  [[".", "light-black"]],
+  rock:   [[".", "light-black"]],
+  flower: [],
+  boat:   [],
+  bush:   [],
 };
 
 function renderFirstPerson(
@@ -159,16 +178,19 @@ function renderFirstPerson(
   const SW = width;
   const SH = height;
   const sea = map.seaLevel;
-  const FOV = Math.PI / 2.2;
-  const HORIZON = Math.floor(SH * 0.42);
-  // Stronger elevation scaling for dramatic relief
+  const FOV = Math.PI / 2.4; // slightly narrower for more depth
+  const HORIZON = Math.floor(SH * 0.38); // lower horizon = more sky = more dramatic
   const isElevated = camElev > sea + 0.05;
-  const ELEV_SC = SH * (isElevated ? 0.55 : 0.35);
+  // Much stronger elevation scaling for dramatic hills
+  const ELEV_SC = SH * (isElevated ? 0.75 : 0.45);
   const FAR = Math.max(
-    Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * 1.5,
-    Math.max(map.width, map.height) * 0.8,
+    Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * 1.6,
+    Math.max(map.width, map.height) * 0.9,
   );
-  const STEPS = 800;
+  const STEPS = 1000;
+  // Sun position (fixed right-of-centre for lighting)
+  const sunCol = Math.floor(SW * 0.7);
+  const sunRow = Math.floor(HORIZON * 0.15);
 
   const tag = (color: string, ch: string) =>
     tags ? `{${color}-fg}${ch}{/${color}-fg}` : ch;
@@ -176,44 +198,61 @@ function renderFirstPerson(
   const canvas: (string | null)[][] = Array.from({ length: SH }, () =>
     Array<string | null>(SW).fill(null),
   );
-  const yBuf = Array<number>(SW).fill(SH); // start from bottom, not horizon
-  const distBuf = Array<number>(SW).fill(FAR + 1); // track distance per column
+  const yBuf = Array<number>(SW).fill(SH);
 
-  // Depth-fogged biome colours
-  const BIOME_COLORS_MID: Record<TerrainBiome, string> = {
+  // Biome colours at 3 depth bands
+  const COL_NEAR: Record<TerrainBiome, string> = {
     "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
-    "plain": "green", "forest": "light-green", "hill": "light-black",
+    "plain": "green", "forest": "light-green", "hill": "white",
+    "ridge": "light-white", "peak": "light-white",
+  };
+  const COL_MID: Record<TerrainBiome, string> = {
+    "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
+    "plain": "green", "forest": "green", "hill": "light-black",
     "ridge": "white", "peak": "light-white",
   };
-  const BIOME_COLORS_FAR: Record<TerrainBiome, string> = {
+  const COL_FAR: Record<TerrainBiome, string> = {
     "deep-water": "blue", "shallow-water": "blue", "shore": "light-black",
     "plain": "light-black", "forest": "light-black", "hill": "light-black",
     "ridge": "light-black", "peak": "light-black",
   };
 
-  // Richer ground surface glyphs varying by biome and distance
-  const SURFACE_NEAR: Record<TerrainBiome, string[]> = {
-    "deep-water": ["≈", "~", "≈"], "shallow-water": ["~", "∽", "~"],
-    "shore": [".", "·", ",", "."], "plain": [",", ".", "'", ",", ";"],
-    "forest": ["♣", "♠", ",", "t", "♣"], "hill": ["∧", "n", "^", "∧"],
-    "ridge": ["▲", "^", "△", "▲"], "peak": ["▲", "△", "▲"],
+  // Surface glyphs by distance band
+  const SURF_NEAR: Record<TerrainBiome, string[]> = {
+    "deep-water": ["≈", "~", "≈", "∽"],
+    "shallow-water": ["~", "∽", "~", "·"],
+    "shore": ["·", ".", ",", "·", "°"],
+    "plain": [",", ".", "'", ";", ",", "·"],
+    "forest": ["♣", "♠", "t", "♣", ","],
+    "hill": ["∧", "n", "^", "∧", "."],
+    "ridge": ["▲", "^", "△", "▲"],
+    "peak": ["▲", "△", "▲", "^"],
   };
-  const SURFACE_MID: Record<TerrainBiome, string[]> = {
-    "deep-water": ["~", "~"], "shallow-water": ["~", "~"],
-    "shore": [".", "."], "plain": [",", "."],
-    "forest": ["♣", "t"], "hill": ["^", "n"],
+  const SURF_MID: Record<TerrainBiome, string[]> = {
+    "deep-water": ["~", "~"], "shallow-water": ["~", "∽"],
+    "shore": [".", "·"], "plain": [",", "."],
+    "forest": [":", "♣"], "hill": ["^", "n"],
     "ridge": ["^", "△"], "peak": ["▲", "△"],
   };
-  const SURFACE_FAR: Record<TerrainBiome, string> = {
-    "deep-water": "~", "shallow-water": "~", "shore": ".",
-    "plain": ".", "forest": ":", "hill": "^",
-    "ridge": "^", "peak": "▲",
+  const SURF_FAR: Record<TerrainBiome, string> = {
+    "deep-water": "~", "shallow-water": "~", "shore": "·",
+    "plain": "·", "forest": "·", "hill": "·",
+    "ridge": "·", "peak": "·",
   };
 
-  // Raycast far-to-near
+  // Column fill glyphs (the vertical face of terrain slopes)
+  const CLIFF_NEAR: Record<TerrainBiome, string[]> = {
+    "deep-water": ["~"], "shallow-water": ["~"],
+    "shore": ["░", "."], "plain": ["▒", "░", ":"],
+    "forest": ["▓", "▒", "│"], "hill": ["▓", "▒", "░"],
+    "ridge": ["█", "▓", "▒"], "peak": ["█", "▓"],
+  };
+  const CLIFF_FAR: string[] = ["│", ":", "."];
+
+  // ── Raycast ──
   for (let step = STEPS; step >= 1; step--) {
     const dist = (FAR * step) / STEPS;
-    const distFrac = dist / FAR; // 0=near, 1=far
+    const d = dist / FAR; // 0=near, 1=far
     for (let col = 0; col < SW; col++) {
       if (yBuf[col]! <= 0) continue;
       const ang = yaw + FOV * (col / (SW - 1) - 0.5);
@@ -225,65 +264,71 @@ function renderFirstPerson(
       const cell = map.cells[iy]?.[ix];
       if (!cell) continue;
 
+      // Perspective projection with distance attenuation
       const proj = Math.max(0, Math.min(SH - 1,
-        HORIZON - Math.round((cell.elevation - camElev) * ELEV_SC / (1 + distFrac * 0.3)),
+        HORIZON - Math.round((cell.elevation - camElev) * ELEV_SC / (1 + d * 0.5)),
       ));
 
       if (proj < yBuf[col]!) {
-        // Choose surface glyph and colour based on distance
-        let surfaceGlyph: string;
-        let surfaceColor: string;
         const hash = ((ix * 31 + iy * 7) & 0x7fffffff);
-        if (distFrac < 0.25) {
-          const arr = SURFACE_NEAR[cell.biome];
-          surfaceGlyph = arr[hash % arr.length];
-          surfaceColor = BIOME_COLORS[cell.biome];
-        } else if (distFrac < 0.55) {
-          const arr = SURFACE_MID[cell.biome];
-          surfaceGlyph = arr[hash % arr.length];
-          surfaceColor = BIOME_COLORS_MID[cell.biome];
+
+        // Surface glyph + colour by distance
+        let sg: string;
+        let sc: string;
+        if (d < 0.2) {
+          const arr = SURF_NEAR[cell.biome];
+          sg = arr[hash % arr.length];
+          sc = COL_NEAR[cell.biome];
+        } else if (d < 0.5) {
+          const arr = SURF_MID[cell.biome];
+          sg = arr[hash % arr.length];
+          sc = COL_MID[cell.biome];
         } else {
-          surfaceGlyph = SURFACE_FAR[cell.biome];
-          surfaceColor = BIOME_COLORS_FAR[cell.biome];
+          sg = SURF_FAR[cell.biome];
+          sc = COL_FAR[cell.biome];
         }
 
-        canvas[proj]![col] = tag(surfaceColor, surfaceGlyph);
-        distBuf[col] = dist;
+        canvas[proj]![col] = tag(sc, sg);
 
-        // Fill column below with shaded terrain
+        // ── Column fill (cliff faces) ──
+        const colHeight = yBuf[col]! - proj;
         for (let r = proj + 1; r < yBuf[col]!; r++) {
-          if (canvas[r]![col] === null) {
-            // Gradient: near terrain gets biome colour, far gets muted
-            const fillFrac = (r - proj) / Math.max(1, yBuf[col]! - proj);
-            if (cell.isWater) {
-              canvas[r]![col] = tag(distFrac > 0.5 ? "blue" : "cyan", "~");
-            } else if (fillFrac < 0.3) {
-              canvas[r]![col] = tag(surfaceColor, distFrac < 0.3 ? ":" : ".");
-            } else {
-              canvas[r]![col] = tag("light-black", distFrac < 0.4 ? "│" : ".");
-            }
+          if (canvas[r]![col] !== null) continue;
+          const fillFrac = (r - proj) / Math.max(1, colHeight);
+
+          if (cell.isWater) {
+            // Water columns: wave animation feel
+            const waveChar = ((col + r) & 1) ? "~" : "≈";
+            canvas[r]![col] = tag(d < 0.4 ? "cyan" : "blue", waveChar);
+          } else if (d < 0.35) {
+            // Near: rich cliff textures
+            const cliffArr = CLIFF_NEAR[cell.biome];
+            const ci = Math.min(cliffArr.length - 1, Math.floor(fillFrac * cliffArr.length));
+            const cliffColor = fillFrac < 0.5 ? sc : "light-black";
+            canvas[r]![col] = tag(cliffColor, cliffArr[ci]);
+          } else if (d < 0.6) {
+            // Mid: simpler cliff
+            const ci = Math.min(CLIFF_FAR.length - 1, Math.floor(fillFrac * CLIFF_FAR.length));
+            canvas[r]![col] = tag("light-black", CLIFF_FAR[ci]);
+          } else {
+            // Far: just dots fading out
+            canvas[r]![col] = tag("light-black", fillFrac < 0.5 ? ":" : ".");
           }
         }
         yBuf[col] = proj;
 
-        // Render terrain objects as vertical elements above the surface
-        if (cell.object && distFrac < 0.6 && proj > 0) {
-          const objGlyph = FP_OBJECT_GLYPHS[cell.object] || "?";
-          const objColor = distFrac < 0.3
-            ? (FP_OBJECT_COLORS[cell.object] || "white")
-            : (FP_OBJECT_COLORS_FAR[cell.object] || "light-black");
-          // Object height: 1-3 rows depending on distance and type
-          const objH = cell.object === "house" || cell.object === "tree" || cell.object === "pine"
-            ? (distFrac < 0.15 ? 3 : distFrac < 0.35 ? 2 : 1)
-            : 1;
-          for (let oh = 0; oh < objH && proj - 1 - oh >= 0; oh++) {
-            const or = proj - 1 - oh;
-            if (oh === objH - 1) {
-              canvas[or]![col] = tag(objColor, objGlyph);
-            } else if (cell.object === "tree" || cell.object === "pine") {
-              canvas[or]![col] = tag(objColor, oh === 0 ? "│" : objGlyph);
-            } else if (cell.object === "house") {
-              canvas[or]![col] = tag(objColor, oh === 0 ? "█" : "▲");
+        // ── Object rendering ──
+        if (cell.object && proj > 0) {
+          const spriteSet = d < 0.18 ? FP_OBJ_SPRITE_NEAR
+            : d < 0.45 ? FP_OBJ_SPRITE_MID
+            : FP_OBJ_SPRITE_FAR;
+          const sprite = spriteSet[cell.object];
+          if (sprite && sprite.length > 0) {
+            for (let si = 0; si < sprite.length; si++) {
+              const row = proj - sprite.length + si;
+              if (row >= 0 && row < SH) {
+                canvas[row]![col] = tag(sprite[si][1], sprite[si][0]);
+              }
             }
           }
         }
@@ -291,52 +336,137 @@ function renderFirstPerson(
     }
   }
 
-  // Below-horizon fill: foreground ground
+  // ── Foreground fill (ground at viewer's feet) ──
   for (let col = 0; col < SW; col++) {
     const groundStart = Math.max(HORIZON, yBuf[col]!);
     for (let r = groundStart; r < SH; r++) {
       if (canvas[r]![col] !== null) continue;
       const frac = (r - HORIZON) / Math.max(1, SH - HORIZON);
+      // Perspective distance: bottom row = nearest, horizon = farthest
+      const perspDist = 1 - frac; // 0=very near, 1=at horizon
       if (camElev < sea + 0.08) {
-        // Near water: waves
-        const wave = ((col + r) % 3 === 0) ? "≈" : "~";
-        canvas[r]![col] = tag(frac < 0.3 ? "cyan" : "blue", wave);
+        // Standing in/near water — rich depth-graded ocean
+        if (perspDist > 0.8) {
+          // Near horizon: calm deep water
+          canvas[r]![col] = tag("blue", ((col + r) & 3) === 0 ? "~" : " ");
+        } else if (perspDist > 0.6) {
+          // Mid distance: gentle swells
+          const swell = Math.sin(col * 0.3 + r * 0.15);
+          canvas[r]![col] = tag("blue", swell > 0.3 ? "~" : swell > -0.3 ? "∽" : " ");
+        } else if (perspDist > 0.35) {
+          // Closer: visible waves
+          const wave = Math.sin(col * 0.5 + r * 0.2) * Math.cos(col * 0.15);
+          if (wave > 0.4) canvas[r]![col] = tag("cyan", "≈");
+          else if (wave > 0) canvas[r]![col] = tag("cyan", "~");
+          else if (wave > -0.3) canvas[r]![col] = tag("blue", "∽");
+          else canvas[r]![col] = tag("blue", " ");
+        } else {
+          // Very near: detailed choppy water with foam
+          const chop = Math.sin(col * 0.8 + r * 0.4) + Math.cos(col * 0.3 - r * 0.6) * 0.5;
+          if (chop > 0.8) canvas[r]![col] = tag("light-white", "~");
+          else if (chop > 0.3) canvas[r]![col] = tag("light-cyan", "≈");
+          else if (chop > -0.2) canvas[r]![col] = tag("cyan", "~");
+          else canvas[r]![col] = tag("blue", "∽");
+        }
       } else {
-        // Ground beneath viewer
-        if (frac < 0.2) canvas[r]![col] = tag("green", ",");
-        else if (frac < 0.5) canvas[r]![col] = tag("green", ".");
-        else canvas[r]![col] = tag("light-green", "'");
+        // Solid ground with perspective texture
+        const camBiome = camCell?.biome ?? "plain";
+        if (frac > 0.85) {
+          // Very close: detailed with objects
+          const nearGlyphs = camBiome === "forest" ? ["♣", ",", "♠", "'", "t", ","]
+            : camBiome === "shore" ? [".", "·", ",", "°", ".", " "]
+            : camBiome === "hill" ? ["^", "n", ".", "∧", "'", "."]
+            : camBiome === "peak" ? ["▲", "^", "△", ".", "^"]
+            : [",", ".", "'", ";", "·", ","];
+          canvas[r]![col] = tag(COL_NEAR[camBiome], nearGlyphs[(col * 3 + r * 2) % nearGlyphs.length]);
+        } else if (frac > 0.6) {
+          const midGlyphs = camBiome === "forest" ? [",", "♣", ".", "'"]
+            : [",", ".", "'", ";"];
+          canvas[r]![col] = tag("green", midGlyphs[(col + r) % midGlyphs.length]);
+        } else if (frac > 0.3) {
+          canvas[r]![col] = tag("green", ((col + r) & 1) ? "," : ".");
+        } else {
+          canvas[r]![col] = tag("light-black", ((col + r) & 3) === 0 ? "." : " ");
+        }
       }
     }
   }
 
-  // Sky: rich gradient from deep blue at top → cyan → light near horizon
-  // with occasional cloud wisps
+  // ── Sky rendering ──
+  // Sun glow
   for (let r = 0; r < SH; r++) {
     for (let col = 0; col < SW; col++) {
       if (canvas[r]![col] !== null) continue;
       const frac = HORIZON > 0 ? r / HORIZON : 0;
-      if (frac > 0.85) {
-        // Near horizon: light haze
+
+      // Sun and sun glow
+      const dSunC = Math.abs(col - sunCol);
+      const dSunR = Math.abs(r - sunRow);
+      const dSun = Math.sqrt(dSunC * dSunC + dSunR * dSunR * 4); // stretch vertically
+      if (dSun < 2) {
+        canvas[r]![col] = tag("light-yellow", "☀");
+        continue;
+      }
+      if (dSun < 5) {
+        canvas[r]![col] = tag("light-yellow", "·");
+        continue;
+      }
+      if (dSun < 10) {
+        canvas[r]![col] = tag("yellow", "·");
+        continue;
+      }
+
+      // Horizon glow band
+      if (frac > 0.88) {
+        // Warm horizon glow
+        const glowIntensity = (frac - 0.88) / 0.12;
+        if (dSun < 25) {
+          canvas[r]![col] = tag("light-yellow", glowIntensity > 0.5 ? "░" : "·");
+        } else {
+          canvas[r]![col] = tag("light-cyan", "░");
+        }
+        continue;
+      }
+      if (frac > 0.75) {
         canvas[r]![col] = tag("light-cyan", "·");
-      } else if (frac > 0.65) {
+        continue;
+      }
+      if (frac > 0.55) {
         canvas[r]![col] = tag("cyan", "·");
-      } else if (frac > 0.4) {
-        // Mid sky — occasional cloud wisps
-        const cloudNoise = Math.sin(col * 0.15 + r * 0.3) * Math.cos(col * 0.08 - r * 0.2);
-        if (cloudNoise > 0.7) {
+        continue;
+      }
+
+      // Mid sky: clouds
+      if (frac > 0.3) {
+        const cx = col * 0.12;
+        const cy = r * 0.25;
+        const cn1 = Math.sin(cx + cy * 0.7) * Math.cos(cx * 0.5 - cy);
+        const cn2 = Math.sin(cx * 0.3 + cy * 1.2) * 0.5;
+        const cloud = cn1 + cn2;
+        if (cloud > 0.85) {
+          canvas[r]![col] = tag("light-white", "█");
+        } else if (cloud > 0.65) {
+          canvas[r]![col] = tag("light-white", "▓");
+        } else if (cloud > 0.5) {
           canvas[r]![col] = tag("light-white", "░");
         } else {
           canvas[r]![col] = tag("blue", "·");
         }
-      } else {
-        // Upper sky: deep blue, very sparse
+        continue;
+      }
+
+      // Upper sky: deep blue with occasional stars
+      if (frac < 0.08) {
         const starRoll = Math.sin(col * 7.3 + r * 13.1) * 0.5 + 0.5;
-        if (frac < 0.1 && starRoll > 0.97) {
+        if (starRoll > 0.96) {
+          canvas[r]![col] = tag("light-white", "✦");
+        } else if (starRoll > 0.93) {
           canvas[r]![col] = tag("light-white", "·");
         } else {
-          canvas[r]![col] = tag("blue", frac < 0.15 ? " " : "·");
+          canvas[r]![col] = tag("blue", " ");
         }
+      } else {
+        canvas[r]![col] = tag("blue", "·");
       }
     }
   }
