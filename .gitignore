@@ -65,3 +65,6 @@ assets/mediapipe-venv/
 .claude/skills/
 tests/tidepool-smoke/results/
 .ralph/
+
+# Large reference media (extracted frames tracked instead)
+asciicker-gameplay-animted.gif

@@ -35,6 +35,10 @@ fi
 
 if [ -n "$ASC_ID" ]; then
   echo "Asciicker window id: $ASC_ID"
+  # Maximize for proper scoring — small windows lose detail
+  curl -sf -X POST http://127.0.0.1:8099/windows/maximize \
+    -H 'Content-Type: application/json' -d "{\"id\":$ASC_ID}" > /dev/null 2>&1
+  sleep 0.5
   echo "=== Screenshot ==="
   curl -s "http://127.0.0.1:8099/screenshot/text?id=$ASC_ID" | head -30
   echo ""
