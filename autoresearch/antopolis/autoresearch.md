@@ -105,3 +105,7 @@ From microapp-sdk.js (already imported or importable):
 - #9 keep (8.8): shorter district labels, pipe separators in resource bar
 - #10 discard (8.8): static terrain + focus mode — no score improvement (auto-reverted but changes preserved)
 - #11 keep (9.0): static terrain, focus mode [z], hide figlet in focus, 3fr:1fr ratio — ALL AXES AT 9
+- #12 keep (9.2): marching ants animation beside figlet, heartbeat pulse in status, ant glyph in Colony Log label
+- #13 keep (9.6): colour-coded ants by caste (red/cyan/yellow/magenta/white), dynamic mood subtitle
+- #14 keep (9.8): colour-coded resource bar matching district borders, coloured census counts
+- #15 WIP: colour-coded Colony Log text (district/caste/resource terms), council view mode, interactive gameplay (decree/migrate/recruit/tab-select), 3 view modes (city/focus/council)

@@ -207,6 +207,107 @@ const SEVERITY_PREFIX: Record<EventSeverity, string> = {
   chaos: "! ",
 };
 
+/** Render the council stats dashboard */
+function renderCouncil(world: World, w: number): string {
+  const lines: string[] = [];
+  const hr = "─".repeat(Math.max(1, w - 4));
+
+  // Population breakdown
+  lines.push("{bold} POPULATION{/bold}");
+  lines.push(hr);
+  const castes: AntCaste[] = ["worker", "soldier", "engineer", "queen", "scientist"];
+  const COUNCIL_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
+  for (const c of castes) {
+    const ants = world.ants.filter(a => a.caste === c);
+    if (ants.length === 0) continue;
+    const col = COUNCIL_COLOURS[c];
+    const districts = (["industrial", "residential", "plaza", "mines"] as DistrictId[])
+      .map(d => { const n = ants.filter(a => a.district === d).length; return n > 0 ? `${DISTRICTS[d].label.split(" ")[0]}:${n}` : null; })
+      .filter(Boolean).join(" ");
+    const avgEnergy = Math.floor(ants.reduce((s, a) => s + a.energy, 0) / ants.length);
+    lines.push(`  {${col}-fg}${CASTE_GLYPHS[c]} ${CASTE_NAMES[c]}s: ${ants.length}{/${col}-fg}  energy:${avgEnergy}%  ${districts}`);
+  }
+  lines.push("");
+
+  // Buildings
+  lines.push("{bold} BUILDINGS{/bold}");
+  lines.push(hr);
+  const districtIds: DistrictId[] = ["industrial", "residential", "plaza", "mines"];
+  for (const d of districtIds) {
+    const bldgs = world.buildings.filter(b => b.district === d);
+    if (bldgs.length === 0) continue;
+    const col = DISTRICTS[d].borderFg;
+    const list = bldgs.map(b => `${b.type}(${b.hp}/${b.maxHp})`).join(", ");
+    lines.push(`  {${col}-fg}${DISTRICTS[d].label}:{/${col}-fg} ${list}`);
+  }
+  lines.push("");
+
+  // Resources + rates
+  lines.push("{bold} RESOURCES{/bold}");
+  lines.push(hr);
+  const r = world.resources;
+  const farms = world.buildings.filter(b => b.type === "farm" && b.powered).length;
+  const drills = world.buildings.filter(b => b.type === "drill" && b.powered).length;
+  const reactors = world.buildings.filter(b => b.type === "reactor" && b.powered).length;
+  const labs = world.buildings.filter(b => b.type === "lab" && b.powered).length;
+  const workers = world.ants.filter(a => a.caste === "worker").length;
+  const consumption = Math.floor(world.ants.length * 0.3);
+  lines.push(`  {green-fg}♣ Food:     ${r.food}{/green-fg}   +${farms * 2 + Math.floor(workers * 0.5)}/tick  -${consumption}/tick`);
+  lines.push(`  {magenta-fg}◇ Crystals: ${r.crystals}{/magenta-fg}   +${drills * 2}/tick`);
+  lines.push(`  {yellow-fg}⚡ Energy:   ${r.energy}{/yellow-fg}   +${reactors * 3}/tick  -${Math.floor(world.buildings.length * 0.3)}/tick`);
+  lines.push(`  {magenta-fg}◊ Science:  ${r.science}{/magenta-fg}   +${labs * 2 + world.ants.filter(a => a.caste === "scientist").length}/tick`);
+  lines.push("");
+
+  // Decrees
+  lines.push("{bold} DECREES{/bold}");
+  lines.push(hr);
+  if (world.decree !== "none") {
+    lines.push(`  Active: {yellow-fg}${DECREE_NAMES[world.decree]}{/yellow-fg} (${Math.ceil(world.decreeTicks)} ticks remaining)`);
+  } else {
+    lines.push("  No active decree. Press [d] to issue one.");
+  }
+  if (world.decreeHistory.length > 0) {
+    lines.push(`  History: ${world.decreeHistory.join(" > ")}`);
+  }
+  lines.push("");
+
+  // Danger
+  lines.push("{bold} DANGER{/bold}");
+  lines.push(hr);
+  const dangerBar = "█".repeat(Math.floor(world.dangerLevel * 20)) + "░".repeat(20 - Math.floor(world.dangerLevel * 20));
+  const dangerCol = world.dangerLevel > 0.5 ? "red" : world.dangerLevel > 0.3 ? "yellow" : "green";
+  lines.push(`  {${dangerCol}-fg}[${dangerBar}] ${(world.dangerLevel * 100).toFixed(0)}%{/${dangerCol}-fg}`);
+  lines.push(`  Reactors: ${reactors}  (each adds danger over time)`);
+
+  return lines.join("\n");
+}
+
+/** Wrap known game terms in blessed colour tags to connect log to game UI */
+function colourizeLogText(text: string): string {
+  // District names → district border colours
+  text = text.replace(/Industrial Zone/g, "{yellow-fg}Industrial Zone{/yellow-fg}");
+  text = text.replace(/Residential Burrows/g, "{green-fg}Residential Burrows{/green-fg}");
+  text = text.replace(/Grand Plaza/g, "{cyan-fg}Grand Plaza{/cyan-fg}");
+  text = text.replace(/Crystal Mines/g, "{magenta-fg}Crystal Mines{/magenta-fg}");
+  // Caste names → caste colours
+  text = text.replace(/Worker/g, "{white-fg}Worker{/white-fg}");
+  text = text.replace(/Soldier/g, "{red-fg}Soldier{/red-fg}");
+  text = text.replace(/Engineer/g, "{cyan-fg}Engineer{/cyan-fg}");
+  text = text.replace(/Queen/g, "{yellow-fg}Queen{/yellow-fg}");
+  text = text.replace(/Scientist/g, "{magenta-fg}Scientist{/magenta-fg}");
+  // Resource keywords
+  text = text.replace(/crystals/gi, "{magenta-fg}crystals{/magenta-fg}");
+  text = text.replace(/TECH LEVEL/g, "{cyan-fg}TECH LEVEL{/cyan-fg}");
+  // Decree keywords
+  text = text.replace(/FESTIVAL/g, "{yellow-fg}FESTIVAL{/yellow-fg}");
+  text = text.replace(/LOCKDOWN/g, "{red-fg}LOCKDOWN{/red-fg}");
+  text = text.replace(/PRODUCTION RUSH/g, "{yellow-fg}PRODUCTION RUSH{/yellow-fg}");
+  text = text.replace(/SCIENCE MANDATE/g, "{magenta-fg}SCIENCE MANDATE{/magenta-fg}");
+  return text;
+}
+
 function evt(w: World, text: string, severity: EventSeverity = "calm") {
   w.events.push({ text, severity });
 }
@@ -840,7 +941,7 @@ function renderStatus(world: World, w: number): string {
   const pulseFrames = ["·", ":", "*", ":", "·", " "];
   const pulse = world.paused ? "-" : pulseFrames[Math.floor(world.tick / 3) % pulseFrames.length];
   const left = ` ${pulse} ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
-  const right = " [z]oom [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
+  const right = " [v]iew [tab]sel [d]ecree [m]ove [1-5]recruit [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
 }
@@ -926,10 +1027,25 @@ function openAntopolis(host: MicroappHost) {
   const figletText = renderFiglet("ANTOPOLIS", "small");
   const figletH = figletText.split("\n").length;
 
-  // Focus mode: null = all districts, or a specific district ID
+  // View modes: city (4-quarter), focus (single district), council (stats dashboard)
+  type ViewMode = "city" | "focus" | "council";
+  let viewMode: ViewMode = "city";
   let focusDistrict: DistrictId | null = null;
   const focusCycle: (DistrictId | null)[] = [null, "industrial", "residential", "plaza", "mines"];
   let focusIdx = 0;
+
+  // Selected district for targeted actions (highlighted in all views)
+  let selectedDistrict: DistrictId = "plaza";
+
+  // Council view box
+  const councilBox = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 0,
+    tags: true,
+    border: "line",
+    label: " Colony Council ",
+    style: { ...t.body, border: { fg: t.accent.fg } },
+    scrollable: true, alwaysScroll: true, mouse: true,
+  });
 
   const biomeGrid = createGrid(win.body, {
     rows: 2, columns: 2,
@@ -961,15 +1077,12 @@ function openAntopolis(host: MicroappHost) {
 
     root.layout({ top: 0, left: 0, width: w, height: h });
 
-    // Figlet header — hide in focus mode to maximize district space
-    if (focusDistrict) {
-      figletBox.hide();
-      subtitleBox.hide();
-    } else {
+    // ── Header area ──
+    const showHeader = viewMode === "city";
+    if (showHeader) {
       figletBox.show();
       subtitleBox.show();
       const pauseTag = world.paused ? "  || PAUSED" : "";
-      // Add a small ant march animation beside the figlet
       const marchFrames = [" ö· ö· ö·", " ·ö ·ö ·ö", " ö· ö· ö·", "  ö· ö· ö·"];
       const march = marchFrames[Math.floor(world.tick / 4) % marchFrames.length];
       figletBox.setContent(figletText + pauseTag + march);
@@ -984,20 +1097,42 @@ function openAntopolis(host: MicroappHost) {
         : world.happiness >= 40 ? "the colony struggles..."
         : "the colony is in crisis!";
       subtitleBox.setContent(` ${mood}  --  ${bldgCount} buildings  --  ${districtSummary}`);
+    } else {
+      figletBox.hide();
+      subtitleBox.hide();
     }
 
-    // Resources
+    // Resources + status (always visible)
     resourceBox.setContent(renderResources(world, w));
-
-    // Status
     statusBox.setContent(renderStatus(world, w));
 
-    // Districts — handle focus mode
-    if (focusDistrict) {
-      // Focus mode: hide non-focused, expand focused to fill grid area
+    // ── Main area: depends on view mode ──
+    if (viewMode === "council") {
+      // Council view: hide districts, show stats dashboard in grid area
+      // First show all districts briefly so the grid layout computes positions
+      for (const id of districtIds) districtBoxes[id].show();
+      root.layout({ top: 0, left: 0, width: w, height: h });
+      // Now read the computed grid area
+      const indBox = districtBoxes.industrial;
+      const mineBox = districtBoxes.mines;
+      const gridTop = Number(indBox.top) || 0;
+      const gridLeft = Number(indBox.left) || 0;
+      const gridRight = (Number(mineBox.left) || 0) + (Number(mineBox.width) || 0);
+      const gridBottom = (Number(mineBox.top) || 0) + (Number(mineBox.height) || 0);
+      // Now hide districts and position council
+      for (const id of districtIds) districtBoxes[id].hide();
+      councilBox.show();
+      councilBox.top = gridTop;
+      councilBox.left = gridLeft;
+      councilBox.width = gridRight - gridLeft;
+      councilBox.height = gridBottom - gridTop;
+      const cw = Math.max(1, (gridRight - gridLeft) - 2);
+      councilBox.setContent(renderCouncil(world, cw));
+    } else if (viewMode === "focus" && focusDistrict) {
+      // Focus mode: single district fills grid area
+      councilBox.hide();
       const gridTop = Number(districtBoxes.industrial.top) || 0;
       const gridLeft = Number(districtBoxes.industrial.left) || 0;
-      // Calculate the full grid area from the 2x2 positions
       let gridW = w, gridH = h;
       for (const id of districtIds) {
         const box = districtBoxes[id];
@@ -1006,11 +1141,9 @@ function openAntopolis(host: MicroappHost) {
         if (br > gridW) gridW = br;
         if (bb > gridH) gridH = bb;
       }
-
       for (const id of districtIds) {
         if (id === focusDistrict) {
           const box = districtBoxes[id];
-          // Position to fill the entire grid area
           box.top = gridTop;
           box.left = gridLeft;
           box.width = gridW - gridLeft;
@@ -1021,13 +1154,14 @@ function openAntopolis(host: MicroappHost) {
           box.setContent(renderDistrict(id, bw, bh, world));
           const count = world.ants.filter(a => a.district === id).length;
           const buildings = world.buildings.filter(b => b.district === id).length;
-          (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ants, ${buildings} bldg] -- FOCUS [z] to cycle `);
+          (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ants, ${buildings} bldg] -- [z] cycle [v] view `);
         } else {
           districtBoxes[id].hide();
         }
       }
     } else {
-      // Overview mode: show all, let grid handle layout
+      // City overview: show all districts in grid
+      councilBox.hide();
       for (const id of districtIds) {
         const box = districtBoxes[id];
         box.show();
@@ -1036,7 +1170,9 @@ function openAntopolis(host: MicroappHost) {
         box.setContent(renderDistrict(id, bw, bh, world));
         const count = world.ants.filter(a => a.district === id).length;
         const buildings = world.buildings.filter(b => b.district === id).length;
-        (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
+        // Highlight selected district
+        const sel = id === selectedDistrict ? " <<" : "";
+        (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg]${sel} `);
       }
     }
 
@@ -1049,7 +1185,8 @@ function openAntopolis(host: MicroappHost) {
     };
     const logLines = world.events.slice(-logH).map(e => {
       const col = SEVERITY_COLOUR[e.severity];
-      return `{${col}-fg}${SEVERITY_PREFIX[e.severity]}${e.text}{/${col}-fg}`;
+      const coloured = colourizeLogText(e.text);
+      return `{${col}-fg}${SEVERITY_PREFIX[e.severity]}{/${col}-fg}${coloured}`;
     });
     logBox.setContent(logLines.join("\n"));
     logBox.setScrollPerc(100);
@@ -1104,25 +1241,80 @@ function openAntopolis(host: MicroappHost) {
         evt(world, "Not enough crystals to build!", "warn");
       }
       render();
-    } else if (key.full === "z") {
-      // Cycle focus: all → industrial → residential → plaza → mines → all
-      focusIdx = (focusIdx + 1) % focusCycle.length;
-      focusDistrict = focusCycle[focusIdx]!;
-      if (focusDistrict) {
-        evt(world, `Zooming into ${DISTRICTS[focusDistrict].label}...`);
+    } else if (key.full === "v") {
+      // Cycle view: city → focus → council → city
+      const views: ViewMode[] = ["city", "focus", "council"];
+      const idx = views.indexOf(viewMode);
+      viewMode = views[(idx + 1) % views.length]!;
+      if (viewMode === "focus") {
+        focusDistrict = selectedDistrict;
+        evt(world, `Focus: ${DISTRICTS[focusDistrict].label}`);
+      } else if (viewMode === "council") {
+        focusDistrict = null;
+        evt(world, "Colony Council convenes...");
       } else {
-        evt(world, "Overview mode restored.");
+        focusDistrict = null;
+        evt(world, "City overview restored.");
+      }
+      render();
+    } else if (key.full === "z" || key.name === "tab") {
+      // Cycle selected district (and focus if in focus mode)
+      const idx = districtIds.indexOf(selectedDistrict);
+      selectedDistrict = districtIds[(idx + 1) % districtIds.length]!;
+      if (viewMode === "focus") {
+        focusDistrict = selectedDistrict;
+      }
+      render();
+    } else if (key.full === "d") {
+      // Issue decree (player acts as queen)
+      if (world.decree !== "none") {
+        evt(world, "A decree is already in effect!", "warn");
+      } else {
+        const decrees: Exclude<DecreeType, "none">[] = ["festival", "lockdown", "rush", "science_push"];
+        const pick = decrees[Math.floor(Math.random() * decrees.length)]!;
+        world.decree = pick;
+        world.decreeTicks = 20 + Math.floor(Math.random() * 10);
+        world.decreeHistory.push(DECREE_NAMES[pick]);
+        if (world.decreeHistory.length > 5) world.decreeHistory.shift();
+        evt(world, `You decree: ${DECREE_NAMES[pick]}!`, "chaos");
+        if (pick === "festival") {
+          emitExplosion(world, 0.5, 0.3, "plaza", 20);
+        }
+      }
+      render();
+    } else if (key.full === "m") {
+      // Migrate: move a random ant FROM selected district to another
+      const fromAnts = world.ants.filter(a => a.district === selectedDistrict && a.caste !== "queen");
+      if (fromAnts.length > 0) {
+        const ant = fromAnts[Math.floor(Math.random() * fromAnts.length)]!;
+        const others = districtIds.filter(d => d !== selectedDistrict);
+        const dest = others[Math.floor(Math.random() * others.length)]!;
+        ant.district = dest;
+        ant.x = 0.3 + Math.random() * 0.4;
+        ant.y = 0.3 + Math.random() * 0.4;
+        evt(world, `${CASTE_NAMES[ant.caste]} #${ant.id} reassigned to ${DISTRICTS[dest].label}.`);
+      } else {
+        evt(world, `No movable ants in ${DISTRICTS[selectedDistrict].label}!`, "warn");
       }
       render();
     } else if (SPAWN_KEYS[key.full]) {
-      const caste = SPAWN_KEYS[key.full]!;
-      spawnAnt(world, caste);
-      evt(world, `Summoned a ${CASTE_NAMES[caste]}!`);
+      // Spawn ant in selected district (costs food)
+      if (world.resources.food >= 10) {
+        const caste = SPAWN_KEYS[key.full]!;
+        const ant = spawnAnt(world, caste);
+        ant.district = selectedDistrict;
+        ant.x = 0.3 + Math.random() * 0.4;
+        ant.y = 0.3 + Math.random() * 0.4;
+        world.resources.food -= 10;
+        evt(world, `Recruited a ${CASTE_NAMES[caste]} in ${DISTRICTS[selectedDistrict].label}! (-10 food)`);
+      } else {
+        evt(world, "Not enough food to recruit! (need 10)", "warn");
+      }
       render();
     }
   });
 
-  win.body.key(["p", "+", "=", "-", "_", "e", "b", "z", "1", "2", "3", "4", "5"], () => {});
+  win.body.key(["p", "+", "=", "-", "_", "e", "b", "v", "z", "d", "m", "tab", "1", "2", "3", "4", "5"], () => {});
 
   // ── Lifecycle ───────────────────────────────────────────────────────
 
@@ -1130,7 +1322,7 @@ function openAntopolis(host: MicroappHost) {
   win.onResize(render);
 
   win.describeState(() => ({
-    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${focusDistrict ? ` FOCUS:${DISTRICTS[focusDistrict].label}` : ""}${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
+    summary: `Antopolis — ${viewMode.toUpperCase()} pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}% sel:${DISTRICTS[selectedDistrict].label}${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
     population: world.ants.length,
     buildings: world.buildings.length,
     techLevel: world.techLevel,
