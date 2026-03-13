@@ -1,6 +1,6 @@
 # Autoresearch Ideas — LLM Orch Studio UI
 
-- Add a small animated element (spinner or pulse) to the status banner when running
+- DONE: animated pulse in status banner — was the 7.0→7.4 breakthrough
 - Use createProgressBar for run progress (step 1/6, 2/6, etc.)
 - Make the settings panel use muted colour for labels vs normal for values
 - Add a small ASCII logo/glyph to the right column header area

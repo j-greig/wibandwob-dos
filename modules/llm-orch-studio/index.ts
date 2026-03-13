@@ -197,6 +197,23 @@ function openStudio(host: MicroappHost) {
   const convoLog = createLogView({ border: true, label: "Wib ↔ Wob Conversation", maxEntries: 500 });
   const stepsLog = createLogView({ border: true, label: "Steps / Stream", maxEntries: 800 });
 
+  // ── Right column header ────────────────────────────────────────────
+  const rightHeaderBox = blessed.box({
+    parent: win.body,
+    top: 0, left: 0, width: 0, height: 0,
+    tags: false,
+    align: "center" as const,
+    style: { fg: host.theme().muted?.fg ?? host.theme().body.fg, bg: host.theme().body.bg },
+  });
+  function refreshRightHeader() {
+    try {
+      const art = renderFiglet("STUDIO", "small");
+      rightHeaderBox.setContent(art);
+    } catch {
+      rightHeaderBox.setContent("STUDIO");
+    }
+  }
+
   // ── Compact settings ──────────────────────────────────────────────
   const settingsPanel = createKeyValuePanel({
     border: true,
@@ -229,10 +246,11 @@ function openStudio(host: MicroappHost) {
   ], { gap: 0 });
 
   const right = createStack(win.body, [
+    { key: "rightHeader", basis: 4, part: createNodePart(rightHeaderBox) },
     { key: "settings", basis: 8, part: settingsPanel },
     { key: "steps", basis: "1fr", part: stepsLog },
     { key: "turns", basis: 6, part: turnsTable },
-  ], { gap: 1 });
+  ], { gap: 0 });
 
   const root = createRow(win.body, [
     { key: "left", basis: "3fr", part: left },
@@ -241,6 +259,7 @@ function openStudio(host: MicroappHost) {
 
   refreshSettings();
   refreshHeader();
+  refreshRightHeader();
   refreshBanner();
   layout();
 
@@ -272,6 +291,7 @@ function openStudio(host: MicroappHost) {
     const width = Math.max(1, Number(win.body.width) || 0);
     const height = Math.max(1, Number(win.body.height) || 0);
     refreshHeader();
+    refreshRightHeader();
     root.layout({ top: 0, left: 0, width, height });
     host.screen.render();
   }
