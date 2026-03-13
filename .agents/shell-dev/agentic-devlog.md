@@ -52,6 +52,18 @@ at runtime — zero drift by construction.
   fails — switched to `set -uo pipefail` (no -e) so all tests run.
 - State API returns theme at `.app.theme` not `.theme` — had to discover
   by inspecting actual JSON structure.
+- document.open uses `filePath` not `path` as its arg key — command
+  descriptions document this but easy to miss. Typed schemas (Zod) would
+  catch this at validation time.
+
+### Phase 2 result: ww CLI
+- src/cli/ww.ts — 140 lines, pure HTTP client
+- 42 automated tests via bash + jq (no TUI inspection needed)
+- Full command parity verified by sorted diff of command IDs
+- Three syntax styles cover all agent use patterns
+- -q mode enables ww windows -q | xargs -I{} ww window {} close
+- Package.json script: bun run ww
+- Total build time: ~45 minutes including test suite
 - Prefer concrete notes tied to scripts, APIs, or runtime surfaces over vague complaints.
 
 ## Current Notes

@@ -393,6 +393,28 @@ BUN_WW=$(cd /Users/james/Repos/wibandwob-dos && bun run ww health 2>/dev/null | 
 check "bun run ww health works" \
   "$([ "$BUN_WW" = "true" ] && echo PASS || echo "got=$BUN_WW")"
 
+# ── 30. JSON validity on all outputs ─────────────────────
+echo "--- json validity ---"
+# Every ww subcommand that returns data should produce valid JSON
+for subcmd in state windows commands health; do
+  VALID=$($WW $subcmd 2>/dev/null | jq empty 2>&1 && echo "valid" || echo "invalid")
+  check "ww $subcmd outputs valid JSON" \
+    "$([ "$VALID" = "valid" ] && echo PASS || echo "$VALID")"
+done
+
+# cmd result should also be valid JSON
+$WW cmd editor.new 2>/dev/null | jq empty 2>&1 && CMD_VALID="valid" || CMD_VALID="invalid"
+check "ww cmd result is valid JSON" \
+  "$([ "$CMD_VALID" = "valid" ] && echo PASS || echo "$CMD_VALID")"
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1; sleep 0.3
+
+# ── 31. Microapp commands visible ────────────────────────
+echo "--- microapp parity ---"
+MICRO_COUNT=$($WW commands -q | grep -c '^microapp\.' || echo 0)
+API_MICRO=$(curl -s "$API/commands/list" | jq '[.commands[] | select(.id | startswith("microapp."))] | length')
+check "microapp commands visible via ww" \
+  "$([ "$MICRO_COUNT" = "$API_MICRO" ] && echo PASS || echo "ww=$MICRO_COUNT api=$API_MICRO")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
