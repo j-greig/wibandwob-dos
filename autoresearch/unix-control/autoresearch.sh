@@ -370,6 +370,29 @@ check "success exit code is 0" "$([ "$GOOD_EXIT" = "0" ] && echo PASS || echo "e
 $WW cmd bad.command >/dev/null 2>&1; BAD_EXIT2=$?
 check "failure exit code is non-zero" "$([ "$BAD_EXIT2" -ne 0 ] && echo PASS || echo "exit=$BAD_EXIT2")"
 
+# ── 28. Rapid fire: open + close cycle ───────────────────
+echo "--- rapid fire ---"
+for i in 1 2 3 4 5; do
+  $WW cmd editor.new >/dev/null 2>&1
+done
+sleep 0.5
+RAPID_COUNT=$($WW windows | jq 'length')
+check "rapid fire: 5 editor.new creates 5 windows" \
+  "$([ "$RAPID_COUNT" -ge 5 ] && echo PASS || echo "count=$RAPID_COUNT")"
+
+# Close all in one pipe
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
+sleep 0.5
+RAPID_AFTER=$($WW windows | jq 'length')
+check "rapid fire: close all via pipe" \
+  "$([ "$RAPID_AFTER" = "0" ] && echo PASS || echo "remaining=$RAPID_AFTER")"
+
+# ── 29. bun run ww shortcut ─────────────────────────────
+echo "--- bun run ww ---"
+BUN_WW=$(cd /Users/james/Repos/wibandwob-dos && bun run ww health 2>/dev/null | jq -r '.ok' || echo "FAIL")
+check "bun run ww health works" \
+  "$([ "$BUN_WW" = "true" ] && echo PASS || echo "got=$BUN_WW")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
