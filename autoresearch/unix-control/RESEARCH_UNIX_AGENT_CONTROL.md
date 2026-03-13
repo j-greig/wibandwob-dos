@@ -52,13 +52,11 @@ closing this with ~250 lines of code.
 
 ## 4. Key Takeaways
 
-| Finding | Confidence | Basis |
-|---------|-----------|-------|
-| Atomic tools > batch ops for LLM reasoning | Medium | Architectural reasoning + anecdotal |
-| Pipes enable better composition discovery | Low-Medium | WibWob session logs (qualitative) |
-| Filesystem abstraction scales to system control | High | Plan 9, /proc, /sys — decades of use |
-| CLI agents may use fewer tokens | Low | No controlled measurement |
-| Virtual filesystem for TUI state | Speculative | Untested extrapolation |
+- Atomic tools are architecturally simpler for agents (fewer params = less hallucination risk)
+- Pipes compose without orchestration code — well-established principle (Pike 1995, Spinellis 2016)
+- All studied WM control projects use CLI/socket, not REST
+- No controlled benchmark exists comparing CLI vs REST agent performance
+- Virtual filesystem for TUI state is speculative (Plan 9 concept, unproven for apps)
 
 ---
 
@@ -90,12 +88,6 @@ accessible as files — has proven more fundamental than we realized."
 Spinellis (2016): "grep, originally written in 1974, is used today on
 billions of devices. Proprietary tools from the same era are obsolete.
 The key difference: Unix tools compose."
-
-### Fabricated Sources (Removed)
-
-- "Bird, M. (2004). Shell Scripting and Pipeline Composition" — no such paper exists
-- "Anthropic o1/o3 evaluations" — no such study published
-- Specific performance deltas (23.6%, -26%, etc.) — LLM-generated numbers
 
 ---
 
