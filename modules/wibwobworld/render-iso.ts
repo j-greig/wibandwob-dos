@@ -25,36 +25,60 @@ const ISO_BIOME_COLORS: Record<TerrainBiome, string> = {
   "peak": "light-white",
 };
 
-// Surface glyphs — more variety for iso view
-const ISO_SURFACE: Record<TerrainBiome, string[]> = {
-  "deep-water": ["≈", "~"],
-  "shallow-water": ["~", "∽"],
-  "shore": ["·", "."],
-  "plain": [",", ".", "'"],
-  "forest": ["♣", "♠", "t"],
-  "hill": ["∧", "n"],
-  "ridge": ["^", "△"],
-  "peak": ["▲", "△"],
+// South-face column colours (slightly darker/warmer for 3D feel)
+const ISO_COLUMN_COLORS: Record<TerrainBiome, string[]> = {
+  "deep-water": ["blue"],
+  "shallow-water": ["cyan", "blue"],
+  "shore": ["yellow", "light-black"],
+  "plain": ["green", "light-black"],
+  "forest": ["green", "light-black"],
+  "hill": ["light-black", "light-black"],
+  "ridge": ["light-black", "light-black"],
+  "peak": ["white", "light-black"],
 };
 
-// Object rendering for iso view
+// Surface glyphs — more variety for iso view
+const ISO_SURFACE: Record<TerrainBiome, string[]> = {
+  "deep-water": ["≈", "~", "≈", "~"],
+  "shallow-water": ["~", "∽", "~", "·"],
+  "shore": ["·", ".", "°", "·"],
+  "plain": [",", ".", "'", ";", "·"],
+  "forest": ["♣", "♠", "t", "♣", ","],
+  "hill": ["∧", "n", "^", "."],
+  "ridge": ["^", "△", "▲", "^"],
+  "peak": ["▲", "△", "▲", "^"],
+};
+
+// Column fill characters for vertical faces
+const ISO_COLUMN_CHARS: Record<TerrainBiome, string[]> = {
+  "deep-water": ["~"],
+  "shallow-water": ["~", "∽"],
+  "shore": ["░", "."],
+  "plain": ["▒", "░", ":"],
+  "forest": ["▓", "▒", "░"],
+  "hill": ["▓", "▒", "░"],
+  "ridge": ["█", "▓", "▒"],
+  "peak": ["█", "▓", "▒"],
+};
+
+// Object rendering for iso view — taller sprites
 const ISO_OBJ_GLYPH: Record<string, string[]> = {
-  tree:   ["♣", "│"],  // canopy, trunk
-  pine:   ["▲", "│"],
-  house:  ["▲", "█"],  // roof, wall
-  rock:   ["●"],
+  tree:   ["♣", "♣", "│"],  // canopy×2, trunk
+  pine:   ["▲", "▲", "│"],
+  house:  ["▲", "█", "█"],  // roof, wall×2
+  rock:   ["●", "▓"],
   flower: ["✿"],
   boat:   ["⛵"],
-  bush:   ["♠"],
+  bush:   ["♠", "♠"],
 };
 const ISO_OBJ_COLOR: Record<string, string[]> = {
-  tree:   ["green", "light-black"],
-  pine:   ["light-green", "light-black"],
-  house:  ["red", "yellow"],
-  rock:   ["white"],
+  tree:   ["green", "light-green", "light-black"],
+  pine:   ["light-green", "green", "light-black"],
+  house:  ["red", "yellow", "yellow"],
+  rock:   ["white", "light-black"],
   flower: ["magenta"],
   boat:   ["light-white"],
-  bush:   ["light-green"],
+  bush:   ["light-green", "green"],
 };
 
 function hashCell(x: number, y: number): number {
@@ -94,15 +118,20 @@ export function renderIso(artifact: SavedTerrainArtifact, width: number, height:
   }
   sampled.sort((a, b) => a.depth - b.depth);
 
+  // Tile spacing: iso tiles should be close together for dense fill
+  // Use integer pixel spacing to avoid gaps
+  const tileW = Math.max(2, Math.round(2 * scale));
+  const tileH = Math.max(1, Math.round(scale));
+
   for (const { wx, wy } of sampled) {
     const cell = map.cells[wy]?.[wx];
     if (!cell) continue;
 
     const sx = wx / stride;
     const sy = wy / stride;
-    const isoX = Math.round((sx - sy) * 2 * scale + centerX);
+    const isoX = Math.round((sx - sy) * tileW + centerX);
     const elevH = Math.max(0, Math.round(Math.max(0, cell.relativeElevation) * ISO_EXAGGERATION));
-    const baseY = Math.round((sx + sy) * scale) + topPad + ISO_EXAGGERATION;
+    const baseY = Math.round((sx + sy) * tileH) + topPad + ISO_EXAGGERATION;
     const isoY = baseY - elevH;
 
     const h = hashCell(wx, wy);
@@ -110,24 +139,40 @@ export function renderIso(artifact: SavedTerrainArtifact, width: number, height:
     const glyph = surfaceArr[h % surfaceArr.length];
     const color = ISO_BIOME_COLORS[cell.biome];
 
-    // Top surface
+    // Top surface — paint 2 chars wide for iso diamond feel
     if (isoY >= 0 && isoY < height && isoX >= 0 && isoX < width) {
       canvas[isoY]![isoX] = `{${color}-fg}${glyph}{/${color}-fg}`;
+      // Adjacent pixel for wider iso tiles
+      if (isoX + 1 < width && canvas[isoY]![isoX + 1] === " ") {
+        const g2 = surfaceArr[(h + 3) % surfaceArr.length];
+        canvas[isoY]![isoX + 1] = `{${color}-fg}${g2}{/${color}-fg}`;
+      }
     }
 
-    // Vertical column below elevated land with shading
+    // Vertical column below elevated land with rich shading
     if (!cell.isWater && elevH > 0) {
+      const colChars = ISO_COLUMN_CHARS[cell.biome];
+      const colColors = ISO_COLUMN_COLORS[cell.biome];
       for (let cy = isoY + 1; cy <= baseY && cy < height; cy++) {
-        if (cy >= 0 && isoX >= 0 && isoX < width && canvas[cy]![isoX] === " ") {
-          // South-face shading: darker at bottom
-          const colFrac = (cy - isoY) / Math.max(1, elevH);
-          if (colFrac < 0.4) {
-            canvas[cy]![isoX] = `{${color}-fg}│{/${color}-fg}`;
-          } else {
-            canvas[cy]![isoX] = `{light-black-fg}│{/light-black-fg}`;
-          }
+        if (cy < 0 || isoX < 0 || isoX >= width) continue;
+        if (canvas[cy]![isoX] !== " ") continue;
+        const colFrac = (cy - isoY) / Math.max(1, elevH);
+        const ci = Math.min(colChars.length - 1, Math.floor(colFrac * colChars.length));
+        const colColor = colColors[Math.min(ci, colColors.length - 1)];
+        canvas[cy]![isoX] = `{${colColor}-fg}${colChars[ci]}{/${colColor}-fg}`;
+        // Fill adjacent column pixel too
+        if (isoX + 1 < width && canvas[cy]![isoX + 1] === " ") {
+          const ci2 = Math.min(colChars.length - 1, Math.floor(colFrac * colChars.length * 1.2));
+          canvas[cy]![isoX + 1] = `{light-black-fg}${colChars[Math.min(ci2, colChars.length - 1)]}{/light-black-fg}`;
         }
       }
+    }
+
+    // Water: add subtle animation feel with alternating chars
+    if (cell.isWater && isoY >= 0 && isoY < height && isoX >= 0 && isoX < width) {
+      const waterDepth = cell.biome === "deep-water" ? "blue" : "cyan";
+      const wg = ((wx + wy) & 1) ? "~" : "≈";
+      canvas[isoY]![isoX] = `{${waterDepth}-fg}${wg}{/${waterDepth}-fg}`;
     }
 
     // Render terrain objects above the surface
@@ -157,11 +202,14 @@ export function renderIso(artifact: SavedTerrainArtifact, width: number, height:
     const focusBaseY = Math.round((fsx + fsy) * scale) + topPad + ISO_EXAGGERATION;
     const focusIsoX = Math.round((fsx - fsy) * 2 * scale + centerX);
     const focusIsoY = focusBaseY - focusElevH;
-    // Player sprite: 2 cells tall
+    // Player sprite: 3 cells tall with glow
     if (focusIsoY >= 0 && focusIsoY < height && focusIsoX >= 0 && focusIsoX < width) {
       canvas[focusIsoY]![focusIsoX] = "{magenta-fg}◕{/magenta-fg}";
       if (focusIsoY - 1 >= 0) {
         canvas[focusIsoY - 1]![focusIsoX] = "{magenta-fg}▼{/magenta-fg}";
+      }
+      if (focusIsoY - 2 >= 0) {
+        canvas[focusIsoY - 2]![focusIsoX] = "{light-magenta-fg}·{/light-magenta-fg}";
       }
     }
   }
