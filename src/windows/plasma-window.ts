@@ -33,6 +33,21 @@ import {
 } from "../services/plasma-engine.js";
 import type { BaseWindowDeps } from "./generative-windows.js";
 
+// ANSI colour codes for sidebar
+const A = {
+  r:   "\x1b[0m",
+  b:   "\x1b[1m",
+  dim: "\x1b[2m",
+  cyn: "\x1b[96m",
+  grn: "\x1b[92m",
+  yel: "\x1b[93m",
+  wht: "\x1b[97m",
+  gry: "\x1b[90m",
+  mag: "\x1b[95m",
+  red: "\x1b[91m",
+  blu: "\x1b[94m",
+} as const;
+
 export interface PlasmaWindowOptions {
   mood?: string;
   renderMode?: PlasmaRenderMode;
@@ -99,26 +114,72 @@ export function openPlasmaWindow(
         left: `Plasma: ${s.mood}`,
         right: s.renderMode.toUpperCase(),
       });
+
+      // ANSI colour sidebar helpers
+      const sep = `  ${A.gry}${"─".repeat(22)}${A.r}`;
+      const label = (icon: string, text: string) => `  ${A.cyn}${icon} ${text}${A.r}`;
+      const key = (k: string, desc: string) => `  ${A.yel}${k.padEnd(4)}${A.gry}${desc}${A.r}`;
+      const bar = (v: number, mx: number, w: number) => {
+        const f = Math.round((v / Math.max(0.001, mx)) * w);
+        return `${A.cyn}${"▮".repeat(Math.min(f, w))}${A.gry}${"▯".repeat(Math.max(0, w - f))}${A.r}`;
+      };
+
+      // Mood colours
+      const moodCols: Record<string, string> = {
+        circuit: A.grn, void: A.gry, chaos: A.red, aurora: A.cyn,
+        sunset: A.yel, acid: A.grn, "deep-space": A.blu, chrome: A.wht,
+      };
+      const moodCol = moodCols[s.mood] ?? A.wht;
+
+      // Mood list with active
+      const moodList = moodNames.map(m => {
+        const active = m === s.mood;
+        const col = moodCols[m] ?? A.wht;
+        return active
+          ? `  ${col}\u25B6 ${A.b}${m}${A.r}`
+          : `  ${A.gry}  ${m}${A.r}`;
+      }).join("\n");
+
+      // Render mode picker
+      const renderLine = RENDER_MODES.map(rm => {
+        const active = rm === s.renderMode;
+        return active
+          ? `${A.wht}${A.b}[${rm.toUpperCase()}]${A.r}`
+          : `${A.gry} ${rm} ${A.r}`;
+      }).join(" ");
+
+      // Source info (if from primer)
+      const srcLines: string[] = [];
+      if (primerName) srcLines.push(`  ${A.gry}source  ${A.wht}${primerName}${A.r}`);
+      if (reason) srcLines.push(`  ${A.gry}reason  ${A.wht}${reason}${A.r}`);
+
       const infoLines = [
-        primerName ? `Source: ${primerName}` : undefined,
-        primerPreview ? `Preview: ${primerPreview}` : undefined,
-        reason ? `Reason: ${reason}` : undefined,
-        primerName || primerPreview || reason ? "" : undefined,
-        `Mood:   ${s.mood}`,
-        `Render: ${s.renderMode}`,
-        `Speed:  ${s.speed.toFixed(3)}`,
-        `Smear:  ${player.mood.displacement} cells`,
-        `FPS:    ${s.fps}`,
         "",
-        "Keys:",
-        " m   mood",
-        " r   render mode",
-        " p   pause",
-        " s   save frame",
-      ].filter((line): line is string => line !== undefined);
+        label("\u2248", "MOOD"),
+        moodList,
+        sep,
+        label("\u25A3", "RENDER"),
+        `  ${renderLine}`,
+        sep,
+        label("\u2699", "ENGINE"),
+        `  ${A.gry}speed${A.r} ${bar(s.speed, 0.12, 10)} ${A.wht}${s.speed.toFixed(3)}${A.r}`,
+        `  ${A.gry}smear${A.r} ${bar(player.mood.displacement, 8, 10)} ${A.wht}${player.mood.displacement}${A.r}`,
+        `  ${A.gry}fps${A.r}   ${A.wht}${s.fps}${A.r}`,
+        ...(srcLines.length ? [sep, label("\u2197", "SOURCE"), ...srcLines] : []),
+        sep,
+        label("\u2328", "CONTROLS"),
+        key("m", "next mood"),
+        key("r", "render mode"),
+        key("p", player.paused ? "resume" : "pause"),
+        key("s", "save capture"),
+        key("f", "fullscreen"),
+      ];
       infoText = infoLines.join("\n");
-      infoBlock.update({ text: infoText });
-      statusBar.update({ left: "m:mood r:render p:pause s:save f:fullscreen" });
+      (infoBlock.node as any).setContent(infoText);
+      statusBar.update({
+        left: "m:mood  r:render  p:pause  s:save  f:fullscreen",
+        right: `${s.mood} \u2502 ${s.renderMode} \u2502 ${s.speed.toFixed(3)}`,
+      });
       deps.onStateChanged?.();
     },
   });
@@ -131,7 +192,7 @@ export function openPlasmaWindow(
     { key: "canvas", basis: "3fr", part: canvasPart },
     { key: "divider", basis: 1, part: divider },
     { key: "info", basis: "1fr", part: infoBlock },
-  ]);
+  ] as const);
 
   const root = createStack(frame.body, [
     { key: "header", basis: 1, part: header },
