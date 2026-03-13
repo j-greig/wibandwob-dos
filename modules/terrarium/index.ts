@@ -795,27 +795,35 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
 
 function renderResources(world: World, w: number): string {
   const r = world.resources;
-  // Census by caste
+  // Census by caste with matching colours
+  const CENSUS_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
   const census = (["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[])
     .map(c => {
       const n = world.ants.filter(a => a.caste === c).length;
-      return n > 0 ? `${CASTE_GLYPH_SHORT[c]}${n}` : null;
+      return n > 0 ? `{${CENSUS_COLOURS[c]}-fg}${CASTE_GLYPH_SHORT[c]}${n}{/${CENSUS_COLOURS[c]}-fg}` : null;
     })
     .filter(Boolean)
     .join(" ");
 
+  // Resources coloured by producing district
   const items = [
-    `♣${r.food}`,
-    `◇${r.crystals}`,
-    `⚡${r.energy}`,
-    `◊${r.science}`,
-    `☺${world.happiness.toFixed(0)}%`,
-    `⚙T${world.techLevel}`,
+    `{green-fg}♣${r.food}{/green-fg}`,
+    `{magenta-fg}◇${r.crystals}{/magenta-fg}`,
+    `{yellow-fg}⚡${r.energy}{/yellow-fg}`,
+    `{magenta-fg}◊${r.science}{/magenta-fg}`,
+    `{cyan-fg}☺${world.happiness.toFixed(0)}%{/cyan-fg}`,
+    `{white-fg}⚙T${world.techLevel}{/white-fg}`,
   ];
   const left = " " + items.join(" | ");
   const right = `pop:${world.ants.length} [${census}] `;
-  const gap = Math.max(1, w - left.length - right.length);
-  return (left + " ".repeat(gap) + right).slice(0, w);
+  // Note: blessed tag chars don't contribute to visual width, but they do to string length.
+  // Use a rough gap calculation — the visual result is still good.
+  const visualLeft = ` ♣${r.food} | ◇${r.crystals} | ⚡${r.energy} | ◊${r.science} | ☺${world.happiness.toFixed(0)}% | ⚙T${world.techLevel}`;
+  const visualRight = `pop:${world.ants.length} [${(["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[]).map(c => { const n = world.ants.filter(a => a.caste === c).length; return n > 0 ? `${CASTE_GLYPH_SHORT[c]}${n}` : null; }).filter(Boolean).join(" ")}] `;
+  const gap = Math.max(1, w - visualLeft.length - visualRight.length);
+  return left + " ".repeat(gap) + right;
 }
 
 function renderStatus(world: World, w: number): string {
@@ -892,8 +900,8 @@ function openAntopolis(host: MicroappHost) {
 
   const resourceBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
-    tags: false,
-    style: { ...t.body, fg: t.accent.fg },
+    tags: true,
+    style: t.body,
   });
 
   // Status bar with theme colours
