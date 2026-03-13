@@ -9,9 +9,9 @@ JSON to stdout, errors to stderr. Designed for `jq`, `xargs`, and shell scripts.
 
 ### Architecture: pure HTTP client, zero catalog import
 
-`wibwob.ts` is ~150 lines of TypeScript. It does NOT import the command catalog,
-the command registry, or any `src/core/` module. It is a pure HTTP client
-that talks to the control API on port 8099.
+`wibwob.ts` is ~150 lines of TypeScript. It does NOT import the command
+catalog, the command registry, or any `src/core/` module. It is a pure
+HTTP client that talks to the control API on port 8099.
 
 ```
 command-catalog.ts        Static command definitions (id, label, group, flags)
@@ -20,7 +20,7 @@ command-registry.ts       Runtime projection (adds dynamic/module commands)
        │
   ┌────┼────────┬──────────────┐
   │    │        │              │
- TUI  API    MCP tools      ww CLI
+ TUI  API    MCP tools     wibwob CLI
 menus  (Hono)  (agent-tools)  (this file)
        │                       │
        └───── HTTP ────────────┘
@@ -57,29 +57,40 @@ validation and generated `--help` per command.
 
 ---
 
+## Setup
+
+The file has a `#!/usr/bin/env bun` shebang so it runs directly.
+Add this to your `~/.zshrc`:
+
+```bash
+alias wibwob='/Users/james/Repos/wibandwob-dos/src/cli/wibwob.ts'
+```
+
+Then `source ~/.zshrc`. Now `wibwob` is a command.
+
 ## Usage
 
 ```bash
 # Builtins
-ww health                          # API health check
-ww state                           # full desktop state (JSON)
+wibwob health                          # is the app running?
+wibwob state                           # full desktop state (JSON)
 wibwob windows                         # list open windows
-wibwob commands                        # list all available commands
-ww screenshot                      # text screenshot of the desktop
+wibwob commands                        # all 144 commands
+wibwob screenshot                      # text screenshot of the desktop
 
 # Run commands — three equivalent syntaxes
-ww cmd editor.new                  # explicit: cmd <id>
-ww editor.new                      # dot syntax: <domain>.<verb>
-ww editor new                      # noun verb: <domain> <verb>
+wibwob cmd editor.new                  # explicit: cmd <id>
+wibwob editor.new                      # dot syntax: <domain>.<verb>
+wibwob editor new                      # noun verb: <domain> <verb>
 
 # Flags
-ww window.move --id 3 --x 10 --y 5
-ww theme.set --name flexoki-ink
-ww figlet.open --text "HELLO" --font banner
+wibwob window.move --id 3 --x 10 --y 5
+wibwob theme.set --name flexoki-ink
+wibwob figlet.open --text "HELLO" --font banner
 
 # Positional window targeting
-ww window 3 close                  # → window.close --id 3
-ww window 3 move --x 10 --y 5     # → window.move --id 3 --x 10 --y 5
+wibwob window 3 close                  # → window.close --id 3
+wibwob window 3 move --x 10 --y 5     # → window.move --id 3 --x 10 --y 5
 
 # Quiet mode: IDs only, one per line (for piping)
 wibwob windows -q                      # window IDs
@@ -98,37 +109,36 @@ wibwob windows | jq length
 wibwob windows | jq -r '.[] | select(.kind=="editor") | .id'
 
 # Close all editors
-wibwob windows -q | xargs -I{} ww window {} close
+wibwob windows -q | xargs -I{} wibwob window {} close
 
-# Close all windows of a specific kind
+# Close windows of a specific kind
 wibwob windows | jq -r '.[] | select(.kind=="art") | .id' | \
-  xargs -I{} ww window {} close
+  xargs -I{} wibwob window {} close
 
-# List commands matching a pattern
+# Find theme commands
 wibwob commands -q | grep '^theme\.'
 
 # Open 5 editors in a row
-for i in $(seq 5); do ww editor.new; done
+for i in $(seq 5); do wibwob editor.new; done
 
 # Tile then screenshot
-ww cmd window.tile && ww screenshot
+wibwob cmd window.tile && wibwob screenshot
 ```
 
 ## Agent workflows
 
 Agents (Claude, Codex, etc.) use `wibwob` instead of raw `curl` calls.
-The three syntax styles cover different agent preferences:
 
 ```bash
-# Structured (Claude tends toward this)
-ww cmd window.move --id 3 --x 10 --y 5
+# Structured
+wibwob cmd window.move --id 3 --x 10 --y 5
 
-# Terse (faster for scripts)
-ww window 3 move --x 10 --y 5
+# Terse
+wibwob window 3 move --x 10 --y 5
 
 # Discovery
 wibwob commands -q | grep window       # what can I do with windows?
-ww state | jq '.focus'             # what's focused?
+wibwob state | jq '.focus'             # what's focused?
 ```
 
 ## Environment
@@ -139,30 +149,8 @@ ww state | jq '.focus'             # what's focused?
 
 ```bash
 # Talk to alt instance on port 8098
-WW_API=http://127.0.0.1:8098 ww health
+WW_API=http://127.0.0.1:8098 wibwob health
 ```
-
-## Running
-
-```bash
-# Via bun directly
-bun run src/cli/wibwob.ts health
-
-# Via package.json script
-bun run wibwob health
-
-# Make it a shell alias (add to .zshrc)
-alias wibwob='bun run /path/to/wibandwob-dos/src/cli/wibwob.ts'
-```
-
-### Name conflicts
-
-`wibwob` has no PATH conflicts — no Homebrew formula, no common Unix tool,
-no man page. Package registries have squatted names (npm: abandoned
-promise lib, PyPI: Python builtins wrapper, crates.io: minimal) but
-none install a `wibwob` binary. Safe for local alias use.
-
-If publishing to npm, use a scoped name: `@wibwob/cli` or `wibwob-cli`.
 
 ## Exit codes
 
@@ -175,8 +163,8 @@ Errors are JSON on stderr: `{"error": 404, "detail": {...}}`
 
 ## Generating documentation
 
-The CLI is auto-built from the command catalog — it has no hardcoded
-command list. So its docs must also be generated from the live API.
+The CLI auto-discovers commands, so its docs must be generated from
+the live API too:
 
 ```bash
 # Full command reference (markdown table)
@@ -191,32 +179,30 @@ wibwob commands | jq -r '
   "\n## \(.[0].id | split(".")[0])\n" +
   ([.[] | "- `\(.id)` — \(.description // "-")"] | join("\n"))'
 
-# Just the IDs, for a quick cheatsheet
+# Just the IDs
 wibwob commands -q | sort
 
-# Write a full reference to a file
+# Write a full reference file
 wibwob commands | jq -r '
-  "# ww command reference\n\nGenerated: \(now | todate)\n\n" +
+  "# wibwob command reference\n\nGenerated: \(now | todate)\n\n" +
   "| Command | Description | Surfaces |\n| --- | --- | --- |\n" +
   ([.[] | "| `\(.id)` | \(.description // "-") | \(.surfaces | join(", ")) |"] | join("\n"))
   ' > src/cli/COMMANDS.md
 ```
 
-The key insight: because `wibwob commands` returns everything the API knows
-(including dynamically registered module commands), the generated docs
-are always complete and current. No manual sync required.
+Because `wibwob commands` returns everything the API knows (including
+dynamically registered module commands), generated docs are always
+complete and current. No manual sync required.
 
-Future improvement: if commands gain Zod schemas for their args, the
-generated docs could include per-command flag tables with types and
-defaults. Until then, the `description` field is the only contract.
+## Name conflicts
+
+`wibwob` has no PATH conflicts — no Homebrew formula, no common Unix
+tool, no man page. Safe for alias use. If publishing to npm, use a
+scoped name: `@wibwob/cli`.
 
 ## Test suite
 
-53 automated tests in `autoresearch/unix-control/autoresearch.sh` covering:
-connectivity, full command ID parity, state parity, all syntax styles,
-flag parsing, jq pipe ergonomics, quiet mode, window operations,
-theme changes, error handling, exit codes, rapid-fire workflows,
-multi-window agent patterns, and a choreography proof-of-concept.
+53 automated tests in `autoresearch/unix-control/autoresearch.sh`:
 
 ```bash
 bash autoresearch/unix-control/autoresearch.sh
