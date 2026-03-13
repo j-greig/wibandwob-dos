@@ -1,1 +1,1 @@
-autoresearch/code-editor/autoresearch.checks.sh
+autoresearch/asciicker/autoresearch.checks.sh
