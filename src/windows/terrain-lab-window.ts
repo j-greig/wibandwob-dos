@@ -65,21 +65,62 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       deps.screen.render();
     },
     onStatus: (s) => {
-      header.update({ left: `${s.terrain} #${s.seed}`, right: s.mode.toUpperCase() });
+      // Mode icons
+      const modeIcons: Record<string, string> = {
+        chaos: "\u2248",   // ≈
+        order: "\u2261",   // ≡
+        hybrid: "\u2637",  // ☷
+      };
+      const modeIcon = modeIcons[s.mode] || "\u2022";
+
+      // Terrain icons
+      const terrainIcons: Record<string, string> = {
+        archipelago: "\u2693",  // ⚓
+        "saddle pass": "\u2229",// ∩
+        "ridge valley": "\u2227",// ∧
+        caldera: "\u25CB",      // ○
+        "lone peak": "\u25B2",  // ▲
+        meadow: "\u223F",       // ∿
+        "twin peaks": "\u25B2\u25B2", // ▲▲
+      };
+      const terrainIcon = terrainIcons[s.terrain] || "\u2022";
+
+      header.update({
+        left: `${terrainIcon} ${s.terrain} #${s.seed}`,
+        right: `${modeIcon} ${s.mode.toUpperCase()}`,
+      });
+
+      // Build rich info panel
+      const sep = "\u2500".repeat(18);
       infoText = [
-        `Mode:    ${s.mode}`,
-        `Terrain: ${s.terrain}`,
-        `Levels:  ${s.levels}`,
-        `Seed:    ${s.seed}`,
         "",
-        "Keys:",
-        " m   mode",
-        " t   terrain",
-        " r   reseed",
-        " +/- levels",
+        `  ${modeIcon} MODE`,
+        `  ${s.mode}`,
+        "",
+        sep,
+        "",
+        `  ${terrainIcon} TERRAIN`,
+        `  ${s.terrain}`,
+        "",
+        sep,
+        "",
+        `  \u25A3 PARAMS`,
+        `  levels:  ${s.levels}`,
+        `  seed:    ${s.seed}`,
+        "",
+        sep,
+        "",
+        `  \u2328 KEYS`,
+        `  m   cycle mode`,
+        `  t   next terrain`,
+        `  r   reseed`,
+        `  +/- levels`,
+        `  s   save frame`,
       ].join("\n");
       infoBlock.update({ text: infoText });
-      statusBar.update({ left: "m:mode t:terrain r:reseed +/-:levels s:save" });
+      statusBar.update({
+        left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
+      });
       deps.onStateChanged?.();
     },
   });

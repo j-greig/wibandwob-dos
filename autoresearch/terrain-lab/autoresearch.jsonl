@@ -1,1 +1,2 @@
 {"type":"config","name":"Terrain Lab UI","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"225954b","metric":4.8,"metrics":{"layout":5,"readability":5,"aesthetic":4,"coherence":5,"character":5},"status":"keep","description":"Baseline: terrain art fills left 75%, plain text sidebar with Mode/Terrain/Levels/Seed/Keys. No colour, no visual hierarchy in sidebar. Monochrome.","timestamp":1773410773260,"segment":0}
