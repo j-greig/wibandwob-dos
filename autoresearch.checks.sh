@@ -1,1 +1,1 @@
-autoresearch/antopolis/autoresearch.checks.sh
+autoresearch/file-manager/autoresearch.checks.sh

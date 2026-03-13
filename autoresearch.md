@@ -1,1 +1,1 @@
-autoresearch/antopolis/autoresearch.md
+autoresearch/file-manager/autoresearch.md
