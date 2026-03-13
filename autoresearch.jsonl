@@ -10,3 +10,4 @@
 {"run":9,"commit":"8f5379c","metric":10,"metrics":{},"status":"keep","description":"Item 6: Tab completion — wibwob completions --zsh/--bash generates shell completions from live command list. 10/10 — ALL BACKLOG ITEMS COMPLETE.","timestamp":1773441157230,"segment":0}
 {"type":"config","name":"Unix Control v3 — Infra + Creative Tooling","metricName":"completion_count","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"590da41","metric":2,"metrics":{},"status":"keep","description":"v3 baseline: 2/10 (A4 _apiCall guard + B4 screenshot region already work). Scaffolding complete.","timestamp":1773442188106,"segment":0}
+{"run":2,"commit":"47c74d9","metric":6,"metrics":{},"status":"checks_failed","description":"6/10 (B1 breed, B2 mosaic, B5 fx commands, B7 jgsbreeder all pass) but v1 regression gate failed due to leftover windows. Fixed checks to clear desktop first.","timestamp":1773443169055,"segment":0}

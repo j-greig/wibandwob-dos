@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""
+breed — Character-level merge of two ASCII art files.
+
+Usage:
+  breed file1.txt file2.txt [--mode MODE] [--bias BIAS] [--out OUTPUT]
+  cat file1.txt | breed - file2.txt --mode xor
+
+Modes:
+  interleave  Alternate rows from each file (default)
+  xor         XOR character codes (space = transparent)
+  density     Average character density using density ramp
+  random      Per-cell coin flip weighted by --bias
+  blend       Weighted character selection by density
+
+Options:
+  --mode MODE   Merge mode (default: interleave)
+  --bias BIAS   Weight toward file2: 0.0 = all file1, 1.0 = all file2 (default: 0.5)
+  --out PATH    Output file (default: stdout)
+"""
+import sys
+import argparse
+import random
+
+DENSITY_RAMP = " .:-=+*#%@"
+
+def char_density(ch):
+    """Map a character to 0.0-1.0 density."""
+    if ch in DENSITY_RAMP:
+        return DENSITY_RAMP.index(ch) / (len(DENSITY_RAMP) - 1)
+    if ch == ' ' or ch == '\t':
+        return 0.0
+    return 0.6  # default for letters/symbols
+
+def density_char(val):
+    """Map 0.0-1.0 to a density ramp character."""
+    idx = int(val * (len(DENSITY_RAMP) - 1) + 0.5)
+    return DENSITY_RAMP[min(idx, len(DENSITY_RAMP) - 1)]
+
+def pad_lines(lines_a, lines_b):
+    """Pad both to same dimensions."""
+    max_lines = max(len(lines_a), len(lines_b))
+    max_width = max(
+        (max(len(l) for l in lines_a) if lines_a else 0),
+        (max(len(l) for l in lines_b) if lines_b else 0),
+    )
+    def pad(lines):
+        result = []
+        for l in lines:
+            result.append(l.ljust(max_width))
+        while len(result) < max_lines:
+            result.append(' ' * max_width)
+        return result
+    return pad(lines_a), pad(lines_b), max_width, max_lines
+
+def breed_interleave(a, b, bias):
+    """Alternate rows, bias controls which file gets odd/even."""
+    out = []
+    for i in range(len(a)):
+        if (i % 2 == 0) != (random.random() < bias):
+            out.append(a[i])
+        else:
+            out.append(b[i])
+    return out
+
+def breed_xor(a, b, bias):
+    """XOR character codes. Space = transparent (take from other)."""
+    out = []
+    for i in range(len(a)):
+        row = []
+        for j in range(len(a[i])):
+            ca, cb = a[i][j], b[i][j]
+            if ca == ' ' and cb == ' ':
+                row.append(' ')
+            elif ca == ' ':
+                row.append(cb)
+            elif cb == ' ':
+                row.append(ca)
+            else:
+                xor_val = ord(ca) ^ ord(cb)
+                # Map XOR result to printable range
+                ch = chr(32 + (xor_val % 95)) if xor_val > 0 else ca
+                row.append(ch)
+        out.append(''.join(row))
+    return out
+
+def breed_density(a, b, bias):
+    """Average character density."""
+    out = []
+    for i in range(len(a)):
+        row = []
+        for j in range(len(a[i])):
+            da = char_density(a[i][j])
+            db = char_density(b[i][j])
+            avg = da * (1 - bias) + db * bias
+            row.append(density_char(avg))
+        out.append(''.join(row))
+    return out
+
+def breed_random(a, b, bias):
+    """Per-cell coin flip."""
+    out = []
+    for i in range(len(a)):
+        row = []
+        for j in range(len(a[i])):
+            row.append(b[i][j] if random.random() < bias else a[i][j])
+        out.append(''.join(row))
+    return out
+
+def breed_blend(a, b, bias):
+    """Weighted selection: pick the denser character, weighted by bias."""
+    out = []
+    for i in range(len(a)):
+        row = []
+        for j in range(len(a[i])):
+            da = char_density(a[i][j])
+            db = char_density(b[i][j])
+            wa = da * (1 - bias)
+            wb = db * bias
+            row.append(b[i][j] if wb >= wa else a[i][j])
+        out.append(''.join(row))
+    return out
+
+MODES = {
+    'interleave': breed_interleave,
+    'xor': breed_xor,
+    'density': breed_density,
+    'random': breed_random,
+    'blend': breed_blend,
+}
+
+def main():
+    parser = argparse.ArgumentParser(description='Breed two ASCII art files')
+    parser.add_argument('file1', help='First file (- for stdin)')
+    parser.add_argument('file2', help='Second file')
+    parser.add_argument('--mode', choices=MODES.keys(), default='interleave')
+    parser.add_argument('--bias', type=float, default=0.5, help='0.0=all file1, 1.0=all file2')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed')
+    parser.add_argument('--out', default=None, help='Output file (default: stdout)')
+    args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
+
+    if args.file1 == '-':
+        lines_a = sys.stdin.read().splitlines()
+    else:
+        with open(args.file1) as f:
+            lines_a = f.read().splitlines()
+    with open(args.file2) as f:
+        lines_b = f.read().splitlines()
+
+    a, b, w, h = pad_lines(lines_a, lines_b)
+    result = MODES[args.mode](a, b, args.bias)
+    output = '\n'.join(result) + '\n'
+
+    if args.out:
+        with open(args.out, 'w') as f:
+            f.write(output)
+        sys.stderr.write(f"→ {args.out}  ({w}w x {h}h, mode={args.mode}, bias={args.bias})\n")
+    else:
+        sys.stdout.write(output)
+
+if __name__ == '__main__':
+    main()

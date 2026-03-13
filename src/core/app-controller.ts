@@ -1454,6 +1454,69 @@ export class TsTuiMvpApp {
     };
   }
 
+  private runFxScript(
+    fx: "glitch" | "shear" | "breed" | "flip",
+    args?: Record<string, unknown>,
+  ): { ok: true; filePath: string; windowId?: number } | { ok: false; error: string } {
+    const { execSync } = require("node:child_process");
+    const outDir = path.join(REPO_ROOT, "scratch", "generated", "fx");
+    fs.mkdirSync(outDir, { recursive: true });
+    const stamp = Date.now();
+    const outPath = path.join(outDir, `${fx}-${stamp}.txt`);
+
+    try {
+      let cmd: string;
+      const fxDir = path.join(REPO_ROOT, "scripts", "fx");
+
+      switch (fx) {
+        case "glitch": {
+          const filePath = String(args?.filePath ?? "");
+          if (!filePath) return { ok: false, error: "fx.glitch requires filePath" };
+          const intensity = Number(args?.intensity ?? 0.5);
+          const seed = args?.seed != null ? Number(args.seed) : Math.floor(Math.random() * 10000);
+          cmd = `cat "${filePath}" | "${fxDir}/glitch" ${intensity} ${seed} > "${outPath}"`;
+          break;
+        }
+        case "shear": {
+          const filePath = String(args?.filePath ?? "");
+          if (!filePath) return { ok: false, error: "fx.shear requires filePath" };
+          const skew = Number(args?.skew ?? 2);
+          cmd = `cat "${filePath}" | "${fxDir}/shear" ${skew} > "${outPath}"`;
+          break;
+        }
+        case "breed": {
+          const file1 = String(args?.file1 ?? "");
+          const file2 = String(args?.file2 ?? "");
+          if (!file1 || !file2) return { ok: false, error: "fx.breed requires file1 and file2" };
+          const mode = String(args?.mode ?? "xor");
+          const bias = Number(args?.bias ?? 0.5);
+          const seed = args?.seed != null ? Number(args.seed) : 42;
+          cmd = `python3 "${fxDir}/breed" "${file1}" "${file2}" --mode ${mode} --bias ${bias} --seed ${seed} --out "${outPath}"`;
+          break;
+        }
+        case "flip": {
+          const filePath = String(args?.filePath ?? "");
+          if (!filePath) return { ok: false, error: "fx.flip requires filePath" };
+          const direction = String(args?.direction ?? "v");
+          cmd = `cat "${filePath}" | "${fxDir}/flip" ${direction} > "${outPath}"`;
+          break;
+        }
+      }
+
+      execSync(cmd, { timeout: 10000 });
+
+      if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
+        return { ok: false, error: `FX ${fx} produced no output` };
+      }
+
+      // Open result as primer
+      const win = this.openPrimerWindow(outPath);
+      return { ok: true, filePath: outPath, windowId: win?.id };
+    } catch (err: any) {
+      return { ok: false, error: `FX ${fx} failed: ${err?.message ?? String(err)}` };
+    }
+  }
+
   private smearTextSurface(args?: Record<string, unknown>): {
     ok: true;
     filePath: string;
@@ -1674,6 +1737,10 @@ export class TsTuiMvpApp {
           };
         }),
       smearTextSurface: (args) => this.smearTextSurface(args),
+      fxGlitch: (args) => this.runFxScript("glitch", args),
+      fxShear: (args) => this.runFxScript("shear", args),
+      fxBreed: (args) => this.runFxScript("breed", args),
+      fxFlip: (args) => this.runFxScript("flip", args),
       openTextFile: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()

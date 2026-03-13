@@ -38,7 +38,10 @@ if ! command -v python3 &>/dev/null; then
 fi
 echo "  python3 available"
 
-# 5. v1 test suite still passes (regression gate)
+# 5. Clear desktop before regression test (leftover windows from creative sessions)
+$WIBWOB cmd desktop.clear-all 2>/dev/null; sleep 0.5
+
+# 6. v1 test suite still passes (regression gate)
 echo "--- v1 regression gate ---"
 V1_OUT=$(bash autoresearch/unix-control/autoresearch.sh 2>&1)
 V1_SCORE=$(echo "$V1_OUT" | grep 'PASSED:' | grep -oE '[0-9]+' | head -1)
