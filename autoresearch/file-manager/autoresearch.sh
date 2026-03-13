@@ -22,11 +22,10 @@ curl -s -X POST http://127.0.0.1:8099/commands/run \
 
 sleep 0.5
 
-# ── 3b. Select a .md file by moving down a few items ────────────────
-# We want to see the preview rendering for an actual file, ideally a .md
-# The repo root has AGENTS.md, README.md etc. Let's navigate to see them.
-# Move selection down to find a visible file (dirs are first, then files)
-# Use keyboard simulation via the state API — just wait for screenshot
+# ── 3b. Navigate to docs/ which has .md files visible near top ──────
+curl -s -X POST http://127.0.0.1:8099/commands/run \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/docs"'"}}' > /dev/null 2>&1 || true
 
 sleep 0.5
 

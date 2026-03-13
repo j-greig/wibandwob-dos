@@ -708,10 +708,24 @@ export function openFileManagerWindow(params: {
 
   };
 
+  /** Build a breadcrumb from currentPath relative to startPath */
+  const renderBreadcrumb = (): string => {
+    const home = params.startPath;
+    const rel = path.relative(home, currentPath);
+    if (!rel || rel === ".") return "\u2302 ~";
+    const parts = rel.split(path.sep);
+    return "\u2302 ~ / " + parts.join(" / ");
+  };
+
   const renderStatusBar = () => {
     const dirs = entries.filter((e) => e.isDirectory && e.label !== "../").length;
     const files = entries.filter((e) => !e.isDirectory).length;
-    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files`);
+    // Total size of visible files
+    const totalSize = entries.filter(e => !e.isDirectory).reduce((s, e) => s + e.size, 0);
+    const sizeStr = totalSize < 1024 ? `${totalSize}B`
+      : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(0)}K`
+      : `${(totalSize / 1048576).toFixed(1)}M`;
+    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr})`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -985,7 +999,7 @@ export function openFileManagerWindow(params: {
     cancelSearch();
     currentPath = directoryPath;
     allEntries = buildEntries(directoryPath);
-    pathLabel.setContent(` \u2302 ${currentPath}`);
+    pathLabel.setContent(` ${renderBreadcrumb()}`);
     applyFilter(selectedIndex);
   };
 
