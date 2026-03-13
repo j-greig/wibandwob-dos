@@ -405,8 +405,42 @@ function openWiretext(host: MicroappHost) {
     const canvasW = Math.max(1, bodyW - SIDEBAR_W - 1);
     const canvasH = Math.max(1, bodyH - HEADER_H - STATUS_H);
 
-    // Render grid
+    // Render grid + per-cell object ownership for colouring
     const grid = renderObjectsToGrid(objects, GRID_COLS, GRID_ROWS);
+    // Build a cell-to-object-type map for coloured rendering
+    const cellType = new Map<string, string>(); // "col,row" -> object type
+    for (const obj of objects) {
+      const bb = getBBox(obj);
+      if (obj.type === "box") {
+        for (let x = bb.col; x < bb.col + bb.w; x++) { cellType.set(`${x},${bb.row}`, "box"); cellType.set(`${x},${bb.row + bb.h - 1}`, "box"); }
+        for (let y = bb.row; y < bb.row + bb.h; y++) { cellType.set(`${bb.col},${y}`, "box"); cellType.set(`${bb.col + bb.w - 1},${y}`, "box"); }
+        if (obj.label) { // label chars
+          const cy = bb.row + Math.floor(bb.h / 2);
+          const sx = bb.col + Math.floor((bb.w - obj.label.length) / 2);
+          for (let i = 0; i < obj.label.length; i++) cellType.set(`${sx + i},${cy}`, "label");
+        }
+      } else if (obj.type === "text") {
+        const lines = (obj.content || "").split("\n");
+        for (let i = 0; i < lines.length; i++)
+          for (let j = 0; j < lines[i].length; j++)
+            cellType.set(`${obj.position.col + j},${obj.position.row + i}`, "text");
+      } else if (obj.type === "line" || obj.type === "arrow") {
+        if (obj.endPosition)
+          for (const p of linePoints(obj.position.col, obj.position.row, obj.endPosition.col, obj.endPosition.row))
+            cellType.set(`${p.col},${p.row}`, obj.type);
+      } else if (obj.type === "pencil") {
+        for (const p of obj.points || []) cellType.set(`${p.col},${p.row}`, "pencil");
+      }
+    }
+    // Colour map per type
+    const typeColour: Record<string, string> = {
+      box: accent,
+      label: bright,
+      text: ansiColour(th.warning?.fg || "yellow"),
+      line: muted,
+      arrow: ansiColour(th.success?.fg || "green"),
+      pencil: ansiColour(th.error?.fg || "red"),
+    };
 
     // Find cells belonging to selected object for highlighting
     const selCells = new Set<string>();
@@ -487,7 +521,9 @@ function openWiretext(host: MicroappHost) {
           } else if (isSel) {
             line += `${selBg}${selFg}${ch}${A.r}`;
           } else if (ch !== " ") {
-            line += `${accent}${ch}${A.r}`;
+            const ct = cellType.get(`${gc},${gr}`);
+            const colour = ct ? (typeColour[ct] || accent) : accent;
+            line += `${colour}${ch}${A.r}`;
           } else {
             // Grid dots every 4 cells
             if ((gc % 4 === 0) && (gr % 4 === 0)) {
@@ -511,7 +547,7 @@ function openWiretext(host: MicroappHost) {
 
     // Header
     const headerLeft = ` ${accent}${A.b}WIRETEXT${A.r} ${muted}│${A.r} ${bright}${tool.toUpperCase()}${A.r}`;
-    const headerBtns = `${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^X${A.r}${bright}Clear${A.r} `;
+    const headerBtns = `${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^D${A.r}${bright}Demo ${A.r}${muted}^X${A.r}${bright}Clear${A.r} `;
     const hlp = stripAnsi(headerLeft).length;
     const hrp = stripAnsi(headerBtns).length;
     const hgap = Math.max(1, bodyW - hlp - hrp);
@@ -541,6 +577,7 @@ function openWiretext(host: MicroappHost) {
     const lines: string[] = [];
 
     // DRAW section
+    const divLine = `${muted}${"_".repeat(SIDEBAR_W - 2)}${A.r}`;
     lines.push(`${accent}${A.b} DRAW${A.r}`);
     for (const t of TOOLS) {
       const active = t.id === tool;
@@ -551,7 +588,7 @@ function openWiretext(host: MicroappHost) {
       }
     }
 
-    lines.push("");
+    lines.push(divLine);
     lines.push(`${accent}${A.b} STYLE${A.r}`);
     for (const s of STYLES) {
       const active = s.id === boxStyle;
@@ -563,7 +600,7 @@ function openWiretext(host: MicroappHost) {
     }
 
     // Selected object info
-    lines.push("");
+    lines.push(divLine);
     if (selectedId) {
       const selObj2 = objects.find(o => o.id === selectedId);
       if (selObj2) {
@@ -718,9 +755,24 @@ function openWiretext(host: MicroappHost) {
     } else if (data.action === "mouseup") {
       if (drag.type === "drawing" && drag.objectId) {
         const obj = objects.find(o => o.id === drag.objectId);
-        if (obj && obj.type === "box" && (obj.width < 2 || obj.height < 2)) {
-          obj.width = Math.max(2, obj.width);
-          obj.height = Math.max(2, obj.height);
+        if (obj && obj.type === "box") {
+          // Remove accidental click-boxes (no meaningful drag)
+          if (obj.width <= 2 && obj.height <= 2) {
+            objects = objects.filter(o => o.id !== obj.id);
+            selectedId = null;
+            undoStack.pop(); // remove the undo entry too
+          } else {
+            obj.width = Math.max(3, obj.width);
+            obj.height = Math.max(3, obj.height);
+          }
+        }
+        if (obj && (obj.type === "line" || obj.type === "arrow") && obj.endPosition) {
+          // Remove zero-length lines
+          if (obj.position.col === obj.endPosition.col && obj.position.row === obj.endPosition.row) {
+            objects = objects.filter(o => o.id !== obj.id);
+            selectedId = null;
+            undoStack.pop();
+          }
         }
       }
       drag = { type: "none" };
@@ -796,6 +848,7 @@ function openWiretext(host: MicroappHost) {
     if (ctrl && key.name === "y") { redo(); return; }
     if (ctrl && key.name === "e") { exportToClipboard(); return; }
     if (ctrl && key.name === "x") { pushUndo(); const n = objects.length; objects = []; selectedId = null; showStatus(`Cleared ${n} objects`); return; }
+    if (ctrl && key.name === "d") { loadDemo(); return; }
 
     // Delete selected
     if (key.name === "delete" || key.name === "backspace") {
@@ -821,6 +874,32 @@ function openWiretext(host: MicroappHost) {
   sidebarBox.on("keypress", (_ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
     if (key.name === "tab") { canvasBox.focus(); return; }
   });
+
+  // ── Demo diagram ──
+  function loadDemo() {
+    pushUndo();
+    objects = [];
+    selectedId = null;
+    const z = () => objects.length;
+    // A simple architecture diagram
+    objects.push({ id: genId(), type: "box", position: { col: 2, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Frontend" });
+    objects.push({ id: genId(), type: "box", position: { col: 28, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "API Server" });
+    objects.push({ id: genId(), type: "box", position: { col: 54, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Database" });
+    objects.push({ id: genId(), type: "arrow", position: { col: 22, row: 3 }, width: 6, height: 1, zIndex: z(), endPosition: { col: 28, row: 3 } });
+    objects.push({ id: genId(), type: "arrow", position: { col: 48, row: 3 }, width: 6, height: 1, zIndex: z(), endPosition: { col: 54, row: 3 } });
+    objects.push({ id: genId(), type: "text", position: { col: 2, row: 8 }, width: 1, height: 1, zIndex: z(), content: "React + TS" });
+    objects.push({ id: genId(), type: "text", position: { col: 28, row: 8 }, width: 1, height: 1, zIndex: z(), content: "FastAPI" });
+    objects.push({ id: genId(), type: "text", position: { col: 54, row: 8 }, width: 1, height: 1, zIndex: z(), content: "PostgreSQL" });
+    objects.push({ id: genId(), type: "line", position: { col: 12, row: 6 }, width: 1, height: 1, zIndex: z(), endPosition: { col: 12, row: 7 } });
+    objects.push({ id: genId(), type: "line", position: { col: 38, row: 6 }, width: 1, height: 1, zIndex: z(), endPosition: { col: 38, row: 7 } });
+    objects.push({ id: genId(), type: "line", position: { col: 64, row: 6 }, width: 1, height: 1, zIndex: z(), endPosition: { col: 64, row: 7 } });
+    // Bottom section
+    objects.push({ id: genId(), type: "box", position: { col: 2, row: 11 }, width: 72, height: 7, zIndex: z(), borderStyle: "rounded", fill: "solid", label: "Infrastructure" });
+    objects.push({ id: genId(), type: "box", position: { col: 5, row: 13 }, width: 18, height: 3, zIndex: z(), borderStyle: "single", fill: "solid", label: "Docker" });
+    objects.push({ id: genId(), type: "box", position: { col: 26, row: 13 }, width: 18, height: 3, zIndex: z(), borderStyle: "single", fill: "solid", label: "Redis Cache" });
+    objects.push({ id: genId(), type: "box", position: { col: 47, row: 13 }, width: 18, height: 3, zIndex: z(), borderStyle: "single", fill: "solid", label: "Nginx" });
+    showStatus("Loaded demo diagram");
+  }
 
   function exportToClipboard() {
     const grid = renderObjectsToGrid(objects, GRID_COLS, GRID_ROWS);
