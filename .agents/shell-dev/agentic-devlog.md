@@ -1102,3 +1102,29 @@ All now return `{ok: false, error: "..."}` instead of hijacking the TUI.
 The `_apiCall` marker is minimal and non-invasive — doesn't change menu/palette
 behaviour at all. Only affects the API path, which is the only path where
 interactive prompts are wrong.
+
+---
+
+## 2026-03-13: Figlet windows too small for long text via API
+
+**Human note:** "GAME OVER" figlet window slightly too small for the words to be visible
+
+When `figlet.open` is called via the API with longer text (e.g. "GAME OVER"), the
+window opens at a default size that's too small to display the full figlet rendering.
+The text gets clipped. Menu/palette path auto-sizes correctly because it measures
+the content first, but the API path doesn't resize to fit.
+
+**Flaw:** `openFigletWindow()` creates the window at a fixed default size rather than
+measuring the figlet output and sizing to fit. The content measurement exists
+(`content-measurement.ts`) but isn't used during API-driven figlet creation.
+
+**Fix needed:** After creating the figlet window via API, measure the rendered content
+and resize the window to `recommendedWidth × recommendedHeight` (already computed
+for primers — needs equivalent for figlet).
+
+**Workaround:** Manually resize after creation:
+```bash
+wibwob cmd figlet.open --text "GAME OVER" --font doom
+WID=$(wibwob windows | jq -r '.[-1].id')
+wibwob window.resize --id $WID --width 60 --height 14
+```
