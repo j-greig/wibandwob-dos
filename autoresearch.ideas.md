@@ -1,30 +1,27 @@
-# Autoresearch Ideas: Unix Control Brief Enhancement
+# Autoresearch Ideas: Unix CLI (ww) — Phase 2
 
-## DONE
-- [x] Killed fabricated benchmarks across all files (R 3.0 -> 6.8)
-- [x] Gutted INDEX from 413 -> 45 lines
-- [x] Trashed SUMMARY (RESEARCH serves both roles now)
-- [x] Rewrote EVIDENCE: pure citations + verification status
-- [x] Consolidated RESEARCH: 720 -> 200 lines
-- [x] Trimmed RECOMMENDATIONS: 470 -> 95 lines
-- [x] Compressed REFERENCE_CLI_TOOLS_RANKED: tiers 3-4 to table
+## Current state
+- src/cli/ww.ts exists — thin HTTP client to control API
+- Supports: state, windows, commands, health, cmd <id>, dot syntax, noun verb syntax
+- Outputs JSON to stdout, errors to stderr
 
-## Next moves to break past 6.0
+## Parity improvements
+- ww window <id> move should also work (target before verb)
+- ww theme set --name dark should work
+- ww screenshot should hit GET /screenshot/text
+- ww window <id> close should work without --id flag (positional arg)
 
-### COHERENCE (5.5 -> 7.5 needed)
-- Merge devnote-parity-problem INTO SURFACE_PARITY — they cover the same topic
-- Merge devnote-cli-naming INTO REFERENCE_CLI_TOOLS_RANKED — naming IS part of design
-- Result: 8 files -> 6 files. Fewer files = higher coherence automatically.
-- Make cross-references between remaining files explicit and bidirectional
+## Ergonomics
+- --quiet / -q flag: output just IDs one per line (for xargs piping)
+- --format flag: template strings like tmux -F
+- Focused-window default: ww window move --x 10 --y 5 (no ID = focused)
 
-### DENSITY (4.8 -> 7.5 needed)
-- SURFACE_PARITY still has verbose "Option B/C/D" comparisons that were already rejected — trim to just "Option A (recommended)" with a 1-line note on why others were rejected
-- REFERENCE_CLI_TOOLS_RANKED proposed grammar section has examples that overlap with SURFACE_PARITY's "50-line CLI" — pick one home
+## Coverage
+- Map all 132 api:true commands to verify they work via ww
+- Special subcommands for frequent operations (ww open, ww close, ww focus)
 
-### EVIDENCE (5.2 -> 7.5 needed)
-- The evidence itself is thin — only 2 verified academic papers, rest is project repos
-- Could strengthen by adding real evidence: actual WibWob-DOS session log excerpts showing agent pipe discovery patterns (not fabricated, actually pulled from backroom logs)
-- Could verify the Zellweger paper URL manually via the ACM DL
-
-### ACTIONABILITY (7.8 -> 8.0 needed)
-- Close to threshold. SURFACE_PARITY is strong. Maybe add concrete "test it" commands that an agent could run right now against the live API.
+## Test improvements
+- Test window.resize with flag parsing
+- Test theme.set
+- Test ww with WW_API env var override
+- Test stderr output format on errors

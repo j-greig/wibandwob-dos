@@ -1,96 +1,147 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Unix Control Brief Quality Benchmark ==="
+echo "=== Unix CLI (ww) Parity Benchmark ==="
 
 cd /Users/james/Repos/wibandwob-dos
+WW="bun run src/cli/ww.ts"
+API="http://127.0.0.1:8099"
 
-# Collect all source docs (exclude meta-files and kickoff)
-SOURCE_DIR="autoresearch/unix-control"
-SOURCE_FILES=$(ls "$SOURCE_DIR"/*.md \
-  | grep -v KICKOFF-PROMPT \
-  | grep -v autoresearch-brief-enhancement)
+PASS=0
+FAIL=0
+TOTAL=0
 
-FILE_COUNT=$(echo "$SOURCE_FILES" | wc -l | tr -d ' ')
-LINE_COUNT=$(cat $SOURCE_FILES | wc -l | tr -d ' ')
+check() {
+  local desc="$1"
+  local result="$2"
+  TOTAL=$((TOTAL + 1))
+  if [ "$result" = "PASS" ]; then
+    PASS=$((PASS + 1))
+    echo "  ✓ $desc"
+  else
+    FAIL=$((FAIL + 1))
+    echo "  ✗ $desc — $result"
+  fi
+}
 
-echo "--- source: $LINE_COUNT lines in $FILE_COUNT files ---"
+# ── 1. Basic connectivity ────────────────────────────────
+echo "--- connectivity ---"
+HEALTH=$($WW health 2>/dev/null | jq -r '.ok' || echo "FAIL")
+check "ww health returns ok" "$([ "$HEALTH" = "true" ] && echo PASS || echo "got: $HEALTH")"
 
-# Concatenate all docs with file headers
-DOCS=""
-for f in $SOURCE_FILES; do
-  fname=$(basename "$f")
-  DOCS+="
-=== FILE: $fname ===
-$(cat "$f")
-"
-done
+# ── 2. Commands parity ───────────────────────────────────
+echo "--- commands parity ---"
+WW_COUNT=$($WW commands 2>/dev/null | jq 'length' || echo 0)
+API_COUNT=$(curl -s "$API/commands/list" | jq '.commands | length' || echo 0)
+check "ww commands count matches API ($WW_COUNT vs $API_COUNT)" \
+  "$([ "$WW_COUNT" = "$API_COUNT" ] && echo PASS || echo "ww=$WW_COUNT api=$API_COUNT")"
 
-# Build scoring prompt
-cat <<'SCORING_PROMPT' > /tmp/unix-control-score-prompt.md
-You are scoring a research document suite about Unix philosophy for AI agent control interfaces.
-The suite should help an engineer build a CLI tool that auto-derives from an existing TypeScript
-command catalog using Zod schemas. Score each axis 1-10 (one decimal place).
+# Compare command IDs
+WW_IDS=$($WW commands 2>/dev/null | jq -r '.[].id' | sort)
+API_IDS=$(curl -s "$API/commands/list" | jq -r '.commands[].id' | sort)
+DIFF=$(diff <(echo "$WW_IDS") <(echo "$API_IDS") || true)
+check "ww command IDs match API exactly" \
+  "$([ -z "$DIFF" ] && echo PASS || echo "diff found")"
 
-EVIDENCE — are claims backed by specific, verifiable references?
-Checklist: performance claims cite benchmarks/papers, URLs are real not hallucinated,
-academic citations have author/year/venue, statistics have sample sizes, no weasel phrases,
-counter-evidence acknowledged, primary vs secondary sources distinguished.
+# ── 3. State parity ──────────────────────────────────────
+echo "--- state parity ---"
+WW_STATE=$($WW state 2>/dev/null | jq -r 'keys | sort | join(",")' || echo "FAIL")
+API_STATE=$(curl -s "$API/state" | jq -r 'keys | sort | join(",")' || echo "FAIL")
+check "ww state keys match API" \
+  "$([ "$WW_STATE" = "$API_STATE" ] && echo PASS || echo "ww=$WW_STATE api=$API_STATE")"
 
-ACTIONABILITY — can a reader build the CLI from this documentation?
-Checklist: concrete first steps per recommendation, runnable code examples,
-time/effort estimates, success metrics defined, specific package recommendations,
-anti-patterns alongside patterns, clear priority ordering.
+# ── 4. Windows list ──────────────────────────────────────
+echo "--- windows ---"
+WW_WIN=$($WW windows 2>/dev/null | jq 'type' || echo "FAIL")
+check "ww windows returns JSON array" \
+  "$([ "$WW_WIN" = '"array"' ] && echo PASS || echo "got: $WW_WIN")"
 
-COHERENCE — does the suite work as a unified whole?
-Checklist: no claim in more than one file (DRY), cross-references correct,
-each file has distinct purpose, no overlap, consistent terminology,
-could reduce file count without losing information, reading order clear.
+# ── 5. Command execution ────────────────────────────────
+echo "--- command execution ---"
 
-DENSITY — information per byte, is there filler?
-Checklist: no throat-clearing paragraphs, no repeated introductions,
-tables for structured data, minimal code examples, every paragraph passes
-"so what?" test, could be shorter without losing content, no emoji noise.
+# Open an editor via ww
+$WW cmd editor.new >/dev/null 2>&1
+sleep 0.5
+WIN_COUNT=$($WW windows 2>/dev/null | jq 'length' || echo 0)
+check "ww cmd editor.new creates a window" \
+  "$([ "$WIN_COUNT" -ge 1 ] && echo PASS || echo "windows=$WIN_COUNT")"
 
-RIGOUR — honest about what it knows vs guesses?
-Checklist: proven claims separated from hypotheses, anecdotal evidence labelled,
-benchmark methodology described, alternative explanations considered,
-limitations discussed, confidence levels on performance claims.
+# Dot syntax: ww editor.new
+$WW editor.new >/dev/null 2>&1
+sleep 0.5
+WIN_COUNT2=$($WW windows 2>/dev/null | jq 'length' || echo 0)
+check "ww editor.new (dot syntax) creates a window" \
+  "$([ "$WIN_COUNT2" -gt "$WIN_COUNT" ] && echo PASS || echo "before=$WIN_COUNT after=$WIN_COUNT2")"
 
-Output EXACTLY this format (no other text before or after):
-EVIDENCE: N.N
-ACTIONABILITY: N.N
-COHERENCE: N.N
-DENSITY: N.N
-RIGOUR: N.N
-AVERAGE: N.N
-WEAKEST_AXIS: name
-WEAKEST_SECTION: filename — brief description of the weakest section
-SCORING_PROMPT
+# Noun verb syntax: ww editor new
+$WW editor new >/dev/null 2>&1
+sleep 0.5
+WIN_COUNT3=$($WW windows 2>/dev/null | jq 'length' || echo 0)
+check "ww editor new (noun verb) creates a window" \
+  "$([ "$WIN_COUNT3" -gt "$WIN_COUNT2" ] && echo PASS || echo "before=$WIN_COUNT2 after=$WIN_COUNT3")"
 
-echo "--- scoring ---"
+# ── 6. Flag parsing ─────────────────────────────────────
+echo "--- flag parsing ---"
 
-RESULT=$(claude -p "$(cat /tmp/unix-control-score-prompt.md)
+# Get a window ID, then move it
+WID=$($WW windows 2>/dev/null | jq -r '.[0].id')
+if [ -n "$WID" ] && [ "$WID" != "null" ]; then
+  $WW cmd window.move --id "$WID" --x 5 --y 3 >/dev/null 2>&1
+  sleep 0.3
+  NEW_X=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .left")
+  check "ww cmd window.move --id $WID --x 5 --y 3 moves window" \
+    "$([ "$NEW_X" = "5" ] && echo PASS || echo "left=$NEW_X expected=5")"
 
-## Document Suite ($FILE_COUNT files, $LINE_COUNT lines)
-
-$DOCS
-")
-
-echo "$RESULT"
-
-# Parse scores
-EVIDENCE=$(echo "$RESULT" | grep "^EVIDENCE:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-ACTIONABILITY=$(echo "$RESULT" | grep "^ACTIONABILITY:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-COHERENCE=$(echo "$RESULT" | grep "^COHERENCE:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-DENSITY=$(echo "$RESULT" | grep "^DENSITY:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-RIGOUR=$(echo "$RESULT" | grep "^RIGOUR:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-AVERAGE=$(echo "$RESULT" | grep "^AVERAGE:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-
-# Fallback: compute average if LLM didn't
-if [ -z "$AVERAGE" ] && [ -n "$EVIDENCE" ] && [ -n "$ACTIONABILITY" ] && [ -n "$COHERENCE" ] && [ -n "$DENSITY" ] && [ -n "$RIGOUR" ]; then
-  AVERAGE=$(echo "scale=1; ($EVIDENCE + $ACTIONABILITY + $COHERENCE + $DENSITY + $RIGOUR) / 5" | bc)
+  # Also test dot syntax with flags
+  $WW window.move --id "$WID" --x 20 --y 10 >/dev/null 2>&1
+  sleep 0.3
+  NEW_X2=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .left")
+  check "ww window.move --flags works" \
+    "$([ "$NEW_X2" = "20" ] && echo PASS || echo "left=$NEW_X2 expected=20")"
+else
+  check "window available for move test" "FAIL no windows"
+  check "ww window.move --flags works" "FAIL no windows"
 fi
 
+# ── 7. jq pipe ergonomics ───────────────────────────────
+echo "--- jq ergonomics ---"
+
+# Can pipe windows through jq to get IDs
+IDS=$($WW windows 2>/dev/null | jq -r '.[].id' || echo "FAIL")
+check "ww windows | jq -r '.[].id' produces IDs" \
+  "$([ -n "$IDS" ] && [ "$IDS" != "FAIL" ] && echo PASS || echo "got: $IDS")"
+
+# Can filter by kind
+EDITORS=$($WW windows 2>/dev/null | jq '[.[] | select(.kind=="editor")] | length' || echo 0)
+check "ww windows | jq select(.kind==editor) filters" \
+  "$([ "$EDITORS" -ge 1 ] && echo PASS || echo "editors=$EDITORS")"
+
+# ── 8. Error handling ───────────────────────────────────
+echo "--- error handling ---"
+
+# Bad command should exit non-zero
+$WW cmd nonexistent.command >/dev/null 2>&1 && BAD_EXIT=0 || BAD_EXIT=$?
+check "bad command exits non-zero" \
+  "$([ "$BAD_EXIT" -ne 0 ] && echo PASS || echo "exit=$BAD_EXIT")"
+
+# ── 9. Help ─────────────────────────────────────────────
+echo "--- help ---"
+HELP=$($WW help 2>&1 || true)
+check "ww help shows usage" \
+  "$(echo "$HELP" | grep -q 'Usage' && echo PASS || echo "no Usage in output")"
+
+# ── Cleanup: close test windows ──────────────────────────
+echo "--- cleanup ---"
+for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
+  $WW cmd window.close --id "$id" >/dev/null 2>&1 || true
+done
+sleep 0.3
+REMAINING=$($WW windows 2>/dev/null | jq 'length' || echo "?")
+check "cleanup: all test windows closed" \
+  "$([ "$REMAINING" = "0" ] && echo PASS || echo "remaining=$REMAINING")"
+
+# ── Score ────────────────────────────────────────────────
 echo ""
-echo "FINAL_SCORE: ${AVERAGE:-0}"
+echo "PASSED: $PASS / $TOTAL"
+SCORE=$(echo "scale=1; $PASS * 10 / $TOTAL" | bc)
+echo "FINAL_SCORE: $SCORE"
