@@ -5,143 +5,97 @@
 WibWob-DOS has three control surfaces that drift apart:
 1. TypeScript app — command-catalog.ts → menus, palette, shortcuts
 2. HTTP API — control-api.ts → REST endpoints, OpenAPI spec
-3. Unix CLI — `ww` command (planned) → shell commands, pipes, jq
+3. Unix CLI — `wibwob` command → shell commands, pipes, jq
 
-## Current State
+## Current State (Post-E039)
 
-command-catalog.ts IS already the single source of truth. Every command
-defined there auto-appears in TUI menus, palette, HTTP API (`/commands/run`),
-agent tools (`tui_run_command`), and OpenAPI spec. Microapp modules auto-
-register via `module.json`.
+command-catalog.ts IS the single source of truth. Every command defined
+there auto-appears in TUI menus, palette, HTTP API (`/commands/run`),
+agent tools (`tui_run_command`), and OpenAPI spec. Microapp modules
+auto-register via `module.json`.
 
-## What's Missing
+The `wibwob` CLI exists and works — a thin HTTP client (~150 lines)
+that talks to the control API. Pure HTTP, no catalog import. Parity
+by construction: the CLI can only do what the API exposes.
 
-1. **Per-command argument schemas.** Commands accept `args?: Record<string, unknown>` —
-   an untyped bag. Fix: add `params?: z.ZodType` to `AppCommandDefinition`.
+53 parity tests pass. The CLI is production-ready.
 
-2. **CLI projection layer.** No code reads the catalog and generates CLI commands.
-   Fix: thin entry point that maps `api: true` commands to subcommands.
-
-3. **Return type hints.** Commands return untyped results. Fix: add
-   `returns?: "json" | "text" | "void"` to the definition.
-
-## Architecture
+## Architecture (As Built)
 
 ```
               command-catalog.ts  ← SINGLE SOURCE OF TRUTH
-              + Zod params schemas
                       │
          ┌────────────┼────────────┐
          ▼            ▼            ▼
-    TUI menus    HTTP API      ww CLI
-    palette      /commands/*   ww <noun> <verb>
-    shortcuts    OpenAPI
+    TUI menus    HTTP API      wibwob CLI
+    palette      /commands/*   wibwob <noun>.<verb>
+    shortcuts    OpenAPI        (thin HTTP client)
 ```
 
-Auto-derive CLI from catalog. If a command has `api: true` + `params` schema,
-it automatically gets a CLI subcommand. Zero manual wiring. Parity by construction.
+The CLI does NOT import the catalog. It discovers commands at runtime
+via `GET /commands/list` and dispatches via `POST /commands/run`.
+This means dynamically registered module commands work automatically.
 
-Stack: Zod (already transitive dep), `citty` or `cac` (~3KB CLI framework).
+Single file: `src/cli/wibwob.ts` (~150 lines). No framework needed —
+raw argv parsing works fine at this scale.
 
-## The CLI (~50 lines)
+## What Was Built (E039)
 
-```typescript
-// src/cli/ww.ts
-import { catalog } from "../core/command-catalog.js";
+- `wibwob state` — full desktop state as JSON
+- `wibwob windows` — window list from state
+- `wibwob commands` — command list from API
+- `wibwob <noun>.<verb> [--key val]` — execute any API command
+- `wibwob health` — API health check
+- `wibwob help` — usage info
+- JSON to stdout, errors to stderr, exit codes for scripting
 
-const [noun, verb, ...rest] = process.argv.slice(2);
+## What's Next (V2 Backlog)
 
-// Special: ww commands list
-if (noun === "commands" && verb === "list") {
-  const cmds = catalog.filter(c => c.api);
-  console.log(JSON.stringify(cmds.map(c => ({
-    id: c.id, label: c.label, description: c.description
-  })), null, 2));
-  process.exit(0);
-}
+1. **Per-command argument schemas** — Add `params?: z.ZodType` to
+   `AppCommandDefinition`. Zod is already a transitive dep. Enables
+   validation (400 on bad args), generated --help, OpenAPI accuracy.
 
-// Map noun.verb to command id
-const cmdId = verb ? `${noun}.${verb}` : noun;
-const cmd = catalog.find(c => c.id === cmdId);
-if (!cmd) { console.error(`Unknown command: ${cmdId}`); process.exit(1); }
+2. **Return type hints** — Add `returns?: "json" | "text" | "void"`
+   to definitions. CLI uses this for output formatting.
 
-// Parse flags into args using Zod schema
-const args = cmd.params ? parseFlags(rest, cmd.params) : {};
+3. **Per-command --help** — `wibwob window.move --help` prints flags,
+   types, defaults. Generated from Zod schemas. Blocked on #1.
 
-// Execute via HTTP (Unix socket later)
-const res = await fetch("http://127.0.0.1:8099/commands/run", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ id: cmdId, args })
-});
-console.log(JSON.stringify(await res.json(), null, 2));
-```
+4. **CI parity script** — Run the 53-test suite as a CI gate.
 
-Three files total: `ww.ts` (~50 lines), `catalog-to-cli.ts` (~100),
-`transport.ts` (~80). ~250 lines for a zero-drift CLI surface.
+5. **Tab completion** — Generate zsh/bash completions from command list.
 
-## Implementation Phases
+6. **Event streaming** — `wibwob watch` streams state changes as ndjson.
 
-**Phase 1: Schema enrichment** (2-3 hours, zero risk)
-Add `params?: z.ZodType` to `AppCommandDefinition`. Start with one command:
+See `autoresearch/unix-control-v2/BACKLOG.md` for full details.
 
-```typescript
-// In command-catalog.ts — add to window.move definition:
-params: z.object({
-  id: z.number().describe("Window ID from GET /state"),
-  x: z.number().describe("Absolute X coordinate"),
-  y: z.number().describe("Absolute Y coordinate"),
-}),
-```
+## Design Decisions (Proven in V1)
 
-Then validate in `/commands/run` handler: `cmd.params?.parse(args)`.
-Success metric: `POST /commands/run` with bad args returns 400 + schema error.
+**Pure HTTP, not catalog import.** The thin HTTP client approach gives
+parity by construction. Importing the catalog would create a build
+dependency and miss dynamically registered module commands.
 
-**Phase 2: CLI projection** (~250 new lines, 4-6 hours)
-Build `ww` tool. Every `api: true` command with params → subcommand with flags.
-Success metric: `ww commands list | jq length` equals API command count.
+**No CLI framework.** Raw argv parsing works at this scale. Adding
+citty or cac would be more code than the CLI itself.
 
-**Phase 3: Parity testing** (1-2 hours)
-CI script: build fails if any `api: true` command lacks CLI subcommand.
-
-**Phase 4: Benchmark** (optional) — Test CLI vs REST agent performance.
+**Single file.** The original plan called for three files (wibwob.ts,
+catalog-to-cli.ts, transport.ts). One file suffices.
 
 ## Integration
 
-No changes: command-registry.ts, state-service.ts, window-facade.ts.
-Changes: command-catalog.ts (add params), control-api.ts (validate args).
-New: src/cli/ww.ts, catalog-to-cli.ts, transport.ts.
+No changes needed to: command-registry.ts, state-service.ts, window-facade.ts.
+The CLI is a pure consumer of the HTTP API surface.
 
-Multi-agent safe: catalog is append-only in practice. CLI reads it at
-runtime. Two agents adding commands in different worktrees = no conflicts.
+## Success Criteria (Achieved)
 
-## Success Criteria
-
-- Every `api: true` command reachable via `ww <noun> <verb>`
+- Every `api: true` command reachable via `wibwob <id> [--flags]`
 - Output parses as JSON (pipeable to jq)
 - New catalog commands auto-appear in CLI (zero manual wiring)
-- Agent can complete multi-step tasks via `ww` pipes
-
-## Test It (against live API on port 8099)
-
-```bash
-# Parity check: CLI command count matches API
-ww commands list | jq length
-curl -s http://127.0.0.1:8099/commands/list | jq '.commands | length'
-# Must match
-
-# Functional: move a window via CLI, verify via API
-WID=$(ww windows list | jq -r '.[0].id')
-ww window $WID move --x 10 --y 5
-curl -s http://127.0.0.1:8099/state | jq ".windows[] | select(.id==$WID) | .left"
-# Must return 10
-
-# Pipe composition: close all editors
-ww windows list | jq -r '.[] | select(.kind=="editor") | .id' | \
-  xargs -I{} ww window {} close
-```
+- Agent can complete multi-step tasks via `wibwob` pipes
+- 53 parity tests green
 
 ## Related
 
-- RESEARCH_UNIX_AGENT_CONTROL.md — evidence and analysis
-- REFERENCE_CLI_TOOLS_RANKED.md — CLI design references and proposed grammar
+- `autoresearch/unix-control/` — V1 research, tests, devlog
+- `autoresearch/unix-control-v2/` — V2 backlog and autoresearch
+- `src/cli/README.md` — CLI usage guide
