@@ -653,7 +653,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       ? ` ${statusLeft.trim()}`
       : ` ${accentCol}Ln ${desc.cursor.row + 1}${A.r}${dimCol}, Col ${desc.cursor.col + 1}${A.r}`;
     const langColour = hasHighlight ? accentCol : dimCol;
-    const statusRightAnsi = `${langColour}${langLabel}${A.r}  ${dimCol}UTF-8  2 sp  ${desc.lines} ln  ${pct}%${A.r} `;
+    // Visual scroll bar (5 chars)
+    const barLen = 5;
+    const scrollPos = Math.round((pct / 100) * (barLen - 1));
+    let scrollBar = "";
+    for (let i = 0; i < barLen; i++) {
+      scrollBar += i === scrollPos ? `${accentCol}\u2588${A.r}` : `${dimCol}\u2591${A.r}`;
+    }
+    const statusRightAnsi = `${langColour}${langLabel}${A.r} ${dimCol}\u2502${A.r} ${dimCol}UTF-8${A.r} ${dimCol}\u2502${A.r} ${dimCol}2 sp${A.r} ${dimCol}\u2502${A.r} ${dimCol}${desc.lines} ln${A.r} ${dimCol}\u2502${A.r} ${scrollBar} ${dimCol}${pct}%${A.r} `;
     // Calculate gap (strip ANSI for width)
     const leftPlain = stripAnsi(statusLeftAnsi).length;
     const rightPlain = stripAnsi(statusRightAnsi).length;
