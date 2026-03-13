@@ -9,11 +9,14 @@ import {
 // SPORE CLOCK — a living fungal timepiece
 //
 // Time is told through mycelial growth, not digits.
-// Hours  → dominant colony colour
+// Hours  → dominant colony colour (with circadian blending)
 // Minutes → hyphal reach (network density)
 // Seconds → spore drift particles
 //
-// The clock grows, sporulates, and recolonises every minute.
+// The clock grows, sporulates, decays, and recolonises.
+// Substrate memory means old growth shapes new growth.
+// Wild colonies emerge from drifting spores.
+// Death feeds birth at minute transitions.
 // ═══════════════════════════════════════════════════════════════
 
 // Mycelial growth characters (density progression)
@@ -22,7 +25,10 @@ const SPORE_CHARS = ["°", "•", "⊙", "◌", "○", "◦", "∘", "⁘", "⁛
 const NODE_CHARS = ["◉", "⊛", "✦", "✧", "❋", "✿", "❀", "⚘"];
 const TENDRIL_H = ["─", "═", "╌", "╍", "┄", "┈"];
 const TENDRIL_V = ["│", "║", "╎", "╏", "┆", "┊"];
-const BRANCH = ["┤", "├", "┬", "┴", "┼", "╋", "╳", "╬"];
+const BRANCH_CROSS = ["┤", "├", "┬", "┴", "┼", "╋"];
+const BRANCH_CORNER = ["┌", "┐", "└", "┘", "╭", "╮", "╰", "╯"];
+const DECAY_CHARS = ["░", "▒", "≈", "~", "˙", "ˑ"];
+const GHOST_CHARS = ["᛫", "᛬", "⋅", "⋯", "∵"];
 
 // Colony colour palette — one per 2-hour block (12 colonies per day)
 const COLONY_COLOURS = [
@@ -40,6 +46,30 @@ const COLONY_COLOURS = [
   "#483d8b",   // 22-23  midnight indigo
 ];
 
+// Colony name vocabulary — procedural mycological names
+const GENUS = [
+  "Amanita", "Tremella", "Cordyceps", "Hericium", "Pleurotus",
+  "Ganoderma", "Mycena", "Russula", "Psilocybe", "Cantharellus",
+  "Lactarius", "Boletus", "Clavaria", "Trametes", "Polyporus",
+  "Hypholoma", "Armillaria", "Coprinus", "Lentinula", "Marasmius",
+];
+const EPITHET = [
+  "Prime", "Nexus", "Cluster", "Node", "Bloom",
+  "Crown", "Veil", "Ring", "Thallus", "Axis",
+  "Mycel", "Spire", "Root", "Arch", "Core",
+  "Haven", "Weave", "Drift", "Pulse", "Deep",
+];
+
+function colonyName(idx: number): string {
+  return `${GENUS[idx % GENUS.length]} ${EPITHET[Math.floor(idx / GENUS.length) % EPITHET.length]}`;
+}
+
+interface SporeTrail {
+  x: number;
+  y: number;
+  age: number; // fading counter
+}
+
 interface Spore {
   x: number;
   y: number;
@@ -47,45 +77,101 @@ interface Spore {
   vy: number;
   age: number;
   char: string;
+  trails: SporeTrail[];
 }
 
 interface HyphalNode {
   x: number;
   y: number;
-  strength: number; // 0-1 growth intensity
+  strength: number;    // 0-1 growth intensity
   connected: number[]; // indices of connected nodes
+  wild: boolean;       // seeded by spore collision?
+  name: string;        // procedural colony name
+  born: number;        // tick of creation
 }
 
 // Cellular automaton grid for mycelial growth
 interface MycelialField {
-  grid: number[][]; // 0-9 density values
+  grid: number[][];       // 0-9 density values
+  ghost: number[][];      // substrate memory from previous cycles
+  nutrient: number[][];   // nutrient richness map (0-1)
+  decay: number[][];      // decay timers per cell
   nodes: HyphalNode[];
   spores: Spore[];
-  colonies: number; // active growth centres
+  colonies: number;       // planned colony count
+  wildColonies: number;   // emergent colony count
   generation: number;
+  totalGenerations: number; // across all cycles
+  cycleCount: number;      // number of minute resets
+}
+
+// Minute transition state
+interface TransitionState {
+  active: boolean;
+  ticksRemaining: number;  // ~24 ticks = 3 seconds at 8fps
+  phase: "sporulating" | "rebirth";
 }
 
 function createField(w: number, h: number): MycelialField {
   const grid: number[][] = [];
+  const ghost: number[][] = [];
+  const nutrient: number[][] = [];
+  const decay: number[][] = [];
   for (let y = 0; y < h; y++) {
     grid.push(new Array(w).fill(0));
+    ghost.push(new Array(w).fill(0));
+    nutrient.push(new Array(w).fill(0));
+    decay.push(new Array(w).fill(0));
   }
-  return { grid, nodes: [], spores: [], colonies: 0, generation: 0 };
+  return {
+    grid, ghost, nutrient, decay,
+    nodes: [], spores: [],
+    colonies: 0, wildColonies: 0,
+    generation: 0, totalGenerations: 0,
+    cycleCount: 0,
+  };
+}
+
+// Generate nutrient zones — Perlin-ish noise via superimposed sine waves
+function generateNutrients(nutrient: number[][], w: number, h: number, seed: number) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const n1 = Math.sin(x * 0.15 + seed) * Math.cos(y * 0.2 + seed * 0.7);
+      const n2 = Math.sin(x * 0.07 - seed * 1.3) * Math.cos(y * 0.11 + seed * 0.4);
+      const n3 = Math.sin((x + y) * 0.09 + seed * 2.1);
+      nutrient[y][x] = (n1 + n2 + n3 + 3) / 6; // normalise to 0-1
+    }
+  }
 }
 
 // Seed a colony at (cx, cy) with given strength
-function seedColony(field: MycelialField, cx: number, cy: number, strength: number) {
+function seedColony(
+  field: MycelialField, cx: number, cy: number,
+  strength: number, wild: boolean, tick: number,
+): boolean {
   const w = field.grid[0]?.length ?? 0;
   const h = field.grid.length;
-  if (cx < 0 || cx >= w || cy < 0 || cy >= h) return;
+  if (cx < 0 || cx >= w || cy < 0 || cy >= h) return false;
+
+  // Don't seed too close to existing nodes
+  const tooClose = field.nodes.some(
+    (n) => Math.abs(n.x - cx) < 3 && Math.abs(n.y - cy) < 2
+  );
+  if (tooClose) return false;
 
   field.grid[cy][cx] = Math.min(9, Math.floor(strength * 9));
+  const idx = field.nodes.length;
   field.nodes.push({
     x: cx, y: cy,
     strength,
     connected: [],
+    wild,
+    name: colonyName(idx + field.cycleCount * 7),
+    born: tick,
   });
-  field.colonies++;
+  if (wild) field.wildColonies++;
+  else field.colonies++;
+  return true;
 }
 
 // Grow the mycelium one generation
@@ -94,7 +180,6 @@ function growField(field: MycelialField, intensity: number) {
   const w = field.grid[0]?.length ?? 0;
   if (w === 0 || h === 0) return;
 
-  // Cellular automaton: each cell influenced by neighbours
   const next: number[][] = [];
   for (let y = 0; y < h; y++) {
     next.push([...field.grid[y]]);
@@ -109,19 +194,50 @@ function growField(field: MycelialField, intensity: number) {
 
       const avg = neighbours / 8;
       const current = field.grid[y][x];
+      const nut = field.nutrient[y]?.[x] ?? 0.5;
+      const ghostBoost = (field.ghost[y]?.[x] ?? 0) * 0.15; // ghost residue helps growth
 
-      if (current === 0 && avg > 0.8) {
-        // colonise empty cell if enough neighbours
-        next[y][x] = Math.min(9, Math.floor(avg * intensity * 1.2));
+      if (current === 0 && avg > 0.6 - ghostBoost) {
+        // colonise empty cell — nutrient zones affect growth threshold
+        const threshold = 0.8 - nut * 0.4 - ghostBoost;
+        if (avg > threshold) {
+          next[y][x] = Math.min(9, Math.floor(avg * intensity * (1.0 + nut * 0.4)));
+        }
       } else if (current > 0 && current < 9) {
-        // grow existing cell
-        const growth = Math.random() < intensity * 0.3 ? 1 : 0;
+        // grow existing cell — nutrient-boosted
+        const growChance = intensity * (0.2 + nut * 0.2);
+        const growth = Math.random() < growChance ? 1 : 0;
         next[y][x] = Math.min(9, current + growth);
       }
-      // random tendril extension
-      if (current === 0 && Math.random() < intensity * 0.02) {
+
+      // Decay — max-density cells start decaying after random interval
+      if (current >= 8) {
+        if (field.decay[y][x] === 0) {
+          // Start decay timer — random 20-80 ticks
+          field.decay[y][x] = 20 + Math.floor(Math.random() * 60);
+        } else {
+          field.decay[y][x]--;
+          if (field.decay[y][x] <= 0) {
+            // Decay! Drop density, feed neighbours
+            next[y][x] = Math.max(0, current - 2 - Math.floor(Math.random() * 3));
+            field.decay[y][x] = 0;
+            // Nutrient boost to neighbours from decay
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const ny = y + dy, nx = x + dx;
+                if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+                  field.nutrient[ny][nx] = Math.min(1, (field.nutrient[ny]?.[nx] ?? 0) + 0.05);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Random tendril extension — nutrient-guided and ghost-guided
+      if (current === 0 && Math.random() < intensity * (0.015 + nut * 0.015 + ghostBoost * 0.02)) {
         const nearNode = field.nodes.find(
-          (n) => Math.abs(n.x - x) < 4 && Math.abs(n.y - y) < 3
+          (n) => Math.abs(n.x - x) < 5 && Math.abs(n.y - y) < 4
         );
         if (nearNode) {
           next[y][x] = 1;
@@ -132,6 +248,7 @@ function growField(field: MycelialField, intensity: number) {
 
   field.grid = next;
   field.generation++;
+  field.totalGenerations++;
 }
 
 // Emit spores from active nodes
@@ -148,22 +265,121 @@ function emitSpores(field: MycelialField, count: number, w: number, h: number) {
       vy: (Math.random() - 0.5) * 0.8,
       age: 0,
       char: SPORE_CHARS[Math.floor(Math.random() * SPORE_CHARS.length)],
+      trails: [],
     });
   }
 }
 
-// Drift spores
-function driftSpores(field: MycelialField, w: number, h: number) {
+// Mass sporulation for minute transition — flood of spores from all cells
+function massSporulate(field: MycelialField, w: number, h: number) {
+  const h2 = field.grid.length;
+  for (let y = 0; y < h2; y++) {
+    for (let x = 0; x < w; x++) {
+      if (field.grid[y][x] >= 4 && Math.random() < 0.08) {
+        field.spores.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 2.5,
+          vy: (Math.random() - 0.5) * 1.2,
+          age: 0,
+          char: SPORE_CHARS[Math.floor(Math.random() * SPORE_CHARS.length)],
+          trails: [],
+        });
+        // Reduce cell density as it releases spores
+        field.grid[y][x] = Math.max(0, field.grid[y][x] - 1);
+      }
+    }
+  }
+}
+
+// Drift spores — with trail recording and wild colony seeding
+function driftSpores(field: MycelialField, w: number, h: number, tick: number) {
   field.spores = field.spores.filter((s) => {
+    // Record trail before moving
+    if (s.age > 0 && s.age % 2 === 0) {
+      s.trails.push({ x: Math.floor(s.x), y: Math.floor(s.y), age: 0 });
+      if (s.trails.length > 6) s.trails.shift(); // max 6 trail points
+    }
+    // Age trails
+    for (const t of s.trails) t.age++;
+
     s.x += s.vx;
     s.y += s.vy;
-    s.vx *= 0.95; // air resistance
-    s.vy *= 0.95;
-    s.vx += (Math.random() - 0.5) * 0.3; // brownian
-    s.vy += (Math.random() - 0.5) * 0.15;
+    s.vx *= 0.94; // air resistance
+    s.vy *= 0.94;
+    s.vx += (Math.random() - 0.5) * 0.35; // brownian
+    s.vy += (Math.random() - 0.5) * 0.18;
     s.age++;
-    return s.age < 40 && s.x >= 0 && s.x < w && s.y >= 0 && s.y < h;
+
+    // Wild colony seeding — spores that drift far and land on empty space
+    if (s.age > 15 && s.age < 35) {
+      const ix = Math.floor(s.x), iy = Math.floor(s.y);
+      if (ix >= 1 && ix < w - 1 && iy >= 1 && iy < h - 1) {
+        const cellVal = field.grid[iy]?.[ix] ?? 0;
+        const nearestNodeDist = field.nodes.reduce((min, n) => {
+          const d = Math.abs(n.x - ix) + Math.abs(n.y - iy);
+          return d < min ? d : min;
+        }, Infinity);
+        // Seed wild colony if far from any node and on empty ground
+        if (cellVal === 0 && nearestNodeDist > 8 && Math.random() < 0.04) {
+          if (seedColony(field, ix, iy, 0.4 + Math.random() * 0.3, true, tick)) {
+            return false; // spore consumed
+          }
+        }
+      }
+    }
+
+    return s.age < 45 && s.x >= 0 && s.x < w && s.y >= 0 && s.y < h;
   });
+}
+
+// Hex colour to RGB
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = hex.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return null;
+  return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+}
+
+// RGB to hex
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+// Blend two colour strings (hex or named) — simple RGB lerp
+function blendColours(a: string, b: string, t: number): string {
+  // Named colour fallback map
+  const named: Record<string, string> = { blue: "#0000ff", white: "#ffffff", grey: "#808080" };
+  const ha = named[a] ?? a;
+  const hb = named[b] ?? b;
+  const ra = hexToRgb(ha), rb = hexToRgb(hb);
+  if (!ra || !rb) return a;
+  const r = ra[0] + (rb[0] - ra[0]) * t;
+  const g = ra[1] + (rb[1] - ra[1]) * t;
+  const bl = ra[2] + (rb[2] - ra[2]) * t;
+  return rgbToHex(r, g, bl);
+}
+
+// Get blended colony colour based on current time — smooth circadian transition
+function getCircadianColour(now: Date): string {
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const colonyIdx = Math.floor(h / 2);
+  const nextIdx = (colonyIdx + 1) % 12;
+
+  // Position within the 2-hour block (0-1)
+  const blockMinutes = (h % 2) * 60 + m;
+  const blockProgress = blockMinutes / 120;
+
+  // Blend in the last 15 minutes of each block
+  if (blockProgress > 0.875) {
+    const blendT = (blockProgress - 0.875) / 0.125; // 0→1 over last 15 min
+    return blendColours(
+      COLONY_COLOURS[colonyIdx] ?? "white",
+      COLONY_COLOURS[nextIdx] ?? "white",
+      blendT,
+    );
+  }
+  return COLONY_COLOURS[colonyIdx] ?? "white";
 }
 
 // Render the field to a string
@@ -171,28 +387,66 @@ function renderField(
   field: MycelialField,
   w: number,
   h: number,
+  tick: number,
   seconds: number,
-  colourFg: string,
 ): string {
+  // Build spore position lookup for O(1) access instead of O(n) find()
+  const sporeMap = new Map<number, Spore>();
+  for (const s of field.spores) {
+    const key = Math.floor(s.y) * w + Math.floor(s.x);
+    sporeMap.set(key, s);
+  }
+
+  // Build trail lookup
+  const trailMap = new Map<number, number>(); // key → oldest age (for fading)
+  for (const s of field.spores) {
+    for (const t of s.trails) {
+      if (t.age < 10) {
+        const key = t.y * w + t.x;
+        const existing = trailMap.get(key);
+        if (existing === undefined || t.age < existing) {
+          trailMap.set(key, t.age);
+        }
+      }
+    }
+  }
+
+  // Build node position lookup
+  const nodeMap = new Map<number, HyphalNode>();
+  for (const n of field.nodes) {
+    nodeMap.set(n.y * w + n.x, n);
+  }
+
   const lines: string[] = [];
 
   for (let y = 0; y < h; y++) {
     let line = "";
     for (let x = 0; x < w; x++) {
+      const key = y * w + x;
+
       // Check for spore at this position
-      const spore = field.spores.find(
-        (s) => Math.floor(s.x) === x && Math.floor(s.y) === y
-      );
+      const spore = sporeMap.get(key);
       if (spore) {
-        // Fade spore based on age
         line += spore.age < 10 ? spore.char : spore.age < 25 ? "·" : " ";
         continue;
       }
 
+      // Check for spore trail
+      const trailAge = trailMap.get(key);
+      if (trailAge !== undefined) {
+        const density = field.grid[y]?.[x] ?? 0;
+        if (density === 0) {
+          line += trailAge < 3 ? "·" : trailAge < 6 ? "⋅" : "᛫";
+          continue;
+        }
+      }
+
       // Check for node at this position
-      const node = field.nodes.find((n) => n.x === x && n.y === y);
+      const node = nodeMap.get(key);
       if (node) {
-        const pulse = Math.sin(seconds * 2 + node.x * 0.3) * 0.5 + 0.5;
+        // Heartbeat pulse — sin wave modulates node glyph selection
+        const pulseSpeed = node.wild ? 3.5 : 2.0;
+        const pulse = Math.sin(tick * 0.15 * pulseSpeed + node.x * 0.3 + node.y * 0.2) * 0.5 + 0.5;
         const ni = Math.floor(pulse * (NODE_CHARS.length - 1));
         line += NODE_CHARS[ni];
         continue;
@@ -201,15 +455,23 @@ function renderField(
       // Mycelial density
       const density = field.grid[y]?.[x] ?? 0;
       if (density > 0) {
-        // Add tendrils for mid-density cells
-        if (density >= 2 && density <= 5) {
+        // Decay visualization
+        if (field.decay[y]?.[x] > 0 && field.decay[y][x] < 10 && density >= 7) {
+          line += DECAY_CHARS[Math.floor(Math.random() * DECAY_CHARS.length)];
+          continue;
+        }
+
+        // Contextual box-drawing for mid-density cells
+        if (density >= 2 && density <= 6) {
           const leftD = field.grid[y]?.[x - 1] ?? 0;
           const rightD = field.grid[y]?.[x + 1] ?? 0;
           const upD = field.grid[y - 1]?.[x] ?? 0;
           const downD = field.grid[y + 1]?.[x] ?? 0;
+          const connections = (leftD > 0 ? 1 : 0) + (rightD > 0 ? 1 : 0) +
+                              (upD > 0 ? 1 : 0) + (downD > 0 ? 1 : 0);
 
-          if (leftD > 0 && rightD > 0 && upD > 0 && downD > 0) {
-            line += BRANCH[Math.floor(Math.random() * 3)];
+          if (connections >= 3) {
+            line += BRANCH_CROSS[density % BRANCH_CROSS.length];
             continue;
           } else if (leftD > 0 && rightD > 0) {
             line += TENDRIL_H[density % TENDRIL_H.length];
@@ -217,11 +479,22 @@ function renderField(
           } else if (upD > 0 && downD > 0) {
             line += TENDRIL_V[density % TENDRIL_V.length];
             continue;
+          } else if (connections === 2) {
+            // Corner pieces
+            const ci = ((leftD > 0 || rightD > 0) ? 1 : 0) + ((upD > 0) ? 2 : 0);
+            line += BRANCH_CORNER[ci % BRANCH_CORNER.length];
+            continue;
           }
         }
         line += HYPHAE[density];
       } else {
-        line += " ";
+        // Ghost residue from previous cycles
+        const ghostVal = field.ghost[y]?.[x] ?? 0;
+        if (ghostVal > 0) {
+          line += GHOST_CHARS[Math.min(ghostVal - 1, GHOST_CHARS.length - 1)];
+        } else {
+          line += " ";
+        }
       }
     }
     lines.push(line);
@@ -242,7 +515,7 @@ function fungalTime(now: Date): string {
     "TEAL LICHEN", "CORNFLOWER", "TWILIGHT", "MIDNIGHT",
   ];
   const density = Math.floor((m / 60) * 100);
-  return `${names[colonyIdx]} colony  ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}  density:${density}%`;
+  return `${names[colonyIdx]}  ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}  ▓${density}%`;
 }
 
 export default function setup(host: MicroappHost) {
@@ -290,6 +563,8 @@ function openSporeClock(host: MicroappHost) {
   let field: MycelialField | null = null;
   let lastMinute = -1;
   let tick = 0;
+  let nutrientSeed = Math.random() * 100;
+  const transition: TransitionState = { active: false, ticksRemaining: 0, phase: "sporulating" };
 
   function getContentSize(): { w: number; h: number } {
     const w = Math.max(8, (Number(canvas.width) || 40));
@@ -297,26 +572,64 @@ function openSporeClock(host: MicroappHost) {
     return { w, h };
   }
 
-  function resetField() {
+  function resetField(preserveMemory: boolean) {
     const { w, h } = getContentSize();
+
+    // Save ghost layer from old field (substrate memory)
+    let oldGhost: number[][] | null = null;
+    let oldCycleCount = 0;
+    let oldTotalGen = 0;
+    if (preserveMemory && field) {
+      const oh = field.grid.length;
+      const ow = field.grid[0]?.length ?? 0;
+      oldGhost = [];
+      for (let y = 0; y < Math.min(oh, h); y++) {
+        const row: number[] = [];
+        for (let x = 0; x < Math.min(ow, w); x++) {
+          // Accumulate: old ghost + 10% of current density
+          const prev = field.ghost[y]?.[x] ?? 0;
+          const curr = field.grid[y]?.[x] ?? 0;
+          row.push(Math.min(5, prev + (curr > 3 ? 1 : 0)));
+        }
+        oldGhost.push(row);
+      }
+      oldCycleCount = field.cycleCount;
+      oldTotalGen = field.totalGenerations;
+    }
+
     field = createField(w, h);
+    field.cycleCount = oldCycleCount + (preserveMemory ? 1 : 0);
+    field.totalGenerations = oldTotalGen;
+
+    // Restore ghost layer
+    if (oldGhost) {
+      for (let y = 0; y < Math.min(oldGhost.length, h); y++) {
+        for (let x = 0; x < Math.min(oldGhost[y].length, w); x++) {
+          field.ghost[y][x] = oldGhost[y][x];
+        }
+      }
+    }
+
+    // Generate nutrient zones — rotate slowly over time
+    nutrientSeed += 0.3;
+    generateNutrients(field.nutrient, w, h, nutrientSeed);
 
     const now = new Date();
     const m = now.getMinutes();
 
-    // Seed colonies based on current time
-    // More colonies as the hour progresses
-    const numSeeds = 3 + Math.floor(m / 15);
+    // Fibonacci-inspired seed spacing — golden angle distribution
+    const numSeeds = 3 + Math.floor(m / 12);
+    const goldenAngle = 137.508 * (Math.PI / 180);
     for (let i = 0; i < numSeeds; i++) {
-      const angle = (i / numSeeds) * Math.PI * 2 + (now.getHours() * 0.5);
-      const radius = Math.min(w, h) * 0.3;
+      const angle = i * goldenAngle + (now.getHours() * 0.5);
+      const radius = Math.min(w, h) * (0.2 + (i / numSeeds) * 0.2);
       const cx = Math.floor(w / 2 + Math.cos(angle) * radius);
       const cy = Math.floor(h / 2 + Math.sin(angle) * radius * 0.5);
-      seedColony(field, cx, cy, 0.5 + Math.random() * 0.5);
+      seedColony(field, cx, cy, 0.5 + Math.random() * 0.5, false, tick);
     }
 
     // Centre node (always)
-    seedColony(field, Math.floor(w / 2), Math.floor(h / 2), 1.0);
+    seedColony(field, Math.floor(w / 2), Math.floor(h / 2), 1.0, false, tick);
   }
 
   function updateDisplay() {
@@ -326,48 +639,92 @@ function openSporeClock(host: MicroappHost) {
     const minutes = now.getMinutes();
     const seconds = now.getSeconds();
 
-    // Reset field every minute (new growth cycle)
-    if (minutes !== lastMinute) {
-      lastMinute = minutes;
-      resetField();
+    // Minute transition handling
+    if (minutes !== lastMinute && lastMinute !== -1) {
+      if (!transition.active) {
+        // Start sporulation phase
+        transition.active = true;
+        transition.phase = "sporulating";
+        transition.ticksRemaining = 20; // ~2.5s of sporulation
+      }
     }
 
-    // Growth intensity increases through the minute
-    const minuteProgress = seconds / 60;
-    const intensity = 0.2 + minuteProgress * 0.8;
+    if (transition.active) {
+      transition.ticksRemaining--;
+      if (transition.phase === "sporulating") {
+        // Mass sporulate — old field releases spores
+        massSporulate(field!, w, h);
+        driftSpores(field!, w, h, tick);
 
-    // Grow mycelium
-    growField(field!, intensity);
+        if (transition.ticksRemaining <= 0) {
+          // Save spores, reset field, restore spores (death feeds birth)
+          const savedSpores = [...field!.spores];
+          lastMinute = minutes;
+          resetField(true); // preserve substrate memory
+          field!.spores = savedSpores;
+          transition.phase = "rebirth";
+          transition.ticksRemaining = 8; // ~1s rebirth settling
+        }
+      } else {
+        // Rebirth phase — spores can seed wild colonies during this
+        driftSpores(field!, w, h, tick);
+        if (transition.ticksRemaining <= 0) {
+          transition.active = false;
+        }
+      }
+    } else {
+      // Normal operation — reset field on first run
+      if (lastMinute === -1) {
+        lastMinute = minutes;
+        resetField(false);
+      }
 
-    // Spore emission scales with seconds
-    const sporeRate = Math.floor(seconds / 10) + 1;
-    if (tick % 3 === 0) {
-      emitSpores(field!, sporeRate, w, h);
+      // Growth intensity increases through the minute
+      const minuteProgress = seconds / 60;
+      const intensity = 0.2 + minuteProgress * 0.8;
+
+      // Grow mycelium
+      growField(field!, intensity);
+
+      // Spore emission scales with seconds
+      const sporeRate = Math.floor(seconds / 10) + 1;
+      if (tick % 3 === 0) {
+        emitSpores(field!, sporeRate, w, h);
+      }
+      driftSpores(field!, w, h, tick);
     }
-    driftSpores(field!, w, h);
 
-    // Get colony colour
-    const colonyIdx = Math.floor(now.getHours() / 2);
-    const colour = COLONY_COLOURS[colonyIdx] ?? "white";
+    // Get blended colony colour
+    const colour = getCircadianColour(now);
 
     // Render
-    const rendered = renderField(field!, w, h, seconds, colour);
+    const rendered = renderField(field!, w, h, tick, seconds);
     canvas.setContent(rendered);
     canvas.style = { fg: colour, bg: host.theme().body.bg };
 
-    // Separator line
-    const sepChar = TENDRIL_H[tick % TENDRIL_H.length];
+    // Separator line — breathing separator
+    const sepPulse = Math.sin(tick * 0.08) * 0.5 + 0.5;
+    const sepIdx = Math.floor(sepPulse * (TENDRIL_H.length - 1));
+    const sepChar = TENDRIL_H[sepIdx];
     sep.setContent(sepChar.repeat(w));
     sep.style = { fg: colour, bg: host.theme().body.bg };
 
-    // Status
-    status.setContent(` ${fungalTime(now)}  gen:${field!.generation}  spores:${field!.spores.length}  nodes:${field!.nodes.length}`);
+    // Enhanced status bar
+    const wildCount = field!.wildColonies;
+    const wildStr = wildCount > 0 ? `  wild:${wildCount}` : "";
+    const cycleStr = field!.cycleCount > 0 ? `  cycle:${field!.cycleCount}` : "";
+    const transStr = transition.active
+      ? `  ${transition.phase === "sporulating" ? "⟡ SPORULATING" : "⟡ REBIRTH"}`
+      : "";
+    status.setContent(
+      ` ${fungalTime(now)}  gen:${field!.generation}  ◦${field!.spores.length}  ◉${field!.nodes.length}${wildStr}${cycleStr}${transStr}`
+    );
 
     host.screen.render();
     tick++;
   }
 
-  resetField();
+  resetField(false);
 
   // Main animation loop — ~8fps for organic feel
   createTimer(() => {
@@ -375,18 +732,30 @@ function openSporeClock(host: MicroappHost) {
   }, 125, timers);
 
   win.onResize(() => {
-    resetField();
+    resetField(false); // full reset on resize (dimensions changed)
     updateDisplay();
   });
 
   win.describeState(() => {
     const now = new Date();
+    const nodeNames = (field?.nodes ?? []).map((n) => ({
+      name: n.name,
+      position: { x: n.x, y: n.y },
+      wild: n.wild,
+      strength: n.strength,
+    }));
     return {
       summary: `Spore Clock — ${fungalTime(now)}`,
       generation: field?.generation ?? 0,
+      totalGenerations: field?.totalGenerations ?? 0,
       sporeCount: field?.spores.length ?? 0,
       nodeCount: field?.nodes.length ?? 0,
-      colonies: field?.colonies ?? 0,
+      plannedColonies: field?.colonies ?? 0,
+      wildColonies: field?.wildColonies ?? 0,
+      cycleCount: field?.cycleCount ?? 0,
+      colonies: nodeNames,
+      transitioning: transition.active ? transition.phase : "none",
+      colour: getCircadianColour(now),
     };
   });
 
