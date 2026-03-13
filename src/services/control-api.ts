@@ -33,6 +33,7 @@ import type { BackroomsChannel, DesktopState } from "../core/types.js";
 import type { RuntimeStatsSnapshot } from "../core/runtime-stats.js";
 import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
+import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
 
@@ -441,9 +442,28 @@ export class ControlApiService {
       if (!id) {
         return Response.json({ ok: false, error: "id required (also accepts 'command' as deprecated alias)" }, { status: 400 });
       }
-      const args = typeof (body as any).args === "object" && (body as any).args !== null
+      const rawArgs = typeof (body as any).args === "object" && (body as any).args !== null
         ? (body as any).args as Record<string, unknown>
         : undefined;
+      // Validate args against Zod schema if the command defines one
+      let args = rawArgs;
+      const cmdDef = getCommandDefinition(id);
+      if (cmdDef?.params && rawArgs) {
+        const result = cmdDef.params.safeParse(rawArgs);
+        if (!result.success) {
+          return Response.json({
+            ok: false,
+            error: "Invalid arguments",
+            details: result.error.issues.map((i: any) => ({
+              path: i.path.join("."),
+              message: i.message,
+              expected: i.expected,
+              received: i.received,
+            })),
+          }, { status: 400 });
+        }
+        args = result.data;
+      }
       try {
         const result = this.handlers.runCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
