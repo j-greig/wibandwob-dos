@@ -19,8 +19,8 @@ wall-clock time. No extension code changes needed.
 First application: improving the LLM Orch Studio UI (E037) by having a Pi
 agent self-score screenshots against a fixed rubric. Five axes (layout,
 readability, aesthetic, coherence, character) each scored 1-10, averaged
-to a primary ui_score. The system is running and producing measurable
-improvement (baseline 3.6 to 7.8 in 13 iterations).
+to a primary ui_score. Run 001 completed: baseline 3.6 to 8.0 in 14
+iterations (+122%), all five axes at 8/10.
 
 This epic tracks the system itself, not the LLM Orch Studio UI. The goal
 is to refine, document, and generalise the visual scoring pipeline so it
@@ -90,7 +90,8 @@ Each axis tracked as secondary metric in autoresearch dashboard.
 | 12 | 7.4 | Animated pulse in status banner |
 | 13 | 7.8 | Dual figlet headers with typographic hierarchy |
 
-Baseline to best: +117% overall. CHARACTER axis: 2 to 8 (+300%).
+Baseline to best: +122% overall (3.6 → 8.0). CHARACTER axis: 2 → 8 (+300%).
+All five axes reached 8/10 in the final iteration (run 14).
 
 ## Feature Checklist
 
@@ -99,7 +100,7 @@ Baseline to best: +117% overall. CHARACTER axis: 2 to 8 (+300%).
 - [x] F03 autoresearch.sh benchmark script (restart, screenshot, archive)
 - [x] F04 autoresearch.checks.sh (typecheck + module-load verification)
 - [x] F05 externalDependencies convention in module.json and SDK docs
-- [x] F06 First scoring session on LLM Orch Studio (baseline to 7.8)
+- [x] F06 First scoring session on LLM Orch Studio (baseline 3.6 to 8.0)
 - [~] F07 Refine rubric based on first session learnings
 - [ ] F08 Generalise: make scoring pipeline reusable for any module
 - [ ] F09 Calibration anchors: reference screenshots of known-good modules

@@ -163,6 +163,94 @@ Rules:
   Lesson:
   - motion is important for creative feel, but it must not mutate semantic controls invisibly
 
+### 2026-03-13 — Autoresearch visual scoring: self-directed UI optimisation loop
+
+**Keywords**: autoresearch, visual scoring, self-scoring, rubric, screenshot, PNG,
+microapp UI, LLM Orch Studio, pi-autoresearch, creative metric, experiment loop
+
+#### What happened
+
+Ran 14 iterations of autonomous visual-quality optimisation on the LLM Orch Studio
+microapp. Score went from 3.6 (generic scaffold) to 8.0 (all five axes at 8/10) in
+roughly 25 minutes of wall time across two sessions. 7 keeps, 7 discards — healthy
+54% discard rate.
+
+#### How it works
+
+The standard pi-autoresearch extension expects a numeric metric. We repurposed it
+for creative work by: (a) replacing the benchmark command with a restart-screenshot
+pipeline (autoresearch.sh), (b) replacing the metric source with agent self-scoring
+against a fixed 5-axis rubric (layout, readability, aesthetic, coherence, character),
+(c) adding module-load verification alongside typecheck in autoresearch.checks.sh.
+No extension code was changed. The key insight: log_experiment accepts any number the
+agent provides, so subjective judgement works as a metric.
+
+#### What worked well as an agent
+
+- **Fixed rubric prevents drift.** Five named axes with definitions stopped me from
+  inflating scores. Scoring each axis separately before averaging forced honest
+  assessment of individual weaknesses.
+- **Screenshot-read-score loop is fast.** Pi's Read tool renders PNGs inline. No
+  external process, no extra billing context. Score turnaround per iteration: ~30s.
+- **Discard discipline is load-bearing.** Equal scores are discarded, not kept. This
+  prevents slow accumulation of neutral changes that add complexity without value.
+- **Structured archive.** Numbered screenshots with timestamps make it trivial to
+  review progression visually and correlate with git log.
+- **autoresearch.md as session memory.** Having the rubric, SDK catalogue, and
+  constraints in one file meant I could re-ground at any point without relying on
+  conversation history.
+
+#### What caused friction
+
+- **JSONL discards lost on revert.** `git checkout -- .` reverts the jsonl alongside
+  code. Discarded experiment metadata is lost. Only git reflog preserves it. Fix:
+  either gitignore the jsonl or write discards to a separate log.
+- **Context window fills with PNGs.** Each screenshot is ~1MB in context. After 14
+  iterations the context was near limit. Strategy needed: either score-and-forget
+  (don't keep old screenshots in context) or periodically summarise and start a new
+  conversation.
+- **Subjective axis ceiling.** At 8.0 across all axes, further improvement requires
+  increasingly specific changes (colour-coded conversation turns, responsive
+  breakpoints, progress bars) that each affect only one axis by +1 at most. Returns
+  diminish. Need either a harder rubric or acceptance that 8 is "done."
+- **Session interruption recovery.** When context limit hit mid-experiment, the
+  uncommitted diff survived but the scoring context was lost. The autoresearch.md
+  "What's Been Tried" section was stale. Lesson: update that section on every keep,
+  not at end of session.
+- **blessed rendering constraints.** Unicode box-drawing in labels renders as dashes.
+  LogView needs content seeded after layout(). gap:1 on createStack applies between
+  ALL children. These are microapp SDK gotchas, not autoresearch-specific, but they
+  burn iterations.
+
+#### Progression pattern observed
+
+The agent naturally moved through phases:
+1. **Structure** (runs 1-5): layout, proportions, basic content — biggest score jumps
+2. **Polish** (runs 5-8): responsive sizing, whitespace, information density
+3. **Character** (runs 8-13): animation, figlet typography, ASCII art, personality
+4. **Refinement** (runs 13-14): removing noise, severity colours, breathing room
+
+Each phase had diminishing returns. The largest single-run gain was +0.8 (animated
+pulse in status banner). Most iterations gained 0.2-0.4.
+
+#### Reusability
+
+The system is module-agnostic. To target a different module, change three things:
+1. autoresearch.md — files in scope
+2. autoresearch.sh — window open command
+3. autoresearch.checks.sh — window title grep
+
+Full recreation guide: `.planning/epics/e038-autoresearch-visual-scoring/scripts/README.md`
+
+#### Ideas for v2
+
+- External cross-validation: periodically run Architecture A (separate claude -p
+  scorer) to check for self-scoring drift
+- Dual-mode capture: text (tmux capture-pane) + PNG for headless environments
+- Calibration anchors: known-good screenshots scored once as reference points
+- Cost tracking: tokens per iteration, total session cost
+- Automated "What's Been Tried" update on every keep commit
+
 ## Proposed Follow-ons
 
 - [ ] Add a `nested interaction smoke` script that can at least prove keyboard move/resize/focus for nested panes
