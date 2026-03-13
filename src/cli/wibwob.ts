@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 /**
- * ww — Unix CLI for WibWob-DOS
+ * wibwob — Unix CLI for WibWob-DOS
  *
  * Thin HTTP client that talks to the control API (default port 8099).
  * All output is JSON to stdout, errors to stderr. Designed for jq piping.
  *
  * Usage:
- *   ww state                        # GET /state
- *   ww windows                      # list windows from /state
- *   ww commands                     # GET /commands/list
- *   ww <noun>.<verb> [--key val]    # POST /commands/run
- *   ww cmd <id> [--key val]         # POST /commands/run (explicit)
- *   ww help                         # show usage
+ *   wibwob state                        # GET /state
+ *   wibwob windows                      # list windows from /state
+ *   wibwob commands                     # GET /commands/list
+ *   wibwob <noun>.<verb> [--key val]    # POST /commands/run
+ *   wibwob cmd <id> [--key val]         # POST /commands/run (explicit)
+ *   wibwob help                         # show usage
  */
 
 const BASE = process.env.WW_API ?? "http://127.0.0.1:8099";
@@ -108,19 +108,19 @@ async function cmdScreenshot() {
 }
 
 function usage() {
-  process.stderr.write(`ww — Unix CLI for WibWob-DOS
+  process.stderr.write(`wibwob — Unix CLI for WibWob-DOS
 
 Usage:
-  ww state                        Full desktop state (JSON)
-  ww windows [-q]                 List windows (JSON array, -q for IDs only)
-  ww commands                     List available commands
-  ww health                       API health check
-  ww screenshot                   Text screenshot of desktop
-  ww cmd <id> [--key val ...]     Run command by ID
-  ww <domain>.<verb> [--flags]    Run command (dot syntax)
-  ww <domain> <verb> [--flags]    Run command (noun verb)
-  ww window <id> <verb> [--flags] Target window then act
-  ww help                         This message
+  wibwob state                        Full desktop state (JSON)
+  wibwob windows [-q]                 List windows (JSON, -q for IDs only)
+  wibwob commands [-q]                List available commands
+  wibwob health                       API health check
+  wibwob screenshot                   Text screenshot of desktop
+  wibwob cmd <id> [--key val ...]     Run command by ID
+  wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
+  wibwob <domain> <verb> [--flags]    Run command (noun verb)
+  wibwob window <id> <verb> [--flags] Target window then act
+  wibwob help                         This message
 
 Flags:
   -q, --quiet    Output IDs only, one per line (for piping)
@@ -161,16 +161,16 @@ async function main() {
       return cmdScreenshot();
     case "cmd": {
       const id = cleanArgs[1];
-      if (!id) { process.stderr.write("Usage: ww cmd <command-id> [--flags]\n"); process.exit(1); }
+      if (!id) { process.stderr.write("Usage: wibwob cmd <command-id> [--flags]\n"); process.exit(1); }
       return cmdRun(id, parseFlags(cleanArgs.slice(2)));
     }
     default: {
-      // Treat as command ID: ww theme.set --name dark
+      // Treat as command ID: wibwob theme.set --name dark
       if (cleanSub.includes(".")) {
         return cmdRun(cleanSub, parseFlags(cleanArgs.slice(1)));
       }
-      // Try: ww window <id> <verb> --flags → window.<verb> --id <id>
-      // e.g. ww window 3 close → window.close --id 3
+      // Try: wibwob window <id> <verb> --flags → window.<verb> --id <id>
+      // e.g. wibwob window 3 close → window.close --id 3
       if (cleanArgs.length >= 3 && !isNaN(Number(cleanArgs[1])) && !cleanArgs[2].startsWith("--")) {
         const noun = cleanSub;
         const target = Number(cleanArgs[1]);
@@ -179,7 +179,7 @@ async function main() {
         flags.id = target;
         return cmdRun(`${noun}.${verb}`, flags);
       }
-      // Try noun + verb: ww window close --id 3 → window.close
+      // Try noun + verb: wibwob window close --id 3 → window.close
       if (cleanArgs.length >= 2 && !cleanArgs[1].startsWith("--")) {
         const id = `${cleanSub}.${cleanArgs[1]}`;
         return cmdRun(id, parseFlags(cleanArgs.slice(2)));
