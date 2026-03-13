@@ -322,20 +322,20 @@ function openWiretext(host: MicroappHost) {
 
   // ── Tool definitions ──
   const TOOLS: Array<{ id: Tool; label: string; icon: string; key: string }> = [
-    { id: "select",  label: "Select",    icon: "◆",  key: "V" },
+    { id: "select",  label: "Select",    icon: "<>", key: "V" },
     { id: "box",     label: "Box",       icon: "□",  key: "B" },
     { id: "text",    label: "Text",      icon: "Aa", key: "T" },
-    { id: "line",    label: "Line",      icon: "──", key: "L" },
+    { id: "line",    label: "Line",      icon: "--", key: "L" },
     { id: "arrow",   label: "Arrow",     icon: "→",  key: "A" },
     { id: "pencil",  label: "Pencil",    icon: "✎",  key: "N" },
     { id: "eraser",  label: "Eraser",    icon: "⌫",  key: "E" },
   ];
 
-  const STYLES: Array<{ id: BoxStyle; label: string; preview: string }> = [
-    { id: "single",  label: "Single",  preview: "┌─┐" },
-    { id: "double",  label: "Double",  preview: "╔═╗" },
-    { id: "rounded", label: "Rounded", preview: "╭─╮" },
-    { id: "heavy",   label: "Heavy",   preview: "┏━┓" },
+  const STYLES: Array<{ id: BoxStyle; label: string; preview: string; num: string }> = [
+    { id: "single",  label: "Single",  preview: "[ ]", num: "1" },
+    { id: "double",  label: "Double",  preview: "╔═╗", num: "2" },
+    { id: "rounded", label: "Rounded", preview: "( )", num: "3" },
+    { id: "heavy",   label: "Heavy",   preview: "┏━┓", num: "4" },
   ];
 
   // ── Widgets ──
@@ -427,31 +427,66 @@ function openWiretext(host: MicroappHost) {
 
     // Canvas rendering
     const canvasLines: string[] = [];
-    for (let y = 0; y < canvasH; y++) {
-      let line = "";
-      for (let x = 0; x < canvasW; x++) {
-        const gc = scrollCol + x;
-        const gr = scrollRow + y;
-        const ch = (gr < GRID_ROWS && gc < GRID_COLS) ? grid[gr][gc] : " ";
-        const isCursor = gc === cursorCol && gr === cursorRow;
-        const isSel = selCells.has(`${gc},${gr}`);
 
-        if (isCursor) {
-          line += `${ansiBgColour(th.body.fg)}${ansiColour(th.body.bg)}${ch}${A.r}`;
-        } else if (isSel) {
-          line += `${selBg}${selFg}${ch}${A.r}`;
-        } else if (ch !== " ") {
-          line += `${accent}${ch}${A.r}`;
+    // Welcome screen for empty canvas
+    if (objects.length === 0) {
+      const welcome = [
+        "",
+        "",
+        `       ${accent}${A.b}W I R E T E X T${A.r}`,
+        `       ${muted}ASCII Art Diagramming${A.r}`,
+        "",
+        `       ${bright}Draw${A.r}`,
+        `       ${muted}Click and drag on the canvas to draw.${A.r}`,
+        `       ${muted}Select a tool from the sidebar first.${A.r}`,
+        "",
+        `       ${bright}Tools${A.r}`,
+        `       ${accent}B${A.r}${muted} Box     ${A.r}${accent}T${A.r}${muted} Text    ${A.r}${accent}L${A.r}${muted} Line${A.r}`,
+        `       ${accent}A${A.r}${muted} Arrow   ${A.r}${accent}N${A.r}${muted} Pencil  ${A.r}${accent}E${A.r}${muted} Eraser${A.r}`,
+        `       ${accent}V${A.r}${muted} Select (move & resize objects)${A.r}`,
+        "",
+        `       ${bright}Styles${A.r}`,
+        `       ${muted}Press 1-4 to change box border style${A.r}`,
+        "",
+        `       ${bright}Actions${A.r}`,
+        `       ${accent}Ctrl+Z${A.r}${muted} Undo   ${A.r}${accent}Ctrl+Y${A.r}${muted} Redo${A.r}`,
+        `       ${accent}Ctrl+E${A.r}${muted} Export to clipboard${A.r}`,
+        `       ${accent}Del${A.r}${muted}    Delete selected object${A.r}`,
+      ];
+      for (let y = 0; y < canvasH; y++) {
+        if (y < welcome.length) {
+          canvasLines.push(welcome[y]);
         } else {
-          // Grid dots every 4 cells
-          if ((gc % 4 === 0) && (gr % 4 === 0)) {
-            line += `${muted}·${A.r}`;
-          } else {
-            line += " ";
-          }
+          canvasLines.push("");
         }
       }
-      canvasLines.push(line);
+    } else {
+      for (let y = 0; y < canvasH; y++) {
+        let line = "";
+        for (let x = 0; x < canvasW; x++) {
+          const gc = scrollCol + x;
+          const gr = scrollRow + y;
+          const ch = (gr < GRID_ROWS && gc < GRID_COLS) ? grid[gr][gc] : " ";
+          const isCursor = gc === cursorCol && gr === cursorRow;
+          const isSel = selCells.has(`${gc},${gr}`);
+
+          if (isCursor) {
+            line += `${ansiBgColour(th.body.fg)}${ansiColour(th.body.bg)}${ch}${A.r}`;
+          } else if (isSel) {
+            line += `${selBg}${selFg}${ch}${A.r}`;
+          } else if (ch !== " ") {
+            line += `${accent}${ch}${A.r}`;
+          } else {
+            // Grid dots every 4 cells
+            if ((gc % 4 === 0) && (gr % 4 === 0)) {
+              line += `${muted}.${A.r}`;
+            } else {
+              line += " ";
+            }
+          }
+        }
+        canvasLines.push(line);
+      }
     }
     canvasBox.setContent(canvasLines.join("\n"));
 
@@ -460,11 +495,11 @@ function openWiretext(host: MicroappHost) {
 
     // Divider
     const dH = Math.max(1, canvasH);
-    divider.setContent(("│\n").repeat(dH).trim());
+    divider.setContent(("|\n").repeat(dH).trim());
 
     // Header
     const headerLeft = ` ${accent}${A.b}WIRETEXT${A.r} ${muted}│${A.r} ${bright}${tool.toUpperCase()}${A.r}`;
-    const headerBtns = `${muted}[^Z]Undo [^Y]Redo [^E]Export [^X]Clear${A.r}`;
+    const headerBtns = `${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^X${A.r}${bright}Clear${A.r} `;
     const hlp = stripAnsi(headerLeft).length;
     const hrp = stripAnsi(headerBtns).length;
     const hgap = Math.max(1, bodyW - hlp - hrp);
@@ -502,9 +537,9 @@ function openWiretext(host: MicroappHost) {
     for (const s of STYLES) {
       const active = s.id === boxStyle;
       if (active) {
-        lines.push(`${selBg}${selFg} ${s.preview} ${s.label.padEnd(10)} ${A.r}`);
+        lines.push(`${selBg}${selFg} ${s.num} ${s.preview} ${s.label.padEnd(8)} ${A.r}`);
       } else {
-        lines.push(` ${muted}${s.preview}${A.r} ${bright}${s.label}${A.r}`);
+        lines.push(` ${muted}${s.num}${A.r} ${muted}${s.preview}${A.r} ${bright}${s.label}${A.r}`);
       }
     }
 
