@@ -1,1 +1,1 @@
-autoresearch/primer-gallery/autoresearch.sh
+autoresearch/code-editor/autoresearch.sh

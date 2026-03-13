@@ -1,1 +1,1 @@
-autoresearch/primer-gallery/autoresearch.checks.sh
+autoresearch/code-editor/autoresearch.checks.sh

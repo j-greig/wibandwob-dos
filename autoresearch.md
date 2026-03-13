@@ -1,1 +1,1 @@
-autoresearch/primer-gallery/autoresearch.md
+autoresearch/code-editor/autoresearch.md
