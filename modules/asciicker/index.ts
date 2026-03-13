@@ -197,6 +197,9 @@ function genTerrain(w: number, h: number, seed: number): Terrain {
   // Post-processing pass 2: Add scattered structures on flat grass
   addStructures(terrain, seed);
 
+  // Post-processing pass 3: Carve paths between nearby structures
+  carvePaths(terrain, seed);
+
   return terrain;
 }
 
@@ -425,6 +428,51 @@ function placeObjects(t: Terrain, seed: number): WorldObj[] {
   }
 
   return objs;
+}
+
+// Carve dirt paths between nearby structures (ROCK biome cells)
+function carvePaths(t: Terrain, seed: number) {
+  // Find structure centres (ROCK cells surrounded by ROCK)
+  const centres: { x: number; y: number }[] = [];
+  for (let y = 10; y < t.h - 10; y += 3) {
+    for (let x = 10; x < t.w - 10; x += 3) {
+      if (t.cells[y * t.w + x].biome === Biome.ROCK) {
+        const adj = [
+          t.cells[(y-1) * t.w + x]?.biome,
+          t.cells[(y+1) * t.w + x]?.biome,
+          t.cells[y * t.w + x-1]?.biome,
+          t.cells[y * t.w + x+1]?.biome,
+        ];
+        if (adj.filter(b => b === Biome.ROCK).length >= 2) {
+          centres.push({ x, y });
+        }
+      }
+    }
+  }
+
+  // Connect nearby centres with sand paths
+  for (let i = 0; i < centres.length; i++) {
+    for (let j = i + 1; j < centres.length; j++) {
+      const dx = centres[j].x - centres[i].x;
+      const dy = centres[j].y - centres[i].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 40) continue; // only connect nearby ones
+
+      // Bresenham-ish path
+      const steps = Math.ceil(dist);
+      for (let s = 0; s < steps; s++) {
+        const px = Math.floor(centres[i].x + dx * s / steps);
+        const py = Math.floor(centres[i].y + dy * s / steps);
+        if (px >= 0 && px < t.w && py >= 0 && py < t.h) {
+          const cell = t.cells[py * t.w + px];
+          if (cell.biome === Biome.GRASS || cell.biome === Biome.FOREST) {
+            cell.biome = Biome.SAND;
+            cell.height = Math.min(cell.height, cell.height - 2); // slightly flatten
+          }
+        }
+      }
+    }
+  }
 }
 
 function getH(t: Terrain, x: number, y: number): number {
@@ -811,6 +859,28 @@ function renderScene(
           }
         }
       }
+    }
+  }
+
+  // ─── Particles — dust, fireflies, weather ──────────────
+  const isNight = sunElevation < 0.3;
+  const particleCount = isNight ? 12 : 6;
+  for (let i = 0; i < particleCount; i++) {
+    const seed2 = hash2d(tick * 3 + i * 17, i * 41, 77);
+    const px = Math.floor(seed2 * sw);
+    const py = Math.floor(hash2d(i * 31, tick * 2 + i, 88) * sh);
+    if (px < 0 || px >= sw || py < 0 || py >= sh) continue;
+    const pidx = py * sw + px;
+    if (buf[pidx].flags === 0) continue; // only on terrain
+
+    if (isNight) {
+      // Fireflies at night — yellow dots that blink
+      if (hash2d(tick + i, i, 33) > 0.5) {
+        buf[pidx] = { ...buf[pidx], glyph: "✦", fg: rgb6(5, 5, 0) };
+      }
+    } else {
+      // Dust motes in sunlight
+      buf[pidx] = { ...buf[pidx], glyph: "·", fg: grey(18) };
     }
   }
 
