@@ -753,7 +753,11 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
     }
   }
 
-  // Render ants (2-char glyphs)
+  // Render ants (2-char glyphs) — store positions for colour overlay
+  const antPositions: { x: number; y: number; glyph: string; colour: string }[] = [];
+  const CASTE_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
   for (const ant of world.ants.filter(a => a.district === districtId)) {
     const ax = Math.floor(ant.x * (w - 3));
     const ay = Math.floor(ant.y * (h - 1));
@@ -762,10 +766,31 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
       for (let c = 0; c < glyph.length; c++) {
         if (ax + c < w) grid[ay]![ax + c] = glyph[c]!;
       }
+      antPositions.push({ x: ax, y: ay, glyph, colour: CASTE_COLOURS[ant.caste] });
     }
   }
 
-  return grid.map(row => row.join("")).join("\n");
+  // Build output with colour tags for ants
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    let x = 0;
+    while (x < w) {
+      // Check if an ant starts at this position
+      const ant = antPositions.find(a => a.y === y && a.x === x);
+      if (ant) {
+        line += `{${ant.colour}-fg}${ant.glyph}{/${ant.colour}-fg}`;
+        x += ant.glyph.length;
+      } else {
+        // Escape any { in terrain to avoid blessed tag interpretation
+        const ch = grid[y]![x]!;
+        line += ch === "{" ? "\\{" : ch;
+        x++;
+      }
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
 }
 
 function renderResources(world: World, w: number): string {
@@ -846,6 +871,7 @@ function openAntopolis(host: MicroappHost) {
       parent: win.body,
       top: 0, left: 0, width: 0, height: 0,
       border: "line",
+      tags: true,
       label: ` ${DISTRICTS[id].label} `,
       style: { ...t.body, border: { fg: DISTRICTS[id].borderFg } },
     });
@@ -945,7 +971,11 @@ function openAntopolis(host: MicroappHost) {
         const n = world.ants.filter(a => a.district === id).length;
         return `${DISTRICTS[id].label.split(" ")[0]}:${n}`;
       }).join("  ");
-      subtitleBox.setContent(` a micro-city for ants with ant technology  --  ${bldgCount} buildings  --  ${districtSummary}`);
+      const mood = world.happiness >= 80 ? "the colony thrives!"
+        : world.happiness >= 60 ? "a micro-city for ants with ant technology"
+        : world.happiness >= 40 ? "the colony struggles..."
+        : "the colony is in crisis!";
+      subtitleBox.setContent(` ${mood}  --  ${bldgCount} buildings  --  ${districtSummary}`);
     }
 
     // Resources
