@@ -52,7 +52,10 @@ export default function setup(host: MicroappHost) {
 }
 
 function openStudio(host: MicroappHost) {
-  const win = host.createWindow({ title: APP_TITLE, width: 126, height: 40 });
+  const geo = host.geometry;
+  const winW = Math.min(geo.width - 4, 160);
+  const winH = Math.min(geo.height - 4, 50);
+  const win = host.createWindow({ title: APP_TITLE, width: winW, height: winH });
 
   let topic = TOPIC_PRESETS[0]!;
   let status: RunStatus = "idle";
@@ -226,13 +229,13 @@ function openStudio(host: MicroappHost) {
   const right = createStack(win.body, [
     { key: "settings", basis: 8, part: settingsPanel },
     { key: "steps", basis: "1fr", part: stepsLog },
-    { key: "turns", basis: 5, part: turnsTable },
+    { key: "turns", basis: 6, part: turnsTable },
   ], { gap: 1 });
 
   const root = createRow(win.body, [
     { key: "left", basis: "3fr", part: left },
     { key: "right", basis: "2fr", part: right },
-  ], { gap: 1 });
+  ], { gap: 2 });
 
   // Seed idle state with atmospheric placeholder messages
   convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
