@@ -18,6 +18,8 @@ import {
   createStack,
   createStatusBar,
   createTextArea,
+  createTimer,
+  clearTimers,
   renderFiglet,
 } from "../../src/services/microapp-sdk.js";
 
@@ -733,9 +735,31 @@ function openStudio(host: MicroappHost) {
     host.screen.render();
   });
 
+  // ── Animated pulse indicator ──────────────────────────────────────
+  const pulseFrames = ["  ·  ", " · · ", "· · ·", " · · ", "  ·  ", "     "];
+  const runFrames   = ["  ◉  ", " ◉◉  ", "◉◉◉  ", " ◉◉  ", "  ◉  ", "     "];
+  let pulseTick = 0;
+  const timers = new Set<ReturnType<typeof setInterval>>();
+  createTimer(() => {
+    pulseTick = (pulseTick + 1) % 6;
+    const frames = status === "running" ? runFrames : pulseFrames;
+    const pulse = frames[pulseTick] ?? "     ";
+    // Update the banner with the pulse
+    const labels: Record<RunStatus, string> = {
+      idle: ` ${pulse} READY ${pulse} `,
+      running: ` ${pulse} RUNNING ${pulse} `,
+      completed: ` ${pulse} COMPLETED ${pulse} `,
+      failed: ` ${pulse} FAILED ${pulse} `,
+      stopped: ` ${pulse} STOPPED ${pulse} `,
+    };
+    statusBanner.setContent(labels[status] ?? ` ${pulse} READY ${pulse} `);
+    host.screen.render();
+  }, 400, timers);
+
   win.onCleanup(() => {
     forceKillRun();
     stopHeartbeat();
+    clearTimers(timers);
     root.destroy();
   });
 
