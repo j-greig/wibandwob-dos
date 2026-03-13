@@ -47,21 +47,20 @@ the difference. Previous versions of this document cited fabricated statistics.
 
 ## 4. Composability
 
-With pipes, N tools can compose in N² ways through a uniform interface (stdin/stdout).
-With REST, each composition requires explicit orchestration code.
+Pipes compose through a uniform interface (stdin/stdout) without explicit
+orchestration. REST requires purpose-built code for each multi-step workflow.
 
-Anecdotal observation from WibWob-DOS session logs: agents using pipe-style
-tools discovered filter-then-act patterns independently. This is a single
-project's qualitative observation, not a controlled study.
+This architectural advantage is well-established in systems design (Pike et al.,
+1995; Spinellis, 2016). Whether it translates to measurably better LLM agent
+performance is an open question — see Section 10.
 
 ---
 
-## 5. Virtual Filesystems
+## 5. Virtual Filesystems (Speculative)
 
-Plan 9 (Pike et al., 1995) proved every resource can be a file. Linux `/proc`
-and `/sys` adopted this. Window manager CLIs follow in spirit. A speculative
-desktop `/proc` model for WibWob-DOS would let agents use `cat`, `grep`,
-`echo >` for all control — unproven for TUI state.
+Plan 9's everything-is-a-file model (Pike et al., 1995) scales to system
+control — proven by Linux `/proc` and `/sys`. Applying this to TUI state
+(a desktop `/proc` for WibWob-DOS) is an unproven long-term direction.
 
 ---
 
