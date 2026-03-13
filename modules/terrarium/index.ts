@@ -787,7 +787,7 @@ function renderResources(world: World, w: number): string {
     `☺${world.happiness.toFixed(0)}%`,
     `⚙T${world.techLevel}`,
   ];
-  const left = " " + items.join("  ");
+  const left = " " + items.join(" | ");
   const right = `pop:${world.ants.length} [${census}] `;
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
@@ -943,8 +943,7 @@ function openAntopolis(host: MicroappHost) {
       box.setContent(renderDistrict(id, bw, bh, world));
       const count = world.ants.filter(a => a.district === id).length;
       const buildings = world.buildings.filter(b => b.district === id).length;
-      const sub = DISTRICTS[id].subtitle;
-      (box as any).setLabel(` ${DISTRICTS[id].label} — ${sub} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
+      (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
     }
 
     // Log with severity prefixes
