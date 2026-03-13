@@ -153,6 +153,18 @@ export class ChromeBrowserService {
         new Promise((r) => setTimeout(r, 15000)),
       ]).catch(() => {});
 
+      // Wait for DOM to settle after JS hydration (React, Next.js, etc.)
+      await this.page!.evaluate(() => new Promise<void>((resolve) => {
+        let timer: ReturnType<typeof setTimeout>;
+        const done = () => { observer.disconnect(); resolve(); };
+        const observer = new MutationObserver(() => {
+          clearTimeout(timer);
+          timer = setTimeout(done, 800);
+        });
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        timer = setTimeout(done, 2000); // max 2s wait
+      })).catch(() => {});
+
       const finalUrl = this.page!.url();
 
       // Resolve lazy-loaded images: multiple strategies for different sites
@@ -230,8 +242,41 @@ export class ChromeBrowserService {
       });
       await client.detach();
 
+      // Pre-clean the HTML before Readability gets it
+      const preCleanDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
+      const preCleanBody = preCleanDoc.window.document;
+      // Remove noise elements that confuse Readability
+      const noiseSelectors = [
+        // Navigation and chrome
+        "nav", "[role='navigation']", "[role='banner']", "[role='contentinfo']",
+        "[aria-label='navigation']", "[aria-label='breadcrumb']",
+        ".nav", ".navbar", ".navigation", ".breadcrumb", ".breadcrumbs",
+        // Cookie banners, popups, modals
+        "[class*='cookie']", "[id*='cookie']", "[class*='consent']", "[id*='consent']",
+        "[class*='popup']", "[class*='modal']", "[class*='overlay']",
+        "[class*='gdpr']", "[id*='gdpr']",
+        // Ads and promos
+        "[class*='ad-']", "[class*='advert']", "[id*='ad-']",
+        "[class*='promo']", "[class*='banner']",
+        // Site furniture
+        ".sidebar", "[role='complementary']", ".toc", ".table-of-contents",
+        ".share-buttons", ".social-share", "[class*='share']",
+        ".comments", "#comments", ".comment-section",
+        // Wikipedia-specific noise
+        ".mw-jump-link", ".mw-editsection", ".reference", ".reflist",
+        ".navbox", ".sistersitebox", ".portalbox", ".noprint",
+        // Skip-to-content links
+        ".skip-link", ".skip-nav", "[class*='skip-to']",
+      ];
+      for (const sel of noiseSelectors) {
+        try {
+          preCleanBody.querySelectorAll(sel).forEach((el: Element) => el.remove());
+        } catch { /* invalid selector on this page, skip */ }
+      }
+      const cleanedHTML = preCleanBody.documentElement.outerHTML;
+
       // Extract with Readability
-      const doc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
+      const doc = new JSDOM(cleanedHTML, { url: finalUrl, virtualConsole: quietConsole() });
       const reader = new Readability(doc.window.document);
       const article = reader.parse();
 
@@ -241,17 +286,19 @@ export class ChromeBrowserService {
       if (article?.content) {
         markdown = this.htmlToMarkdown(article.content);
       } else {
-        // Fallback: strip noise and extract main content
+        // Fallback: strip noise and extract main content from original HTML
         const fallbackDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
         const fallbackBody = fallbackDoc.window.document;
         fallbackBody
           .querySelectorAll(
-            "script, style, noscript, nav, header, footer, aside"
+            "script, style, noscript, nav, header, footer, aside, " +
+            "[role='navigation'], [role='banner'], [role='contentinfo'], " +
+            "[class*='cookie'], [class*='consent'], [class*='gdpr']"
           )
           .forEach((el: Element) => el.remove());
         const main =
           fallbackBody.querySelector(
-            "main, article, [role='main'], .content, #content"
+            "main, article, [role='main'], .content, #content, .post, .entry"
           ) || fallbackBody.body;
         const fallbackHtml = main?.innerHTML || "";
         if (fallbackHtml.trim().length > 100) {
@@ -270,14 +317,22 @@ export class ChromeBrowserService {
       if (markdown.length < 500) {
         try {
           const domText = await this.page!.evaluate(() => {
-            const root = document.querySelector("main, article, [role='main']") || document.body;
+            const root = document.querySelector("main, article, [role='main'], .content, #content") || document.body;
             // Remove noise elements
-            root.querySelectorAll("nav, footer, header, aside, script, style, noscript").forEach(el => el.remove());
+            const noiseEls = "nav, footer, header, aside, script, style, noscript, " +
+              "[role='navigation'], [role='banner'], [role='contentinfo'], " +
+              "[class*='cookie'], [class*='consent'], [class*='nav'], " +
+              "[class*='sidebar'], [class*='footer'], [class*='header']";
+            root.querySelectorAll(noiseEls).forEach(el => el.remove());
             // Walk visible elements and extract structured text
             const lines: string[] = [];
+            const seen = new Set<string>();
             const walk = (el: Element) => {
               const style = window.getComputedStyle(el);
-              if (style.display === "none" || style.visibility === "hidden") return;
+              if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return;
+              // Skip tiny/hidden elements
+              const rect = el.getBoundingClientRect();
+              if (rect.width < 10 || rect.height < 5) return;
               const tag = el.tagName.toLowerCase();
               if (tag === "img") {
                 const src = (el as HTMLImageElement).src;
@@ -288,12 +343,24 @@ export class ChromeBrowserService {
               if (/^h[1-6]$/.test(tag)) {
                 const level = parseInt(tag[1]!);
                 const text = el.textContent?.trim();
-                if (text) lines.push("\n" + "#".repeat(level) + " " + text + "\n");
+                if (text && !seen.has(text)) {
+                  seen.add(text);
+                  lines.push("\n" + "#".repeat(level) + " " + text + "\n");
+                }
                 return;
               }
-              if (tag === "p" || tag === "li") {
+              if (tag === "p" || tag === "li" || tag === "td" || tag === "th") {
                 const text = el.textContent?.trim();
-                if (text) lines.push((tag === "li" ? "- " : "") + text + "\n");
+                if (text && text.length > 3 && !seen.has(text)) {
+                  seen.add(text);
+                  const prefix = tag === "li" ? "- " : "";
+                  lines.push(prefix + text + "\n");
+                }
+                return;
+              }
+              if (tag === "pre" || tag === "code") {
+                const text = el.textContent?.trim();
+                if (text) lines.push("\n```\n" + text + "\n```\n");
                 return;
               }
               // Recurse into containers

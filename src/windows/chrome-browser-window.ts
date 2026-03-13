@@ -30,8 +30,11 @@ export function openChromeBrowserWindow(params: {
   const service = new ChromeBrowserService();
 
   const frame = windowManager.createFrame("Chrome Browser", "browser");
-  frame.frame.width = 100;
-  frame.frame.height = 30;
+  // Size to fill most of the screen for readable content
+  const screenW = Number(screen.width) || 200;
+  const screenH = Number(screen.height) || 60;
+  frame.frame.width = Math.min(screenW - 4, Math.max(100, Math.floor(screenW * 0.8)));
+  frame.frame.height = Math.min(screenH - 4, Math.max(30, Math.floor(screenH * 0.85)));
 
   // -- Toolbar row 1: navigation buttons + URL --
   const toolbar = blessed.box({

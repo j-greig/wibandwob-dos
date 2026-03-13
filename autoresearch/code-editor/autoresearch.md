@@ -1,77 +1,51 @@
-# Autoresearch — WibWobWorld Terrain Views
+# Autoresearch — Chrome Browser Content Extraction
 
 ## Objective
-Transform WibWobWorld's rendering across all view modes. Make ISO view feel like
-SimCity 2000 isometric with terrain objects. Make 3D/firstperson view feel like
-standing on a hilltop looking at a landscape — rolling hills, distant sea, trees,
-houses, depth fog. Add terrain objects (trees, houses, simple geometric ASCII-friendly
-shapes) that render in BOTH iso and 3D modes.
+Improve the Chrome Browser's ability to extract clean, readable content from
+complex web pages. Fix issues with: nav/aria section handling, JS-rendered
+content detection, text visibility decisions, complex page layouts.
 
-## Current State
-- ISO mode: single-glyph-per-cell diamonds, vertical columns, basic biome colouring
-- 3D/firstperson mode: y-buffer raycaster but VERY sparse — just sky dots and ground
-  underscores with almost no visible terrain features
-- No objects on terrain (no trees, no houses, no structures)
-- 5 render modes: terrain, contours, iso, hybrid, firstperson
+## Current Problems
+1. Readability often fails on complex pages → falls back to basic DOM strip
+2. Nav/aria landmarks not properly stripped (role="navigation", cookie banners, etc.)
+3. JS-rendered content missed — only waits for networkidle2, not DOM mutations
+4. No retry with longer wait for slow JS rendering
+5. Thin-content fallback DOM walk doesn't respect computed visibility well
+6. No handling of common SPA patterns (React hydration, Next.js, etc.)
+7. No structured data extraction (JSON-LD, microdata) as fallback
 
 ## Architecture
-- `modules/wibwobworld/index.ts` — module shell, layout, controls (981 lines)
-- `modules/wibwobworld/render-iso.ts` — iso renderer (105 lines)
-- `src/services/terrain-render.ts` — all non-iso renderers including firstperson
-- `src/services/terrain-model.ts` — TerrainCell, TerrainMap, biome types
-- `src/services/contour-engine.ts` — heightmap generation, hill system
+- `src/services/chrome-browser-service.ts` — puppeteer CDP, Readability, Turndown, image handling (854 lines)
+- `src/windows/chrome-browser-window.ts` — blessed window, toolbar, markdown rendering (473 lines)
+- `src/services/markdown-service.ts` — markdown→blessed rendering
+- `src/services/image-hydrator.mjs` — image→ASCII conversion
 
 ## Key Files to Modify
-- `modules/wibwobworld/render-iso.ts` — SimCity-style iso with objects
-- `src/services/terrain-render.ts` — dramatically improved firstperson renderer
-- `src/services/terrain-model.ts` — add object placement data to TerrainCell
+- `src/services/chrome-browser-service.ts` — puppeteer CDP, Readability, Turndown, image handling (854 lines)
+- `src/windows/chrome-browser-window.ts` — blessed window, toolbar, navigation (473 lines)
+- `src/services/markdown-service.ts` — markdown→ANSI rendering: figlet headings, tables, code, lists (434 lines)
+- `src/services/image-hydrator.mjs` — image→ASCII conversion subprocess (100 lines)
 
-## Target Improvements
+## Scoring
+Test against a set of complex pages and score extraction quality:
+- Content completeness: does it get the main article/content?
+- Noise removal: are nav, footer, cookie banners, ads stripped?
+- Structure preservation: headings, lists, code blocks, tables intact?
+- JS content: does it catch dynamically rendered text?
+- Image discovery: does it find and render key images?
 
-### 1. Terrain Objects (affects all modes)
-Place objects on terrain during map generation:
-- Trees: `♣` `♠` `⌂` on forest/plain biomes (varying density)
-- Houses: `⌂` `■` on plain biomes near shore (sparse, clustered)
-- Rocks: `�ite` `●` on hill/ridge biomes
-- Flowers: `*` `✿` on plain biomes (sparse)
-- Boats: `⛵` on shallow water near shore
-Objects stored in TerrainCell so all renderers can use them.
-
-### 2. ISO View — SimCity 2000 Style
-- Multi-cell buildings with roofs (not just single glyphs)
-- Trees rendered as 2-cell tall sprites (trunk + canopy)
-- Visible terrain layering with shading on south faces
-- Better colour palette: lush greens, warm browns, blue water
-- Grid lines or tile borders visible at closer zoom
-- Player marker more prominent
-
-### 3. 3D/Firstperson View — Standing on a Hill
-The view should feel like:
-- Standing on top of a hill looking out at rolling terrain
-- Distant hills visible with atmospheric perspective (fog/fade)
-- Sea visible at horizon when facing water
-- Trees visible as vertical elements breaking the skyline
-- Houses visible as small squares on plains
-- Better sky: gradient from dark blue at top to light at horizon
-- Ground texture varies: grass, dirt, sand near shore
-- Depth cueing: distant features use dimmer colours
-- Higher elevation scaling so terrain relief is dramatic
-
-### 4. Hybrid View Polish
-- Left pane (contour map) + right pane (iso) already works
-- Ensure objects visible in both panes
+## Test URLs (score each 1-10, average)
+1. https://en.wikipedia.org/wiki/ASCII_art — complex wiki with tables, images, sections
+2. https://news.ycombinator.com — JS-light but complex nav structure
+3. https://github.com/nicbarker/clay — repo README with mixed content
+4. https://developer.mozilla.org/en-US/docs/Web/HTML — reference docs with nav landmarks
 
 ## Rubric
-5-axis: LAYOUT, READABILITY, COHERENCE, STYLE, FUNCTIONALITY — each 1-10, averaged.
-
-- LAYOUT: spatial arrangement, how well views use available space
-- READABILITY: can you parse terrain features, identify objects, understand depth
-- COHERENCE: do all view modes feel like the same world
-- STYLE: visual richness, colour usage, WibWob personality
-- FUNCTIONALITY: do views feel genuinely useful/immersive, object variety
+EXTRACTION (main content captured), NOISE (junk removed), STRUCTURE (formatting preserved),
+JS_HANDLING (dynamic content caught), DISPLAY (how it looks in the TUI) — each 1-10, averaged.
 
 ## Constraints
-- Modify: `modules/wibwobworld/` files, `src/services/terrain-render.ts`, `src/services/terrain-model.ts`
+- Modify: `src/services/chrome-browser-service.ts`, `src/windows/chrome-browser-window.ts`
 - Must pass `bun run typecheck`
-- RESTART required after changes (touching src/ files)
-- Keep all 5 existing render modes working
+- RESTART required after changes (src/ files)
+- Chrome must be running or launchable
