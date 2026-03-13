@@ -1,11 +1,12 @@
 /**
- * TR-808 ASCII Renderer — blessed tag colour output.
+ * TR-808 ASCII Renderer — pure ANSI colour output.
  *
- * Uses blessed {colour-fg}/{colour-bg} tags for reliable colour rendering.
- * The host widget MUST have tags:true for this to work.
+ * Uses raw ANSI escape codes for colour. Content is set via
+ * (display.node).setContent() which bypasses blessed's tag parser
+ * and wrapping. ANSI codes render directly in blessed's terminal output.
  *
  * Colour-coded step groups matching the real TR-808:
- *   Group 1 (1-4): red, Group 2 (5-8): yellow,
+ *   Group 1 (1-4): red, Group 2 (5-8): orange/yellow,
  *   Group 3 (9-12): yellow, Group 4 (13-16): white
  */
 
@@ -17,27 +18,43 @@ import {
 } from "./engine.js";
 
 // ---------------------------------------------------------------------------
-// Colour helpers using blessed tags
+// ANSI escape codes
 // ---------------------------------------------------------------------------
 
-const STEP_FG = ["red", "yellow", "yellow", "white"] as const;
-const STEP_BG = ["red", "yellow", "yellow", "white"] as const;
-function sfg(i: number) { return STEP_FG[Math.floor(i / 4)] ?? "white"; }
-function sbg(i: number) { return STEP_BG[Math.floor(i / 4)] ?? "white"; }
+const R = "\x1b[0m";       // reset
+const B = "\x1b[1m";       // bold
+const DIM = "\x1b[2m";     // dim
 
-// Tag helpers
-function fg(col: string, text: string) { return `{${col}-fg}${text}{/${col}-fg}`; }
-function bg(col: string, text: string) { return `{${col}-bg}${text}{/${col}-bg}`; }
-function bold(text: string) { return `{bold}${text}{/bold}`; }
+const FG = {
+  red:    "\x1b[91m",  green: "\x1b[92m",  yellow: "\x1b[93m",
+  cyan:   "\x1b[96m",  white: "\x1b[97m",  gray:   "\x1b[90m",
+  black:  "\x1b[30m",  mag:   "\x1b[95m",
+} as const;
 
-// Step characters
-const ON  = "\u2588\u2588"; // ██
-const OFF = "\u2591\u2591"; // ░░
+const BG = {
+  red:    "\x1b[41m",  yellow: "\x1b[43m",
+  white:  "\x1b[47m",  cyan:   "\x1b[46m",
+} as const;
+
+// Step group colours — matching the real TR-808 button colours
+// Using DIFFERENT characters per group to distinguish even without colour
+const STEP_GROUP = [
+  { fg: FG.red,    bg: BG.red,    on: "\u2588\u2588" },  // ██ solid red
+  { fg: FG.yellow, bg: BG.yellow, on: "\u2593\u2593" },  // ▓▓ dark shade yellow
+  { fg: FG.yellow, bg: BG.yellow, on: "\u2593\u2593" },  // ▓▓ dark shade yellow
+  { fg: FG.white,  bg: BG.white,  on: "\u2592\u2592" },  // ▒▒ medium shade white
+] as const;
+
+function sg(i: number) { return STEP_GROUP[Math.floor(i / 4)]!; }
+
+const OFF = "\u2591\u2591"; // ░░ light shade (empty)
+
+// Accent markers
 const ACC_ON  = "\u25B2 ";  // ▲
 const ACC_OFF = "\u25BD ";  // ▽
 
-// Knob display
-const KNOB = ["\u25CB", "\u25D4", "\u25D1", "\u25D5", "\u25CF"];
+// Knob display (phase indicators)
+const KNOB = ["\u25CB", "\u25D4", "\u25D1", "\u25D5", "\u25CF"]; // ○ ◔ ◑ ◕ ●
 function knob(v: number, mx: number) {
   return KNOB[Math.min(4, Math.floor((v / Math.max(1, mx)) * 5))] ?? "\u25CB";
 }
@@ -47,12 +64,11 @@ function bar(v: number, mx: number, w: number): string {
   return "\u25AE".repeat(f) + "\u25AF".repeat(Math.max(0, w - f));
 }
 
-/** Strip blessed tags to get visual width */
-function vlen(s: string): number { return s.replace(/\{[^}]*\}/g, "").length; }
+/** Strip ANSI escapes to measure visual width */
+function vlen(s: string): number { return s.replace(/\x1b\[[0-9;]*m/g, "").length; }
 function pad(s: string, w: number): string {
   const vw = vlen(s);
-  if (vw >= w) return s;
-  return s + " ".repeat(w - vw);
+  return vw >= w ? s : s + " ".repeat(w - vw);
 }
 function centre(s: string, w: number): string {
   const vw = vlen(s);
@@ -82,18 +98,18 @@ export function renderTR808(
   const playing = engine.state === "playing";
 
   // ── TITLE ─────────────────────────────────────────────────
-  lines.push(bold(centre("T R - 8 0 8   R H Y T H M   C O M P O S E R", w)));
+  lines.push(`${B}${FG.white}${centre("T R - 8 0 8   R H Y T H M   C O M P O S E R", w)}${R}`);
   lines.push("");
 
   // ── TRANSPORT BAR ─────────────────────────────────────────
-  const stC = playing ? "green" : "gray";
+  const stC = playing ? FG.green : FG.gray;
   const stI = playing ? "\u25B6 PLAY" : "\u25A0 STOP";
-  const aud = audioEnabled ? fg("green", "\u266B ON") : fg("gray", "\u266B --");
+  const aud = audioEnabled ? `${FG.green}\u266B ON${R}` : `${FG.gray}\u266B --${R}`;
   lines.push(
-    `  ${fg(stC, stI)}  {white-fg}${engine.tempo}{/white-fg} ${fg("gray", "BPM")}` +
-    `  ${fg("cyan", `${slot.bank}${slot.number}-${slot.variation}`)}` +
-    `  ${fg("gray", engine.scaleLabel)}` +
-    (engine.swing !== 50 ? `  SWG:{white-fg}${engine.swing}%{/white-fg}` : "") +
+    `  ${stC}${stI}${R}  ${FG.white}${engine.tempo}${R} ${FG.gray}BPM${R}` +
+    `  ${FG.cyan}${slot.bank}${slot.number}-${slot.variation}${R}` +
+    `  ${FG.gray}${engine.scaleLabel}${R}` +
+    (engine.swing !== 50 ? `  SWG:${FG.white}${engine.swing}%${R}` : "") +
     `  ${aud}` +
     `    VOL:${bar(engine.master, 100, 8)}` +
     `  ACC:${bar(engine.accent, 100, 8)}`
@@ -101,17 +117,23 @@ export function renderTR808(
   lines.push("");
 
   // ── COLUMN LAYOUT ─────────────────────────────────────────
-  const lblW = 5;
-  const stepW = STEPS * 3;
+  const lblW = 5;       // ▶BD M
+  const stepW = STEPS * 3;  // "XX " * 16 = 48
   const paramW = Math.min(45, Math.max(16, w - lblW - stepW - 8));
 
-  // Step number header
-  let hdr = " ".repeat(lblW + paramW) + ` ${fg("gray", "\u2502")} `;
+  // Step number header with group colours
+  let hdr = " ".repeat(lblW + paramW) + ` ${FG.gray}\u2502${R} `;
   for (let i = 0; i < STEPS; i++) {
-    hdr += `${fg(sfg(i), String(i + 1).padStart(2))} `;
+    const g = sg(i);
+    hdr += `${g.fg}${String(i + 1).padStart(2)}${R} `;
   }
   lines.push(hdr);
-  lines.push(" ".repeat(lblW + paramW) + ` ${fg("gray", "\u2502")} ${fg("gray", "\u2500".repeat(stepW))}`);
+
+  // Thin separator
+  lines.push(
+    " ".repeat(lblW + paramW) + ` ${FG.gray}\u2502${R} ` +
+    `${FG.gray}${"\u2500".repeat(stepW)}${R}`
+  );
 
   // ── INSTRUMENT ROWS ───────────────────────────────────────
   for (const inst of INSTRUMENTS) {
@@ -119,40 +141,46 @@ export function renderTR808(
     const isMuted = engine.isMuted(inst.id);
     const isSoloed = engine.isSoloed(inst.id);
 
-    const mk = isSel ? fg("cyan", "\u25B6") : " ";
-    const nm = fg(isSel ? "cyan" : "white", inst.shortLabel.padEnd(2));
-    const mf = isSoloed ? fg("yellow", "S") : isMuted ? fg("red", "M") : " ";
+    // Label: ▶BD M (5 chars visual)
+    const mk = isSel ? `${FG.cyan}\u25B6` : " ";
+    const nm = isSel
+      ? `${FG.cyan}${inst.shortLabel.padEnd(2)}${R}`
+      : `${FG.white}${inst.shortLabel.padEnd(2)}${R}`;
+    const mf = isSoloed ? `${FG.yellow}S${R}` : isMuted ? `${FG.red}M${R}` : " ";
     const label = `${mk}${nm}${mf}`;
 
+    // Params with knobs
     const pp: string[] = [];
     for (const p of inst.params) {
-      pp.push(`${fg("gray", p.label)}${knob(engine.getParam(inst.id, p.id), p.max)}`);
+      pp.push(`${FG.gray}${p.label}${R}${knob(engine.getParam(inst.id, p.id), p.max)}`);
     }
     const params = pad(pp.join(" "), paramW);
 
+    // Step grid — colour + shape per group
     let steps = "";
     const stArr = engine.getSteps(inst.id);
     for (let i = 0; i < STEPS; i++) {
       const on = stArr[i];
       const isHead = playing && i === cur;
       const isEdit = !playing && i === editCursor;
+      const g = sg(i);
 
-      if (isHead && on)       steps += `{white-bg}{black-fg}${ON}{/black-fg}{/white-bg} `;
-      else if (isHead)        steps += `{white-bg}{black-fg}${OFF}{/black-fg}{/white-bg} `;
-      else if (isEdit && on)  steps += `{cyan-bg}{black-fg}${ON}{/black-fg}{/cyan-bg} `;
-      else if (isEdit)        steps += `${fg("cyan", "\u2592\u2592")} `;
-      else if (on)            steps += `{${sbg(i)}-bg}{black-fg}${ON}{/black-fg}{/${sbg(i)}-bg} `;
-      else                    steps += `${fg("gray", OFF)} `;
+      if (isHead && on)       steps += `${BG.white}${FG.black}${g.on}${R} `;
+      else if (isHead)        steps += `${BG.white}${FG.black}${OFF}${R} `;
+      else if (isEdit && on)  steps += `${BG.cyan}${FG.black}${g.on}${R} `;
+      else if (isEdit)        steps += `${FG.cyan}\u2592\u2592${R} `;
+      else if (on)            steps += `${g.fg}${g.on}${R} `;
+      else                    steps += `${FG.gray}${OFF}${R} `;
     }
 
-    lines.push(`${label} ${params} ${fg("gray", "\u2502")} ${steps}`);
+    lines.push(`${label} ${params} ${FG.gray}\u2502${R} ${steps}`);
   }
 
   // ── ACCENT ROW ────────────────────────────────────────────
   {
     const isSel = sel === "accent";
-    const mk = isSel ? fg("cyan", "\u25B6") : " ";
-    const nm = fg(isSel ? "cyan" : "white", "AC");
+    const mk = isSel ? `${FG.cyan}\u25B6` : " ";
+    const nm = isSel ? `${FG.cyan}AC${R}` : `${FG.white}AC${R}`;
     const label = `${mk}${nm} `;
     const params = pad(`LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`, paramW);
 
@@ -162,25 +190,26 @@ export function renderTR808(
       const on = acSteps[i];
       const isHead = playing && i === cur;
       const isEdit = !playing && i === editCursor;
+      const g = sg(i);
 
-      if (isHead && on)       steps += `{white-bg}{black-fg}${ACC_ON}{/black-fg}{/white-bg} `;
-      else if (isHead)        steps += `{white-bg}{black-fg}${ACC_OFF}{/black-fg}{/white-bg} `;
-      else if (isEdit && on)  steps += `${fg("cyan", ACC_ON)} `;
-      else if (isEdit)        steps += `${fg("cyan", ACC_OFF)} `;
-      else if (on)            steps += `{${sbg(i)}-bg}{black-fg}${ACC_ON}{/black-fg}{/${sbg(i)}-bg} `;
-      else                    steps += `${fg("gray", ACC_OFF)} `;
+      if (isHead && on)       steps += `${BG.white}${FG.black}${ACC_ON}${R} `;
+      else if (isHead)        steps += `${BG.white}${FG.black}${ACC_OFF}${R} `;
+      else if (isEdit && on)  steps += `${FG.cyan}${ACC_ON}${R} `;
+      else if (isEdit)        steps += `${FG.cyan}${ACC_OFF}${R} `;
+      else if (on)            steps += `${g.fg}${ACC_ON}${R} `;
+      else                    steps += `${FG.gray}${ACC_OFF}${R} `;
     }
 
-    lines.push(`${label}${params} ${fg("gray", "\u2502")} ${steps}`);
+    lines.push(`${label}${params} ${FG.gray}\u2502${R} ${steps}`);
   }
 
   // ── PLAYHEAD / CURSOR ─────────────────────────────────────
   lines.push("");
   const off = lblW + paramW + 3;
   if (playing && cur >= 0) {
-    lines.push(" ".repeat(off + cur * 3) + fg("white", "\u25B2\u25B2"));
+    lines.push(" ".repeat(off + cur * 3) + `${FG.white}\u25B2\u25B2${R}`);
   } else if (editCursor >= 0) {
-    lines.push(" ".repeat(off + editCursor * 3) + fg("cyan", "\u25B2\u25B2"));
+    lines.push(" ".repeat(off + editCursor * 3) + `${FG.cyan}\u25B2\u25B2${R}`);
   } else {
     lines.push("");
   }
@@ -188,15 +217,15 @@ export function renderTR808(
   // ── GROUP LABELS ──────────────────────────────────────────
   let grp = " ".repeat(off);
   for (let g = 0; g < 4; g++) {
-    const c = STEP_FG[g]!;
-    grp += fg(c, `${g * 4 + 1}-${g * 4 + 4}`);
-    if (g < 3) grp += `  ${fg("gray", "\u2502")}  `;
+    const c = STEP_GROUP[g]!.fg;
+    grp += `${c}${g * 4 + 1}-${g * 4 + 4}${R}`;
+    if (g < 3) grp += `  ${FG.gray}\u2502${R}  `;
   }
   lines.push(grp);
 
   // ── KEYBOARD HELP ─────────────────────────────────────────
   lines.push("");
-  lines.push(fg("gray", "  SPC:play/stop  ENTER:toggle  \u2190\u2192:cursor  1-0,-,=:inst  \\`:accent  a/z:tempo  v:var  b:bank  p:preset  m:audio"));
+  lines.push(`  ${FG.gray}SPC:play/stop  ENTER:toggle  \u2190\u2192:cursor  1-0,-,=:inst  \`:accent  a/z:tempo  v:var  b:bank  p:preset  m:audio${R}`);
 
   while (lines.length < h) lines.push("");
   return lines.slice(0, h).join("\n");

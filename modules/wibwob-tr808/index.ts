@@ -94,22 +94,14 @@ export default function setup(host: MicroappHost) {
       height: Math.max(28, Math.round(screenH * 0.95)),
     });
 
-    // Use a raw blessed box with tags:true for reliable colour rendering
-    const blessed = require("blessed");
-    const displayBox = blessed.box({
-      parent: win.body,
-      top: 1,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      tags: true,
-      scrollable: true,
-      alwaysScroll: true,
-      mouse: true,
-      style: host.theme().body,
-    });
     const headerBar = host.ui.createHeaderBar(win.body, { leftInset: 1 });
+    const display = host.ui.createTextBlock(win.body, { paddingLeft: 0, paddingTop: 0 });
     const statusBar = host.ui.createStatusBar(win.body, { leftInset: 1 });
+    const root = host.ui.createStack(win.body, [
+      { key: "header", basis: 1, part: headerBar },
+      { key: "display", basis: "1fr", part: display },
+      { key: "status", basis: 1, part: statusBar },
+    ]);
 
     function render() {
       if (!engine) {
@@ -117,13 +109,7 @@ export default function setup(host: MicroappHost) {
       }
       const innerW = Math.max(0, Number(win.body.width) || 0);
       const innerH = Math.max(0, Number(win.body.height) || 0);
-
-      // Layout header and status bars
-      headerBar.layout({ top: 0, left: 0, width: innerW, height: 1 });
-      statusBar.layout({ top: innerH - 1, left: 0, width: innerW, height: 1 });
-      displayBox.top = 1;
-      displayBox.height = Math.max(1, innerH - 2);
-      displayBox.width = innerW;
+      root.layout({ top: 0, left: 0, width: innerW, height: innerH });
 
       const w = Math.max(80, innerW);
       const h = Math.max(1, innerH - 2);
@@ -132,7 +118,8 @@ export default function setup(host: MicroappHost) {
         left: "TR-808 Rhythm Composer",
         right: `${engine.state === "playing" ? "PLAY" : "STOP"} ${engine.tempo} BPM`,
       });
-      displayBox.setContent(content);
+      // Bypass wrapIndentedText by setting content directly
+      (display.node as any).setContent(content);
       statusBar.update({
         left: "[SPACE] play [ENTER] step [1-0,-,=,`,BKSP] select",
         right: "[q] close",
