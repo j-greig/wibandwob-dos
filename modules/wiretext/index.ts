@@ -7,17 +7,19 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+import { renderFigletLines, isFigletAvailable } from "../../src/services/figlet-service.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
 type BoxStyle = "single" | "double" | "rounded" | "heavy";
-type Tool = "select" | "box" | "text" | "line" | "arrow" | "pencil" | "eraser";
+type Tool = "select" | "box" | "text" | "line" | "arrow" | "pencil" | "eraser" | "component";
+type ComponentType = "button" | "input" | "table" | "modal" | "card" | "progress" | "checkbox" | "tabs";
 
 interface Position { col: number; row: number; }
 
 interface CanvasObject {
   id: string;
-  type: "box" | "text" | "line" | "arrow" | "pencil";
+  type: "box" | "text" | "line" | "arrow" | "pencil" | "component" | "figlet";
   position: Position;
   width: number;
   height: number;
@@ -28,6 +30,14 @@ interface CanvasObject {
   content?: string;
   endPosition?: Position;
   points?: Position[];
+  componentType?: ComponentType;
+  columns?: string[];
+  checked?: boolean;
+  progress?: number;
+  tabs?: string[];
+  shadow?: boolean;
+  figletFont?: string;
+  figletLines?: string[]; // cached rendered figlet output
 }
 
 type Grid = string[][];
@@ -166,6 +176,18 @@ function renderObjectsToGrid(objects: CanvasObject[], cols: number, rows: number
   const grid = createGrid(cols, rows);
   const sorted = [...objects].sort((a, b) => a.zIndex - b.zIndex);
 
+  // Pass 1: render drop shadows
+  for (const obj of sorted) {
+    if (!obj.shadow) continue;
+    if (obj.type === "box" || obj.type === "component") {
+      const sc = obj.position.col + 1, sr = obj.position.row + 1;
+      for (let y = 0; y < obj.height; y++)
+        for (let x = 0; x < obj.width; x++)
+          drawChar(grid, sc + x, sr + y, "░");
+    }
+  }
+
+  // Pass 2: render objects
   for (const obj of sorted) {
     const { col, row } = obj.position;
     switch (obj.type) {
@@ -227,6 +249,106 @@ function renderObjectsToGrid(objects: CanvasObject[], cols: number, rows: number
         for (const p of obj.points || []) drawChar(grid, p.col, p.row, "█");
         break;
       }
+      case "figlet": {
+        const lines = obj.figletLines || [];
+        for (let i = 0; i < lines.length; i++) {
+          for (let j = 0; j < lines[i].length; j++) {
+            if (lines[i][j] !== " ") setChar(grid, col + j, row + i, lines[i][j]);
+          }
+        }
+        break;
+      }
+      case "component": {
+        const cCol = col, cRow = row, cW = obj.width, cH = obj.height;
+        const bs = obj.borderStyle || "single";
+        fillRect(grid, cCol, cRow, cW, cH);
+        drawBoxBorder(grid, cCol, cRow, cW, cH, bs);
+        switch (obj.componentType) {
+          case "button":
+            placeCenteredText(grid, cCol, cRow, cW, cH, obj.label || "Button");
+            break;
+          case "input": {
+            const midR = cRow + Math.floor(cH / 2);
+            const txt = obj.label || "Input...";
+            for (let i = 0; i < txt.length && cCol + 2 + i < cCol + cW - 1; i++)
+              setChar(grid, cCol + 2 + i, midR, txt[i]);
+            break;
+          }
+          case "checkbox": {
+            const midR = cRow + Math.floor(cH / 2);
+            const sym = obj.checked !== false ? "[x]" : "[ ]";
+            const txt = `${sym} ${obj.label || "Checkbox"}`;
+            for (let i = 0; i < txt.length && cCol + 2 + i < cCol + cW - 1; i++)
+              setChar(grid, cCol + 2 + i, midR, txt[i]);
+            break;
+          }
+          case "table": {
+            const cols = obj.columns || ["Col A", "Col B"];
+            const innerW = cW - 2;
+            const colW = Math.floor(innerW / cols.length);
+            // Header separator
+            for (let c = 1; c < cW - 1; c++) setChar(grid, cCol + c, cRow + 2, "─");
+            // Column headers + separators
+            for (let ci = 0; ci < cols.length; ci++) {
+              const hdr = cols[ci].slice(0, colW - 2);
+              for (let i = 0; i < hdr.length; i++) setChar(grid, cCol + 1 + ci * colW + 1 + i, cRow + 1, hdr[i]);
+              if (ci > 0) {
+                const lc = cCol + ci * colW;
+                for (let r = 1; r < cH - 1; r++) drawChar(grid, lc, cRow + r, "│");
+                drawChar(grid, lc, cRow, "┬");
+                drawChar(grid, lc, cRow + 2, "┼");
+                drawChar(grid, lc, cRow + cH - 1, "┴");
+              }
+            }
+            break;
+          }
+          case "modal": {
+            if (cH >= 5) {
+              // Title
+              const title = obj.label || "Modal";
+              for (let i = 0; i < title.length && cCol + 2 + i < cCol + cW - 3; i++)
+                setChar(grid, cCol + 2 + i, cRow + 1, title[i]);
+              setChar(grid, cCol + cW - 3, cRow + 1, "x");
+              // Title separator
+              for (let c = 1; c < cW - 1; c++) setChar(grid, cCol + c, cRow + 2, "─");
+              const bc = BOX[bs];
+              drawChar(grid, cCol, cRow + 2, bc.tr2);
+              drawChar(grid, cCol + cW - 1, cRow + 2, bc.tl2);
+            }
+            break;
+          }
+          case "card": {
+            if (cH >= 5) {
+              const title = obj.label || "Card";
+              for (let i = 0; i < title.length && cCol + 2 + i < cCol + cW - 1; i++)
+                setChar(grid, cCol + 2 + i, cRow + 1, title[i]);
+              for (let c = 1; c < cW - 1; c++) setChar(grid, cCol + c, cRow + 2, "─");
+              const bc = BOX[bs];
+              drawChar(grid, cCol, cRow + 2, bc.tr2);
+              drawChar(grid, cCol + cW - 1, cRow + 2, bc.tl2);
+            }
+            break;
+          }
+          case "progress": {
+            const midR = cRow + Math.floor(cH / 2);
+            const pct = obj.progress ?? 40;
+            const barW = cW - 4;
+            const filled = Math.round(Math.max(0, Math.min(100, pct)) / 100 * barW);
+            for (let i = 0; i < barW; i++)
+              setChar(grid, cCol + 2 + i, midR, i < filled ? "▓" : "░");
+            break;
+          }
+          case "tabs": {
+            const midR = cRow + Math.floor(cH / 2);
+            const tabList = obj.tabs || ["Tab 1", "Tab 2", "Tab 3"];
+            const tabText = tabList.join(" | ");
+            for (let i = 0; i < tabText.length && cCol + 2 + i < cCol + cW - 1; i++)
+              setChar(grid, cCol + 2 + i, midR, tabText[i]);
+            break;
+          }
+        }
+        break;
+      }
     }
   }
   return grid;
@@ -235,7 +357,7 @@ function renderObjectsToGrid(objects: CanvasObject[], cols: number, rows: number
 function hitTest(objects: CanvasObject[], col: number, row: number): CanvasObject | null {
   const sorted = [...objects].sort((a, b) => b.zIndex - a.zIndex);
   for (const obj of sorted) {
-    if (obj.type === "box" || obj.type === "text") {
+    if (obj.type === "box" || obj.type === "text" || obj.type === "component" || obj.type === "figlet") {
       const bb = getBBox(obj);
       if (col >= bb.col && col < bb.col + bb.w && row >= bb.row && row < bb.row + bb.h) return obj;
     } else if (obj.type === "line" || obj.type === "arrow") {
@@ -256,6 +378,11 @@ function getBBox(obj: CanvasObject): { col: number; row: number; w: number; h: n
   if (obj.type === "text") {
     const lines = (obj.content || "").split("\n");
     return { col: obj.position.col, row: obj.position.row, w: Math.max(...lines.map(l => l.length), 1), h: lines.length || 1 };
+  }
+  if (obj.type === "figlet") {
+    const lines = obj.figletLines || [];
+    const maxW = lines.reduce((m, l) => Math.max(m, l.length), 1);
+    return { col: obj.position.col, row: obj.position.row, w: maxW, h: lines.length || 1 };
   }
   if (obj.type === "line" || obj.type === "arrow") {
     if (!obj.endPosition) return { col: obj.position.col, row: obj.position.row, w: 1, h: 1 };
@@ -308,6 +435,22 @@ function openWiretext(host: MicroappHost) {
   let textEditId: string | null = null; // inline text editing
   let statusMessage = "";
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+  let pendingComponent: ComponentType = "button";
+  let shadowEnabled = false;
+  let figletMode = false;
+  let figletInput = "";
+  let clipboard: CanvasObject | null = null;
+
+  const COMPONENTS: Array<{ type: ComponentType; label: string; w: number; h: number }> = [
+    { type: "button",   label: "Button",   w: 12, h: 3 },
+    { type: "input",    label: "Input",    w: 20, h: 3 },
+    { type: "checkbox", label: "Checkbox", w: 20, h: 3 },
+    { type: "table",    label: "Table",    w: 24, h: 8 },
+    { type: "modal",    label: "Modal",    w: 30, h: 12 },
+    { type: "card",     label: "Card",     w: 20, h: 8 },
+    { type: "progress", label: "Progress", w: 20, h: 3 },
+    { type: "tabs",     label: "Tabs",     w: 30, h: 3 },
+  ];
 
   // ── Layout constants ──
   const SIDEBAR_W = 20;
@@ -331,6 +474,7 @@ function openWiretext(host: MicroappHost) {
     { id: "arrow",   label: "Arrow",     icon: "→",  key: "A" },
     { id: "pencil",  label: "Pencil",    icon: "✎",  key: "N" },
     { id: "eraser",  label: "Eraser",    icon: "⌫",  key: "E" },
+    { id: "component", label: "Component", icon: "UI", key: "U" },
   ];
 
   const STYLES: Array<{ id: BoxStyle; label: string; preview: string; num: string }> = [
@@ -430,6 +574,21 @@ function openWiretext(host: MicroappHost) {
             cellType.set(`${p.col},${p.row}`, obj.type);
       } else if (obj.type === "pencil") {
         for (const p of obj.points || []) cellType.set(`${p.col},${p.row}`, "pencil");
+      } else if (obj.type === "component") {
+        // Border cells
+        for (let x = bb.col; x < bb.col + bb.w; x++) { cellType.set(`${x},${bb.row}`, "component"); cellType.set(`${x},${bb.row + bb.h - 1}`, "component"); }
+        for (let y = bb.row; y < bb.row + bb.h; y++) { cellType.set(`${bb.col},${y}`, "component"); cellType.set(`${bb.col + bb.w - 1},${y}`, "component"); }
+      } else if (obj.type === "figlet") {
+        const fLines = obj.figletLines || [];
+        for (let i = 0; i < fLines.length; i++)
+          for (let j = 0; j < fLines[i].length; j++)
+            if (fLines[i][j] !== " ") cellType.set(`${obj.position.col + j},${obj.position.row + i}`, "figlet");
+      }
+      // Shadow cells
+      if (obj.shadow && (obj.type === "box" || obj.type === "component")) {
+        for (let y = 0; y < bb.h; y++)
+          for (let x = 0; x < bb.w; x++)
+            cellType.set(`${bb.col + x + 1},${bb.row + y + 1}`, "shadow");
       }
     }
     // Colour map per type
@@ -440,6 +599,9 @@ function openWiretext(host: MicroappHost) {
       line: muted,
       arrow: ansiColour(th.success?.fg || "green"),
       pencil: ansiColour(th.error?.fg || "red"),
+      component: ansiColour(th.success?.fg || "green"),
+      figlet: ansiColour(th.warning?.fg || "yellow"),
+      shadow: muted,
     };
 
     // Find cells belonging to selected object for highlighting
@@ -547,7 +709,8 @@ function openWiretext(host: MicroappHost) {
 
     // Header
     const headerLeft = ` ${accent}${A.b}WIRETEXT${A.r} ${muted}│${A.r} ${bright}${tool.toUpperCase()}${A.r}`;
-    const headerBtns = `${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^D${A.r}${bright}Demo ${A.r}${muted}^X${A.r}${bright}Clear${A.r} `;
+    const shadowBadge = shadowEnabled ? `${accent}[S]${A.r} ` : "";
+    const headerBtns = `${shadowBadge}${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^X${A.r}${bright}Cut/Clear${A.r} `;
     const hlp = stripAnsi(headerLeft).length;
     const hrp = stripAnsi(headerBtns).length;
     const hgap = Math.max(1, bodyW - hlp - hrp);
@@ -561,6 +724,8 @@ function openWiretext(host: MicroappHost) {
     let statusLeft: string;
     if (statusMessage) {
       statusLeft = ` ${warnC}${statusMessage}${A.r}`;
+    } else if (figletMode) {
+      statusLeft = ` ${accent}Figlet:${A.r} ${bright}${figletInput}_${A.r} ${muted}(Enter=place, Esc=cancel)${A.r}`;
     } else {
       statusLeft = ` ${accent}${cursorCol},${cursorRow}${A.r} ${muted}|${A.r} ${bright}${boxStyle}${A.r}${selInfo}`;
     }
@@ -599,6 +764,20 @@ function openWiretext(host: MicroappHost) {
       }
     }
 
+    // Components section (shown when component tool active)
+    if (tool === "component") {
+      lines.push(divLine);
+      lines.push(`${accent}${A.b} COMPONENTS${A.r}`);
+      for (const comp of COMPONENTS) {
+        const active = comp.type === pendingComponent;
+        if (active) {
+          lines.push(`${selBg}${selFg} ${comp.label.padEnd(14)} ${A.r}`);
+        } else {
+          lines.push(` ${bright}${comp.label}${A.r}`);
+        }
+      }
+    }
+
     // Selected object info
     lines.push(divLine);
     if (selectedId) {
@@ -615,8 +794,13 @@ function openWiretext(host: MicroappHost) {
     } else {
       lines.push(`${accent}${A.b} INFO${A.r}`);
       lines.push(` ${muted}${objects.length} objects${A.r}`);
-      lines.push(` ${muted}^E export${A.r}`);
-      lines.push(` ${muted}^X clear all${A.r}`);
+      lines.push(` ${muted}Tab${A.r} ${bright}cycle${A.r}`);
+      lines.push(` ${muted}^C${A.r} ${bright}copy${A.r}  ${muted}^V${A.r} ${bright}paste${A.r}`);
+      lines.push(` ${muted}^D${A.r} ${bright}dupe${A.r}  ${muted}^X${A.r} ${bright}cut${A.r}`);
+      lines.push(` ${muted}F${A.r}  ${bright}figlet${A.r} ${muted}S${A.r} ${bright}shadow${A.r}`);
+      if (shadowEnabled) {
+        lines.push(` ${accent}shadow: ON${A.r}`);
+      }
     }
 
     // Pad to fill sidebar
@@ -665,6 +849,7 @@ function openWiretext(host: MicroappHost) {
         position: { col: gc, row: gr }, width: 1, height: 1,
         zIndex: objects.length,
         borderStyle: boxStyle, fill: "solid",
+        shadow: tool === "box" && shadowEnabled,
       };
       if (tool === "line" || tool === "arrow") {
         obj.endPosition = { col: gc, row: gr };
@@ -701,6 +886,23 @@ function openWiretext(host: MicroappHost) {
         objects = objects.filter(o => o.id !== hit.id);
         if (selectedId === hit.id) selectedId = null;
       }
+    } else if (tool === "component") {
+      pushUndo();
+      const comp = COMPONENTS.find(c => c.type === pendingComponent) || COMPONENTS[0];
+      const id = genId();
+      const obj: CanvasObject = {
+        id, type: "component", position: { col: gc, row: gr },
+        width: comp.w, height: comp.h, zIndex: objects.length,
+        borderStyle: boxStyle, fill: "solid",
+        componentType: comp.type, label: comp.label,
+        shadow: shadowEnabled,
+      };
+      if (comp.type === "table") obj.columns = ["Col A", "Col B"];
+      if (comp.type === "checkbox") obj.checked = true;
+      if (comp.type === "progress") obj.progress = 40;
+      if (comp.type === "tabs") obj.tabs = ["Tab 1", "Tab 2", "Tab 3"];
+      objects.push(obj);
+      selectedId = id;
     }
     render();
   });
@@ -809,6 +1011,49 @@ function openWiretext(host: MicroappHost) {
   canvasBox.on("keypress", (_ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
     const ctrl = key.ctrl ?? false;
 
+    // Figlet input mode
+    if (figletMode) {
+      if (key.name === "escape") {
+        figletMode = false;
+        figletInput = "";
+        showStatus("");
+        render();
+        return;
+      }
+      if (key.name === "return" || key.name === "enter") {
+        if (figletInput.trim()) {
+          pushUndo();
+          const lines = renderFigletLines(figletInput.trim(), "standard");
+          if (lines.length > 0) {
+            const id = genId();
+            const maxW = lines.reduce((m, l) => Math.max(m, l.length), 0);
+            objects.push({
+              id, type: "figlet", position: { col: cursorCol, row: cursorRow },
+              width: maxW, height: lines.length, zIndex: objects.length,
+              content: figletInput.trim(), figletFont: "standard", figletLines: lines,
+            });
+            selectedId = id;
+            showStatus(`Placed figlet: "${figletInput.trim()}"`);
+          }
+        }
+        figletMode = false;
+        figletInput = "";
+        render();
+        return;
+      }
+      if (key.name === "backspace") {
+        figletInput = figletInput.slice(0, -1);
+        showStatus(`Figlet: ${figletInput}_`);
+        return;
+      }
+      if (_ch && _ch.length === 1 && _ch.charCodeAt(0) >= 32 && !ctrl) {
+        figletInput += _ch;
+        showStatus(`Figlet: ${figletInput}_`);
+        return;
+      }
+      return;
+    }
+
     // Text editing mode
     if (textEditId) {
       const obj = objects.find(o => o.id === textEditId);
@@ -841,14 +1086,155 @@ function openWiretext(host: MicroappHost) {
       if (upper === "2") { boxStyle = "double"; render(); return; }
       if (upper === "3") { boxStyle = "rounded"; render(); return; }
       if (upper === "4") { boxStyle = "heavy"; render(); return; }
+      // Shadow toggle
+      if (upper === "S") {
+        shadowEnabled = !shadowEnabled;
+        showStatus(shadowEnabled ? "Shadows ON" : "Shadows OFF");
+        return;
+      }
+      // Figlet text - create at cursor position
+      if (upper === "F") {
+        if (isFigletAvailable()) {
+          textEditId = null;
+          figletMode = true;
+          figletInput = "";
+          showStatus("Figlet: type text, Enter to place, Esc to cancel");
+        } else {
+          showStatus("figlet CLI not available");
+        }
+        return;
+      }
     }
 
     // Ctrl combos
     if (ctrl && key.name === "z") { undo(); return; }
     if (ctrl && key.name === "y") { redo(); return; }
     if (ctrl && key.name === "e") { exportToClipboard(); return; }
-    if (ctrl && key.name === "x") { pushUndo(); const n = objects.length; objects = []; selectedId = null; showStatus(`Cleared ${n} objects`); return; }
-    if (ctrl && key.name === "d") { loadDemo(); return; }
+    if (ctrl && key.name === "x") {
+      if (selectedId) {
+        // Cut selected
+        const obj = objects.find(o => o.id === selectedId);
+        if (obj) {
+          clipboard = JSON.parse(JSON.stringify(obj));
+          pushUndo();
+          objects = objects.filter(o => o.id !== selectedId);
+          selectedId = null;
+          showStatus("Cut object");
+        }
+      } else {
+        pushUndo(); const n = objects.length; objects = []; selectedId = null; showStatus(`Cleared ${n} objects`);
+      }
+      return;
+    }
+    if (ctrl && key.name === "c") {
+      if (selectedId) {
+        const obj = objects.find(o => o.id === selectedId);
+        if (obj) {
+          clipboard = JSON.parse(JSON.stringify(obj));
+          showStatus("Copied object");
+        }
+      }
+      return;
+    }
+    if (ctrl && key.name === "v") {
+      if (clipboard) {
+        pushUndo();
+        const newObj = JSON.parse(JSON.stringify(clipboard)) as CanvasObject;
+        newObj.id = genId();
+        newObj.position = { col: cursorCol, row: cursorRow };
+        if (newObj.endPosition) {
+          const dx = newObj.endPosition.col - clipboard.position.col;
+          const dy = newObj.endPosition.row - clipboard.position.row;
+          newObj.endPosition = { col: cursorCol + dx, row: cursorRow + dy };
+        }
+        if (newObj.points) {
+          const dx = cursorCol - clipboard.position.col;
+          const dy = cursorRow - clipboard.position.row;
+          newObj.points = newObj.points.map(p => ({ col: p.col + dx, row: p.row + dy }));
+        }
+        newObj.zIndex = objects.length;
+        objects.push(newObj);
+        selectedId = newObj.id;
+        showStatus("Pasted object");
+        render();
+      }
+      return;
+    }
+    if (ctrl && key.name === "d") {
+      if (selectedId) {
+        // Duplicate selected
+        const obj = objects.find(o => o.id === selectedId);
+        if (obj) {
+          pushUndo();
+          const dup = JSON.parse(JSON.stringify(obj)) as CanvasObject;
+          dup.id = genId();
+          dup.position = { col: obj.position.col + 2, row: obj.position.row + 1 };
+          if (dup.endPosition) {
+            dup.endPosition = { col: dup.endPosition.col + 2, row: dup.endPosition.row + 1 };
+          }
+          if (dup.points) {
+            dup.points = dup.points.map(p => ({ col: p.col + 2, row: p.row + 1 }));
+          }
+          dup.zIndex = objects.length;
+          objects.push(dup);
+          selectedId = dup.id;
+          showStatus("Duplicated");
+          render();
+        }
+      } else {
+        loadDemo();
+      }
+      return;
+    }
+
+    // Component cycling with [ and ]
+    if (tool === "component" && !ctrl && (_ch === "[" || _ch === "]")) {
+      const idx = COMPONENTS.findIndex(c => c.type === pendingComponent);
+      if (_ch === "]") pendingComponent = COMPONENTS[(idx + 1) % COMPONENTS.length].type;
+      else pendingComponent = COMPONENTS[(idx - 1 + COMPONENTS.length) % COMPONENTS.length].type;
+      render();
+      return;
+    }
+
+    // Escape deselects
+    if (key.name === "escape") {
+      selectedId = null;
+      render();
+      return;
+    }
+
+    // Tab cycles through objects
+    if (key.name === "tab" && !key.shift) {
+      if (objects.length > 0) {
+        const idx = selectedId ? objects.findIndex(o => o.id === selectedId) : -1;
+        const next = (idx + 1) % objects.length;
+        selectedId = objects[next].id;
+        // Scroll to show selected object
+        const bb = getBBox(objects[next]);
+        const bodyW = (win.body as any).width as number || 80;
+        const canvasW = Math.max(1, bodyW - SIDEBAR_W - 1);
+        const canvasH = Math.max(1, ((win.body as any).height as number || 30) - HEADER_H - STATUS_H);
+        if (bb.col < scrollCol || bb.col >= scrollCol + canvasW) scrollCol = Math.max(0, bb.col - 4);
+        if (bb.row < scrollRow || bb.row >= scrollRow + canvasH) scrollRow = Math.max(0, bb.row - 2);
+        render();
+      }
+      return;
+    }
+    if (key.name === "tab" && key.shift) {
+      if (objects.length > 0) {
+        const idx = selectedId ? objects.findIndex(o => o.id === selectedId) : 0;
+        const prev = (idx - 1 + objects.length) % objects.length;
+        selectedId = objects[prev].id;
+        const bb = getBBox(objects[prev]);
+        const bodyW = (win.body as any).width as number || 80;
+        const canvasW = Math.max(1, bodyW - SIDEBAR_W - 1);
+        const canvasH = Math.max(1, ((win.body as any).height as number || 30) - HEADER_H - STATUS_H);
+        if (bb.col < scrollCol || bb.col >= scrollCol + canvasW) scrollCol = Math.max(0, bb.col - 4);
+        if (bb.row < scrollRow || bb.row >= scrollRow + canvasH) scrollRow = Math.max(0, bb.row - 2);
+        render();
+      }
+      return;
+    }
 
     // Delete selected
     if (key.name === "delete" || key.name === "backspace") {
@@ -861,11 +1247,31 @@ function openWiretext(host: MicroappHost) {
       return;
     }
 
-    // Arrow keys — scroll canvas
-    if (key.name === "left") { scrollCol = Math.max(0, scrollCol - 1); render(); return; }
-    if (key.name === "right") { scrollCol = Math.min(GRID_COLS - 10, scrollCol + 1); render(); return; }
-    if (key.name === "up") { scrollRow = Math.max(0, scrollRow - 1); render(); return; }
-    if (key.name === "down") { scrollRow = Math.min(GRID_ROWS - 10, scrollRow + 1); render(); return; }
+    // Arrow keys — move selected object, or scroll canvas if nothing selected
+    if (key.name === "left" || key.name === "right" || key.name === "up" || key.name === "down") {
+      const dc = key.name === "left" ? -1 : key.name === "right" ? 1 : 0;
+      const dr = key.name === "up" ? -1 : key.name === "down" ? 1 : 0;
+      if (selectedId) {
+        const obj = objects.find(o => o.id === selectedId);
+        if (obj) {
+          pushUndo();
+          obj.position = { col: Math.max(0, obj.position.col + dc), row: Math.max(0, obj.position.row + dr) };
+          if (obj.endPosition) {
+            obj.endPosition = { col: obj.endPosition.col + dc, row: obj.endPosition.row + dr };
+          }
+          if (obj.points) {
+            obj.points = obj.points.map(p => ({ col: p.col + dc, row: p.row + dr }));
+          }
+          render();
+          return;
+        }
+      }
+      // No selection — scroll canvas
+      scrollCol = Math.max(0, Math.min(GRID_COLS - 10, scrollCol + dc));
+      scrollRow = Math.max(0, Math.min(GRID_ROWS - 10, scrollRow + dr));
+      render();
+      return;
+    }
 
     // Tab to focus sidebar
     if (key.name === "tab") { sidebarBox.focus(); return; }
@@ -882,9 +1288,9 @@ function openWiretext(host: MicroappHost) {
     selectedId = null;
     const z = () => objects.length;
     // A simple architecture diagram
-    objects.push({ id: genId(), type: "box", position: { col: 2, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Frontend" });
-    objects.push({ id: genId(), type: "box", position: { col: 28, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "API Server" });
-    objects.push({ id: genId(), type: "box", position: { col: 54, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Database" });
+    objects.push({ id: genId(), type: "box", position: { col: 2, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Frontend", shadow: true });
+    objects.push({ id: genId(), type: "box", position: { col: 28, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "API Server", shadow: true });
+    objects.push({ id: genId(), type: "box", position: { col: 54, row: 1 }, width: 20, height: 5, zIndex: z(), borderStyle: "double", fill: "solid", label: "Database", shadow: true });
     objects.push({ id: genId(), type: "arrow", position: { col: 22, row: 3 }, width: 6, height: 1, zIndex: z(), endPosition: { col: 28, row: 3 } });
     objects.push({ id: genId(), type: "arrow", position: { col: 48, row: 3 }, width: 6, height: 1, zIndex: z(), endPosition: { col: 54, row: 3 } });
     objects.push({ id: genId(), type: "text", position: { col: 2, row: 8 }, width: 1, height: 1, zIndex: z(), content: "React + TS" });
