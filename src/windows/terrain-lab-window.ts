@@ -110,18 +110,38 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       const val = (text: string) => `  ${A.wht}${text}${A.r}`;
       const key = (k: string, desc: string) => `  ${A.yel}${k.padEnd(4)}${A.gry}${desc}${A.r}`;
 
-      // Mode colour
-      const modeCol = s.mode === "chaos" ? A.red : s.mode === "order" ? A.grn : A.mag;
+      // Mode colours
+      const modeCols: Record<string, string> = {
+        chaos: A.red, order: A.grn, hybrid: A.mag,
+      };
+
+      // Build mode picker line
+      const modeLine = MODE_ORDER.map(m => {
+        const active = m === s.mode;
+        const col = modeCols[m] ?? A.wht;
+        return active
+          ? `${col}${A.b}[${m.toUpperCase()}]${A.r}`
+          : `${A.gry} ${m} ${A.r}`;
+      }).join(" ");
+
+      // Build terrain list with active
+      const tNames = terrainNames;
+      const tIdx = tNames.indexOf(s.terrain);
+      const terrainList = tNames.map((t, i) => {
+        return i === tIdx
+          ? `  ${A.cyn}\u25B6 ${t}${A.r}`
+          : `  ${A.gry}  ${t}${A.r}`;
+      }).join("\n");
 
       infoText = [
         "",
         label(modeIcon, "MODE"),
-        `  ${modeCol}${A.b}${s.mode.toUpperCase()}${A.r}`,
+        `  ${modeLine}`,
         "",
         sep,
         "",
         label(terrainIcon, "TERRAIN"),
-        val(s.terrain),
+        terrainList,
         "",
         sep,
         "",
