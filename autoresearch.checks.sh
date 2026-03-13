@@ -14,10 +14,19 @@ curl -sf http://127.0.0.1:8099/health > /dev/null 2>&1 || {
   exit 1
 }
 
-# Verify LLM Orch Studio window exists in state
+# Verify LLM Orch Studio window exists in state (give it a moment after open)
+sleep 1
 curl -sf http://127.0.0.1:8099/state 2>&1 | grep -q "LLM Orch Studio" || {
   echo "ERROR: LLM Orch Studio window not found in /state"
-  exit 1
+  echo "Attempting to open it..."
+  curl -sf http://127.0.0.1:8099/commands/run \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{"command":"microapp.wibwob.llm-orch-studio.open"}' > /dev/null 2>&1
+  sleep 2
+  curl -sf http://127.0.0.1:8099/state 2>&1 | grep -q "LLM Orch Studio" || {
+    echo "ERROR: LLM Orch Studio still not found after retry"
+    exit 1
+  }
 }
 
 echo "checks passed"

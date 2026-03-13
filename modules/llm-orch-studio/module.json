@@ -4,6 +4,18 @@
   "description": "LLM Orch Studio microapp",
   "type": "microapp",
   "entry": "index.ts",
+  "externalDependencies": {
+    "llm-orchestrator": {
+      "repo": "https://github.com/Symbients/llm-orchestrator",
+      "cloneTo": "scratch/llm-orchestrator",
+      "runtime": "cargo",
+      "notes": "Rust CLI. Requires rustup. Invoked via cargo run --release."
+    },
+    "claude-code": {
+      "bin": "claude",
+      "notes": "Must be installed and authenticated. Used as LLM backend by orchestrator actors."
+    }
+  },
   "microapp": {
     "id": "wibwob.llm-orch-studio",
     "title": "LLM Orch Studio",

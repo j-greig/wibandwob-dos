@@ -28,7 +28,7 @@ curl -sf http://127.0.0.1:8099/health > /dev/null 2>&1 || {
 # Close any existing windows first, then open fresh
 curl -sf http://127.0.0.1:8099/commands/run \
   -X POST -H 'Content-Type: application/json' \
-  -d '{"command":"wibwob.llm-orch-studio:open"}' > /dev/null 2>&1 || true
+  -d '{"command":"microapp.wibwob.llm-orch-studio.open"}' > /dev/null 2>&1 || true
 
 # Let the UI settle (render, layout, animations)
 sleep 3
