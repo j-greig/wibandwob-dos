@@ -23,6 +23,8 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 
 /** Percent of window width given to the list/left pane; preview gets the rest. */
 const PREVIEW_SPLIT_RATIO = 42;
+/** Strip .txt/.md extension for display */
+const cleanLabel = (label: string) => label.replace(/\.(txt|md)$/i, "");
 import type { WindowManager } from "../core/window-manager.js";
 
 /** Truncate a line by visible width and pad to a fixed viewport width. */
@@ -150,7 +152,7 @@ export function openPrimerGalleryWindow(params: {
     left: 0,
     width: `${PREVIEW_SPLIT_RATIO}%`,
     bottom: 0,
-    items: tabs[0].entries.map((entry) => entry.label),
+    items: tabs[0].entries.map((entry) => cleanLabel(entry.label)),
   });
   const list = listHandle.node;
   const preview = blessed.box({
@@ -181,7 +183,9 @@ export function openPrimerGalleryWindow(params: {
     }
     try {
       const content = fs.readFileSync(entry.filePath, "utf8");
-      previewRawContent = `${tabs[activeTabIndex].label} :: ${entry.label}\n${entry.filePath}\n\n${content}`;
+      const lineCount = content.split("\n").length;
+      const cleanName = entry.label.replace(/\.(txt|md)$/i, "");
+      previewRawContent = `${tabs[activeTabIndex].label} :: ${cleanName}  (${lineCount} lines)\n${entry.filePath}\n\n${content}`;
     } catch (error) {
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
@@ -199,24 +203,26 @@ export function openPrimerGalleryWindow(params: {
     tabBar.children.forEach((child) => child.destroy());
     let left = 0;
     tabs.forEach((tabConfig, index) => {
+      const count = tabConfig.entries.length;
+      const tabLabel = count > 0 ? `${tabConfig.label} (${count})` : tabConfig.label;
       const tabNode = blessed.box({
         parent: tabBar,
         top: 0,
         left,
         height: 1,
-        width: tabConfig.label.length + 2,
+        width: tabLabel.length + 2,
         mouse: true,
         clickable: true,
-        content: ` ${tabConfig.label} `,
+        content: ` ${tabLabel} `,
         style: index === activeTabIndex ? theme().input : theme().footer
       });
       tabNode.on("click", () => switchTab(index));
-      left += tabConfig.label.length + 2;
+      left += tabLabel.length + 2;
     });
   };
   const applySearch = () => {
     activeEntries = allEntries.filter((entry) => entry.label.toLowerCase().includes(searchValue.toLowerCase()));
-    list.setItems(activeEntries.map((entry) => entry.label));
+    list.setItems(activeEntries.map((entry) => cleanLabel(entry.label)));
     list.select(0);
     updatePreview(0);
     params.onStateChanged?.();
@@ -225,7 +231,7 @@ export function openPrimerGalleryWindow(params: {
   const switchTab = (index: number) => {
     activeTabIndex = index;
     activeEntries = tabs[index].entries;
-    list.setItems(activeEntries.map((entry) => entry.label));
+    list.setItems(activeEntries.map((entry) => cleanLabel(entry.label)));
     list.select(0);
     filterBox.setValue(index === 5 ? searchValue : ` ${tabs[index].label} `);
     renderTabs();

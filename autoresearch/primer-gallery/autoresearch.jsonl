@@ -1,1 +1,2 @@
 {"type":"config","name":"Primer Gallery UI","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"ab413fe","metric":6.4,"metrics":{"layout":7,"readability":6,"aesthetic":5,"coherence":7,"character":7},"status":"keep","description":"Baseline: tab bar with numbered tabs, file list on left, ASCII art preview on right. Clean split but monochrome list, no colour accents beyond theme selection.","timestamp":1773412069887,"segment":0}
