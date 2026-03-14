@@ -6,11 +6,11 @@ Start here for agent-facing canon and session continuity.
 
 `.agents/shell-dev/agentic-devlog.md`
 
-Use this as the first write target for shell-runtime AND module-authoring friction, failure modes, and winning patterns discovered during live work.
+Use this as the first write target for shell-runtime AND microapp-authoring friction, failure modes, and winning patterns discovered during live work.
 
 ## Core directories
 
-- `.agents/module-dev/` — module authoring guidance
+- `.agents/microapp-dev/` — microapp authoring guidance
 - `.agents/shell-dev/` — shell/runtime internals guidance
 - `.agents/skills/` — reusable agent skills
 

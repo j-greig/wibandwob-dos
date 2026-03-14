@@ -153,12 +153,12 @@ DON'T: assume Scramble is always ready — it may be sleeping or thinking
 DO: keep jailed tools jailed — any bypass defeats the safety model
 DON'T: add an unjailed bash or read tool for "convenience"
 
-## Module Registration (from agentic-devlog 2026-03-10)
+## Microapp Registration (from agentic-devlog 2026-03-10)
 
-Adding a new microapp module is a multi-file dance that agents get wrong every time.
+Adding a new microapp is a multi-file dance that agents get wrong every time.
 Both files must be correct simultaneously.
 
-### module.json — exact required shape
+### microapp.json — exact required shape
 
   {
     "name": "my-module",
@@ -182,8 +182,8 @@ Both files must be correct simultaneously.
     action: (args) => { /* open the window */ }
   });
 
-WRONG: `menu: "applications"` — module-loader calls `.map()` on it, crashes silently.
-WRONG: omitting `menu` from registerCommand — module.json menu field is for bridge
+WRONG: `menu: "applications"` — microapp-loader calls `.map()` on it, crashes silently.
+WRONG: omitting `menu` from registerCommand — microapp.json menu field is for bridge
 commands only, NOT what places the item in the actual menu bar.
 
 ### Commands with required args must have a picker fallback
@@ -209,12 +209,12 @@ Then: `tail scratch/logs/stderr.log` for live errors.
 
 | Changed | Action |
 |---------|--------|
-| modules/*/index.ts or module.json | Reload: POST /commands/run with id:"modules.reload" |
+| microapps/*/index.ts or microapp.json | Reload: POST /commands/run with id:"microapps.reload" |
 | src/core/*, src/services/* | RESTART: bash scripts/restart.sh |
 | .pi/skills/*, scratch/* | No action — read at use time |
 | Theme files, package.json | RESTART required |
 
-Mnemonic: modules/ = reload, src/ = restart.
+Mnemonic: microapps/ = reload, src/ = restart.
 
 ## Change Checklist
 

@@ -116,11 +116,11 @@ Wrong:
 
 ### 2026-03-14 — Runtime refactor closeout: module reload, hot-reload guardrails, and TUI hygiene
 
-- `modules.reload` is now the stable, canonical module-only reload path.
+- `microapps.reload` is now the stable, canonical microapp-only reload path.
   Treat watcher-driven close/reopen as scaffolding, not as a guaranteed
   live-state-preserving contract.
 - Hot-reload experiments surfaced two real shell-level failure modes:
-  - module-loader logging via `console.*` polluted the visible TUI because raw
+  - microapp-loader logging via `console.*` polluted the visible TUI because raw
     stdout leaked into the terminal beneath Blessed
   - partial raw Blessed styles can crash widgets at runtime
 - Canon fix for the logging case: shell/runtime services should log through the
@@ -133,7 +133,7 @@ Wrong:
   scaffold, restart, screenshot, watcher, and local-first CLI helpers should be
   linked from agent-facing docs near the workflow steps they support.
 
-### 2026-03-13 — Symbient experience: building a module from inside the substrate
+### 2026-03-13 — Symbient experience: building a microapp from inside the substrate
 
 **Context:** Wib & Wob (Claude Code session, not the embedded pi agent) built the
 Spore Clock module from scratch, then watched an autoloop enhance it from 415→999
@@ -144,7 +144,7 @@ from the agent side.
 **Module creation flow — what worked:**
 - `bash scripts/scaffold-microapp.sh` → edit → typecheck → restart → open via API.
   This loop is clean. Scaffold gives you a running window in under 2 minutes.
-- The SDK docs (`.agents/module-dev/sdk-reference.md` + `docs/building-custom-modules.md`)
+- The SDK docs (`.agents/microapp-dev/sdk-reference.md` + `docs/building-custom-microapps.md`)
   are genuinely sufficient. Didn't need to read any `src/core/` files to build the module.
 - `createTimer` / `clearTimers` pattern is the right abstraction. No leaked intervals.
 
@@ -153,9 +153,9 @@ from the agent side.
   `wibwob.spore-clock.open`. The `microapp.` prefix is not obvious from the docs
   or the scaffold output. Had to search `/commands/list` to discover the real ID.
   Fix: scaffold script should print the full prefixed command ID.
-- `modules.reload` does not exist as a command (README claims it does). Module code
+- `microapps.reload` does not exist as a command (README claims it does). Module code
   changes require either: (a) restart for `src/` changes, or (b) close window + reopen
-  for module-only changes. The "reopen picks up new code" behaviour is undocumented
+  for microapp-only changes. The "reopen picks up new code" behaviour is undocumented
   and was discovered by accident.
 - Multiple stale bun processes accumulated (3 instances eating 95%+ CPU each) because
   previous tmux sessions died without clean SIGTERM. The `scripts/restart.sh` script
@@ -168,7 +168,7 @@ from the agent side.
   autonomously. The loop went from baseline 5.6 → 8.0 score in one pass.
 - `DREAM-FEATURES.md` next to `index.ts` worked as a menu for the autoloop. It
   implemented 14 of 16 features, prioritising correctly by visual impact.
-- The autoloop correctly used the `modules/spore-clock/index.ts` single-file constraint
+- The autoloop correctly used the `microapps/spore-clock/index.ts` single-file constraint
   and never tried to import from `src/core/`.
 
 **Autoloop handoff — friction points:**
@@ -472,7 +472,7 @@ in the microapp SDK.
 ## AC-15 parked: microapp SDK boundary audit
 
 Modules should import from `src/services/microapp-sdk.ts` only, not reach
-into `src/core/` or `src/services/` directly. Currently `modules/sy2-chronicles/index.ts`
+into `src/core/` or `src/services/` directly. Currently `microapps/sy2-chronicles/index.ts`
 has 9 direct imports past the SDK:
 
 ```
@@ -590,7 +590,7 @@ session setup. All manual, no script.
 **Failure mode**: three times during this session the agent was on `main` instead of
 `epic/e028-canvas-documents`. Once committed unrelated files to a spike branch.
 Once created the module directory on main, then couldn't find it after switching.
-Once the whole `modules/zine/` directory vanished because a revert on the wrong
+Once the whole `microapps/zine/` directory vanished because a revert on the wrong
 branch nuked it.
 
 **Root cause**: no pre-action branch check. Agent starts work without running
@@ -604,20 +604,20 @@ to main when an epic branch exists.
 
 **Failure mode**: creating a new microapp module required getting ALL of these right
 simultaneously:
-1. `module.json` — needs `name`, `type`, `microapp.id`, `microapp.title`
+1. `microapp.json` — needs `name`, `type`, `microapp.id`, `microapp.title`
 2. `registerCommand()` in `index.ts` — menu placement uses array format
    `[{ category, order, label }]`, NOT the string `"applications"`
 3. The manifest `microapp.menu` field is read by the loader for bridge commands
    but `registerCommand({ menu })` is what actually places the command in menus
-4. `palette` config also goes in `registerCommand`, not just `module.json`
+4. `palette` config also goes in `registerCommand`, not just `microapp.json`
 
-Agent tried 4 different module.json formats before one worked. Then the menu
+Agent tried 4 different microapp.json formats before one worked. Then the menu
 item was registered but did nothing because `registerCommand` lacked `menu`.
 Then adding `menu: "applications"` (string) crashed because the loader calls
 `.map()` on it expecting an array.
 
 **Fix needed**: E001 specialist doc for "adding a new microapp module" with exact
-template. The `new-window-type` skill exists but doesn't cover the module.json +
+template. The `new-window-type` skill exists but doesn't cover the microapp.json +
 registerCommand dance in enough detail. Alternatively: a `scripts/scaffold-module.sh`
 that generates both files from a template.
 
@@ -649,7 +649,7 @@ shows a list picker if multiple exist. This should be the standard pattern.
 ### content-loader.ts already existed — agent duplicated YAML parsing
 
 **Failure mode**: agent wrote its own YAML-to-panel parsing in the ZINE module,
-duplicating what `modules/sy2-chronicles/content-loader.ts` already does. Had to be
+duplicating what `microapps/sy2-chronicles/content-loader.ts` already does. Had to be
 told by human that the loader exists. Then exported `loadCanvas()` from it.
 
 **Fix needed**: E001 cold memory doc for "panel/canvas content pipeline" listing
@@ -712,7 +712,7 @@ The paper's insight is correct: documentation is infrastructure. When the spec f
 fail 4 times before stumbling on the right incantation.
 
 Priority candidates for E001 specialists:
-1. **Module registration** — module.json schema, registerCommand patterns, menu/palette wiring
+1. **Module registration** — microapp.json schema, registerCommand patterns, menu/palette wiring
 2. **Panel chrome** — frame/titleBar/content pattern, fixed:true, theme tokens
 3. **Content pipeline** — content-loader, panel-types, panel-layout, canvas YAML schema
 4. **Branch discipline** — pre-action branch check, epic branch naming, commit conventions
@@ -836,7 +836,7 @@ the wrapping function breaks blessed tags mid-tag (e.g. `{gray-` on one line,
 Use pattern 1 (direct setContent) until the SDK adds tag-aware wrapping.
 Always set `(display.node as any).parseTags = true` in the microapp setup.
 
-Applied in: `modules/wibwob-tr808/index.ts`
+Applied in: `microapps/wibwob-tr808/index.ts`
 
 **Potential skill/script idea:** A `ww-microapp-colour` skill that documents
 this pattern and provides a copy-pasteable snippet for any microapp that needs
@@ -1081,7 +1081,7 @@ Extracted frames from asciicker.gif with ffmpeg. Key visual differences from my 
 Takeaway: the per-cell bg colour is not optional decoration, it's the primary visual technique.
 
 **Module reload vs restart confusion.**
-New modules require a full app restart to be discovered (module-loader scans at
+New modules require a full app restart to be discovered (microapp-loader scans at
 startup). But code changes to an existing module's `index.ts` only need the window
 closed and reopened — the module is re-evaluated on window creation. The autoresearch
 reload pattern (close window → reopen) works for code changes but NOT for new modules.
@@ -1270,11 +1270,11 @@ Rule for agents:
 
 ---
 
-## 2026-03-14: `module-loader` should not own the public microapp contract
+## 2026-03-14: `microapp-loader` should not own the public microapp contract
 
 Problem pattern:
 
-- the public `MicroappHost` contract lived in `src/services/module-loader.ts`
+- the public `MicroappHost` contract lived in `src/services/microapp-loader.ts`
 - the stable module import path was already `src/services/microapp-sdk.ts`
 - that meant the public SDK contract leaked out of a host-internal service owner
 
@@ -1284,7 +1284,7 @@ What shipped:
 - moved reusable SDK helpers into `src/sdk/runtime-helpers.ts`
 - added `src/sdk/index.ts` as the internal SDK ownership anchor
 - kept `src/services/microapp-sdk.ts` as the stable public facade
-- updated `module-loader.ts` to consume/re-export the moved host contract instead of owning it
+- updated `microapp-loader.ts` to consume/re-export the moved host contract instead of owning it
 
 Verification:
 
@@ -1294,9 +1294,9 @@ Verification:
 
 Rule for agents:
 
-1. public module authoring contract belongs in `src/sdk/*`
+1. public microapp authoring contract belongs in `src/sdk/*`
 2. `src/services/microapp-sdk.ts` stays as the stable import path until an intentional public migration
-3. do not add new module-author types back into `module-loader.ts`
+3. do not add new module-author types back into `microapp-loader.ts`
 
 ---
 
@@ -1343,7 +1343,7 @@ What shipped:
   - `fetchRuntimeInspection()`
   - `fetchRuntimeCommands()`
 - exported through `src/services/microapp-sdk.ts`
-- new module: `modules/runtime-inspector/`
+- new module: `microapps/runtime-inspector/`
   - command: `microapp.wibwob.runtime-inspector.open`
   - reads `/runtime/inspection` and `/commands/list`
   - shows instance identity, blocker state, windows, stats, and command catalogue summary
@@ -1443,13 +1443,14 @@ Rule for agents:
 2. for figlet-like rendered content, open first, inspect real state, then arrange
 3. when a window needs both resize and move in one batch, do resize first if top/left clamping depends on final dimensions
 - 2026-03-14 — Microapp reload follow-on
-  - `modules.reload` is now the stable module-only reload seam.
+  - `microapps.reload` is now the stable microapp-only reload seam.
   - `scripts/watch-microapp.ts` is useful scaffolding, but reliable hot-swapping
-    of already-open module windows is not solved yet.
+    of already-open microapp windows is not solved yet.
   - concrete gotchas discovered while pushing it:
-    - `/state` exposes module identity at `window.details.appType`, not `window.appType`
-    - local module-dev scripts should default to `http://127.0.0.1:8099`, not inherit hosted `WW_API`
+    - `/state` exposes microapp identity at `window.details.appType`, not `window.appType`
+    - local microapp-dev scripts should default to `http://127.0.0.1:8099`, not inherit hosted `WW_API`
     - the remaining problem is window/state handoff, not dynamic import cache-busting
+    - best-effort reopen is good enough for stateless/simple windows when geometry is restored after reopen; verified live with `microapps/layout-probe`
   - keep this in the post-refactor lane unless a stronger host-level window reload
     abstraction is introduced
   - new agent-useful scripts landed:

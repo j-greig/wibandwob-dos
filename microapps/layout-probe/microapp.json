@@ -1,0 +1,24 @@
+{
+  "name": "layout-probe",
+  "version": "0.1.0",
+  "description": "Layout-heavy microapp proving grid, row, stack, and layout reporting through the SDK.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.layout-probe.open"
+  },
+  "microapp": {
+    "id": "wibwob.layout-probe",
+    "title": "Layout Probe",
+    "description": "Probe layout composition and layout-report semantics through the canonical SDK.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 170, "label": "Layout Probe" }
+    ],
+    "palette": { "order": 170, "label": "Layout Probe" },
+    "agent": true,
+    "api": true
+  }
+}

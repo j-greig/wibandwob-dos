@@ -7,7 +7,7 @@ files:
   - src/core/window-chrome.ts
   - src/core/types.ts (WindowRecord, WindowKind, AppType)
   - src/core/app-controller.ts (focusOrCreate, clearDesktop)
-  - .agents/module-dev/sdk-reference.md
+  - .agents/microapp-dev/sdk-reference.md
 triggers:
   pre-change: window lifecycle, createFrame, registerWindow, describeState, WindowRecord fields
   post-change: verify bun run typecheck, GET /state, window appears/closes correctly
@@ -19,7 +19,7 @@ WindowManager owns all live windows: creation (createFrame + registerWindow), z-
 focus, drag, resize, tile, cascade, close. WindowFacade is the single 11-method interface
 consumed by control API, agent tools, workspace restore, and app-controller. Every window
 is a WindowRecord — a plain object combining blessed widgets with lifecycle hooks.
-Microapps register their own window types at runtime via module-loader.ts.
+Microapps register their own window types at runtime via microapp-loader.ts.
 
 ## Key Files
 
@@ -28,7 +28,7 @@ Microapps register their own window types at runtime via module-loader.ts.
 - src/core/window-chrome.ts — chrome sizing math (borders, padding offsets); never inline in window code
 - src/core/types.ts:231 — WindowRecord definition; :9 — WindowKind union; :111 — AppType union
 - src/core/app-controller.ts:364 — focusOrCreate (singleton guard pattern); :734 — findWindowByAppType
-- .agents/module-dev/sdk-reference.md — full microapp registration contract
+- .agents/microapp-dev/sdk-reference.md — full microapp registration contract
 
 ## Core Types
 
@@ -46,7 +46,7 @@ WindowRecord (types.ts:220) — live in-memory window. Key fields:
   filePath?: string   — set by file-backed windows (editor, primer, reader, markdown)
   editor?: EditorState — set by text-windows.ts (editor windows only)
   finder?: FinderController — set by content-windows.ts (browser/file-manager)
-  microappId?: string — set by module-loader.ts (microapp windows only)
+  microappId?: string — set by microapp-loader.ts (microapp windows only)
   savedBounds?        — set when maximized; cleared on restore or any manual geometry change
   cleanup?: () => void — called by close(); timers, subscriptions, external resources
   refresh?: () => void — called after resize; reflow content
@@ -83,7 +83,7 @@ DesktopWindowState (types.ts:175) — serialised shape in GET /state:
 | Window title bar shows stale title | title set on record but not on titleBar.setContent | Call titleBar.setContent(` ${newTitle} `) and record.title = newTitle together |
 | Close button fires during drag | suppressClickWindowId not set | Don't bypass WindowManager click wiring — use createFrame and its built-in suppression |
 | Content overflows chrome into borders | content width calculated without chrome offsets | Import window-chrome.ts contentToWindowSize(); never compute offsets inline |
-| Microapp window missing from /state | microappId not set on record | Set record.microappId = moduleId in the microapp factory before registerWindow |
+| Microapp window missing from /state | microappId not set on record | Set `record.microappId` from the manifest `microapp.id` in the microapp factory before registerWindow |
 | Double wibwob-agent or companion window | focusOrCreate not used | Replace openX() with focusOrCreate(appType, createFn) — app-controller.ts:364 |
 
 ## Do / Don't
@@ -111,14 +111,14 @@ DON'T: hardcode style colours — theme can change at runtime
 
 ## Microapp Window Registration
 
-Microapps (modules/*/index.ts) register window types via MicroappHost:
+Microapps (microapps/*/index.ts) register window types via MicroappHost:
 
   host.registerWindowType({
     id: "my-app",           // unique string, kebab-case
     label: "My App",
     create: (ctx) => {
       const record = ctx.windowManager.createFrame("My App", "microapp");
-      record.microappId = ctx.moduleId;
+      record.microappId = "wibwob.my-app";
       record.describeState = () => ({ appType: "my-app", summary: "..." });
       record.cleanup = () => { /* stop timers */ };
       // ... wire content into record.body ...
@@ -129,7 +129,7 @@ Microapps (modules/*/index.ts) register window types via MicroappHost:
 
 WindowKind for all microapps is "microapp" (types.ts:9). AppType is the registered id string.
 The isMicroappWindow(w) guard (types.ts) narrows to MicroappWindowRecord with guaranteed microappId.
-Full SDK: .agents/module-dev/sdk-reference.md
+Full SDK: .agents/microapp-dev/sdk-reference.md
 
 ## Blessed Scroll + Nested Child Gotchas (from agentic-devlog 2026-03-09)
 

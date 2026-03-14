@@ -44,7 +44,7 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
-  reloadModules: () => unknown;
+  reloadMicroapps: () => unknown;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
@@ -152,7 +152,7 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
  * compatibility. Kebab-case aliases are registered in LEGACY_COMMAND_ALIASES
  * in command-registry.ts so both forms work.
  *
- * Microapp commands are auto-prefixed: microapp.<moduleId>.<commandId>
+ * Microapp commands are auto-prefixed: microapp.<microappId>.<commandId>
  *
  * Labels: use plain names, not "Open ..." prefix (majority convention).
  */
@@ -544,11 +544,11 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     agent: true
   },
   {
-    id: "modules.reload",
+    id: "microapps.reload",
     label: "Reload Microapps",
     description: "Reload dynamic microapp modules from disk without restarting the shell.",
     group: "system",
-    actionKey: "reloadModules",
+    actionKey: "reloadMicroapps",
     menuPlacements: [{ category: "view", order: 95 }],
     palettePlacement: { order: 196 },
     api: true,

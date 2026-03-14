@@ -6,30 +6,30 @@ Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 
 ---
 
-## Building a Module
+## Building a Microapp
 
-Most agents arrive here to build a module addon. Start here.
+Most agents arrive here to build a microapp addon. Start here.
 
-1. `bash scripts/scaffold-microapp.sh modules/<name> wibwob.<id> "<Title>" <menuOrder>`
-2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
+1. `bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>`
+2. Read `docs/building-custom-microapps.md` — lifecycle, SDK, common mistakes
 3. Edit the scaffold, `bun run typecheck`, restart app
 
-Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
+Quick start (30-second pattern): `.agents/microapp-dev/quick-start.md`
 
 ### Which example for which pattern
 
-| Tier | Module | What it shows |
+| Tier | Microapp | What it shows |
 |------|--------|--------------|
-| Static | `modules/demo-hello-world/` | Responsive figlet, onResize, no timers |
-| Animated | `modules/demo-heartbeat/` | createTimer, cleanup, structured describeState |
-| Persistent | `modules/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
-| SDK sampler | `modules/demo-e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
+| Static | `microapps/demo-hello-world/` | Responsive figlet, onResize, no timers |
+| Animated | `microapps/demo-heartbeat/` | createTimer, cleanup, structured describeState |
+| Persistent | `microapps/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
+| SDK sampler | `microapps/demo-e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
 
-Full examples guide: `.agents/module-dev/examples-by-tier.md`
+Full examples guide: `.agents/microapp-dev/examples-by-tier.md`
 
-### Module dev docs
+### Microapp dev docs
 
-All module authoring docs live in `.agents/module-dev/`:
+All microapp authoring docs live in `.agents/microapp-dev/`:
 
 - `quick-start.md` — 30-second scaffold-to-running pattern
 - `sdk-reference.md` — MicroappHost, WindowHandle, and SDK primitives
@@ -37,9 +37,12 @@ All module authoring docs live in `.agents/module-dev/`:
 - `persistence.md` — registerSnapshot for workspace save/restore
 - `pitfalls.md` — common mistakes and gotchas
 
-Public full guide: `docs/building-custom-modules.md`
+Public full guide: `docs/building-custom-microapps.md`
 
-**You do not need `.agents/shell-dev/` to build a module.** That directory
+Private/internal microapps live under `microapps-private/` in this setup.
+Treat that tree as a separate private repo/submodule, not as public sample code.
+
+**You do not need `.agents/shell-dev/` to build a microapp.** That directory
 is for contributors working on the shell itself.
 
 ---
@@ -127,7 +130,7 @@ Rule: registry command first → low-level TUI tool if insufficient → expose v
 | `bun run handover` | Generate session handover doc from live state |
 | `bun run planning:status` | Show current epic state |
 | `bun run planning:sync` | Regenerate EPIC_STATUS.md from frontmatter |
-| `bun run scaffold:microapp` | Scaffold a new microapp module |
+| `bun run scaffold:microapp` | Scaffold a new microapp package |
 | `bun run gen-primitives` | Regenerate `src/core/primitives.ts` index |
 
 **CLI flags** (defined in `src/core/cli.ts`):
@@ -181,20 +184,20 @@ bash scripts/start-alt-instance.sh
 
 | Changed | Action |
 |---------|--------|
-| `modules/*/index.ts` or `module.json` | Reload: `POST /commands/run` with `modules.reload` |
+| `microapps/*/index.ts` or `microapp.json` | Reload: `POST /commands/run` with `microapps.reload` |
 | `.pi/skills/*`, `scratch/*`, docs | No action needed — read at use time |
 | `src/core/*`, `src/services/*` | RESTART required (`bash scripts/restart.sh`) |
 | `src/windows/*` | RESTART required |
 | Theme files | RESTART required (theme loaded at startup) |
 | `package.json`, `tsconfig.json` | RESTART required |
 
-Rule of thumb: if it lives in `modules/`, reload. If it lives in `src/`, restart.
+Rule of thumb: if it lives in `microapps/`, reload. If it lives in `src/`, restart.
 
 ## Subsystem Specs
 
 Subsystem specs live in `.agents/shell-dev/specs/`. These are for shell
-contributors editing `src/` internals — **not for module authors** editing
-their own `modules/*/index.ts`. Module authors use `.agents/module-dev/`.
+contributors editing `src/` internals — **not for microapp authors** editing
+their own `microapps/*/index.ts`. Microapp authors use `.agents/microapp-dev/`.
 
 Read the relevant spec before touching the `src/` files listed:
 
@@ -213,7 +216,7 @@ Read the relevant spec before touching the `src/` files listed:
 | Window system | `bun run typecheck` · GET /state shows correct windows · close() removes from stack |
 | State / API | GET /state field names match · /health responds · tui_get_state returns real IDs |
 | Workspace | Save → restart → windows restore at correct positions with correct content |
-| Agent session / modules | Module loads without stderr errors · command appears in menu · no double-input |
+| Agent session / microapps | Microapp loads without stderr errors · command appears in menu · no double-input |
 
 ### Self-edit rule
 
@@ -381,7 +384,7 @@ Deferred work not yet epic-tracked. Promote when conditions change.
 - **BPM-synced animation speed for primer frame rate** — Animated primers (multi-frame with --- separators) should sync to BPM. Concept: A 4-frame animation at 128 BPM in 4/4 = one frame per beat (~469ms). Timeline format could specify `frameSync: "beat" | "half" | "eighth" | "bar" | <ms>`. Requires either a control API endpoint or programmatic frame duplication at timeline write time. Deferred pending vj-timeline stability.
 - **ASCII music video: grime remix, Gondry/Shrigley/Cunningham directed** — Use WibWob-DOS itself as visual substrate: windows as panels, primers as actors, figlets as titles. Timed workspace JSON with per-window enter/exit timecodes + effects. Architecture: define spec, build renderer, choreograph full 45s video, render at 1080x1920 15fps. Music track (grime-v2) needs more Björk/hyperpop extremeness per human feedback. Deferred pending timeline spec refinement.
 - **Ambient-presence v3: composer-grade chiptune with Eno/Frahm influence** — v2 has right concept but primitive execution. Needs research (Eno, Frahm), score document (intervals, voicing, arc), compositional discipline (harmonic movement, rhythmic evolution, register interplay, dynamic arc, silence). Then implement v3 with chiptune-bricks, then unexpected remix in different genre. Custom system prompt updated with methodology; future sessions auto-carry discipline. This is a long-arc creative process, not a sprint task.
-- **Module inspection endpoint: /modules/list** — No module inspection exists. GET /state has no module info, module-loader.ts has no listModules(). Needed for hosted operators to know what microapps are loaded, version, status. Shape: `GET /modules → [{name, version, appType, loaded, commands[]}]`. Codex's lane; deferred as non-MVP future work.
+- **Module inspection endpoint: /microapps/list** — No module inspection exists. GET /state has no module info, microapp-loader.ts has no listModules(). Needed for hosted operators to know what microapps are loaded, version, status. Shape: `GET /modules → [{name, version, appType, loaded, commands[]}]`. Codex's lane; deferred as non-MVP future work.
 - **Unicode/cell-aware text rendering** — replace fragile string repaint for complex Unicode with shared text-to-cells path. Deferred; emoji-specific glitches only. Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
-- **Terminal subsystem (production quality)** — spike-quality terminal module exists at `modules/terminal/` (blessed.terminal + Node PTY bridge). Production path: swap term.js for `@xterm/headless` per spike plan `.planning/spikes/spk-terminal-emulation/spike.md`. Known issues: mouse passthrough patched (0-based→1-based), keyboard to nested TUI apps works but fragile.
+- **Terminal subsystem (production quality)** — spike-quality terminal module exists at `microapps/terminal/` (blessed.terminal + Node PTY bridge). Production path: swap term.js for `@xterm/headless` per spike plan `.planning/spikes/spk-terminal-emulation/spike.md`. Known issues: mouse passthrough patched (0-based→1-based), keyboard to nested TUI apps works but fragile.
 - **Event/persistence/multi-instance model** — re-spec TS-native event/persistence layer. Spec: `e002 legacy-docs/013-events-persistence-and-multi-instance.md`
