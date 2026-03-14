@@ -147,6 +147,13 @@ The tests and scripts probably make assumptions that are no longer true. Find ev
 New modules probably reinvented things the older modules already solved. Read the oldest and most stable parts of the codebase to understand what patterns were established. Then read the newest parts. Find the gaps where new code ignored those patterns. Close them. Typecheck clean. Commit.
 ```
 
+**god file decomposition**
+- a single file that has grown to contain multiple distinct subsystems — terrain gen, rendering, input handling, NPC AI, weather, combat — all in one blob
+- happens naturally when agents build incrementally: each feature gets appended to the same file because it is the easiest place to add things
+- the fix is not to split after the fact (expensive, error-prone) but to split EARLY: when a file crosses ~300 lines or gains a second distinct responsibility, extract before continuing
+- prevention signals: if you are adding a new system (not extending an existing one), it belongs in a new file
+- the asciicker module hit 1434 lines with terrain, rendering, camera, NPCs, combat, weather, items, particles, and UI all in index.ts — splitting after the fact risks regressions and is harder than splitting at 400 lines would have been
+
 ## SCAFFOLD PROMPTS
 
 Token-efficient patterns for requesting extensible features. Name the trigger, the dispatch pattern, the first case, and the API. Skip rationale.

@@ -1,0 +1,1 @@
+{"run":2,"commit":"2af2b59","metric":451.4,"metrics":{"max_file_lines":2244,"any_count":147,"god_files":20,"cross_layer":12,"blessed_heavy":4,"long_fns":52,"file_count":127},"status":"keep","description":"Extract pattern-generators, restyle-bundle, tabbed-container from ui-parts.ts (2395->2048 lines). Max file now app-controller at 2244.","timestamp":1773448709721,"segment":0}
