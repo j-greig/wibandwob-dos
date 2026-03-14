@@ -270,6 +270,65 @@ if (shimClean) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// 6. Registry coverage: every microapp ID should be in the registry
+// ═══════════════════════════════════════════════════════════════════════
+
+console.log("\n📊 Registry coverage check");
+checks++;
+
+const REGISTRY_PATH = join(ROOT, "src/core/microapp-registry.ts");
+const registryContent = readFileSync(REGISTRY_PATH, "utf-8");
+
+// Extract all IDs from the REGISTRY const
+const registryIds = new Set<string>();
+const regMatches = registryContent.matchAll(/"(wibwob\.[^"]+)":\s*"(core|beta|internal|disabled)"/g);
+for (const m of regMatches) {
+  registryIds.add(m[1]!);
+}
+
+// Find all microapp IDs from manifests
+let coverageClean = true;
+if (existsSync(MICROAPPS_DIR)) {
+  for (const dir of readdirSync(MICROAPPS_DIR, { withFileTypes: true })) {
+    if (!dir.isDirectory() || dir.name.startsWith(".")) continue;
+    const manifestPath = join(MICROAPPS_DIR, dir.name, "microapp.json");
+    if (!existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+      if (manifest.type !== "microapp" || !manifest.microapp?.id) continue;
+      const id = manifest.microapp.id;
+      if (!registryIds.has(id)) {
+        fail("registry-coverage", `Microapp "${id}" (${dir.name}) not in microapp-registry.ts — defaults to beta`);
+        coverageClean = false;
+      }
+    } catch {}
+  }
+}
+
+// Also check microapps-private
+const PRIVATE_DIR = join(ROOT, "microapps-private");
+if (existsSync(PRIVATE_DIR)) {
+  for (const dir of readdirSync(PRIVATE_DIR, { withFileTypes: true })) {
+    if (!dir.isDirectory() || dir.name.startsWith(".")) continue;
+    const manifestPath = join(PRIVATE_DIR, dir.name, "microapp.json");
+    if (!existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+      if (manifest.type !== "microapp" || !manifest.microapp?.id) continue;
+      const id = manifest.microapp.id;
+      if (!registryIds.has(id)) {
+        fail("registry-coverage", `Microapp "${id}" (private/${dir.name}) not in microapp-registry.ts — defaults to beta`);
+        coverageClean = false;
+      }
+    } catch {}
+  }
+}
+
+if (coverageClean) {
+  console.log(`  ✅ All microapp IDs covered in registry (${registryIds.size} entries)`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Summary
 // ═══════════════════════════════════════════════════════════════════════
 

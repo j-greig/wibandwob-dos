@@ -49,6 +49,8 @@ export interface DynamicCommandDefinition {
   palettePlacement?: PalettePlacement;
   api?: boolean;
   agent?: boolean;
+  /** Host-assigned tier from microapp-registry. */
+  tier?: "core" | "beta" | "internal" | "disabled";
 }
 
 const LEGACY_COMMAND_ALIASES: Record<string, string> = {
@@ -221,6 +223,7 @@ export class CommandRegistry {
       surfaces: this.getDynamicSurfaces(dyn),
       menuCategories: [...new Set((dyn.menuPlacements ?? []).map((p) => p.category))] as AppCommandCategory[],
       available: true,
+      ...(dyn.tier ? { tier: dyn.tier } : {}),
     }));
 
     const all = [...builtIn, ...dynamic];

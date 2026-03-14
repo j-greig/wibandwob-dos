@@ -320,16 +320,22 @@ export class ControlApiService {
     }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
+      const tierFilter = url.searchParams.get("tier");
       const includeUnavailableRaw = url.searchParams.get("includeUnavailable");
       const includeUnavailable =
         includeUnavailableRaw === "1" ||
         includeUnavailableRaw === "true" ||
         includeUnavailableRaw === "yes";
+      let commands = this.deps.commands.list(surface ?? undefined, {
+        includeUnavailable,
+      });
+      if (tierFilter) {
+        const tiers = new Set(tierFilter.split(","));
+        commands = commands.filter((cmd: any) => tiers.has(cmd.tier) || (!cmd.tier && tiers.has("builtin")));
+      }
       return Response.json({
         ok: true,
-        commands: this.deps.commands.list(surface ?? undefined, {
-          includeUnavailable,
-        }),
+        commands,
       });
     }
 

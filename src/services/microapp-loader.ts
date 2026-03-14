@@ -23,6 +23,7 @@ import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
 import { log } from "./app-logger.js";
 import { clearDynamicSnapshots, registerDynamicSnapshot } from "../core/snapshot-registry.js";
+import { getMicroappTier, isMicroappEnabled, isTierVisibleOn } from "../core/microapp-registry.js";
 import type { SnapshotHandler } from "../core/snapshot-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
 import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "../core/types.js";
@@ -172,23 +173,36 @@ function createMicroappHost(
     registerCommand(def) {
       const fullId = `microapp.${microappId}.${def.id}`;
       const multiInstance = def.multiInstance ?? manifest.multiInstance ?? false;
+      const tier = getMicroappTier(microappId);
+
+      // Tier-based visibility filtering:
+      //   menu:    core only
+      //   palette: core + beta
+      //   api:     core + beta
+      //   agent:   core + beta
+      const showMenu    = isTierVisibleOn(tier, "menu");
+      const showPalette = isTierVisibleOn(tier, "palette");
+      const showApi     = isTierVisibleOn(tier, "api");
+      const showAgent   = isTierVisibleOn(tier, "agent");
+
       const dynDef: DynamicCommandDefinition = {
         id: fullId,
         label: def.label,
         description: def.description,
         action: def.direct ? def.action : (args) => focusOrCreate(microappId, () => def.action(args), multiInstance),
         multiInstance,
-        menuPlacements: Array.isArray(def.menu) ? def.menu.map(m => ({
+        menuPlacements: (showMenu && Array.isArray(def.menu)) ? def.menu.map(m => ({
           category: m.category as MenuPlacement["category"],
           order: m.order,
           label: m.label,
         })) : undefined,
-        palettePlacement: (def.palette && typeof def.palette === "object") ? {
+        palettePlacement: (showPalette && def.palette && typeof def.palette === "object") ? {
           order: def.palette.order,
           label: def.palette.label,
         } : undefined,
-        api: manifest.api !== false,
-        agent: manifest.agent !== false,
+        api: showApi && (manifest.api !== false),
+        agent: showAgent && (manifest.agent !== false),
+        tier,
       };
       commands.addDynamic(dynDef);
     },
@@ -364,6 +378,12 @@ async function loadMicroappModule(mod: DiscoveredMicroapp, deps: MicroappHostDep
   const config = mod.manifest.microapp;
   if (!config?.id || !config?.title) {
     log.err(`[microapp-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
+    return;
+  }
+
+  // ── Registry gate: skip disabled microapps ──
+  if (!isMicroappEnabled(config.id)) {
+    log.app(`[microapp-loader] Skipped disabled microapp: ${config.id}`);
     return;
   }
 

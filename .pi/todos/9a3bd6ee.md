@@ -5,8 +5,8 @@
     "refactor",
     "dx"
   ],
-  "status": "open",
+  "status": "done",
   "created_at": "2026-03-14T20:45:20.935Z"
 }
 
-Continue `.planning/refactor-docs/025-agent-friendly-microapp-dev-follow-on.md`. Improve the watch/reload/restart dev loop for microapp authors. Key constraint: don't oversell hot reload — the safe path is restart+reopen, not arbitrary stateful hot-swap.
+025 follow-on is landed: scaffold, typecheck, reload, watch loop all work. check-coat script added. Hot reload parked (correct decision per doc).
