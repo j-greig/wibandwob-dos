@@ -15,6 +15,7 @@ interface JournalEntry {
   kind?: EntryKind;
   tags?: string[];
   actor?: string; // peer provenance — who specifically (e.g. "claude", "james", "cron")
+  referenceId?: number; // linked entry — index of referenced entry (0-based)
 }
 
 // ── Data ────────────────────────────────────────────────────────────
@@ -114,15 +115,18 @@ function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
   const indent = " ".repeat(prefixLen);
 
   const tagStr = e.tags && e.tags.length > 0
-    ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}`
+    ? `  {${accent}-fg}${e.tags.map(tg => `#${tg}`).join(" ")}{/${accent}-fg}`
+    : "";
+  const refStr = e.referenceId !== undefined
+    ? `  {${muted}-fg}→ #${e.referenceId}{/${muted}-fg}`
     : "";
 
   const result = wrapped.map((line, i) =>
     i === 0 ? `${prefix}${line}` : `${indent}${line}`
   );
   // Append tags to last line
-  if (tagStr && result.length > 0) {
-    result[result.length - 1] += tagStr;
+  if ((tagStr || refStr) && result.length > 0) {
+    result[result.length - 1] += tagStr + refStr;
   }
   return result;
 }
@@ -167,7 +171,8 @@ export default function setup(host: MicroappHost) {
       const kind = args?.kind as EntryKind | undefined;
       const tags = Array.isArray(args?.tags) ? args.tags.filter((t: any) => typeof t === "string") : undefined;
       const actor = typeof args?.actor === "string" ? args.actor : undefined;
-      const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), kind, tags, actor };
+      const referenceId = typeof args?.referenceId === "number" ? args.referenceId : undefined;
+      const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), kind, tags, actor, referenceId };
       appendEntry(journalPath(host), entry);
       return { ok: true, entry };
     },
@@ -217,6 +222,81 @@ export default function setup(host: MicroappHost) {
       return { ok: true, switchJournal: name, note: "Reopen journal to use new file" };
     },
   });
+
+  host.registerCommand({
+    id: "summarize",
+    label: "Summarize Journal",
+    description: "Return a summary of the current journal. Args: { journalName? }",
+    direct: true,
+    action: (args: any) => {
+      const jName = args?.journalName || "journal";
+      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
+      const all = loadEntries(fp);
+      const humans = all.filter(e => e.peer === "human").length;
+      const agents = all.filter(e => e.peer === "agent").length;
+      const days = new Set(all.map(e => dayKey(e.ts))).size;
+      const kinds: Record<string, number> = {};
+      for (const e of all) if (e.kind) kinds[e.kind] = (kinds[e.kind] || 0) + 1;
+      const allTags = new Set(all.flatMap(e => e.tags || []));
+      const last5 = all.slice(-5).map(e => ({ peer: e.peer, text: e.text, ts: e.ts }));
+      return {
+        ok: true,
+        journalName: jName,
+        totalEntries: all.length,
+        peerBreakdown: { human: humans, agent: agents, system: all.length - humans - agents },
+        days,
+        kinds,
+        tags: [...allTags],
+        recentEntries: last5,
+      };
+    },
+  });
+
+  host.registerCommand({
+    id: "ambient",
+    label: "Journal Ambient",
+    description: "Open a compact ambient view showing the last 3 entries.",
+    action: () => openAmbient(host),
+  });
+}
+
+function openAmbient(host: MicroappHost) {
+  const fp = join(host.repoRoot, "scratch", "journal.jsonl");
+  const win = host.createWindow({ title: "Journal ·", width: 50, height: 6 });
+  const t = () => host.theme();
+
+  const box = blessed.box({
+    parent: win.body,
+    top: 0, left: 0, right: 0, bottom: 0,
+    tags: true,
+    style: t().body,
+  });
+
+  function render() {
+    const entries = loadEntries(fp);
+    const last3 = entries.slice(-3);
+    const th = t();
+    const muted = th.muted?.fg || "#555";
+    const lines = last3.map(e => {
+      const glyph = PEER_GLYPH[e.peer] || "·";
+      const fg = peerColor(e.peer, th);
+      const time = formatTime(e.ts);
+      return `{${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time}{/${muted}-fg} ${e.text}`;
+    });
+    if (lines.length === 0) lines.push(`{${muted}-fg}empty journal{/${muted}-fg}`);
+    box.setContent(lines.join("\n"));
+    host.screen.render();
+  }
+
+  render();
+  // Refresh every 5s
+  const timer = setInterval(render, 5000);
+
+  win.describeState(() => ({ summary: "Journal ambient — last 3" }));
+  win.captureText(() => box.getContent());
+  win.onRestyle(() => { box.style = t().body; render(); });
+  win.onCleanup(() => clearInterval(timer));
+  win.focus();
 }
 
 function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
@@ -401,13 +481,28 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.setFocusTarget(inputBox);
 
   // ── Lifecycle ─────────────────────────────────────────────────
-  win.describeState(() => ({
-    summary: `Journal — ${entries.length} entries`,
-    lastEntry: entries.length > 0 ? entries[entries.length - 1]!.text : null,
-    entryCount: entries.length,
-    filterByPeer,
-    journalName,
-  }));
+  win.describeState(() => {
+    const humans = entries.filter(e => e.peer === "human").length;
+    const agents = entries.filter(e => e.peer === "agent").length;
+    const systems = entries.filter(e => e.peer === "system").length;
+    const last = entries.length > 0 ? entries[entries.length - 1]! : null;
+    const peerBreakdown = { human: humans, agent: agents, system: systems };
+    // mood heuristic: ratio of questions to decisions
+    const questions = entries.filter(e => e.kind === "question").length;
+    const decisions = entries.filter(e => e.kind === "decision").length;
+    const mood = questions > decisions ? "curious" : decisions > 0 ? "decisive" : "observing";
+    const stats = { entryCount: entries.length, peerBreakdown, mood };
+    return {
+      summary: `Journal — ${entries.length} entries`,
+      lastEntry: last?.text ?? null,
+      entryCount: entries.length,
+      filterByPeer,
+      journalName,
+      peerBreakdown,
+      mood,
+      stats,
+    };
+  });
 
   win.captureText(() => entries.map(e => {
     const glyph = PEER_GLYPH[e.peer] || "·";
