@@ -16,6 +16,7 @@
     "check-surface-parity": "bun run scripts/.archive/check-surface-parity.ts",
     "typecheck": "node_modules/.bin/tsc --noEmit",
     "handover": "bash scripts/handover.sh",
+    "check-coat": "bun run scripts/check-coat.ts",
     "check-themes": "bun run scripts/check-themes.ts",
     "watch:microapp": "bun run scripts/watch-microapp.ts",
     "planning:status": "bash .claude/scripts/planning.sh status",

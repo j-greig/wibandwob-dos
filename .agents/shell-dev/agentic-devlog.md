@@ -2160,3 +2160,172 @@ it's the correct boundary recognition.
 - God-file shared helpers (primer browser + file manager in one file)
 - WindowRecord mutations that the SDK doesn't surface
 - Overlay flows that microapps can't drive (list prompts, file pickers with preview)
+
+---
+
+## 2026-03-14: Ghostty custom shaders — conditional GPU effects for WibWob-DOS
+
+### What got built
+
+GPU shader pipeline that applies CRT/glow/starfield effects to the Ghostty terminal
+when WibWob-DOS is running. Three custom shaders + one community shader, scriptable
+toggle, AppleScript reload, app lifecycle integration.
+
+### Architecture
+
+```
+shaders/wibwob-glow.glsl         ← phosphor bloom, grain, moiré, scanlines, corner vignette
+shaders/wibwob-crt.glsl          ← full CRT: barrel curvature, chromatic aberration, heavy scanlines
+shaders/wibwob-nord-tint.glsl    ← cool blue color grade for Nord theme
+shaders/starfield-og.glsl        ← community starfield (from 0xhckr/ghostty-shaders)
+scripts/ghostty-shader.sh        ← on/off/list/status/install toggle script
+~/.config/ghostty/shaders/shader.glsl  ← active shader (single-file swap target)
+```
+
+Ghostty config points at `~/.config/ghostty/shaders/shader.glsl`. Swapping shaders
+= copying a different `.glsl` file to that path + `Cmd+Shift+,` to reload.
+
+### App lifecycle hook (src/app.ts)
+
+```typescript
+const ghosttyShader = process.env.WIBWOB_GHOSTTY_SHADER;
+const isGhostty = (process.env.TERM_PROGRAM || "").toLowerCase().includes("ghostty")
+  || !!process.env.GHOSTTY_RESOURCES_DIR
+  || process.env.WIBWOB_GHOSTTY_FORCE === "1";
+```
+
+On start: copies the named shader to the active path. On exit (SIGTERM/SIGINT):
+removes the file. Ghostty's `?` prefix on `config-file` means missing file = no
+shader = clean.
+
+### Gotchas and lessons learned
+
+**1. `config-file` indirection didn't work reliably.**
+Initial design used `config-file = ?/path/to/scratch/.ghostty-shaders` in the main
+Ghostty config to conditionally include shader settings. This worked for
+`+show-config` but the actual Ghostty renderer didn't always pick up changes to the
+included file. Fix: hardcode `custom-shader = ~/.config/ghostty/shaders/shader.glsl`
+directly in the main Ghostty config. Swap the file content, not the config reference.
+
+**2. Shader compilation errors are completely silent.**
+If a `.glsl` file has a syntax error (e.g. renamed const vars but code still
+references old names), Ghostty silently ignores the shader. No error in logs, no
+warning, no visual indicator. The terminal just renders without the effect. The only
+signal is "nothing happened." Diagnosis: check the GLSL code manually. Ghostty has
+no shader compilation error reporting surface.
+
+**3. Renamed consts broke the shader silently.**
+Renamed `BLOOM_RADIUS` → `GLOW_SPREAD` etc. for readability, but forgot to update
+the function body references. Shader failed to compile → Ghostty silently dropped it
+→ "no theme visible." Lesson: GLSL has no IDE — rename with extreme care, grep for
+every old name.
+
+**4. `TERM_PROGRAM` is unreliable for Ghostty detection.**
+Running WibWob-DOS from Zed's integrated terminal sets `TERM_PROGRAM=zed`, not
+`ghostty`. Running from tmux sets `TERM_PROGRAM=tmux`. Ghostty sets
+`GHOSTTY_RESOURCES_DIR` but Zed strips it from child environments. Fix: added
+`WIBWOB_GHOSTTY_FORCE=1` env var for explicit opt-in when auto-detection fails.
+
+**5. Hot reload works for config changes, NOT for same-path shader edits.**
+`Cmd+Shift+,` re-reads the config file and picks up new `custom-shader` paths. But
+if the path hasn't changed and only the file content changed, Ghostty uses its
+compiled shader cache. Fix: copy to a new filename to force recompilation, or
+restart Ghostty entirely.
+
+**6. First shader load requires Ghostty restart.**
+Adding `custom-shader` to a config that previously had none requires a full Ghostty
+quit + reopen. Hot reload (`Cmd+Shift+,`) doesn't initialize the shader pipeline
+from scratch — it only updates an already-initialized pipeline.
+
+**7. AppleScript `perform action` didn't trigger reload.**
+Ghostty's sdef exposes `perform action "reload_config" on terminal`, and it returns
+`true`, but the config didn't actually reload. The `System Events` keystroke approach
+(`keystroke "," using {command down, shift down}`) works reliably. May be a permissions
+issue — Automation privacy settings need explicit grant per controlling app.
+
+**8. Shaders pause on focus loss.**
+`custom-shader-animation = true` only animates when the terminal is focused. Losing
+focus pauses `iTime` progression. This is actually good for WibWob-DOS — saves GPU
+when the terminal is backgrounded. Can be overridden with `custom-shader-animation = always`
+but costs more CPU.
+
+**9. Multiple `custom-shader` lines chain.**
+Ghostty supports stacking shaders — each reads the previous shader's output via
+`iChannel0`. Order matters: `glow` then `starfield` = stars appear on glowed text.
+`starfield` then `glow` = stars get bloomed too.
+
+**10. Ghostty-specific shader uniforms are powerful.**
+Beyond standard ShaderToy uniforms (`iResolution`, `iTime`, `iChannel0`), Ghostty
+provides: `iPalette[256]` (full terminal palette), `iFocus` (focus state),
+`iTimeFocus` (time since focus change), `iCurrentCursor` (cursor position/size),
+`iBackgroundColor`/`iForegroundColor`. These enable theme-aware shaders that adapt
+to the terminal's color scheme.
+
+### Shader tuning workflow
+
+The fastest iteration loop:
+1. Edit `~/.config/ghostty/shaders/shader.glsl` directly (or edit in repo, then `cp`)
+2. Quit and reopen Ghostty (hot reload doesn't catch same-path edits)
+3. Or: copy to a new filename, update config, `Cmd+Shift+,`
+
+For quick A/B comparison:
+```bash
+cp shaders/wibwob-glow.glsl ~/.config/ghostty/shaders/shader.glsl  # swap
+# Cmd+Shift+, in Ghostty (only works if filename changed or first load)
+```
+
+### Shader const naming convention
+
+Use human-readable names — these are the tuning knobs:
+```glsl
+const float GLOW_SPREAD        = 3.0;    // how far bloom bleeds in pixels
+const float GLOW_INTENSITY     = 0.45;   // how bright the glow is
+const float SCANLINE_DARKNESS  = 0.156;  // how dark the horizontal lines are
+const float COLOR_FRINGING     = 1.04;   // RGB split / chromatic aberration in px
+const float FILM_GRAIN         = 0.06;   // static fuzz / noise
+const float MOIRE_PATTERN      = 0.12;   // diagonal interference shimmer
+const float CORNER_DARKNESS    = 0.18;   // how dark the corners get
+```
+
+### Community shader: starfield performance tuning
+
+The `0xhckr/ghostty-shaders` starfield uses 21 layers × 30 grid divisions = expensive.
+For daily use: `layers = 7`, `repeats = 10` cuts GPU work ~90%. Also clamped
+`sparkle = min(sparkle, 0.15)` so stars don't balloon when "close to camera."
+Added `STAR_SPEED = 0.3` for slower Win95-screensaver drift.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `shaders/wibwob-glow.glsl` | Phosphor bloom + grain + moiré + scanlines + vignette |
+| `shaders/wibwob-crt.glsl` | Full retro CRT barrel distortion effect |
+| `shaders/wibwob-nord-tint.glsl` | Cool blue color grade for Nord palette |
+| `shaders/starfield-og.glsl` | Community starfield (original 21-layer version) |
+| `shaders/starfield-lite.glsl` | Performance-tuned starfield (7 layers, smaller stars) |
+| `shaders/ghostty-test-crt.glsl` | Ghostty's own test CRT (used for pipeline validation) |
+| `scripts/ghostty-shader.sh` | Toggle script: on/off/list/status/install |
+| `src/app.ts` | Lifecycle hooks: activate on start, deactivate on exit |
+| `~/.wibwob` | Shell aliases: `ww-shader on wibwob-glow` |
+
+### Usage
+
+```bash
+# One-time Ghostty config setup
+bash scripts/ghostty-shader.sh install
+
+# Manual swap
+cp shaders/wibwob-glow.glsl ~/.config/ghostty/shaders/shader.glsl
+# Cmd+Shift+, in Ghostty (or restart if first load)
+
+# Auto-activate on app start (add to shell profile)
+export WIBWOB_GHOSTTY_SHADER="wibwob-glow"
+export WIBWOB_GHOSTTY_FORCE="1"  # needed if running from Zed/tmux
+bun run dev
+
+# CLI alias (after sourcing ~/.wibwob)
+ww-shader on wibwob-crt
+ww-shader off
+ww-shader list
+ww-shader status
+```

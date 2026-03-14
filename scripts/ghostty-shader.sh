@@ -49,14 +49,14 @@ EOF
     echo "✅ Shader enabled: ${shader}"
     echo "   Config written to: $ACTIVE_CONFIG"
     echo ""
-    echo "   Reload Ghostty config: Cmd+Shift+, (or restart Ghostty)"
+    cmd_reload
 }
 
 cmd_off() {
     if [[ -f "$ACTIVE_CONFIG" ]]; then
         rm "$ACTIVE_CONFIG"
         echo "✅ Shaders disabled (config removed)"
-        echo "   Reload Ghostty config: Cmd+Shift+, (or restart Ghostty)"
+        cmd_reload
     else
         echo "ℹ️  Shaders already disabled"
     fi
@@ -118,6 +118,14 @@ EOF
     echo "✅ Installed shader hook in Ghostty config"
     echo "   Added: ${include_line}"
     echo "   Reload Ghostty to pick it up: Cmd+Shift+,"
+}
+
+cmd_reload() {
+    osascript -e '
+      tell application "Ghostty" to activate
+      delay 0.3
+      tell application "System Events" to tell process "Ghostty" to keystroke "," using {command down, shift down}
+    ' 2>/dev/null && echo "✅ Ghostty config reloaded" || echo "⚠️  Could not reload — Cmd+Shift+, or restart Ghostty"
 }
 
 case "${1:-help}" in
