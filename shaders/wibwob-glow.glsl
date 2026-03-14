@@ -10,8 +10,8 @@ const float BRIGHTNESS      = 1.15;
 const float GLOW_THRESHOLD  = 0.1;
 const float FUZZ_AMOUNT     = 0.03;    // film grain / static fuzz
 const float MOIRE_STRENGTH  = 0.06;    // moiré interference pattern
-const float VIGNETTE_POWER  = 0.55;    // heavy corner darkening (higher = darker)
-const float VIGNETTE_RADIUS = 0.75;    // how far vignette reaches inward
+const float VIGNETTE_POWER  = 0.18;    // corner darkening (1/3 of original)
+const float VIGNETTE_RADIUS = 0.88;    // how far vignette reaches inward
 
 // Pseudo-random
 float hash(vec2 p) {
@@ -69,7 +69,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vig = pow(vig, VIGNETTE_POWER);
     // Extra corner crush — darken more aggressively in the very corners
     float cornerDist = length(max(abs(c) - 0.3, 0.0));
-    float cornerDark = 1.0 - smoothstep(0.0, 0.25, cornerDist) * 0.4;
+    float cornerDark = 1.0 - smoothstep(0.0, 0.25, cornerDist) * 0.13;
     col *= vig * cornerDark;
 
     col *= BRIGHTNESS;

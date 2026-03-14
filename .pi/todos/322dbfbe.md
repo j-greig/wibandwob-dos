@@ -5,16 +5,12 @@
     "refactor",
     "architecture"
   ],
-  "status": "open",
+  "status": "done",
   "created_at": "2026-03-14T20:45:20.942Z"
 }
 
-Migrate host-owned built-ins from `src/windows/` to proper microapps under `microapps/`.
-
-Full mapping, classification, and migration order:
-`X-CODEX-REFACTOR/host-to-microapp-migration-map.md`
-
-12 candidates ranked by complexity. Migration pattern is COAT-compliant:
-scaffold → extract → SDK-only imports → manifest commands → verify parity → delete old file.
-
-Command parity checklist included per migration.
+4 migrations complete: figlet-banner, contour-studio, plasma, generative-art.
+Text-editor and browser-windows assessed and deferred (too host-integrated).
+Monster-cam, terrain-lab, backrooms, music-player, chrome-browser parked.
+Full mapping at X-CODEX-REFACTOR/host-to-microapp-migration-map.md.
+Boundary analysis in devlog and 030-coat-enforcement-notes.md.
