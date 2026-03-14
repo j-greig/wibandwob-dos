@@ -6,10 +6,15 @@ import { join, dirname } from "path";
 
 // ── Types ───────────────────────────────────────────────────────────
 
+type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
+
 interface JournalEntry {
   peer: "human" | "agent" | "system";
   text: string;
   ts: string;
+  kind?: EntryKind;
+  tags?: string[];
+  actor?: string; // peer provenance — who specifically (e.g. "claude", "james", "cron")
 }
 
 // ── Data ────────────────────────────────────────────────────────────
@@ -38,6 +43,9 @@ function appendEntry(path: string, entry: JournalEntry) {
 
 const PEER_GLYPH = { human: "▸", agent: "▹", system: "·" } as const;
 const PEER_LABEL = { human: "HUMAN", agent: "AGENT", system: "SYS" } as const;
+const KIND_ICON: Record<string, string> = {
+  note: "░", observation: "◊", decision: "■", discovery: "★", question: "?",
+};
 
 function peerColor(peer: string, t: any): string {
   if (peer === "human") return t.body.fg || "white";
@@ -90,22 +98,33 @@ function formatDayDivider(dateStr: string, width: number, t: any): string {
 
 function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
   const glyph = PEER_GLYPH[e.peer] || "·";
-  const tag = PEER_LABEL[e.peer] || "???";
+  const peerTag = PEER_LABEL[e.peer] || "???";
   const time = formatTime(e.ts);
   const rel = timeAgo(e.ts);
   const fg = peerColor(e.peer, t);
   const muted = t.muted?.fg || "#555";
+  const accent = t.selected?.fg || "#b48ead";
 
-  const prefix = `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${tag.padEnd(5)} ${rel.padEnd(7)}{/${muted}-fg}  `;
-  // prefix visible length: 2 + 1 + 1 + 5 + 1 + 5 + 1 + 7 + 2 = ~25
-  const prefixLen = 25;
+  const kindIcon = e.kind ? (KIND_ICON[e.kind] || "░") + " " : "";
+  const prefix = `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${peerTag.padEnd(5)} ${rel.padEnd(7)}{/${muted}-fg}  ${kindIcon}`;
+  // prefix visible length: ~25 + kind (2 if present)
+  const prefixLen = 25 + (e.kind ? 2 : 0);
   const textW = Math.max(10, maxTextW - prefixLen);
   const wrapped = wrapText(e.text, textW);
   const indent = " ".repeat(prefixLen);
 
-  return wrapped.map((line, i) =>
+  const tagStr = e.tags && e.tags.length > 0
+    ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}`
+    : "";
+
+  const result = wrapped.map((line, i) =>
     i === 0 ? `${prefix}${line}` : `${indent}${line}`
   );
+  // Append tags to last line
+  if (tagStr && result.length > 0) {
+    result[result.length - 1] += tagStr;
+  }
+  return result;
 }
 
 // ── Setup ───────────────────────────────────────────────────────────
@@ -145,7 +164,10 @@ export default function setup(host: MicroappHost) {
         return { ok: false, error: "text is required" };
       }
       const peer = (args?.peer === "agent" || args?.peer === "system") ? args.peer : "human";
-      const entry: JournalEntry = { peer, text, ts: new Date().toISOString() };
+      const kind = args?.kind as EntryKind | undefined;
+      const tags = Array.isArray(args?.tags) ? args.tags.filter((t: any) => typeof t === "string") : undefined;
+      const actor = typeof args?.actor === "string" ? args.actor : undefined;
+      const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), kind, tags, actor };
       appendEntry(journalPath(host), entry);
       return { ok: true, entry };
     },
@@ -355,8 +377,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     host.screen.render();
   }
 
-  function addEntry(text: string, peer: "human" | "agent" | "system" = "human") {
-    const entry: JournalEntry = { peer, text, ts: new Date().toISOString() };
+  function addEntry(text: string, peer: "human" | "agent" | "system" = "human", opts?: { kind?: EntryKind; tags?: string[]; actor?: string }) {
+    const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), ...opts };
     entries.push(entry);
     appendEntry(fp, entry);
     render();
