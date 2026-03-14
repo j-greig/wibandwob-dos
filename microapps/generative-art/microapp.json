@@ -1,0 +1,25 @@
+{
+  "name": "generative-art",
+  "version": "0.1.0",
+  "description": "Animated generative art surfaces — pattern fields and procedural art.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.generative.pattern"
+  },
+  "microapp": {
+    "id": "wibwob.generative",
+    "title": "Generative Art",
+    "description": "Animated generative art surfaces.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 80, "label": "Pattern Field" },
+      { "category": "demos", "order": 60, "label": "Generative Art" }
+    ],
+    "palette": { "order": 60, "label": "Pattern Field" },
+    "agent": true,
+    "api": true
+  }
+}

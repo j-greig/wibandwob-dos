@@ -578,10 +578,12 @@ for ev in timeline:
         # Resolve FIGLET:N and LAST_FIGLET placeholders
         if "FIGLET:" in batch_json or "LAST_FIGLET" in batch_json:
             try:
-                state = api_get_json("/state")
-                figlet_ids = [w["id"] for w in state.get("windows", [])
-                             if w.get("kind") == "figlet" or
-                                (w.get("kind") == "microapp" and "Banner:" in w.get("title", ""))]
+                # Use subprocess + jq for reliable JSON parsing (urllib chokes on figlet content)
+                result = subprocess.run(
+                    ["bash", "-c", f"curl -s {api}/state | jq -r '[.windows[] | select(.title | startswith(\"Banner:\")) | .id]'"],
+                    capture_output=True, text=True, timeout=5
+                )
+                figlet_ids = json.loads(result.stdout.strip()) if result.stdout.strip() else []
                 if "LAST_FIGLET" in batch_json and figlet_ids:
                     batch_json = batch_json.replace('"LAST_FIGLET"', str(figlet_ids[-1]))
                 def replace_figlet_ref(m):

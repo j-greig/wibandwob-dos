@@ -108,8 +108,6 @@ import {
 } from "../windows/browser-windows.js";
 import {
   openCommandPaletteWindow as openPaletteWindow,
-  openArtWindow as openGenerativeArtWindow,
-  openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
@@ -1042,12 +1040,9 @@ export class TsTuiMvpApp {
   }
 
   private openPatternWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("pattern-animation", () => {
-      openPatternAnimationWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-      });
-    });
+    const result = this.commands.runDynamic("microapp.wibwob.generative.pattern");
+    if (!result.ok) this.overlays.flash(result.error);
+    return undefined;
   }
 
   private openContourWindow(): WindowRecord | undefined {
@@ -1276,12 +1271,9 @@ export class TsTuiMvpApp {
   }
 
   private openArtWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("generative-art", () => {
-      openGenerativeArtWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-      });
-    });
+    const result = this.commands.runDynamic("microapp.wibwob.generative.art");
+    if (!result.ok) this.overlays.flash(result.error);
+    return undefined;
   }
 
   private openMonsterCam(): WindowRecord | undefined {
