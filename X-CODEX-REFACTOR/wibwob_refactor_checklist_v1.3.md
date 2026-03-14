@@ -136,9 +136,9 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### First Verbs To Stabilize
 
-- `[ ]` `openWindow`
-- `[ ]` `closeWindow`
-- `[ ]` `focusWindow`
+- `[x]` `openWindow`
+- `[x]` `closeWindow`
+- `[x]` `focusWindow`
 - `[x]` `runCommand`
 - `[ ]` `saveWorkspace`
 - `[ ]` `loadWorkspace`

@@ -157,6 +157,10 @@ import {
   createRuntimeInspectionService,
   type RuntimeInspectionService,
 } from "../application/runtime-inspection-service.js";
+import {
+  createRuntimeWindowService,
+  type RuntimeWindowService,
+} from "../application/runtime-window-service.js";
 import type {
   RuntimeInspectionSnapshot,
   RuntimeOverlayInspection,
@@ -206,6 +210,7 @@ export class TsTuiMvpApp {
   private readonly controlApi: ControlApiService;
   private readonly runtimeCommands: RuntimeCommandService;
   private readonly runtimeInspection: RuntimeInspectionService;
+  private readonly runtimeWindows: RuntimeWindowService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
@@ -379,12 +384,16 @@ export class TsTuiMvpApp {
         })),
       }),
     });
+    this.runtimeWindows = createRuntimeWindowService({
+      commands: this.runtimeCommands,
+      windows: this.windowManager,
+    });
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
         commands: this.runtimeCommands,
         inspection: this.runtimeInspection,
-        windows: this.windowManager,
+        windows: this.runtimeWindows,
       },
       {
         instanceLabel: this.instanceLabel,
@@ -712,45 +721,6 @@ export class TsTuiMvpApp {
           source: "agent",
           interactive: false,
         }),
-      openWindow: (type) => {
-        const map: Record<string, () => WindowRecord | undefined> = {
-          editor: () => this.editor.openWindow(),
-          art: () => this.openArtWindow(),
-          gallery: () => this.openPrimerGalleryWindow(),
-          browser: () => this.openBrowserReaderWindow(),
-          pattern: () => this.openPatternWindow(),
-          plasma: () => {
-            this.openPlasmaWindow();
-            return undefined;
-          },
-          companion: () => this.openCompanionWindow(),
-          inspector: () => this.openStateInspectorWindow(),
-          "music-player": () => this.openMusicPlayerWindow(),
-          primer: () => this.openPrimerBrowserWindow(),
-          figlet: () => this.openFigletWindow("WibWob"),
-        };
-        const fn = map[type];
-        if (!fn) return { error: `unknown window type: ${type}` };
-        const window = fn();
-        return window
-          ? { id: window.id }
-          : { error: `${type} window failed to open` };
-      },
-      openFigletWindow: (text, font) => {
-        const window = this.openFigletWindow(
-          text,
-          font ?? getDefaultFigletFont(),
-        );
-        return window
-          ? { id: window.id }
-          : { error: "figlet window failed to open" };
-      },
-      openChromeBrowser: (url) => {
-        const window = this.openChromeBrowserWindow(url);
-        return window
-          ? { id: window.id }
-          : { error: "chrome browser window failed to open" };
-      },
       browserSearch: async (query, numResults) => {
         const svc = new ChromeBrowserService();
         try {
@@ -760,7 +730,7 @@ export class TsTuiMvpApp {
           svc.disconnect();
         }
       },
-      windows: this.windowManager,
+      windows: this.runtimeWindows,
     };
 
     const existing = this.findWindowByAppType("wibwob-agent");

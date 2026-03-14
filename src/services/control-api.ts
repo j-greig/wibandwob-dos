@@ -37,12 +37,13 @@ import { worldChatService, formatWorldChannelText } from "./world-chat-service.j
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
+import type { RuntimeWindowService } from "../application/runtime-window-service.js";
 import type { InstanceDescriptor } from "../domain/instance-descriptor.js";
 
 interface ControlApiDeps {
   commands: RuntimeCommandService;
   inspection: RuntimeInspectionService;
-  windows: import("../core/window-facade.js").WindowFacade;
+  windows: RuntimeWindowService;
 }
 
 type ControlApiIdentity = Pick<InstanceDescriptor, "instanceId" | "instanceLabel">;
@@ -556,13 +557,13 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
-        ok: this.deps.windows.focusWindow(Number((body as any).id)),
+        ok: this.deps.windows.focus(Number((body as any).id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       const b = body as any;
       return Response.json({
-        ok: this.deps.windows.moveWindow(
+        ok: this.deps.windows.move(
           Number(b.id),
           Number(b.left ?? b.x),
           Number(b.top ?? b.y),
@@ -572,7 +573,7 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/resize") {
       const b = body as any;
       return Response.json({
-        ok: this.deps.windows.resizeWindow(
+        ok: this.deps.windows.resize(
           Number(b.id),
           Number(b.width ?? b.w),
           Number(b.height ?? b.h),
@@ -581,7 +582,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
-        ok: this.deps.windows.closeWindow(Number((body as any).id)),
+        ok: this.deps.windows.close(Number((body as any).id)),
       });
     }
 
@@ -606,24 +607,16 @@ export class ControlApiService {
       if (!Array.isArray(ops)) {
         return Response.json({ ok: false, error: "ops must be an array" }, { status: 400 });
       }
-      const results: boolean[] = [];
-      for (const op of ops) {
-        const id = Number(op.id);
-        if (op.close) {
-          results.push(this.deps.windows.closeWindow(id));
-          continue;
-        }
-        const left = op.left ?? op.x;
-        const top = op.top ?? op.y;
-        const width = op.width ?? op.w;
-        const height = op.height ?? op.h;
-        if (left !== undefined && top !== undefined) {
-          results.push(this.deps.windows.moveWindow(id, Number(left), Number(top)));
-        }
-        if (width !== undefined && height !== undefined) {
-          results.push(this.deps.windows.resizeWindow(id, Number(width), Number(height)));
-        }
-      }
+      const results = this.deps.windows.batch(
+        ops.map((op) => ({
+          id: Number(op.id),
+          left: op.left ?? op.x,
+          top: op.top ?? op.y,
+          width: op.width ?? op.w,
+          height: op.height ?? op.h,
+          close: op.close,
+        })),
+      );
       return Response.json({ ok: results.every(Boolean), results });
     }
     if (request.method === "POST" && url.pathname === "/windows/input") {
