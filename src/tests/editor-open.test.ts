@@ -16,7 +16,7 @@ async function post(path: string, body?: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json() as Promise<any>;
+  return { status: res.status, data: await res.json() as any };
 }
 
 async function get(path: string) {
@@ -102,12 +102,17 @@ describe("editor open failure paths", () => {
     try { fs.unlinkSync(tmpFile); } catch {}
   });
 
-  test("no args → does not crash (opens picker or no-op)", async () => {
-    // Just verify it doesn't crash the app
-    await post("/commands/run", { id: "editor.open" });
+  test("no args via API → fails cleanly and leaves no overlay behind", async () => {
+    const result = await post("/commands/run", { id: "editor.open" });
+    expect(result.status).toBe(404);
+    expect(result.data.ok).toBe(false);
+    expect(result.data.error).toContain("non-interactive control surface");
     await new Promise(r => setTimeout(r, 300));
     const health = await get("/health");
     expect(health.ok).toBe(true);
     expect(typeof health.instanceId).toBe("string");
+    const overlay = await get("/overlay/info");
+    expect(overlay.ok).toBe(true);
+    expect(overlay.result.active).toBe(false);
   });
 });

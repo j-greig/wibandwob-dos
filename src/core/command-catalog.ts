@@ -5,8 +5,17 @@
  * by command-registry.ts.
  */
 
-import type { AppType, MenuConfig, MenuItem } from "./types.js";
-import type { CapabilityKey } from "../services/capability-service.js";
+import type { MenuConfig, MenuItem } from "./types.js";
+import type {
+  AppCommandCategory,
+  AppCommandDefinition,
+  AppCommandDescriptor,
+  AppCommandGroup,
+  ContextMenuPlacement,
+  MenuContext,
+  MenuPlacement,
+  PalettePlacement,
+} from "../domain/command-definition.js";
 import { z } from "zod";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
@@ -37,7 +46,7 @@ export interface AppMenuActions {
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
-  clearDesktop: () => void;
+  clearDesktop: (args?: Record<string, unknown>) => unknown;
   toggleDesktopChrome: () => void;
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
@@ -112,98 +121,11 @@ export interface AppMenuActions {
   viewReadme: () => void;
 }
 
-/** Menu bucket — determines which top-level menu a command appears in. */
-export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "demos" | "help";
-/** Logical clustering within a category, used for future separators and adapters. */
-export type AppCommandGroup =
-  | "browse"
-  | "open"
-  | "save"
-  | "focus"
-  | "layout"
-  | "surface"
-  | "edit"
-  | "inspect"
-  | "system";
-
-/** Where a command appears in a top-level menu. Not executable on its own. */
-export interface MenuPlacement {
-  category: AppCommandCategory;
-  order: number;
-  label?: string;
-  appTypes?: AppType[];
-  separatorAfter?: true;
-  favourite?: true;
-}
-
-/** Where a command appears in the command palette. Not executable on its own. */
-export interface PalettePlacement {
-  order: number;
-  label?: string;
-}
-
-/** Context passed to context-menu visibility checks. */
-export interface MenuContext {
-  focusedWindow?: { kind: string; filePath?: string; title?: string };
-  selection?: "file" | "url" | "none";
-}
-
-/** Coarse context-menu visibility. */
-export interface ContextMenuPlacement {
-  /** Show when these window kinds are focused. Empty/undefined = desktop only. */
-  windowKinds?: string[];
-  /** Show on desktop right-click (no window focused). */
-  desktop?: boolean;
-  /** Fine-grained check. Return false to hide even when coarse match passes. */
-  enabled?: (ctx: MenuContext) => boolean;
-  /** Override label in context menu. */
-  label?: string;
-  /** Sort order within context menu. */
-  order?: number;
-}
-
-/** Authored command definition — the static catalog shape before projection. */
-export interface AppCommandDefinition {
-  id: string;
-  label: string;
-  group: AppCommandGroup;
-  actionKey: keyof AppMenuActions;
-  requires?: CapabilityKey[];
-  description?: string;
-  multiInstance?: boolean;
-  menuPlacements?: MenuPlacement[];
-  palettePlacement?: PalettePlacement;
-  contextMenu?: ContextMenuPlacement;
-  api?: boolean;
-  agent?: boolean;
-  /** Hint for CLI output formatting: json (pretty-print), text (raw), void (silent on success). */
-  returns?: "json" | "text" | "void";
-  /** Zod schema for command arguments. Enables validation, --help generation, and OpenAPI accuracy. */
-  params?: z.ZodType;
-}
-
 interface MenuDefinition {
   category: AppCommandCategory;
   label: MenuConfig["label"];
   key: MenuConfig["key"];
   left: MenuConfig["left"];
-}
-
-/** Projected command descriptor — normalised shape consumed by registry, palette, and API. */
-export interface AppCommandDescriptor {
-  id: string;
-  label: string;
-  group: AppCommandGroup;
-  actionKey: keyof AppMenuActions;
-  requires?: CapabilityKey[];
-  description?: string;
-  multiInstance?: boolean;
-  menuPlacements: MenuPlacement[];
-  palettePlacement?: PalettePlacement;
-  contextMenu?: ContextMenuPlacement;
-  api: boolean;
-  agent: boolean;
-  returns?: "json" | "text" | "void";
 }
 
 const MENU_DEFINITIONS: MenuDefinition[] = [
@@ -230,7 +152,7 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
  *
  * Labels: use plain names, not "Open ..." prefix (majority convention).
  */
-const APP_COMMANDS: AppCommandDefinition[] = [
+const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
   {
     id: "primer.browse",
     label: "Browse Primers",
@@ -342,14 +264,21 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.open",
     label: "Open Primer...",
-    description: "Open a primer viewer. Args: filePath (string, absolute path). Optional: x, y, w, h (numbers for position/size — w,h default to recommended dimensions). Without args opens interactive file picker.",
+    description: "Open a primer viewer. Menu use can open the file picker; API/agent callers should pass filePath. Optional: x, y, w, h for position and size.",
     group: "open",
     actionKey: "openPrimerPrompt",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
     api: true,
     agent: true,
-    returns: "json"
+    returns: "json",
+    params: z.object({
+      filePath: z.string().optional().describe("Absolute path to the primer file"),
+      x: z.number().optional().describe("Left position in columns"),
+      y: z.number().optional().describe("Top position in rows"),
+      w: z.number().optional().describe("Window width in columns"),
+      h: z.number().optional().describe("Window height in rows"),
+    })
   },
   {
     id: "primer.list",
@@ -436,25 +365,33 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "editor.open",
     label: "Open Text File...",
-    description: "Open a text file in the editor. Args: filePath (string), title (string, optional), initial (string, optional). Without args opens interactive file picker.",
+    description: "Open a text file in the editor. Menu use can open the file picker; API/agent callers should pass filePath or create an unsaved buffer with title/initial.",
     group: "open",
     actionKey: "openTextFile",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     api: true,
-    agent: true
+    agent: true,
+    params: z.object({
+      filePath: z.string().optional().describe("Path to an existing or new text file"),
+      title: z.string().optional().describe("Unsaved buffer title"),
+      initial: z.string().optional().describe("Initial text for an unsaved buffer"),
+    })
   },
   {
     id: "markdown.open",
     label: "Open Markdown...",
-    description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Args: filePath (string, absolute path to .md file). Without args opens interactive file picker filtered to *.md.",
+    description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Menu use can open the markdown picker; API/agent callers should pass filePath.",
     group: "open",
     actionKey: "openMarkdownViewer",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 35 }],
     palettePlacement: { order: 32 },
     api: true,
-    agent: true
+    agent: true,
+    params: z.object({
+      filePath: z.string().optional().describe("Absolute path to a markdown file"),
+    })
   },
   {
     id: "markdown.toggle_figlet",
@@ -711,12 +648,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "desktop.clear-all",
     label: "Clear Desktop",
-    description: "Close all windows except the Wib&Wob Agent. Use for silence cues in timelines.",
+    description: "Emergency escape hatch: cancel active overlays, close menus, and close all non-agent windows. Pass all=true to nuke every window.",
     group: "focus",
     actionKey: "clearDesktop",
     menuPlacements: [{ category: "window", order: 35 }],
     api: true,
-    agent: false
+    agent: true,
+    returns: "json",
+    params: z.object({
+      all: z.boolean().optional().describe("Close every window, including chat/agent windows. Default false."),
+    })
   },
   {
     id: "desktop.toggle_chrome",
@@ -1194,11 +1135,11 @@ function byPlacementOrder(
 
 /** Project static catalog data into normalised command descriptors. */
 /** Look up a raw command definition by id (includes params schema). */
-export function getCommandDefinition(id: string): AppCommandDefinition | undefined {
+export function getCommandDefinition(id: string): AppCommandDefinition<keyof AppMenuActions> | undefined {
   return APP_COMMANDS.find((c) => c.id === id);
 }
 
-export function listAppCommands(): AppCommandDescriptor[] {
+export function listAppCommands(): AppCommandDescriptor<keyof AppMenuActions>[] {
   return APP_COMMANDS.map((command) => ({
     id: command.id,
     label: command.label,

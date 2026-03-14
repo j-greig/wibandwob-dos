@@ -96,13 +96,11 @@ describe("command registry", () => {
     expect(data.ok).toBe(false);
   });
 
-  test("commands.run accepts deprecated command alias but prefers id", async () => {
-    // command: is still accepted as a backward-compat alias for id:
+  test("commands.run requires canonical id body field", async () => {
     const { status, data } = await api("/commands/run", "POST", { command: "theme.cycle" });
-    expect(status).toBe(200);
-    expect(data.ok).toBe(true);
-    // Toggle back
-    await api("/commands/run", "POST", { id: "theme.cycle" });
+    expect(status).toBe(400);
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain("id required");
   });
 
   test("toggle_theme executes without error", async () => {
@@ -152,6 +150,16 @@ describe("state service", () => {
     expect(typeof data.stats.agent.streaming).toBe("boolean");
     expect(typeof data.stats.agent.messageCount).toBe("number");
     expect(typeof data.stats.agent.toolRunCount).toBe("number");
+  });
+
+  test("returns runtime inspection snapshot with UI state", async () => {
+    const { status, data } = await api("/runtime/inspection");
+    expect(status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(typeof data.snapshot.state.app.instanceId).toBe("string");
+    expect(typeof data.snapshot.ui.menu.open).toBe("boolean");
+    expect(data.snapshot.ui.overlay === null || typeof data.snapshot.ui.overlay.type === "string").toBe(true);
+    expect(typeof data.snapshot.stats.render.fps).toBe("number");
   });
 
   test("every window has required fields", async () => {

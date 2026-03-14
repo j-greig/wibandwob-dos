@@ -3,13 +3,15 @@ import {
   createPaletteCommands,
   listAppCommands,
   getCommandDefinition,
-  type AppCommandCategory,
-  type AppCommandDescriptor,
   type AppMenuActions,
-  type MenuContext,
-  type MenuPlacement,
-  type PalettePlacement,
 } from "./command-catalog.js";
+import type {
+  AppCommandCategory,
+  AppCommandDescriptor,
+  MenuContext,
+  MenuPlacement,
+  PalettePlacement,
+} from "../domain/command-definition.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { MenuConfig, MenuItem } from "./types.js";
 import { log } from "../services/app-logger.js";
@@ -32,8 +34,8 @@ export interface CommandListItem {
 }
 
 export type CommandRunResult =
-  | { ok: true; result?: unknown }
-  | { ok: false; error: string };
+  | ({ ok: true; result?: unknown } & Record<string, unknown>)
+  | ({ ok: false; error: string } & Record<string, unknown>);
 
 /** Definition accepted by addDynamic(). Self-contained — no AppMenuActions key needed. */
 export interface DynamicCommandDefinition {
@@ -114,8 +116,29 @@ function safeSerializable(value: unknown): unknown {
   }
 }
 
+function isCommandRunResultLike(value: unknown): value is CommandRunResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (candidate.ok === true) {
+    return true;
+  }
+  return candidate.ok === false && typeof candidate.error === "string";
+}
+
+function normalizeActionResult(result: unknown): CommandRunResult {
+  if (result === undefined) {
+    return { ok: true };
+  }
+  if (isCommandRunResultLike(result)) {
+    return result;
+  }
+  return { ok: true, result: safeSerializable(result) };
+}
+
 export class CommandRegistry {
-  private readonly commands: AppCommandDescriptor[];
+  private readonly commands: AppCommandDescriptor<keyof AppMenuActions>[];
   /** Dynamic commands registered by microapp modules at runtime. */
   private readonly dynamicCommands: DynamicCommandDefinition[] = [];
 
@@ -212,14 +235,14 @@ export class CommandRegistry {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+      return normalizeActionResult(result);
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+      return normalizeActionResult(result);
     }
     log.cmd(`${canonicalId}${argsStr} → unknown command`);
     return { ok: false, error: `Unknown command: ${id}` };
@@ -232,7 +255,7 @@ export class CommandRegistry {
       return { ok: false, error: `Unknown dynamic command: ${id}` };
     }
     const result = dyn.action(args);
-    return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+    return normalizeActionResult(result);
   }
 
   /** Return context-menu items for the given context, sorted by order. */
@@ -278,7 +301,7 @@ export class CommandRegistry {
     });
   }
 
-  private getSurfaces(command: AppCommandDescriptor): CommandSurface[] {
+  private getSurfaces(command: AppCommandDescriptor<keyof AppMenuActions>): CommandSurface[] {
     const surfaces = new Set<CommandSurface>();
     if (command.menuPlacements.length > 0) {
       surfaces.add("menu");

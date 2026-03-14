@@ -26,7 +26,7 @@ import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "
 import type { WindowManager } from "../core/window-manager.js";
 import type { WindowFacade } from "../core/window-facade.js";
 import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-registry.js";
-import type { MenuPlacement, PalettePlacement } from "../core/command-catalog.js";
+import type { MenuPlacement, PalettePlacement } from "../domain/command-definition.js";
 import type {
   Chatspot,
   WorldChannel,

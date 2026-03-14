@@ -157,6 +157,10 @@ import {
   createRuntimeInspectionService,
   type RuntimeInspectionService,
 } from "../application/runtime-inspection-service.js";
+import type {
+  RuntimeInspectionSnapshot,
+  RuntimeOverlayInspection,
+} from "../domain/runtime-inspection.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -349,21 +353,31 @@ export class TsTuiMvpApp {
       syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
       screenshotText: () => (this.screen as any).screenshot() as string,
-      getRuntimeStats: () => this.runtimeStats.snapshot(),
-      getScrambleState: () => ({
-        status: this.scrambleBrain.status,
-        sleeping: this.scrambleBrain.sleeping,
-        model: this.scrambleBrain.modelName,
-        sessionId: this.scrambleBrain.sessionId,
-        messageCount: this.scrambleBrain.history.length,
-        lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
-        logPath: this.scrambleBrain.logPath ?? null,
+      getSnapshot: (): RuntimeInspectionSnapshot => ({
+        state: this.getDesktopState(),
+        stats: this.runtimeStats.snapshot(),
+        ui: {
+          menu: {
+            open: this.menuUi.isAnyMenuOpen(),
+            label: this.menuUi.getOpenMenuLabel(),
+          },
+          overlay: this.getRuntimeOverlayInspection(),
+        },
+        scramble: {
+          status: this.scrambleBrain.status,
+          sleeping: this.scrambleBrain.sleeping,
+          model: this.scrambleBrain.modelName,
+          sessionId: this.scrambleBrain.sessionId,
+          messageCount: this.scrambleBrain.history.length,
+          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+          logPath: this.scrambleBrain.logPath ?? null,
+        },
+        history: this.scrambleBrain.history.map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
       }),
-      getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-      })),
     });
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
@@ -667,12 +681,37 @@ export class TsTuiMvpApp {
     return undefined;
   }
 
+  private isNonInteractiveCommand(args?: Record<string, unknown>): boolean {
+    return args?._interactive === false;
+  }
+
+  private getRuntimeOverlayInspection(): RuntimeOverlayInspection | null {
+    const info = this.overlays.getActiveOverlayInfo();
+    if (!info || typeof info.type !== "string") {
+      return null;
+    }
+    return {
+      type: info.type,
+      selectedIndex:
+        typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
+      count: typeof info.count === "number" ? info.count : undefined,
+      currentDirectory:
+        typeof info.currentDirectory === "string"
+          ? info.currentDirectory
+          : undefined,
+    };
+  }
+
   /** Build TuiToolContext, create the agent session, and open/focus the native agent window. */
   private openWibWobAgentWindow(): WindowRecord | undefined {
     const tuiContext: TuiToolContext = {
       getState: () => this.runtimeInspection.syncState(),
       listCommands: () => this.runtimeCommands.list("agent"),
-      runCommand: (id, args) => this.runtimeCommands.run(id, args),
+      runCommand: (id, args) =>
+        this.runtimeCommands.run(id, args, {
+          source: "agent",
+          interactive: false,
+        }),
       openWindow: (type) => {
         const map: Record<string, () => WindowRecord | undefined> = {
           editor: () => this.editor.openWindow(),
@@ -1720,7 +1759,13 @@ export class TsTuiMvpApp {
         const filePath =
           typeof args?.filePath === "string" ? args.filePath : undefined;
         if (!filePath) {
-          if (args?._apiCall) return { ok: false, error: "primer.open requires filePath arg when called via API" };
+          if (this.isNonInteractiveCommand(args)) {
+            return {
+              ok: false,
+              error:
+                "primer.open requires filePath when called through a non-interactive control surface",
+            };
+          }
           this.promptForPrimer();
           return;
         }
@@ -1783,8 +1828,14 @@ export class TsTuiMvpApp {
           const win = this.editor.openWindow(undefined, title, initial);
           if (win && onSave) win.onSave = onSave;
         } else {
-          // Path C: interactive file picker (skip for API calls)
-          if (args?._apiCall) return { ok: false, error: "editor.open requires filePath, title, or initial arg when called via API" };
+          // Path C: interactive file picker for keyboard/menu callers only
+          if (this.isNonInteractiveCommand(args)) {
+            return {
+              ok: false,
+              error:
+                "editor.open requires filePath, title, or initial when called through a non-interactive control surface",
+            };
+          }
           this.editor.openPicker();
         }
       },
@@ -1821,7 +1872,13 @@ export class TsTuiMvpApp {
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        if (!filePath && args?._apiCall) return { ok: false, error: "markdown.open requires filePath arg when called via API" };
+        if (!filePath && this.isNonInteractiveCommand(args)) {
+          return {
+            ok: false,
+            error:
+              "markdown.open requires filePath when called through a non-interactive control surface",
+          };
+        }
         this.openMarkdownViewerWindow(filePath, undefined);
       },
       toggleMarkdownFiglet: () => {
@@ -1872,13 +1929,27 @@ export class TsTuiMvpApp {
         const h = args?.h ?? args?.height;
         this.windowManager.resizeWindow(Number(args?.id), Number(w), Number(h));
       },
-      clearDesktop: () => {
+      clearDesktop: (args) => {
+        const closeAll = args?.all === true;
+        const overlayCancelled = this.overlays.cancelActiveOverlay();
+        this.closeMenus();
         const windows = this.windowManager.getWindows();
+        let closed = 0;
+        let kept = 0;
         for (const w of windows) {
-          if (w.kind !== "chat") {
+          if (closeAll || w.kind !== "chat") {
             this.windowManager.closeWindow(w.id);
+            closed++;
+          } else {
+            kept++;
           }
         }
+        return {
+          closed,
+          kept,
+          overlayCancelled,
+          closeAll,
+        };
       },
       toggleDesktopChrome: () => this.toggleDesktopChrome(),
       closeMenus: () => this.closeMenus(),
@@ -1979,7 +2050,13 @@ export class TsTuiMvpApp {
           const font = (args?.font as string) || getDefaultFigletFont();
           this.openFigletWindow(text, font);
         } else {
-          if (args?._apiCall) return { ok: false, error: "figlet.open requires text arg when called via API" };
+          if (this.isNonInteractiveCommand(args)) {
+            return {
+              ok: false,
+              error:
+                "figlet.open requires text when called through a non-interactive control surface",
+            };
+          }
           this.promptForFigletText();
         }
       },

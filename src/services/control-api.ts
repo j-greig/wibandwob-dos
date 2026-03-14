@@ -58,6 +58,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/runtime/inspection",            description: "Structured runtime snapshot: desktop state, menu/overlay UI state, runtime stats, and Scramble inspection." },
   { method: "GET",  path: "/runtime/stats",                 description: "Shell-level runtime stats: render FPS, frame time, RAM, and agent activity" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
@@ -68,7 +69,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
   { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
-  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
+  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
   // ── View endpoints — convenience aliases for /commands/run ──
   // All dispatch through the command registry. Prefer /commands/run for new integrations.
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Open primer viewer. Alias: primer.open" },
@@ -229,6 +230,13 @@ export class ControlApiService {
     };
   }
 
+  private runApiCommand(id: string, args?: Record<string, unknown>) {
+    return this.deps.commands.run(id, args, {
+      source: "api",
+      interactive: false,
+    });
+  }
+
   private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -270,16 +278,20 @@ export class ControlApiService {
       return Response.json(this.deps.inspection.syncState());
     }
 
+    if (request.method === "GET" && url.pathname === "/runtime/inspection") {
+      return Response.json({ ok: true, snapshot: this.deps.inspection.getSnapshot() });
+    }
+
     if (request.method === "GET" && url.pathname === "/runtime/stats") {
-      return Response.json({ ok: true, stats: this.deps.inspection.getRuntimeStats() });
+      return Response.json({ ok: true, stats: this.deps.inspection.getSnapshot().stats });
     }
 
     if (request.method === "GET" && url.pathname === "/scramble/state") {
-      return Response.json(this.deps.inspection.getScrambleState());
+      return Response.json(this.deps.inspection.getSnapshot().scramble);
     }
 
     if (request.method === "GET" && url.pathname === "/scramble/history") {
-      return Response.json({ history: this.deps.inspection.getScrambleHistory() });
+      return Response.json({ history: this.deps.inspection.getSnapshot().history });
     }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
@@ -412,11 +424,9 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id
-        : typeof (body as any).command === "string" ? (body as any).command
-        : "";
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
       if (!id) {
-        return Response.json({ ok: false, error: "id required (also accepts 'command' as deprecated alias)" }, { status: 400 });
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
       const rawArgs = typeof (body as any).args === "object" && (body as any).args !== null
         ? (body as any).args as Record<string, unknown>
@@ -441,9 +451,7 @@ export class ControlApiService {
         args = result.data;
       }
       try {
-        // Mark as API call so action handlers can skip interactive prompts
-        const apiArgs = { ...(args ?? {}), _apiCall: true };
-        const result = this.deps.commands.run(id, apiArgs);
+        const result = this.runApiCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
@@ -451,7 +459,7 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/view/figlet/fonts") {
-      const result = this.deps.commands.run("figlet.fonts");
+      const result = this.runApiCommand("figlet.fonts");
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -462,12 +470,15 @@ export class ControlApiService {
       const font = typeof (body as any).font === "string" && (body as any).font.trim()
         ? (body as any).font.trim()
         : undefined;
-      const result = this.deps.commands.run("figlet.open", font ? { text, font } : { text });
+      const result = this.runApiCommand(
+        "figlet.open",
+        font ? { text, font } : { text },
+      );
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
     if (request.method === "GET" && url.pathname === "/view/zine/canvases") {
-      const result = this.deps.commands.run("microapp.wibwob.zine.list-canvases");
+      const result = this.runApiCommand("microapp.wibwob.zine.list-canvases");
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -479,7 +490,7 @@ export class ControlApiService {
       if (filePath) {
         args = { filePath };
       } else if (typeof (body as any).index === "number") {
-        const listed = this.deps.commands.run("microapp.wibwob.zine.list-canvases");
+        const listed = this.runApiCommand("microapp.wibwob.zine.list-canvases");
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
         }
@@ -492,7 +503,7 @@ export class ControlApiService {
       } else {
         return Response.json({ ok: false, error: "filePath or index required" }, { status: 400 });
       }
-      const result = this.deps.commands.run("microapp.wibwob.zine.open", args);
+      const result = this.runApiCommand("microapp.wibwob.zine.open", args);
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -537,7 +548,7 @@ export class ControlApiService {
         return Response.json({ ok: false, error: "filePath required" }, { status: 400 });
       }
       try {
-        const result = this.deps.commands.run(viewRoute.id, args);
+        const result = this.runApiCommand(viewRoute.id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err) }, { status: 500 });
@@ -661,16 +672,19 @@ export class ControlApiService {
     // ── Backrooms + workspace — also dispatch through command registry ──
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
       const channel = normalizeBackroomsChannel(body);
-      const result = this.deps.commands.run("backrooms.open", channel as unknown as Record<string, unknown>);
+      const result = this.runApiCommand(
+        "backrooms.open",
+        channel as unknown as Record<string, unknown>,
+      );
       return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
     }
     // ── Overlay control ──
     if (request.method === "GET" && url.pathname === "/overlay/info") {
-      const result = this.deps.commands.run("overlay.info");
+      const result = this.runApiCommand("overlay.info");
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/confirm") {
-      const result = this.deps.commands.run("overlay.confirm");
+      const result = this.runApiCommand("overlay.confirm");
       const inner = (result as any).result;
       if (inner && !inner.confirmed) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
@@ -678,7 +692,7 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/cancel") {
-      const result = this.deps.commands.run("overlay.cancel");
+      const result = this.runApiCommand("overlay.cancel");
       const inner = (result as any).result;
       if (inner && !inner.cancelled) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
@@ -690,7 +704,7 @@ export class ControlApiService {
       if (!Number.isFinite(index)) {
         return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
       }
-      const result = this.deps.commands.run("overlay.select", { index });
+      const result = this.runApiCommand("overlay.select", { index });
       const inner = (result as any).result;
       if (inner && !inner.selected) {
         return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
@@ -699,12 +713,12 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
       const name = String((body as any).name ?? "default");
-      const result = this.deps.commands.run("workspace.save", { name });
+      const result = this.runApiCommand("workspace.save", { name });
       return Response.json({ ...result, name });
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
       const name = String((body as any).name ?? "default");
-      const result = this.deps.commands.run("workspace.load_named", { name });
+      const result = this.runApiCommand("workspace.load_named", { name });
       return Response.json({ ...result, name });
     }
 
