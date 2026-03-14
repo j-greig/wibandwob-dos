@@ -6,11 +6,20 @@ DISPLAY_NUM="${DISPLAY_NUM:-2}"
 API="http://127.0.0.1:8099"
 SCORE=0
 
-# ── 1. Reload microapps ─────────────────────────────────────────────
-curl -sf -X POST "$API/commands/run" \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"microapps.reload"}' > /dev/null 2>&1 || true
-sleep 1
+# ── 1. Restart app (microapps.reload doesn't pick up TS changes) ────
+bash scripts/restart.sh > /dev/null 2>&1 || {
+  echo "WARNING: restart.sh failed, trying manual restart"
+  kill $(cat scratch/wibwob.pid 2>/dev/null) 2>/dev/null || true
+  sleep 2
+  tmux send-keys -t wibwob "bun run start" Enter
+  sleep 5
+}
+
+# Wait for health
+for i in $(seq 1 20); do
+  curl -sf "$API/health" > /dev/null 2>&1 && break
+  sleep 1
+done
 
 # ── 2. Open Journal window ──────────────────────────────────────────
 curl -sf -X POST "$API/commands/run" \

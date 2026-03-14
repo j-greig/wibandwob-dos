@@ -21,17 +21,13 @@ curl -sf "$API/health" > /dev/null 2>&1 || {
 }
 echo "PASS: API healthy"
 
-# ── 3. Microapp reload ──────────────────────────────────────────────
-echo "=== reload ==="
-RELOAD=$(curl -sf -X POST "$API/commands/run" \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"microapps.reload"}' 2>/dev/null || echo '{"ok":false}')
-echo "$RELOAD" | grep -q '"ok"' || {
-  echo "ERROR: microapps.reload failed"
+# ── 3. Verify app is running ─────────────────────────────────────────
+echo "=== app running ==="
+curl -sf "$API/health" > /dev/null 2>&1 || {
+  echo "ERROR: app not running after autoresearch.sh restart"
   exit 1
 }
-sleep 1
-echo "PASS: microapps reloaded"
+echo "PASS: app running"
 
 # ── 4. Journal opens ────────────────────────────────────────────────
 echo "=== open journal ==="

@@ -163,14 +163,14 @@ function openJournal(host: MicroappHost) {
     const muted = th.muted?.fg || "#555";
     const accent = th.selected?.fg || "#b48ead";
 
-    // Header: JRNL figlet + tagline
+    // Header
     let fig = "";
     try { fig = renderFiglet("JRNL", "small"); } catch { fig = "JRNL"; }
     const figLines = fig.split("\n").filter(l => l.trim()).slice(0, 2);
     const tagline = `{${muted}-fg}symbient logbook // dual-authored record{/${muted}-fg}`;
     headerBox.setContent([...figLines, tagline].join("\n"));
 
-    // Log: entries with day dividers
+    // Log
     const logW = Math.max(10, w - 4);
     const lines: string[] = [];
     let lastDay = "";
@@ -194,7 +194,7 @@ function openJournal(host: MicroappHost) {
     const humans = entries.filter(e => e.peer === "human").length;
     const agents = entries.filter(e => e.peer === "agent").length;
     statusBar.setContent(
-      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} total  ━━━{/${muted}-fg}`
+      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} total{/${muted}-fg}`
     );
 
     host.screen.render();
@@ -215,7 +215,6 @@ function openJournal(host: MicroappHost) {
     inputBox.focus();
   });
 
-  // System entry
   if (entries.length === 0) {
     addEntry("journal initialised", "system");
   } else {
