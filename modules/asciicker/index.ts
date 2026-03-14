@@ -1189,10 +1189,14 @@ function openAsciicker(host: MicroappHost) {
     const dayPhases = ["Dawn", "Morning", "Noon", "Afternoon", "Dusk", "Evening", "Night", "Late Night"];
     const phaseIdx = Math.floor(dayProg * 8) % 8;
     const sunPct = Math.round(sunElev * 100);
+    // Tick message timer
+    if (messageTimer > 0) messageTimer--;
+    const msgDisplay = messageTimer > 0 ? `  💬 ${messageText}` : "";
     status.setContent(
       ` ⊕${Math.floor(playerX)},${Math.floor(playerY)}  ▲${alt}m  ${biomeName}  ` +
-      `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ☀${dayPhases[phaseIdx]}(${sunPct}%)  ` +
-      `WASD:move Q/E:rotate +/-:zoom`
+      `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ☀${dayPhases[phaseIdx]}  ` +
+      `WASD:move Q/E:rotate Space:talk` +
+      msgDisplay
     );
 
     host.screen.render();
@@ -1200,6 +1204,36 @@ function openAsciicker(host: MicroappHost) {
   }
 
   // Key handling
+  // Message display — shows NPC dialogue or game events
+  let messageText = "";
+  let messageTimer = 0;
+  function showMessage(text: string, duration: number = 40) {
+    messageText = text;
+    messageTimer = duration;
+  }
+
+  // NPC interaction — find nearest NPC and show dialogue
+  function interactWithNPC() {
+    let nearest: typeof npcs[0] | null = null;
+    let nearestDist = Infinity;
+    for (const npc of npcs) {
+      const d = Math.sqrt((npc.x - playerX) ** 2 + (npc.y - playerY) ** 2);
+      if (d < nearestDist && d < 5) { nearestDist = d; nearest = npc; }
+    }
+    if (nearest) {
+      const dialogues: Record<string, string[]> = {
+        "Villager": ["Fine day for fishing!", "Watch out for wolves.", "The mountain path is treacherous."],
+        "Guard": ["Move along, citizen.", "The roads are safe... mostly.", "Report any suspicious activity."],
+        "Merchant": ["Finest goods in the land!", "Everything must go!", "Special price, just for you!"],
+      };
+      const lines = dialogues[nearest.name] ?? ["..."];
+      const line = lines[Math.floor(hash2d(tick, nearest.homeX, nearest.homeY) * lines.length)];
+      showMessage(`${nearest.name}: "${line}"`);
+    } else {
+      showMessage("No one nearby to talk to.");
+    }
+  }
+
   const keyHandler = (_ch: string, key: { name?: string } | undefined) => {
     if (!key || !key.name) return;
     const n = key.name.toLowerCase();
@@ -1207,6 +1241,7 @@ function openAsciicker(host: MicroappHost) {
     else if (n === "e") { cam.yaw = (cam.yaw + 345) % 360; }
     else if (n === "=") { cam.zoom = Math.min(3, cam.zoom + 0.15); }
     else if (n === "-") { cam.zoom = Math.max(0.4, cam.zoom - 0.15); }
+    else if (n === "space") { interactWithNPC(); }
     else if (["w", "a", "s", "d", "up", "down", "left", "right"].includes(n)) {
       keys.add(n);
       setTimeout(() => keys.delete(n), 200);
