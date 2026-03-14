@@ -1460,3 +1460,29 @@ Rule for agents:
     these are local-first on purpose so repo tooling does not silently hit a hosted runtime
   - live API tests that mutate one tmux shell should be serialized; `bun test fileA fileB`
     can race itself because both files drive the same runtime concurrently
+
+- 2026-03-14 — Bun `import()` cache-busting is broken for hot reload
+  - **Symptom:** `microapps.reload` fires, epoch bumps, module "reloads" — but
+    the old code runs. Title bar, colors, UI elements all stale. Maddening because
+    every signal says reload succeeded.
+  - **Root cause:** Bun caches compiled TypeScript modules by file path. The
+    `?reload=${Date.now()}` query-string trick that works in browsers and Node
+    does NOT bust Bun's module cache. The `import()` returns the old compiled module.
+  - **Fix (v2, clean):** `delete require.cache[require.resolve(entryPath)]` before
+    the dynamic `import()`. This tells Bun to evict the compiled module. The
+    `?reload=<timestamp>` query string is kept as belt-and-suspenders but alone
+    it does nothing — Bun ignores query strings for cache keying. Confirmed with
+    a standalone test: `import(url+'?v=1')` and `import(url+'?v=2')` return the
+    same object (`===`), but after `delete require.cache[...]` they return fresh ones.
+  - **Discarded v1 (temp-file copy):** copied entry to a unique temp file before
+    import, deleted after. Worked but ugly and leaked files on crash.
+  - **Proof:** Changed window title from "ZILLA WAS HERE" → "💩 PROOF IT WORKS 💩"
+    via `microapps.reload` — same instance `j14`, no restart, title changed live.
+  - **Agent pain log:** This took way too long to diagnose because every API
+    response said the reload worked (epoch bumped, command re-registered, no
+    errors). The only signal was visual: the title bar didn't change. Lesson:
+    when testing hot reload, change something unmissable (title, color, size)
+    and verify visually — API responses lie when the cache lies.
+  - **Watcher note:** `watch-microapp.ts` with `--strategy reload` now works
+    end-to-end for real hot reload. The default `--strategy restart` is the safe
+    fallback but kills the whole app. For microapp dev iteration, use reload.

@@ -376,6 +376,9 @@ async function loadMicroappModule(mod: DiscoveredMicroapp, deps: MicroappHostDep
   }
 
   try {
+    // Bun ignores query-string cache busters on dynamic import().
+    // Clear require.cache first so the next import() gets fresh compiled code.
+    try { delete require.cache[require.resolve(entryPath)]; } catch {}
     const imported = await import(`${pathToFileURL(entryPath).href}?reload=${Date.now()}`);
     const setup = imported.default;
 

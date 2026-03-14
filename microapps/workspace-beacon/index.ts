@@ -1,5 +1,9 @@
 import blessed from "blessed";
 import type { MicroappHost, MicroappSnapshotWindow } from "../../src/services/microapp-sdk.js";
+import {
+  createTimer,
+  clearTimers,
+} from "../../src/services/microapp-sdk.js";
 
 type BeaconStage = "seed" | "draft" | "review" | "ship";
 
@@ -15,33 +19,32 @@ interface RestoreArgs {
 }
 
 const STAGES: BeaconStage[] = ["seed", "draft", "review", "ship"];
-const DEFAULT_NOTE = "Name the current workspace intent so restore does not feel anonymous.";
+const DEFAULT_NOTE = "Name the current workspace intent.";
+
+const STAGE_STYLE: Record<BeaconStage, { label: string; fg: string; bar: string }> = {
+  seed:   { label: "SEED",   fg: "green",   bar: "░" },
+  draft:  { label: "DRAFT",  fg: "cyan",    bar: "▒" },
+  review: { label: "REVIEW", fg: "yellow",  bar: "▓" },
+  ship:   { label: "SHIP",   fg: "magenta", bar: "█" },
+};
 
 let activeBeacon:
-  | {
-      updateNote: (note: string) => void;
-      cycleStage: () => void;
-      togglePinned: () => void;
-    }
+  | { updateNote: (n: string) => void; cycleStage: () => void; togglePinned: () => void }
   | undefined;
 
 function nowLabel(): string {
   return new Date().toLocaleTimeString();
 }
 
-function nextStage(stage: BeaconStage): BeaconStage {
-  const index = STAGES.indexOf(stage);
-  return STAGES[(index + 1) % STAGES.length] ?? "seed";
+function nextStage(s: BeaconStage): BeaconStage {
+  return STAGES[(STAGES.indexOf(s) + 1) % STAGES.length] ?? "seed";
 }
 
 function sanitizeState(input?: Partial<BeaconState>): BeaconState {
-  const requestedStage = input?.stage as BeaconStage | undefined;
-  const stage = requestedStage && STAGES.includes(requestedStage)
-    ? requestedStage
-    : "seed";
+  const req = input?.stage as BeaconStage | undefined;
   return {
     note: String(input?.note ?? DEFAULT_NOTE),
-    stage,
+    stage: req && STAGES.includes(req) ? req : "seed",
     pinned: Boolean(input?.pinned),
     updatedAt: String(input?.updatedAt ?? nowLabel()),
   };
@@ -54,17 +57,17 @@ export default function setup(host: MicroappHost) {
     description: "Open the workspace-aware beacon microapp.",
     menu: [{ category: "applications", order: 169, label: "Workspace Beacon" }],
     palette: { order: 169, label: "Workspace Beacon" },
-    action: (args) => openWorkspaceBeacon(host, args as RestoreArgs | undefined),
+    action: (args) => openBeacon(host, args as RestoreArgs | undefined),
   });
 
   host.registerCommand({
     id: "set-note",
-    label: "Set Workspace Beacon Note",
-    description: "Set the pinned workspace note for the open Workspace Beacon.",
+    label: "Set Beacon Note",
+    description: "Set the workspace note.",
     direct: true,
     action: (args) => {
       const note = String(args?.note ?? "");
-      if (!activeBeacon) return { ok: false, error: "Workspace Beacon is not open." };
+      if (!activeBeacon) return { ok: false, error: "Not open." };
       activeBeacon.updateNote(note || DEFAULT_NOTE);
       return { ok: true, note: note || DEFAULT_NOTE };
     },
@@ -72,11 +75,10 @@ export default function setup(host: MicroappHost) {
 
   host.registerCommand({
     id: "cycle-stage",
-    label: "Cycle Workspace Beacon Stage",
-    description: "Advance the workspace stage marker for the open Workspace Beacon.",
+    label: "Cycle Stage",
     direct: true,
     action: () => {
-      if (!activeBeacon) return { ok: false, error: "Workspace Beacon is not open." };
+      if (!activeBeacon) return { ok: false, error: "Not open." };
       activeBeacon.cycleStage();
       return { ok: true };
     },
@@ -84,11 +86,10 @@ export default function setup(host: MicroappHost) {
 
   host.registerCommand({
     id: "toggle-pin",
-    label: "Toggle Workspace Beacon Pin",
-    description: "Toggle whether the Workspace Beacon is marked as pinned.",
+    label: "Toggle Pin",
     direct: true,
     action: () => {
-      if (!activeBeacon) return { ok: false, error: "Workspace Beacon is not open." };
+      if (!activeBeacon) return { ok: false, error: "Not open." };
       activeBeacon.togglePinned();
       return { ok: true };
     },
@@ -96,13 +97,8 @@ export default function setup(host: MicroappHost) {
 
   host.registerSnapshot({
     serialize: (window: MicroappSnapshotWindow) => {
-      const state = window.describeState?.() ?? {};
-      return {
-        note: String(state.note ?? DEFAULT_NOTE),
-        stage: String(state.stage ?? "seed"),
-        pinned: Boolean(state.pinned),
-        updatedAt: String(state.updatedAt ?? nowLabel()),
-      };
+      const s = window.describeState?.() ?? {};
+      return { note: String(s.note ?? DEFAULT_NOTE), stage: String(s.stage ?? "seed"), pinned: Boolean(s.pinned), updatedAt: String(s.updatedAt ?? nowLabel()) };
     },
     restore: (_snapshot, payload) => {
       host.runCommand("open", { _restore: payload });
@@ -110,149 +106,167 @@ export default function setup(host: MicroappHost) {
   });
 }
 
-function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
+function openBeacon(host: MicroappHost, args?: RestoreArgs) {
   let state = sanitizeState(args?._restore);
-  const themedStyles = () => ({
-    root: host.theme().body,
-    header: host.theme().body,
-    body: host.theme().body,
-    footer: host.theme().body,
-  });
+  const timers = new Set<ReturnType<typeof setInterval>>();
+
   const win = host.createWindow({
     title: "Workspace Beacon",
-    width: 72,
+    width: 52,
     height: 18,
-    left: 18,
-    top: 8,
+    left: 20,
+    top: 6,
   });
 
-  const root = blessed.box({
+  const t = () => host.theme().body;
+
+  // ── Widgets ───────────────────────────────────────────────────────
+
+  const stageBar = blessed.box({
     parent: win.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    style: themedStyles().root,
+    top: 0, left: 0, right: 0, height: 1,
+    tags: true,
   });
 
-  const header = blessed.box({
-    parent: root,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    tags: true,
-    style: themedStyles().header,
+  const progressBar = blessed.box({
+    parent: win.body,
+    top: 1, left: 0, right: 0, height: 1,
+    tags: false,
   });
 
-  const body = blessed.box({
-    parent: root,
-    top: 4,
-    left: 0,
-    right: 0,
-    bottom: 3,
-    tags: true,
-    style: themedStyles().body,
+  const divider1 = blessed.box({
+    parent: win.body,
+    top: 2, left: 0, right: 0, height: 1,
+    tags: false,
   });
 
-  const footer = blessed.box({
-    parent: root,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 3,
+  const noteLabel = blessed.box({
+    parent: win.body,
+    top: 3, left: 0, right: 0, height: 1,
     tags: true,
-    style: themedStyles().footer,
   });
+
+  const noteBody = blessed.box({
+    parent: win.body,
+    top: 4, left: 0, right: 0, bottom: 3,
+    tags: false,
+  });
+
+  const divider2 = blessed.box({
+    parent: win.body,
+    left: 0, right: 0, bottom: 2, height: 1,
+    tags: false,
+  });
+
+  const statusLine = blessed.box({
+    parent: win.body,
+    left: 0, right: 0, bottom: 1, height: 1,
+    tags: true,
+  });
+
+  const keysLine = blessed.box({
+    parent: win.body,
+    left: 0, right: 0, bottom: 0, height: 1,
+    tags: true,
+  });
+
+  // ── Pulse dot ─────────────────────────────────────────────────────
+  let pulse = false;
 
   function render() {
-    header.setContent([
-      "{bold}Workspace Beacon · RESTART RELOAD OK{/bold}",
-      `stage  ${state.stage}    pinned  ${state.pinned ? "yes" : "no"}`,
-      `updated ${state.updatedAt}`,
-      "watch:microapp reopened this window",
-    ].join("\n"));
-    body.setContent([
-      "{underline}Current note{/underline}",
-      "",
-      state.note,
-      "",
-      "{underline}Why it exists{/underline}",
-      "A workspace restore should bring back human/agent intent, not just window geometry.",
-      "",
-      "{underline}Visible reload token{/underline}",
-      "workspace-beacon-ui-proof-v4",
-    ].join("\n"));
-    footer.setContent([
-      "[ Edit Note ]  [ Cycle Stage ]  [ Toggle Pin ]  [ Restart OK ]",
-      "e edit note · s cycle stage · p toggle pin · q close",
-    ].join("\n"));
+    const bg = t().bg ?? "black";
+    const fg = t().fg ?? "white";
+    const s = STAGE_STYLE[state.stage];
+    const idx = STAGES.indexOf(state.stage);
+    const w = Math.max(1, Number(win.body.width) || 48);
+
+    // Stage indicator line
+    const dot = pulse ? "●" : "○";
+    const pin = state.pinned ? " 📌" : "";
+    stageBar.style = { fg: s.fg, bg };
+    stageBar.setContent(`  ${dot}  ${s.label}${pin}`);
+
+    // Progress: filled segments per stage
+    const segW = Math.floor((w - 4) / STAGES.length);
+    const prog = STAGES.map((_, i) => {
+      const ch = i <= idx ? s.bar : "·";
+      return ch.repeat(segW);
+    }).join(" ");
+    progressBar.style = { fg: s.fg, bg };
+    progressBar.setContent(`  ${prog}`);
+
+    // Dividers
+    const rule = "─".repeat(Math.max(0, w - 4));
+    divider1.style = { fg: "grey", bg };
+    divider1.setContent(`  ${rule}`);
+    divider2.style = { fg: "grey", bg };
+    divider2.setContent(`  ${rule}`);
+
+    // Note
+    noteLabel.style = { fg, bg };
+    noteLabel.setContent(`  {bold}Note{/bold}`);
+    noteBody.style = { fg, bg };
+    noteBody.setContent(`  ${state.note}`);
+
+    // Status
+    statusLine.style = { fg: "grey", bg };
+    statusLine.setContent(`  ${state.updatedAt}`);
+
+    // Keys
+    keysLine.style = { fg: "grey", bg };
+    keysLine.setContent("  {bold}e{/bold} edit  {bold}s{/bold} stage  {bold}p{/bold} pin  {bold}q{/bold} close");
+
     host.screen.render();
   }
 
+  // Gentle pulse every second
+  createTimer(() => {
+    pulse = !pulse;
+    render();
+  }, 1000, timers);
+
   function commit(next: Partial<BeaconState>) {
-    state = {
-      ...state,
-      ...next,
-      updatedAt: nowLabel(),
-    };
+    state = { ...state, ...next, updatedAt: nowLabel() };
     render();
   }
 
   activeBeacon = {
-    updateNote(note) {
-      commit({ note });
-    },
-    cycleStage() {
-      commit({ stage: nextStage(state.stage) });
-    },
-    togglePinned() {
-      commit({ pinned: !state.pinned });
-    },
+    updateNote(n) { commit({ note: n }); },
+    cycleStage() { commit({ stage: nextStage(state.stage) }); },
+    togglePinned() { commit({ pinned: !state.pinned }); },
   };
 
-  root.key(["e"], () => {
-    host.promptValue("Workspace Beacon note", state.note, (value) => {
-      activeBeacon?.updateNote(value.trim() || DEFAULT_NOTE);
+  win.body.key(["e"], () => {
+    host.promptValue("Beacon note", state.note, (v) => {
+      activeBeacon?.updateNote(v.trim() || DEFAULT_NOTE);
     });
   });
-  root.key(["s"], () => activeBeacon?.cycleStage());
-  root.key(["p"], () => activeBeacon?.togglePinned());
-  root.key(["q"], () => win.close());
+  win.body.key(["s"], () => activeBeacon?.cycleStage());
+  win.body.key(["p"], () => activeBeacon?.togglePinned());
+  win.body.key(["q"], () => win.close());
 
   win.describeState(() => ({
-    summary: `Workspace Beacon · ${state.stage} · ${state.pinned ? "pinned" : "floating"}`,
+    summary: `Beacon · ${state.stage} · ${state.pinned ? "pinned" : "floating"}`,
     note: state.note,
     stage: state.stage,
     pinned: state.pinned,
     updatedAt: state.updatedAt,
   }));
+
   win.captureText(() => [
-    "Workspace Beacon · RESTART RELOAD OK",
-    `stage: ${state.stage}`,
-    `pinned: ${state.pinned ? "yes" : "no"}`,
-    `updated: ${state.updatedAt}`,
-    "",
-    state.note,
-    "",
-    "Visible reload token:",
-    "workspace-beacon-ui-proof-v4",
-    "",
-    "[ Edit Note ] [ Cycle Stage ] [ Toggle Pin ] [ Restart OK ]",
+    `Workspace Beacon`,
+    `${STAGE_STYLE[state.stage].label}${state.pinned ? " 📌" : ""}`,
+    `${state.note}`,
+    `${state.updatedAt}`,
   ].join("\n"));
-  win.onRestyle(() => {
-    const styles = themedStyles();
-    root.style = styles.root;
-    header.style = styles.header;
-    body.style = styles.body;
-    footer.style = styles.footer;
-    render();
-  });
+
+  win.onResize(render);
+  win.onRestyle(render);
   win.onCleanup(() => {
-    if (activeBeacon) {
-      activeBeacon = undefined;
-    }
+    clearTimers(timers);
+    if (activeBeacon) activeBeacon = undefined;
   });
+
   render();
   win.focus();
 }
