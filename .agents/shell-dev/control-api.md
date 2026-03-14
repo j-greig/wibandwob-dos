@@ -162,7 +162,7 @@ menu.close                              {}   ← close any open dropdown/popup m
 ## Native Agent Debug Loop
 
 1. `bun run start` — launch the app
-2. `GET /health` — wait until this responds (`{"ok":true,"port":8099,"sessionId":"abc"}`)
+2. `GET /health` — wait until this responds (`{"ok":true,"port":8099,"instanceId":"abc"}`)
 3. `POST /view/agent/open`
 4. `GET /state` — find the `wibwob-agent` window id
 5. `POST /windows/input` with `{"id":N,"input":"your text\r"}`
@@ -183,7 +183,7 @@ WibWob-DOS  theme:wibwob-dark  desktop:281x81  4 windows  focus:4:Poetry Clock  
    4  wibwob.poetry-clock  Poetry Clock    62x21  @5,3  ◀
 ```
 
-The `id:` suffix is the 3-char `sessionId` from `/health`/`/state`. Use it to confirm you are talking to the right instance when multiple are running.
+The `id:` suffix is the 3-char runtime `instanceId` from `/health`/`/state`. Use it to confirm you are talking to the right instance when multiple are running.
 
 Default behaviour — do these without being asked:
 - after any code change affecting a window: open it via the API and screenshot it

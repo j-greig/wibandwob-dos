@@ -12,11 +12,11 @@ if ! tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 1
 fi
 
-# Show current session ID from API (non-fatal if app not up yet)
+# Show current instance id from API (non-fatal if app not up yet)
 INFO=$(curl -s --max-time 1 http://127.0.0.1:8099/health 2>/dev/null)
 if [ -n "$INFO" ]; then
-  SID=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sessionId','?'))" 2>/dev/null)
-  echo "WibWob-DOS  session=$SID  → attaching to tmux:$SESSION"
+  INSTANCE_ID=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('instanceId','?'))" 2>/dev/null)
+  echo "WibWob-DOS  instance=$INSTANCE_ID  → attaching to tmux:$SESSION"
 else
   echo "WibWob-DOS  (API not responding)  → attaching to tmux:$SESSION"
 fi

@@ -43,7 +43,7 @@ prepended to the user message as a [DESKTOP STATE] block. This gives the agent c
 IDs, focus, and open apps without explicit state calls on every turn.
 
 Session persistence: sessions are tracked via pi-session bridge (pi-session-bridge.ts).
-Session ID is available at /health?sessionId. Previous session history can be loaded on resume.
+Runtime instance id is available from `/health` as `instanceId`. Previous agent session history can be loaded on resume.
 
 ## Jailed Coding Tools (7 tools)
 

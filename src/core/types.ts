@@ -190,7 +190,7 @@ export interface DesktopState {
     cwd: string;
     statePath: string;
     instanceLabel?: string;
-    sessionId?: string;
+    instanceId?: string;
     deployProfile?: string | null;
     controlApiEnabled?: boolean;
     controlApiPort?: number;

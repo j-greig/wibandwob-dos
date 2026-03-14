@@ -13,22 +13,22 @@ if (flags.help) {
   process.exit(0);
 }
 
-function randomSessionId(): string {
+function randomInstanceId(): string {
   return Math.random().toString(36).slice(2, 5).padEnd(3, "0");
 }
 
 const instanceLabel = process.env.WIBWOB_INSTANCE_LABEL?.trim() || undefined;
-const sessionId = randomSessionId();
-process.env.WIBWOB_SESSION_ID = sessionId;
+const instanceId = randomInstanceId();
+process.env.WIBWOB_INSTANCE_ID = instanceId;
 
 // Set process title so `pkill wibwob-dos` works and ps output is readable.
 // Include instance label so dual-instance is distinguishable: wibwob-dos-main, wibwob-dos-zuk
-// Process title includes instance label + session ID so ps/htop and pkill match what you see in the TUI top-right.
-// e.g. "wibwob-dos-main-jp9" — pkill wibwob-dos-jp9 kills exactly that session.
+// Process title includes instance label + instance id so ps/htop and pkill match what you see in the TUI top-right.
+// e.g. "wibwob-dos-main-jp9" — pkill wibwob-dos-jp9 kills exactly that runtime node.
 process.title = [
   "wibwob-dos",
   instanceLabel,
-  sessionId,
+  instanceId,
 ].filter(Boolean).join("-");
 
 // Write PID file so agents can kill cleanly: kill $(cat scratch/wibwob.pid)
@@ -48,4 +48,4 @@ process.once("SIGINT",  () => { removePid(); process.exit(0); });
 
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 
-await new TsTuiMvpApp({ instanceLabel, sessionId }).run();
+await new TsTuiMvpApp({ instanceLabel, instanceId }).run();

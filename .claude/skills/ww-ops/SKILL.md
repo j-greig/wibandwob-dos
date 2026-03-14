@@ -43,7 +43,7 @@ curl -sf http://127.0.0.1:8099/health
 curl -sf http://127.0.0.1:8099/state | python3 -m json.tool
 ```
 
-Health returns `{"ok":true,"sessionId":"abc","instanceLabel":"..."}`.
+Health returns `{"ok":true,"instanceId":"abc","instanceLabel":"..."}`.
 Wait up to 15s on first launch.
 
 ## 4. RESTART (live session)

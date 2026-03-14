@@ -102,7 +102,7 @@ function defaultChatspots(width: number, height: number): Chatspot[] {
 const WORLD_CHAT_LOG_PATH = path.join(LOGS_DIR, "world-chat.log");
 const WORLD_CHAT_IDENTITY = [
   process.env.WIBWOB_INSTANCE_LABEL?.trim(),
-  process.env.WIBWOB_SESSION_ID?.trim(),
+  process.env.WIBWOB_INSTANCE_ID?.trim(),
 ].filter(Boolean).join(" ");
 
 function appendWorldChatLog(line: string): void {
@@ -127,7 +127,7 @@ class WorldChatService {
   private readonly listeners = new Set<(event: WorldChatChangeEvent) => void>();
 
   constructor() {
-    this.transport = createWorldChatTransport(process.env.WIBWOB_SESSION_ID?.trim() || "wwd");
+    this.transport = createWorldChatTransport(process.env.WIBWOB_INSTANCE_ID?.trim() || "wwd");
     this.transport.onEvent((event) => {
       if (event.type === "system") {
         if (event.channelId) logWorldChatEvent(event.channelId, "system", event.text);

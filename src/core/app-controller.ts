@@ -198,11 +198,11 @@ export class TsTuiMvpApp {
   private readonly scrambleBrain: ScrambleBrain = new ScrambleBrain();
   private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
-  private readonly sessionId: string;
+  private readonly instanceId: string;
 
-  constructor(opts?: { instanceLabel?: string; sessionId?: string }) {
+  constructor(opts?: { instanceLabel?: string; instanceId?: string }) {
     this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
-    this.sessionId = opts?.sessionId?.trim() || "???";
+    this.instanceId = opts?.instanceId?.trim() || "???";
     log.setIdentity(this.getInstanceDisplayLabel());
     patchBlessedUnicode();
     this.screen = blessed.screen({
@@ -354,7 +354,7 @@ export class TsTuiMvpApp {
       },
       {
         instanceLabel: this.instanceLabel,
-        sessionId: this.sessionId,
+        instanceId: this.instanceId,
       },
     );
     this.state = new StateService(
@@ -364,7 +364,7 @@ export class TsTuiMvpApp {
         cwd: REPO_ROOT,
         statePath: STATE_PATH,
         instanceLabel: this.instanceLabel,
-        sessionId: this.sessionId,
+        instanceId: this.instanceId,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -473,8 +473,8 @@ export class TsTuiMvpApp {
 
   private getInstanceDisplayLabel(): string {
     return this.instanceLabel
-      ? `${this.instanceLabel} · ${this.sessionId}`
-      : this.sessionId;
+      ? `${this.instanceLabel} · ${this.instanceId}`
+      : this.instanceId;
   }
 
   private toggleTheme(): void {

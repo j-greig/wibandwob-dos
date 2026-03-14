@@ -11,7 +11,7 @@ interface StateServiceOptions {
   cwd: string;
   statePath: string;
   instanceLabel?: string;
-  sessionId: string;
+  instanceId: string;
   getControlApiStatus?: () => {
     enabled: boolean;
     port?: number;
@@ -104,7 +104,7 @@ export class StateService {
         cwd: this.options.cwd,
         statePath: this.options.statePath,
         instanceLabel: this.options.instanceLabel,
-        sessionId: this.options.sessionId,
+        instanceId: this.options.instanceId,
         deployProfile: process.env.WIBWOB_DEPLOY_PROFILE ?? null,
         controlApiEnabled: controlApi?.enabled,
         controlApiPort: controlApi?.port,

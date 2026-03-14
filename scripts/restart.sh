@@ -4,7 +4,7 @@
 #        bash scripts/restart.sh --force 0    (default)
 #        bash scripts/restart.sh alt          (second instance, port 8098)
 #
-# Safe pattern: capture old sessionId → stop process → reset terminal modes → tmux send-keys → poll /health.
+# Safe pattern: capture old instanceId → stop process → reset terminal modes → tmux send-keys → poll /health.
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ force_kill() {
 
 echo "▶ restart: session=$SESSION window=$WINDOW port=$PORT force=$FORCE"
 
-OLD_SID=$(curl -s --max-time 2 "http://127.0.0.1:${PORT}/health" | grep -o '"sessionId":"[^"]*"' | cut -d'"' -f4 || true)
+OLD_ID=$(curl -s --max-time 2 "http://127.0.0.1:${PORT}/health" | grep -o '"instanceId":"[^"]*"' | cut -d'"' -f4 || true)
 
 if [[ "$FORCE" -eq 1 ]]; then
   force_kill
@@ -76,11 +76,11 @@ for _ in $(seq 1 30); do
   sleep 1
   r=$(curl -s --max-time 2 "http://127.0.0.1:${PORT}/health" 2>/dev/null || true)
   if [ -n "$r" ]; then
-    NEW_SID=$(printf '%s' "$r" | grep -o '"sessionId":"[^"]*"' | cut -d'"' -f4 || true)
+    NEW_ID=$(printf '%s' "$r" | grep -o '"instanceId":"[^"]*"' | cut -d'"' -f4 || true)
     echo ""
     echo "  ready: $r"
-    if [ -n "$OLD_SID" ] && [ -n "$NEW_SID" ] && [ "$OLD_SID" = "$NEW_SID" ]; then
-      echo "  ⚠ sessionId unchanged — old process may still be running"
+    if [ -n "$OLD_ID" ] && [ -n "$NEW_ID" ] && [ "$OLD_ID" = "$NEW_ID" ]; then
+      echo "  ⚠ instanceId unchanged — old process may still be running"
     fi
     exit 0
   fi

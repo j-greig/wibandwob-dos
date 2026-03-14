@@ -36,7 +36,7 @@ DesktopState (types.ts:192) — returned by GET /state and tui_get_state:
     cwd: string
     statePath: string
     instanceLabel?: string
-    sessionId?: string
+    instanceId?: string
     theme?: string
     controlApiEnabled?: boolean
     controlApiPort?: number
@@ -80,7 +80,7 @@ CRITICAL field names agents get wrong:
 
 Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
 
-  GET  /health          → { ok: true, port, sessionId, instanceLabel? }
+  GET  /health          → { ok: true, port, instanceId, instanceLabel? }
   GET  /state           → DesktopState (full live snapshot)
   GET  /commands/list   → CommandListItem[] (optional ?surface=menu|palette|api|agent)
   POST /commands/run    → { ok, result?, error? }

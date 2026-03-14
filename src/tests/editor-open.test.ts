@@ -108,6 +108,6 @@ describe("editor open failure paths", () => {
     await new Promise(r => setTimeout(r, 300));
     const health = await get("/health");
     expect(health.ok).toBe(true);
-    expect(typeof health.sessionId).toBe("string");
+    expect(typeof health.instanceId).toBe("string");
   });
 });

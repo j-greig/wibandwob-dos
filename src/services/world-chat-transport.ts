@@ -147,7 +147,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
   }
 }
 
-export function createWorldChatTransport(sessionId: string): WorldChatTransport {
+export function createWorldChatTransport(instanceId: string): WorldChatTransport {
   const transport = process.env.WIBWOB_CHAT_TRANSPORT?.trim().toLowerCase();
   if (transport !== "irc") return new LocalWorldChatTransport();
 
@@ -157,7 +157,7 @@ export function createWorldChatTransport(sessionId: string): WorldChatTransport 
   const port = rawPort ? Number(rawPort) : 6667;
   const nick =
     process.env.WIBWOB_CHAT_IRC_NICK?.trim() ||
-    `ww-${process.env.WIBWOB_INSTANCE_LABEL?.trim() || sessionId}`;
+    `ww-${process.env.WIBWOB_INSTANCE_LABEL?.trim() || instanceId}`;
   const username = process.env.WIBWOB_CHAT_IRC_USERNAME?.trim() || nick;
   const realname = process.env.WIBWOB_CHAT_IRC_REALNAME?.trim() || "WibWobWorld";
   return new IrcWorldChatTransport(

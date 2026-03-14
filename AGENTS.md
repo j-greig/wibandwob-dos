@@ -148,11 +148,11 @@ bun install && bun run typecheck && bun run dev:world
 bash scripts/restart.sh
 ```
 SIGTERM → waits for clean exit → `tmux send-keys` → polls `/health` until ready.
-Returns the new session ID. Requires tmux session `wibwob` with the app in window 0.
+Returns the new instance id. Requires tmux session `wibwob` with the app in window 0.
 
 **Wait for API before acting:**
 ```bash
-curl -s http://127.0.0.1:8099/health   # returns {"ok":true,"sessionId":"abc"}
+curl -s http://127.0.0.1:8099/health   # returns {"ok":true,"instanceId":"abc"}
 ```
 Do not guess window ids or command availability before `/health` responds.
 
@@ -296,12 +296,12 @@ Files: point at the script(s) to improve.
 ```
 
 Good candidates for Codex tooling improvement:
-- `scripts/restart.sh` — if it reports ready with the same session ID (old process still alive)
+- `scripts/restart.sh` — if it reports ready with the same instance id (old process still alive)
 - `.pi/skills/tui-smoke-test/scripts/smoke-test.sh` — if smoke targets grow stale
 - `.pi/skills/*` — if a skill's instructions cause agents to make repeated mistakes
 - `scripts/handover.sh` — if the epic table or todo list goes stale
 
-Example: Codex improved `restart.sh` to capture old sessionId, confirm new sessionId differs, kill more aggressively (SIGKILL fallback), and reset terminal escape codes before launching — after the plain SIGTERM pattern left the terminal poisoned on unclean exits.
+Example: Codex improved `restart.sh` to capture old instanceId, confirm new instanceId differs, kill more aggressively (SIGKILL fallback), and reset terminal escape codes before launching — after the plain SIGTERM pattern left the terminal poisoned on unclean exits.
 
 ### Three-tier planning model
 

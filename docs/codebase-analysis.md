@@ -937,7 +937,7 @@ Local HTTP server (`Bun.serve()`) on port 8099 (configurable via `CONTROL_API_PO
 | Endpoint | Description |
 |---|---|
 | `GET /` or `/help` | Structured endpoint catalogue with method, path, description, body fields |
-| `GET /health` | Health check `{ok:true, port:number, sessionId:string, instanceLabel?:string}` |
+| `GET /health` | Health check `{ok:true, port:number, instanceId:string, instanceLabel?:string}` |
 | `GET /openapi.json` | Full OpenAPI 3.0 spec derived from `ENDPOINT_CATALOGUE` |
 | `GET /state` | Full live `DesktopState` JSON |
 | `GET /commands/list?surface=` | All commands (optionally filtered by `menu\|palette\|api\|agent`) |

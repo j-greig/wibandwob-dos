@@ -68,7 +68,7 @@ interface ControlApiHandlers {
 
 interface ControlApiIdentity {
   instanceLabel?: string;
-  sessionId: string;
+  instanceId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ export class ControlApiService {
         service: "wibwob-ts-tui-control-api",
         port: this.actualPort,
         instanceLabel: this.identity.instanceLabel,
-        sessionId: this.identity.sessionId,
+        instanceId: this.identity.instanceId,
         docs: "GET /openapi.json for full OpenAPI 3.0 spec",
         endpoints: ENDPOINT_CATALOGUE,
       });
@@ -284,7 +284,7 @@ export class ControlApiService {
         ok: true,
         port: this.actualPort,
         instanceLabel: this.identity.instanceLabel,
-        sessionId: this.identity.sessionId,
+        instanceId: this.identity.instanceId,
       });
     }
 

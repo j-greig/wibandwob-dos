@@ -44,7 +44,7 @@ screen  = state.get('screen', {})
 sw, sh  = screen.get('width', 280), screen.get('height', 80)
 focus_id      = state.get('focus', {}).get('windowId')
 theme         = state.get('app', {}).get('theme', '?')
-session_id    = state.get('app', {}).get('sessionId', '')
+instance_id    = state.get('app', {}).get('instanceId', '')
 instance_label = state.get('app', {}).get('instanceLabel', '')
 
 MW, MH = 62, 18
@@ -117,7 +117,7 @@ for w in sorted(windows, key=lambda w: w.get('zIndex', 0)):
 
 f = state.get('focus', {})
 focus_label = f\"{f.get('windowId','?')}:{f.get('title','?')}\" if f else 'none'
-identity = f\"{instance_label}·{session_id}\" if instance_label else session_id
+identity = f\"{instance_label}·{instance_id}\" if instance_label else instance_id
 id_suffix = f\"  id:{identity}\" if identity else \"\"
 print(f'WibWob-DOS  {theme}  {sw}x{sh}  {len(windows)} window{\"\" if len(windows)==1 else \"s\"}  focus:{focus_label}{id_suffix}')
 print('  +' + '-'*MW + '+')
