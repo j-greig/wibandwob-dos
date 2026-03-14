@@ -615,6 +615,15 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       `{${muted}-fg} [${focusHint}]  ▸${humans} ▹${agents} · ${entries.length}  ${days}d  │  Tab switch  j/k scroll  / filter  Esc clear${filterHint}{/${muted}-fg}`
     );
 
+    // Update input prompt based on focus
+    if (focusedPanel === "input") {
+      inputPrompt.setContent(` {bold}▸{/bold} `);
+      inputPrompt.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
+    } else {
+      inputPrompt.setContent(` {${muted}-fg}▸{/${muted}-fg} `);
+      inputPrompt.style = { fg: th.muted?.fg || "#555", bg: th.body.bg };
+    }
+
     host.screen.render();
   }
 
@@ -669,6 +678,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   });
   // i key in log returns to input (vim-like)
   logBox.key(["i"], () => focusInput());
+
+  // Mouse click to switch panels
+  logBox.on("click", () => { if (focusedPanel !== "log") focusLog(); });
+  inputBox.on("click", () => { if (focusedPanel !== "input") focusInput(); });
+  inputPrompt.on("click", () => { if (focusedPanel !== "input") focusInput(); });
 
   focusInput();
 
