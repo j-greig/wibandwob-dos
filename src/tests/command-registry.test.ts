@@ -107,23 +107,13 @@ describe("command registry", () => {
     expect(data.error).toContain("id required");
   });
 
-  test("toggle_theme executes without error", async () => {
+  test("theme.cycle executes without error", async () => {
     // Toggle twice to end up back where we started
     const r1 = await api("/commands/run", "POST", { id: "theme.cycle" });
     expect(r1.status).toBe(200);
     expect(r1.data.ok).toBe(true);
 
     const r2 = await api("/commands/run", "POST", { id: "theme.cycle" });
-    expect(r2.status).toBe(200);
-    expect(r2.data.ok).toBe(true);
-  });
-
-  test("legacy alias executes without error", async () => {
-    const r1 = await api("/commands/run", "POST", { id: "app.toggle_theme" });
-    expect(r1.status).toBe(200);
-    expect(r1.data.ok).toBe(true);
-
-    const r2 = await api("/commands/run", "POST", { id: "app.toggle_theme" });
     expect(r2.status).toBe(200);
     expect(r2.data.ok).toBe(true);
   });

@@ -58,6 +58,30 @@ A codebase where:
   modal dialog, status bar, toolbar) are SDK primitives with correct blessed defaults
 - Functions do one thing, take explicit parameters, return explicit results
 
+## 2026-03-14 Runtime Refactor Slice Status
+
+The thin runtime-centric slice on `epic/refactor-13` landed these architectural seams:
+
+- canonical runtime-node identity via `instanceId`
+- shared runtime command, inspection, window, and workspace services
+- blocking picker/file-open control paths with inspectable UI blockers
+- runtime-node descriptor with instance-scoped scratch/capture/workspace paths
+- SDK ownership anchors under `src/sdk/` with stable `src/services/microapp-sdk.ts` facade
+- CLI inspection + canonical CLI parity harness
+- Runtime Inspector proof microapp consuming `/runtime/inspection` and `/commands/list`
+
+Explicitly parked follow-ons from this slice:
+
+- peer provenance / actor attribution
+  - `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- host-vs-terminal-microapp agent efficiency benchmark
+  - `.planning/refactor-docs/023-agent-runtime-efficiency-benchmark-follow-on.md`
+- figlet window sizing should fit real rendered glyph height
+  - `.planning/refactor-docs/024-figlet-window-sizing-follow-on.md`
+
+This means E042 now has a proven runtime/application/SDK direction to build on,
+even though the broader god-file decomposition and deeper type-system work remain open.
+
 ## Subgoals (Measurable)
 
 1. **Better organised TypeScript** — no file over 500 lines, clear naming, one

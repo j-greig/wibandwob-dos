@@ -68,7 +68,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Identify the main duplicate behaviors across TUI / API / CLI / agent
 - `[x]` Identify the highest-value direct widget mutation hotspots that still bypass shared semantics
 - `[x]` Mark duplicate paths as keep, move, delete, or defer in the architecture mapping
-- `[~]` Retire or merge stale docs only when the replacement text is already better
+- `[x]` Retire or merge stale docs only when the replacement text is already better
 
 ### Slice 2: Workspace Service Convergence
 
@@ -122,21 +122,21 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 8: Legacy Pruning, Docs Consolidation, and Stable-State Tooling
 
-- `[ ]` Remove dead command paths, shims, and docs once the replacement seams are proven
-- `[ ]` Move uncertain files/docs into `.trash/` instead of leaving them ambiguously active
-- `[ ]` Consolidate overlapping markdown into fewer stronger agent-facing docs
-- `[ ]` Update `.planning` to match the landed architecture
-- `[ ]` Fold the stable refactor shape into scripts and `bun run dev` workflows
-- `[ ]` Preserve text-first whole-TUI capture as the default evidence path and PNG as secondary evidence
-- `[ ]` Turn the Ghostty-vs-terminal-microapp agent efficiency comparison into a concrete later tooling task
+- `[x]` Remove dead command paths, shims, and docs once the replacement seams are proven
+- `[x]` Move uncertain files/docs into `.trash/` instead of leaving them ambiguously active
+- `[x]` Consolidate overlapping markdown into fewer stronger agent-facing docs
+- `[x]` Update `.planning` to match the landed architecture
+- `[x]` Fold the stable refactor shape into scripts and `bun run dev` workflows
+- `[x]` Preserve text-first whole-TUI capture as the default evidence path and PNG as secondary evidence
+- `[x]` Turn the Ghostty-vs-terminal-microapp agent efficiency comparison into a concrete later tooling task
 
 ## Deferred Cross-Cutting Track: Peer Provenance / Attribution
 
-- `[ ]` Define a lightweight peer/actor descriptor separate from runtime `instanceId`
-- `[ ]` Distinguish human, agent, and system-originated mutations in runtime-owned events
-- `[ ]` Add optional actor metadata seams to workspace saves, document edits, and persistent history logs
-- `[ ]` Prefer append-only provenance metadata before any full collaborative-edit history
-- `[ ]` Evaluate canonical TypeScript-native event/audit approaches when this work becomes active
+- `[-]` Define a lightweight peer/actor descriptor separate from runtime `instanceId` — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- `[-]` Distinguish human, agent, and system-originated mutations in runtime-owned events — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- `[-]` Add optional actor metadata seams to workspace saves, document edits, and persistent history logs — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- `[-]` Prefer append-only provenance metadata before any full collaborative-edit history — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- `[-]` Evaluate canonical TypeScript-native event/audit approaches when this work becomes active — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
 
 ## Phase 1: Architecture Mapping
 
@@ -180,35 +180,35 @@ This file is the execution surface for the refactor. The masterplan stays concep
 ## Phase 2: Extract Pure Logic Into Domain
 
 - `[x]` Define the initial `src/domain/` shape without over-expanding it
-- `[ ]` Extract side-effect-free window model logic from UI/render owners
-- `[~]` Extract command definitions and schemas that are currently mixed with dispatch or UI concerns
-- `[ ]` Extract workspace snapshot schema / transforms into pure logic
+- `[-]` Extract side-effect-free window model logic from UI/render owners — deferred to broader E042 god-file decomposition
+- `[-]` Extract command definitions and schemas that are currently mixed with dispatch or UI concerns — deferred beyond this thin runtime slice
+- `[-]` Extract workspace snapshot schema / transforms into pure logic — deferred to broader E042 workspace decomposition
 - `[x]` Define an explicit instance descriptor model
-- `[ ]` Add focused tests for each extracted pure unit
+- `[-]` Add focused tests for each extracted pure unit — deferred until the broader extractions above are active
 
 ### Candidate Domain Objects
 
-- `[ ]` Window model
-- `[ ]` Layout rules
-- `[~]` Command definition / argument schema
-- `[ ]` Workspace snapshot
-- `[ ]` Peer / actor descriptor
+- `[-]` Window model — deferred to broader E042 decomposition
+- `[-]` Layout rules — deferred to broader E042 decomposition
+- `[-]` Command definition / argument schema — partially extracted; deeper extraction deferred
+- `[-]` Workspace snapshot — deferred to broader E042 decomposition
+- `[-]` Peer / actor descriptor — parked in `.planning/refactor-docs/022-peer-provenance-follow-on.md`
 - `[x]` Instance descriptor
 - `[x]` Runtime inspection shapes
 
 ## Phase 3: Isolate Side Effects
 
-- `[ ]` Inventory filesystem touchpoints
-- `[ ]` Inventory process / spawn / restart touchpoints
-- `[ ]` Inventory timer ownership
-- `[ ]` Inventory network / fetch usage
-- `[ ]` Introduce thin infrastructure wrappers only where extraction materially reduces coupling
-- `[ ]` Ensure extracted domain logic depends on no Bun / Blessed / filesystem APIs
+- `[-]` Inventory filesystem touchpoints — deferred to broader E042 decomposition
+- `[-]` Inventory process / spawn / restart touchpoints — deferred to broader E042 decomposition
+- `[-]` Inventory timer ownership — deferred to broader E042 decomposition
+- `[-]` Inventory network / fetch usage — deferred to broader E042 decomposition
+- `[-]` Introduce thin infrastructure wrappers only where extraction materially reduces coupling — deferred to broader E042 decomposition
+- `[-]` Ensure extracted domain logic depends on no Bun / Blessed / filesystem APIs — deferred to broader E042 decomposition
 
 ## Phase 4: Introduce Application Services
 
 - `[x]` Define the first service layer under `src/application/`
-- `[~]` Promote shared verbs out of interface handlers and into service functions
+- `[x]` Promote shared verbs out of interface handlers and into service functions
 - `[x]` Establish one command execution path shared by TUI / API / CLI where practical
 - `[x]` Establish one workspace save / load path shared by all interfaces (`src/application/runtime-workspace-service.ts`)
 - `[x]` Establish one runtime inspection path shared by all interfaces
@@ -243,18 +243,18 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ## Phase 7: Migrate Built-In Functionality Toward Microapps
 
-- `[ ]` Decide which built-ins are in scope for this refactor pass
-- `[ ]` Choose a proof microapp for the new runtime model
-- `[ ]` Build the Runtime Inspector proof microapp once runtime inspection is real
-- `[ ]` Migrate one representative built-in feature without regressing command/API parity
-- `[ ]` Confirm existing external modules still load under the compatibility boundary
+- `[x]` Decide which built-ins are in scope for this refactor pass
+- `[x]` Choose a proof microapp for the new runtime model
+- `[x]` Build the Runtime Inspector proof microapp once runtime inspection is real
+- `[x]` Migrate one representative built-in feature without regressing command/API parity
+- `[x]` Confirm existing external modules still load under the compatibility boundary
 
 ## Phase 8: Remove Legacy Paths
 
-- `[~]` Delete dead or parallel command flows once shared services are stable
-- `[ ]` Delete microapp imports that bypass the canonical SDK surface
-- `[~]` Delete interface-specific logic that duplicates shared runtime verbs
-- `[~]` Remove obsolete compatibility shims only after module validation passes
+- `[x]` Delete dead or parallel command flows once shared services are stable
+- `[x]` Delete microapp imports that bypass the canonical SDK surface
+- `[x]` Delete interface-specific logic that duplicates shared runtime verbs
+- `[x]` Remove obsolete compatibility shims only after module validation passes
 
 ## Verification Gates
 
@@ -264,18 +264,18 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Verify `/health`
 - `[x]` Verify `/state`
 - `[x]` Verify command execution parity across TUI / API / CLI for the refactored slice
-- `[ ]` Perform visual verification in tmux for affected UI behavior
+- `[-]` Perform visual verification in tmux for affected UI behavior — text captures and live tmux pane inspection were preserved; human attach remains the final visual handoff step
 - `[x]` Capture evidence when behavior changes materially
 - `[x]` Preserve whole-desktop capture paths with text/API capture as the default path and PNG capture as secondary visual evidence
 
 ## Documentation / Planning
 
-- `[ ]` Update `.planning` when scope or execution order becomes concrete
+- `[x]` Update `.planning` when scope or execution order becomes concrete
 - `[x]` Record architecture decisions in the refactor docs as they solidify
 - `[x]` Update `.agents/` or relevant skill docs if the refactor reveals repeated agent failure modes
 - `[x]` Update scripts and local skills when the refactor changes assumptions they encode
-- `[~]` Consolidate overlapping markdown into fewer, clearer agent-friendly docs when ownership is obvious
-- `[ ]` Move retired or superseded markdown into `.trash/` once replacement docs are clearly better
+- `[x]` Consolidate overlapping markdown into fewer, clearer agent-friendly docs when ownership is obvious
+- `[x]` Move retired or superseded markdown into `.trash/` once replacement docs are clearly better
 - `[x]` Capture concrete command-surface examples in the refactor docs when they clarify how shell/CLI/API/runtime commands differ
 
 ## Resolved With Author
@@ -302,3 +302,4 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[-]` Stable-state automation should default to existing API-driven text capture for whole-TUI artifacts
 - `[-]` PNG capture remains useful as secondary visual evidence when text/API capture is not sufficient
 - `[-]` Add a host-vs-microapp agent runtime efficiency check: compare running a Pi agent or Claude Code agent in normal Ghostty versus inside the WibWob terminal microapp, using concrete metrics such as per-process RSS/PSS, idle memory, active-task peak memory, CPU while streaming, startup latency, and end-to-end command/response latency
+- `[-]` Follow on the remaining figlet window sizing defect: size figlet banners from central font metadata plus rendered content measurement so tall glyphs do not clip — parked in `.planning/refactor-docs/024-figlet-window-sizing-follow-on.md`

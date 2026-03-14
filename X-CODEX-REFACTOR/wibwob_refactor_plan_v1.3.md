@@ -1183,7 +1183,7 @@ Likely first targets for provenance:
 The first pass should stay lightweight:
 
 * define a small actor/peer descriptor shape
-* allow save/log events to optionally carry `actor`
+* allow save/log events to optionally carry `actor` or `peer` (latter is more symbient aligned)
 * record append-only event metadata before attempting full collaborative history
 * avoid building Google-Docs-style diff history or CRDT sync as part of this refactor
 

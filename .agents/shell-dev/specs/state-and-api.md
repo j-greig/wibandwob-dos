@@ -176,6 +176,8 @@ Important command-pipeline rule:
 | POST /commands/run returns {ok:false} | Wrong command id, missing required args | GET /commands/list first; check exact id and arg names |
 | POST /commands/run returns 404 for editor.open/markdown.open/primer.open with no args | Non-interactive control surface blocked picker-style UI | Pass filePath/title/initial args explicitly, or use menu/TUI flow |
 | UI gets stranded by a failing live test | Test opened a blocking surface but did not cleanup on assertion failure | Use `try/finally` and always send `desktop.clear-all` in live API tests |
+| Live Bun API tests pass alone but fail in a combined run | Multiple test files are mutating one shared runtime concurrently | Run live API test files serially with `bash scripts/live-api-test-suite.sh` |
+| Bun live test unexpectedly talks to the hosted API | Bun auto-loaded `.env` and picked `WIBWOB_API` instead of the local runtime | In Bun live tests, use `API_URL` or `WW_API`, not hosted `WIBWOB_API` |
 | tui_move_window has no effect | Used "x"/"y" instead of "left"/"top" | Field names are left, top, width, height |
 | Wrong window targeted | Cached/guessed window ID | Always GET /state for fresh IDs before targeting |
 | /health returns connection refused | App not running or wrong port | Check CONTROL_API_PORT; run curl /health; restart if needed |
@@ -194,6 +196,12 @@ DON'T: chain individual move calls — batch is atomic and cheaper
 
 DO: check command id with GET /commands/list before POST /commands/run
 DON’T: assume command ids — they change; catalog is source of truth
+
+DO: run shared-runtime live API tests through `bash scripts/live-api-test-suite.sh`
+DON'T: bundle multiple live API test files into one `bun test ...` invocation against the same app
+
+DO: point Bun live tests at `API_URL` or `WW_API`
+DON'T: read hosted `WIBWOB_API` from `.env` inside local runtime tests
 
 DO: treat `/commands/run` as canonical and pass `id`
 DON’T: send the old `command` body field — it is retired

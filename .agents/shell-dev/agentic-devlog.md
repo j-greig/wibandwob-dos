@@ -1339,3 +1339,36 @@ Rule for agents:
 1. if a microapp needs runtime reads, use the SDK runtime-client helpers
 2. prefer proving seams through shared APIs over reaching into host internals
 3. do not broaden one proof microapp into a mass built-in migration
+
+---
+
+## 2026-03-14: Shared-runtime Bun tests need a serialized harness, not one big invocation
+
+Problem pattern:
+
+- several `src/tests/*.test.ts` files hit the same live WibWob runtime over HTTP
+- `bun test file-a file-b ...` can schedule those files concurrently
+- that turns desktop cleanup and window assertions into test-runner races instead of product checks
+
+What shipped:
+
+- `scripts/live-api-test-suite.sh`
+  - clears the desktop through the canonical runtime command before each file
+  - runs the live API test files one at a time in separate Bun invocations
+  - leaves the desktop cleared at the end
+- `src/tests/workspace-roundtrip.test.ts`
+  - now starts from a canonical desktop reset instead of ambient window state
+- `.agents/shell-dev/specs/state-and-api.md`
+  - documents the shared-runtime concurrency failure mode and the required harness
+
+Rule for agents:
+
+1. if a test talks to one live runtime over HTTP, assume cross-file concurrency is unsafe
+2. prefer a shell harness that serializes files over a single multi-file `bun test` command
+3. clear the desktop through `desktop.clear-all` before and after live-stateful checks
+
+Important correction:
+
+- Bun auto-loads `.env`, so local live tests can accidentally pick hosted `WIBWOB_API`
+- for local runtime tests, only use `API_URL`, `WW_API`, or a literal local fallback
+- reserve `WIBWOB_API_BASE_URL` for in-process runtime clients that intentionally follow the local app
