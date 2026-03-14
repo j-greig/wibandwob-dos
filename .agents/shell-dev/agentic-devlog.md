@@ -2373,3 +2373,36 @@ Six automated checks, all passing:
 6. **Registry coverage** — every microapp ID appears in `microapp-registry.ts`
 
 Run as a gate: `bun run check-coat`. Exit 1 on any violation.
+
+### tmux resolution vs window sizing (2026-03-14)
+
+**Problem:** Journal microapp opened at 72x24 despite code requesting 95% of screen.
+Agent spent 15+ minutes fighting blank windows, stale code, and wrong dimensions.
+
+**Root causes (5 whys):**
+
+1. `microapps.reload` does NOT reload TypeScript — Bun caches the import. Only
+   `scripts/restart.sh` loads fresh TS. The docs say "reload" but it only re-registers
+   commands from the already-cached module.
+
+2. `host.geometry` was correct but the **window** was created by old cached code.
+   Close → reload → reopen still ran old code. Must **restart** the app.
+
+3. Nested `createRow` inside `createStack` crashed — blessed nodes need a real parent
+   chain via `parent: win.body`. Wrapping a layout object as a fake LayoutPart breaks
+   `element.screen` resolution. Use flat blessed positioning (`top/left/right/bottom`)
+   or a single `createStack` instead.
+
+4. `restart.sh` assumed tmux session exists — fails with "no server running" when tmux
+   died. Agent must `tmux new-session -d -s wibwob` first.
+
+5. tmux geometry (211x56 default) was way too large for the human's font size. Fix:
+   `tmux resize-window -t wibwob -x 169 -y 44` then restart. The microapp's
+   `host.geometry` picks up the new screen size and fills 95% of it.
+
+**Fix applied:** `autoresearch.sh` now uses `scripts/restart.sh` instead of
+`microapps.reload` for TS changes. tmux geometry set to 169x44 to match human
+preference. Documented in `.agents/shell-dev/devlogs/2026-03-14-journal-tmux-pain.md`.
+
+**Rule:** For microapp TS changes, always restart. `microapps.reload` is for
+manifest/command metadata only, not code.

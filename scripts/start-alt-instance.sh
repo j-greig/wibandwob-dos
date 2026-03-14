@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    start-alt-instance
+# @desc    Launch second WibWob-DOS instance (port 8098, label=zuk)
 # start-alt-instance.sh — launch a second WibWob-DOS instance in a new tmux window.
 #
 # Usage:

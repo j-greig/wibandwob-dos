@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    cli-runtime-triage
+# @desc    Quick runtime health triage via CLI
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    restart
+# @desc    Stop → relaunch → verify new instance (delegates to ensure-running if no tmux)
 # Restart WibWob-DOS without human involvement.
 #
 # Usage: bash scripts/restart.sh [--force]

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    attach
+# @desc    Attach to running WibWob-DOS tmux session (starts if needed)
 # attach.sh — attach to the running WibWob-DOS tmux session
 # Usage: bash scripts/attach.sh
 # Alias:  alias wwdos='bash ~/Repos/wibandwob-dos/scripts/attach.sh'

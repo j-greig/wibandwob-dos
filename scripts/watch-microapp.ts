@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+// @name    watch-microapp
+// @desc    File watcher — auto reload+reopen microapp on change
 
 import fs from "node:fs";
 import path from "node:path";

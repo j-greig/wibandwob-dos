@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    cli-text-loop
+# @desc    Stress test text rendering via CLI
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

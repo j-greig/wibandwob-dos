@@ -70,7 +70,7 @@ check "structured describeState" 3 "$(grep -q 'entryCount\|lastEntry' "$SOURCE" 
 echo ""
 echo "=== v2 — Rich Rendering (12 pts) ==="
 check "day dividers" 2 "$(grep -qE 'divider|day.*sep|───|━━━|date.*header' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
-check "keyboard navigation" 3 "$(grep -qE "key.*\[.*'j'|key.*\[.*'k'|'g'.*'G'" "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "keyboard navigation" 3 "$(grep -qE 'key.*\[.*"j"|key.*\[.*"k"|scroll\(-1\)|scroll\(1\)' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 check "search/filter" 3 "$(grep -qE 'filterEntries|searchMode|createInlineSearch|filterByPeer' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 check "relative timestamps" 2 "$(grep -qE 'ago|relative.*time|timeAgo|formatRelative' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 check "word-wrap" 2 "$(grep -qE 'wrap|wordWrap|wrapText' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
@@ -103,7 +103,7 @@ echo "========================================="
 
 # ── 4. Capture screenshot ────────────────────────────────────────────
 # Ensure fixed tmux geometry for comparable screenshots
-tmux resize-window -t wibwob -x 211 -y 56 2>/dev/null || true
+tmux resize-window -t wibwob -x 169 -y 44 2>/dev/null || true
 sleep 1
 
 mkdir -p "$(dirname "$SCREENSHOT_PATH")"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    reload-microapp
+# @desc    Close → reload code → reopen a microapp (solves reload ≠ reopen)
 # reload-microapp.sh — Close, reload, and reopen a microapp window.
 #
 # Solves the "reload ≠ reopen" confusion: microapps.reload refreshes

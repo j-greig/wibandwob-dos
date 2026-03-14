@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    runtime-parity-check
+# @desc    Verify runtime inspection data matches actual state
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

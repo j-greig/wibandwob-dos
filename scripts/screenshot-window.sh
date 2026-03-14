@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    screenshot-window
+# @desc    Text crop of a single window from the live TUI
 # screenshot-window.sh — TEXT crop of the live TUI to a single window's rect
 #
 # WARNING: This tool outputs plain text, NOT PNG/JPEG images.

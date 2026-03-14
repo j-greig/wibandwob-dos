@@ -1,4 +1,6 @@
 #!/bin/bash
+# @name    overlap-check
+# @desc    Detect overlapping windows with bounds, clipping, fix hints
 # overlap-check — window bounds, overlaps, clipping, and layout suggestions
 # Works for any number of windows. Run after any layout change.
 PORT=${CONTROL_API_PORT:-8099}

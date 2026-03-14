@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    cli-parity-check
+# @desc    Verify CLI commands match API surface
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

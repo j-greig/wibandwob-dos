@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    blocking-flow-check
+# @desc    Detect blocking UI flows that lack API entrypoints or cleanup
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+// @name    check-coat
+// @desc    COAT enforcement — import boundary, orphan keys, manifests, IDs, shims, registry
 /**
  * check-coat.ts — COAT (Command Once, Adapt Thin) enforcement checks.
  *

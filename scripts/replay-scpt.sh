@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    replay-scpt
+# @desc    Replay a .scpt.md timeline script against live WibWob-DOS
 set -euo pipefail
 # replay-scpt.sh — Replay a .scpt.md ASCII cinema script against live WibWob-DOS
 #

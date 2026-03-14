@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    ci-cli-test
+# @desc    CI gate — run CLI parity suite against live API
 set -euo pipefail
 # CI parity gate — runs the canonical wibwob CLI parity suite against a live API.
 #

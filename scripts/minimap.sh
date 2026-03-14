@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    minimap
+# @desc    ASCII spatial map of the live desktop — all windows with positions
 # minimap.sh — ASCII art spatial map of the live WibWob-DOS desktop
 # Usage: scripts/minimap.sh
 # Fetches /state from port 8099 and renders scaled window rectangles.

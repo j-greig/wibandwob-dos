@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    live-api-test-suite
+# @desc    Run API endpoint tests against running instance
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

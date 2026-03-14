@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    scaffold-microapp
+# @desc    Create a new microapp package with manifest + entry file
 set -euo pipefail
 
 if [[ $# -lt 3 || $# -gt 4 ]]; then

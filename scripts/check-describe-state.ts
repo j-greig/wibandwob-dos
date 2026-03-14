@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+// @name    check-describe-state
+// @desc    Verify all window types implement describeState correctly
 /**
  * Runtime describeState coverage checker.
  *

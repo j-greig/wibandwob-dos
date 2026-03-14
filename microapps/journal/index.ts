@@ -50,8 +50,33 @@ function formatTime(ts: string): string {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function timeAgo(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 function dayKey(ts: string): string {
   return new Date(ts).toISOString().slice(0, 10);
+}
+
+function wrapText(text: string, width: number): string[] {
+  if (text.length <= width) return [text];
+  const lines: string[] = [];
+  let remaining = text;
+  while (remaining.length > width) {
+    let breakAt = remaining.lastIndexOf(" ", width);
+    if (breakAt <= 0) breakAt = width;
+    lines.push(remaining.slice(0, breakAt));
+    remaining = remaining.slice(breakAt).trimStart();
+  }
+  if (remaining) lines.push(remaining);
+  return lines;
 }
 
 function formatDayDivider(dateStr: string, width: number, t: any): string {
@@ -63,13 +88,24 @@ function formatDayDivider(dateStr: string, width: number, t: any): string {
   return `{${muted}-fg}${left}${label}${right}{/${muted}-fg}`;
 }
 
-function formatEntryLine(e: JournalEntry, t: any): string {
+function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
   const glyph = PEER_GLYPH[e.peer] || "·";
   const tag = PEER_LABEL[e.peer] || "???";
   const time = formatTime(e.ts);
+  const rel = timeAgo(e.ts);
   const fg = peerColor(e.peer, t);
   const muted = t.muted?.fg || "#555";
-  return `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${tag.padEnd(5)}{/${muted}-fg}  ${e.text}`;
+
+  const prefix = `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${tag.padEnd(5)} ${rel.padEnd(7)}{/${muted}-fg}  `;
+  // prefix visible length: 2 + 1 + 1 + 5 + 1 + 5 + 1 + 7 + 2 = ~25
+  const prefixLen = 25;
+  const textW = Math.max(10, maxTextW - prefixLen);
+  const wrapped = wrapText(e.text, textW);
+  const indent = " ".repeat(prefixLen);
+
+  return wrapped.map((line, i) =>
+    i === 0 ? `${prefix}${line}` : `${indent}${line}`
+  );
 }
 
 // ── Setup ───────────────────────────────────────────────────────────
@@ -117,11 +153,29 @@ function openJournal(host: MicroappHost) {
   const t = () => host.theme();
   const fp = journalPath(host);
   let entries = loadEntries(fp);
+  let filterByPeer: "all" | "human" | "agent" | "system" = "all";
+  let filterText = "";
 
-  // ── Header ────────────────────────────────────────────────────
+  function filterEntries(): JournalEntry[] {
+    return entries.filter(e => {
+      if (filterByPeer !== "all" && e.peer !== filterByPeer) return false;
+      if (filterText && !e.text.toLowerCase().includes(filterText.toLowerCase())) return false;
+      return true;
+    });
+  }
+
+  // ── Header: figlet + tagline ──────────────────────────────────
   const headerBox = blessed.box({
     parent: win.body,
-    top: 0, left: 0, right: 0, height: 3,
+    top: 0, left: 1, right: 0, height: 7,
+    tags: true,
+    style: t().body,
+  });
+
+  // ── Separator ─────────────────────────────────────────────────
+  const sepBox = blessed.box({
+    parent: win.body,
+    top: 7, left: 0, right: 0, height: 1,
     tags: true,
     style: t().body,
   });
@@ -129,7 +183,7 @@ function openJournal(host: MicroappHost) {
   // ── Log ───────────────────────────────────────────────────────
   const logBox = blessed.box({
     parent: win.body,
-    top: 3, left: 0, right: 0, bottom: 2,
+    top: 8, left: 0, right: 0, bottom: 2,
     tags: true,
     scrollable: true,
     alwaysScroll: true,
@@ -151,9 +205,33 @@ function openJournal(host: MicroappHost) {
   // ── Input ─────────────────────────────────────────────────────
   const inputBox = blessed.textbox({
     parent: win.body,
-    bottom: 0, left: 0, right: 0, height: 1,
+    bottom: 0, left: 7, right: 0, height: 1,
     inputOnFocus: true,
     style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+  });
+
+  const inputPrompt = blessed.box({
+    parent: win.body,
+    bottom: 0, left: 0, width: 7, height: 1,
+    tags: true,
+    content: " {bold}▸{/bold} ",
+    style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+  });
+
+  // ── Keyboard nav ──────────────────────────────────────────────
+  logBox.key(["j"], () => { logBox.scroll(1); host.screen.render(); });
+  logBox.key(["k"], () => { logBox.scroll(-1); host.screen.render(); });
+  logBox.key(["g"], () => { (logBox as any).scrollTo(0); host.screen.render(); });
+  logBox.key(["S-g"], () => { logBox.setScrollPerc(100); host.screen.render(); });
+
+  // ── Filter keys ───────────────────────────────────────────────
+  // / = cycle peer filter: all → human → agent → system → all
+  logBox.key(["/"], () => {
+    const cycle: Array<typeof filterByPeer> = ["all", "human", "agent", "system"];
+    const idx = cycle.indexOf(filterByPeer);
+    filterByPeer = cycle[(idx + 1) % cycle.length]!;
+    filterText = "";
+    render();
   });
 
   // ── Render ────────────────────────────────────────────────────
@@ -163,18 +241,33 @@ function openJournal(host: MicroappHost) {
     const muted = th.muted?.fg || "#555";
     const accent = th.selected?.fg || "#b48ead";
 
-    // Header
+    // Header — bigger font at large breakpoints
+    const font = w >= 80 ? "slant" : "small";
     let fig = "";
-    try { fig = renderFiglet("JRNL", "small"); } catch { fig = "JRNL"; }
-    const figLines = fig.split("\n").filter(l => l.trim()).slice(0, 2);
+    try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
+    const figLines = fig.split("\n").filter(l => l.trim());
     const tagline = `{${muted}-fg}symbient logbook // dual-authored record{/${muted}-fg}`;
-    headerBox.setContent([...figLines, tagline].join("\n"));
+    headerBox.setContent([...figLines, "", tagline].join("\n"));
+
+    // Separator
+    sepBox.setContent(`{${muted}-fg}${"━".repeat(w)}{/${muted}-fg}`);
 
     // Log
-    const logW = Math.max(10, w - 4);
+    const logW = Math.max(10, w - 2);
+    const visible = filterEntries();
     const lines: string[] = [];
+
+    // Filter indicator
+    if (filterByPeer !== "all" || filterText) {
+      const parts: string[] = [];
+      if (filterByPeer !== "all") parts.push(`peer:${filterByPeer}`);
+      if (filterText) parts.push(`"${filterText}"`);
+      lines.push(`  {${accent}-fg}FILTER: ${parts.join(" + ")}{/${accent}-fg}  {${muted}-fg}(${visible.length}/${entries.length} shown, / to clear){/${muted}-fg}`);
+      lines.push("");
+    }
+
     let lastDay = "";
-    for (const e of entries) {
+    for (const e of visible) {
       const day = dayKey(e.ts);
       if (day !== lastDay) {
         if (lastDay) lines.push("");
@@ -182,7 +275,7 @@ function openJournal(host: MicroappHost) {
         lines.push("");
         lastDay = day;
       }
-      lines.push(formatEntryLine(e, th));
+      lines.push(...formatEntryLines(e, th, logW));
     }
     if (lines.length === 0) {
       lines.push(`  {${muted}-fg}no entries yet. type below.{/${muted}-fg}`);
@@ -193,8 +286,9 @@ function openJournal(host: MicroappHost) {
     // Status bar
     const humans = entries.filter(e => e.peer === "human").length;
     const agents = entries.filter(e => e.peer === "agent").length;
+    const days = new Set(entries.map(e => dayKey(e.ts))).size;
     statusBar.setContent(
-      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} total{/${muted}-fg}`
+      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} entries  ${days} day${days !== 1 ? "s" : ""}  │  j/k scroll  g/G jump{/${muted}-fg}`
     );
 
     host.screen.render();
@@ -238,9 +332,11 @@ function openJournal(host: MicroappHost) {
   win.onRestyle(() => {
     const th = t();
     headerBox.style = th.body;
+    sepBox.style = th.body;
     logBox.style = th.body;
     statusBar.style = { fg: th.muted?.fg || "#666", bg: th.body.bg };
     inputBox.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
+    inputPrompt.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
     render();
   });
 

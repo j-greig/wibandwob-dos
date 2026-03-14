@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    capture-tui-png
+# @desc    Capture macOS display to PNG for visual proof
 # capture-tui-png.sh — capture a macOS display to PNG for WibWob visual proof.
 #
 # IMPORTANT:

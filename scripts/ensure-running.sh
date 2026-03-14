@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    ensure-running
+# @desc    Idempotent start — handles no tmux, no session, dead app, already alive
 # ensure-running.sh — Idempotent: make sure WibWob-DOS is alive.
 #
 # Handles ALL cases:

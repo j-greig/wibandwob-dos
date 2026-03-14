@@ -75,9 +75,25 @@ curl -s -X POST $API/commands/run -H 'Content-Type: application/json' \
   -d '{"id":"microapp.wibwob.journal.open"}'
 ```
 
+### 6. Why did `microapps.reload` not pick up TypeScript changes?
+
+Bun caches the imported module. `microapps.reload` re-registers commands from
+the cached module but does NOT re-import the `.ts` file from disk. The old code
+keeps running. Only a full app restart (`scripts/restart.sh`) loads fresh TS.
+
+**Fix needed:** `microapps.reload` must bust the Bun import cache — either
+via `delete require.cache[path]` equivalent, or by appending a `?v=timestamp`
+query param to the dynamic import path. Until then, agents MUST use restart
+for TS changes, not reload.
+
+**Impact:** The autoresearch.sh script was using `microapps.reload` and getting
+stale code every iteration. Switched to `scripts/restart.sh`.
+
 ## Lessons
 
-- Hot reload ≠ hot reopen. Reload refreshes code; you still need close+open.
+- **`microapps.reload` does NOT reload TS code** — use `scripts/restart.sh`
+- Hot reload ≠ hot reopen. Reload refreshes commands; code stays cached.
 - Don't nest `createRow` inside `createStack` by wrapping layout objects.
 - `restart.sh` is fragile when tmux isn't running. Agent should create session.
 - Always verify window dimensions via `/state` after opening, not just assume.
+- `applyRect` with manual positioning rendered blank — use blessed's own `top/left/right/bottom` props instead.

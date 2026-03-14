@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    wibwob-record
+# @desc    Record asciinema session + audio mix + export to MP4
 # wibwob-record — asciinema recording + audio mix + export
 #
 # Standalone script, NOT part of the CLI (which is a pure HTTP client).

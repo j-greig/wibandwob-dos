@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    layout-sweep
+# @desc    Resize a window through breakpoints and dump layout at each
 # layout-sweep.sh — resize a module window through breakpoints and dump layout report at each.
 #
 # Usage:

@@ -1,3 +1,5 @@
+// @name    check-themes
+// @desc    Validate all theme files have required tokens
 /**
  * check-themes.ts
  * Validates all theme variants (built-in + module) against the full ThemeTokens contract.

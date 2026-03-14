@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    ghostty-shader
+# @desc    Toggle Ghostty custom shaders for CRT/scanline effects
 # Toggle Ghostty custom shaders for WibWob-DOS
 #
 # Usage:

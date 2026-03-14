@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    cli-batch-relayout
+# @desc    Batch relayout windows via CLI for testing
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
