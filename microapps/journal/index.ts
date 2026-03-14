@@ -364,6 +364,31 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
+    id: "query",
+    label: "Query Journal Entries",
+    description: "Search entries by peer, kind, tag, or text. Args: { peer?, kind?, tag?, text?, limit?, journalName? }",
+    direct: true,
+    action: (args: any) => {
+      const jName = args?.journalName || "journal";
+      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
+      let results = loadEntries(fp);
+      if (args?.peer) results = results.filter(e => e.peer === args.peer);
+      if (args?.kind) results = results.filter(e => e.kind === args.kind);
+      if (args?.tag) results = results.filter(e => e.tags?.includes(args.tag));
+      if (args?.text) {
+        const q = args.text.toLowerCase();
+        results = results.filter(e => e.text.toLowerCase().includes(q));
+      }
+      const limit = args?.limit || 20;
+      return {
+        ok: true,
+        total: results.length,
+        entries: results.slice(-limit),
+      };
+    },
+  });
+
+  host.registerCommand({
     id: "ambient",
     label: "Journal Ambient",
     description: "Open a compact ambient view showing the last 3 entries.",
