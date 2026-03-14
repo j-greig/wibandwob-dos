@@ -2,39 +2,39 @@
 set -euo pipefail
 
 echo "=== typecheck ==="
-cd /Users/james/Repos/wibandwob-dos
+cd /Users/james/Repos/wibandwob-dos-asciicker-engine
 bun run typecheck
 
 echo "=== API health ==="
 curl -sf http://127.0.0.1:8099/health | grep -q '"ok":true'
 echo "API healthy"
 
-echo "=== Asciicker window check ==="
+echo "=== Asciicker v2 window check ==="
 ASC_ID=$(curl -s http://127.0.0.1:8099/state | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         print(w['id']); break
 " 2>/dev/null || true)
 
 if [ -z "$ASC_ID" ]; then
-  echo "Asciicker not open — opening..."
+  echo "Asciicker v2 not open — opening..."
   curl -sf -X POST http://127.0.0.1:8099/commands/run \
     -H 'Content-Type: application/json' \
-    -d '{"id":"microapp.wibwob.asciicker.open"}' > /dev/null
+    -d '{"id":"microapp.wibwob.asciicker-v2.open"}' > /dev/null
   sleep 3
   ASC_ID=$(curl -s http://127.0.0.1:8099/state | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         print(w['id']); break
 " 2>/dev/null || true)
 fi
 
 if [ -n "$ASC_ID" ]; then
-  echo "Asciicker window id: $ASC_ID"
+  echo "Asciicker v2 window id: $ASC_ID"
   # Maximize for proper scoring — small windows lose detail
   curl -sf -X POST http://127.0.0.1:8099/windows/maximize \
     -H 'Content-Type: application/json' -d "{\"id\":$ASC_ID}" > /dev/null 2>&1
@@ -47,11 +47,11 @@ if [ -n "$ASC_ID" ]; then
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         print(json.dumps(w, indent=2))
 "
 else
-  echo "FAIL: Could not open Asciicker window"
+  echo "FAIL: Could not open Asciicker v2 window"
   exit 1
 fi
 

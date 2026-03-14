@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /Users/james/Repos/wibandwob-dos
+cd /Users/james/Repos/wibandwob-dos-asciicker-engine
 
-echo "=== Asciicker Quality Benchmark ==="
+echo "=== Asciicker v2 Quality Benchmark ==="
 
 # 1. Typecheck
 echo "--- typecheck ---"
 bun run typecheck 2>&1 | tail -3
 
-# 2. Ensure asciicker is running
-echo "--- reload asciicker ---"
-# Close existing
+# 2. Reload modules so new code is picked up
+echo "--- reload modules ---"
+curl -sf -X POST http://127.0.0.1:8099/commands/run \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"modules.reload"}' >/dev/null 2>&1 || true
+sleep 1
+
+# 3. Close any existing asciicker-v2 window
 curl -s http://127.0.0.1:8099/state | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         print(w['id'])
 " 2>/dev/null | while read id; do
   curl -s -X POST http://127.0.0.1:8099/windows/close \
@@ -25,35 +30,35 @@ done
 
 sleep 0.3
 
-# Open fresh
+# 4. Open fresh
 curl -s -X POST http://127.0.0.1:8099/commands/run \
   -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.asciicker.open"}' >/dev/null 2>&1
+  -d '{"id":"microapp.wibwob.asciicker-v2.open"}' >/dev/null 2>&1
 
 sleep 0.5
 
-# 3. Get window ID
+# 5. Get window ID
 SC_ID=$(curl -s http://127.0.0.1:8099/state | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         print(w['id']); break
 " 2>/dev/null)
 
 if [ -z "$SC_ID" ]; then
-  echo "FAIL: Asciicker window not found"
+  echo "FAIL: Asciicker v2 window not found"
   exit 1
 fi
 
 echo "Window ID: $SC_ID"
 
-# 3b. Maximize window for full resolution scoring
+# 5b. Maximize window for full resolution scoring
 curl -sf -X POST http://127.0.0.1:8099/windows/maximize \
   -H 'Content-Type: application/json' -d "{\"id\":$SC_ID}" > /dev/null 2>&1
 sleep 0.5
 
-# 4. Wait for rendering then capture frames
+# 6. Wait for rendering then capture frames
 echo "--- capturing frames ---"
 sleep 4
 
@@ -63,25 +68,25 @@ FRAME2=$(curl -s "http://127.0.0.1:8099/screenshot/text?id=$SC_ID" 2>/dev/null)
 sleep 2
 FRAME3=$(curl -s "http://127.0.0.1:8099/screenshot/text?id=$SC_ID" 2>/dev/null)
 
-# 5. Get describeState
+# 7. Get describeState
 STATE=$(curl -s http://127.0.0.1:8099/state | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker':
+    if w.get('appType')=='wibwob.asciicker-v2':
         import json as j
         print(j.dumps(w, indent=2))
         break
 " 2>/dev/null)
 
-# 6. Read source for analysis — all .ts files in the module
-SOURCE=$(cat modules/asciicker/*.ts)
-SOURCE_LINES=$(cat modules/asciicker/*.ts | wc -l)
-SOURCE_FILE_COUNT=$(ls modules/asciicker/*.ts | wc -l)
+# 8. Read source for analysis — all .ts files in the module
+SOURCE=$(cat modules/asciicker-v2/*.ts)
+SOURCE_LINES=$(cat modules/asciicker-v2/*.ts | wc -l)
+SOURCE_FILE_COUNT=$(ls modules/asciicker-v2/*.ts | wc -l)
 
 echo "--- source: $SOURCE_LINES lines in $SOURCE_FILE_COUNT files ---"
 
-# 7. Score via LLM
+# 9. Score via LLM
 echo "--- scoring ---"
 
 cat <<'SCORING_PROMPT' > /tmp/asciicker-score-prompt.md

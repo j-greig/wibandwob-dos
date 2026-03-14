@@ -1,0 +1,20 @@
+{
+  "name": "asciicker-v2",
+  "version": "0.1.0",
+  "description": "Cat in Glasgow — isometric ASCII city exploration",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.asciicker-v2",
+    "title": "Cat in Glasgow",
+    "description": "Be a cat exploring Glasgow tenements at night. Isometric 3D ASCII.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 171, "label": "Cat in Glasgow" }
+    ],
+    "palette": { "order": 171, "label": "Open Cat in Glasgow" },
+    "agent": true,
+    "api": true
+  }
+}
