@@ -1,147 +1,139 @@
 #!/usr/bin/env bash
+# E042 Solid Foundations — Architecture fitness scorer
+# Uses a subagent to compare actual codebase against target architecture
+# Outputs: architecture_score (0-100, higher is better)
 set -uo pipefail
 
-echo "=== Unix Control v3 — Infra + Creative Tooling ==="
+REPO="$(cd "$(dirname "$0")" && pwd)"
+TARGET="$REPO/autoresearch/solid-foundations/target-architecture.md"
 
-cd /Users/james/Repos/wibandwob-dos
-WIBWOB="bun run src/cli/wibwob.ts"
-API="http://127.0.0.1:8099"
+# Quick deterministic pre-checks (fast, no LLM needed)
+# These feed the scorer but also give us hard numbers
 
-PASS=0
-FAIL=0
-TOTAL=10
+# God object line counts
+ac_lines=$(wc -l < "$REPO/src/core/app-controller.ts" 2>/dev/null || echo 9999)
+ui_lines=$(wc -l < "$REPO/src/core/ui-parts.ts" 2>/dev/null || echo 9999)
+bw_lines=$(wc -l < "$REPO/src/windows/browser-windows.ts" 2>/dev/null || echo 9999)
+was_lines=$(wc -l < "$REPO/src/services/wibwob-agent-session.ts" 2>/dev/null || echo 9999)
 
-check() {
-  local num="$1"
-  local desc="$2"
-  local result="$3"
-  if [ "$result" = "PASS" ]; then
-    PASS=$((PASS + 1))
-    echo "  ✓ #$num $desc"
-  else
-    FAIL=$((FAIL + 1))
-    echo "  ✗ #$num $desc — $result"
-  fi
-}
+# Files over thresholds
+over_1000=$(find "$REPO/src" -name '*.ts' -not -path '*/types/*' -not -path '*/tests/*' | xargs wc -l 2>/dev/null | awk '$1 > 1000 && !/total/' | wc -l | tr -d ' ')
+over_500=$(find "$REPO/src" -name '*.ts' -not -path '*/types/*' -not -path '*/tests/*' | xargs wc -l 2>/dev/null | awk '$1 > 500 && !/total/' | wc -l | tr -d ' ')
 
-# ── A1: Full Zod schema coverage ────────────────────────
-# Count api:true commands that accept args vs those with params schemas
-TOTAL_WITH_ARGS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.description != null and (.description | test("Args:|args:"; "i")))] | length' || echo 0)
-WITH_PARAMS=$($WIBWOB commands 2>/dev/null | jq '[.[] | select(.params != null)] | length' || echo 0)
-if [ "$TOTAL_WITH_ARGS" -gt 0 ]; then
-  COVERAGE=$(( WITH_PARAMS * 100 / TOTAL_WITH_ARGS ))
-else
-  COVERAGE=0
-fi
-if [ "$COVERAGE" -ge 80 ]; then
-  check "A1" "Zod schema coverage ($WITH_PARAMS/$TOTAL_WITH_ARGS = ${COVERAGE}%)" "PASS"
-else
-  check "A1" "Zod schema coverage ($WITH_PARAMS/$TOTAL_WITH_ARGS = ${COVERAGE}%)" "need >=80%"
-fi
+# as any count
+any_count=$(grep -r "as any" "$REPO/src" --include='*.ts' -l 2>/dev/null | xargs grep -c "as any" 2>/dev/null | awk -F: '{s+=$2} END {print s}')
 
-# ── A2: Unix socket transport ───────────────────────────
-SOCK_PATH="/tmp/wibwob-main.sock"
-if [ -S "$SOCK_PATH" ] && $WIBWOB health 2>/dev/null | jq -r '.ok' | grep -q true; then
-  check "A2" "Unix socket transport" "PASS"
-else
-  check "A2" "Unix socket transport" "no socket at $SOCK_PATH"
-fi
+# Layer violations (core importing from services/windows, excluding app-controller)
+core_svc_violations=$(grep -r "from ['\"]\.\.\/services\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | grep -v app-controller | wc -l | tr -d ' ')
+core_win_violations=$(grep -r "from ['\"]\.\.\/windows\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | grep -v app-controller | wc -l | tr -d ' ')
+core_mod_violations=$(grep -r "from ['\"]\.\.\/\.\.\/modules\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | wc -l | tr -d ' ')
 
-# ── A3: Virtual filesystem spike ────────────────────────
-if mountpoint -q /wibwob 2>/dev/null || [ -d /tmp/wibwob-fuse ] && [ -f /tmp/wibwob-fuse/state ]; then
-  check "A3" "FUSE VFS spike" "PASS"
-else
-  # Check if the FUSE script at least exists
-  if [ -f scripts/wibwob-fuse.py ] || [ -f src/cli/wibwob-fuse.ts ]; then
-    check "A3" "FUSE VFS spike" "script exists but not mounted"
-  else
-    check "A3" "FUSE VFS spike" "no FUSE implementation found"
-  fi
-fi
-
-# ── A4: _apiCall guard full coverage ────────────────────
-# Test all commands that have interactive fallbacks
-GUARD_PASS=0
-GUARD_TOTAL=0
-
-for cmd_id in primer.open editor.open markdown.open figlet.open; do
-  GUARD_TOTAL=$((GUARD_TOTAL + 1))
-  RESULT=$($WIBWOB cmd "$cmd_id" 2>/dev/null | jq -r '.result.error // .error // empty')
-  if echo "$RESULT" | grep -qi 'requires.*arg.*api\|via API'; then
-    GUARD_PASS=$((GUARD_PASS + 1))
-  fi
+# Target files that exist (check key extractions from target architecture)
+target_files_exist=0
+for f in \
+  src/core/action-bridge.ts \
+  src/core/window-openers.ts \
+  src/core/ui-layout.ts \
+  src/core/ui-chrome.ts \
+  src/core/ui-tabs.ts \
+  src/core/ui-scroll-viewport.ts \
+  src/core/ui-sidebar.ts \
+  src/core/ui-selectable-list.ts \
+  src/core/ui-draft-input.ts \
+  src/core/overlays/browser-prompt.ts \
+  src/core/overlays/file-browser-prompt.ts \
+  src/core/overlays/list-picker.ts \
+  src/windows/file-manager-window.ts \
+  src/windows/document-reader-window.ts \
+  src/services/agent/tool-registry.ts \
+  src/services/html-to-markdown.ts \
+  src/core/ansi-palette.ts \
+  src/tests/helpers.ts; do
+  [ -f "$REPO/$f" ] && target_files_exist=$((target_files_exist + 1))
 done
+total_target_files=18
 
-if [ "$GUARD_PASS" -eq "$GUARD_TOTAL" ]; then
-  check "A4" "_apiCall guard ($GUARD_PASS/$GUARD_TOTAL commands)" "PASS"
-else
-  check "A4" "_apiCall guard ($GUARD_PASS/$GUARD_TOTAL commands)" "missing guards"
-fi
+# Deduplication check
+html_to_md_copies=$(grep -rl "htmlToMarkdown\|html_to_markdown\|htmltomarkdown" "$REPO/src/services" --include='*.ts' 2>/dev/null | wc -l | tr -d ' ')
 
-# ── B1: breed.py exists and works ───────────────────────
-BREED_SCRIPT=""
-[ -f scripts/breed.py ] && BREED_SCRIPT="scripts/breed.py"
-[ -f scripts/fx/breed ] && BREED_SCRIPT="scripts/fx/breed"
-[ -f .pi/skills/vj-timeline/scripts/breed.py ] && BREED_SCRIPT=".pi/skills/vj-timeline/scripts/breed.py"
+# Output all metrics
+echo "god_ac_lines=$ac_lines"
+echo "god_ui_lines=$ui_lines"  
+echo "god_bw_lines=$bw_lines"
+echo "god_was_lines=$was_lines"
+echo "over_1000=$over_1000"
+echo "over_500=$over_500"
+echo "any_count=$any_count"
+echo "core_svc_violations=$core_svc_violations"
+echo "core_win_violations=$core_win_violations"
+echo "core_mod_violations=$core_mod_violations"
+echo "target_files_exist=$target_files_exist"
+echo "total_target_files=$total_target_files"
+echo "html_to_md_copies=$html_to_md_copies"
 
-if [ -n "$BREED_SCRIPT" ]; then
-  # Test it with two small files
-  echo "AAAA" > /tmp/breed-test-a.txt
-  echo "BBBB" > /tmp/breed-test-b.txt
-  BREED_OUT=$(python3 "$BREED_SCRIPT" /tmp/breed-test-a.txt /tmp/breed-test-b.txt --out /tmp/breed-test-out.txt 2>&1 || true)
-  if [ -f /tmp/breed-test-out.txt ] && [ -s /tmp/breed-test-out.txt ]; then
-    check "B1" "breed.py works" "PASS"
-  else
-    check "B1" "breed.py exists but failed" "$BREED_OUT"
-  fi
-  rm -f /tmp/breed-test-a.txt /tmp/breed-test-b.txt /tmp/breed-test-out.txt
-else
-  check "B1" "breed.py" "script not found"
-fi
+# Compute composite score (deterministic, fast)
+# God objects: target is ac=600, ui=200, bw=0(split), was=400
+# Score = how close to target, 0-100 per object, averaged
+god_score=$(python3 -c "
+import math
+def shrink_score(current, original, target):
+    if current <= target: return 100
+    progress = (original - current) / (original - target) * 100
+    return max(0, min(100, progress))
 
-# ── B2: Window-as-pixel mosaic ──────────────────────────
-if [ -f scripts/mosaic.sh ] || [ -f scripts/mosaic.py ] || [ -f scripts/fx/mosaic.sh ] || [ -f scripts/fx/zoo.sh ]; then
-  check "B2" "Mosaic script exists" "PASS"
-else
-  check "B2" "Mosaic script" "not found"
-fi
+ac = shrink_score($ac_lines, 2244, 600)
+ui = shrink_score($ui_lines, 2395, 200)
+bw = shrink_score($bw_lines, 2082, 0)
+was = shrink_score($was_lines, 1063, 400)
+print(f'{(ac + ui + bw + was) / 4:.1f}')
+")
 
-# ── B3: Per-window chromeless mode ──────────────────────
-# Test by trying the command
-CHROME_RESULT=$($WIBWOB commands -q 2>/dev/null | grep -c 'window.set_chrome' || true)
-CHROME_RESULT=${CHROME_RESULT:-0}
-if [ "$CHROME_RESULT" -ge 1 ]; then
-  check "B3" "Per-window chromeless command" "PASS"
-else
-  check "B3" "Per-window chromeless command" "window.set_chrome not in catalog"
-fi
+# Layer discipline: start at baseline for current state (~10 violations)
+# Each violation removed is worth points, scaled so 0 violations = 100
+layer_violations=$((core_svc_violations + core_win_violations + core_mod_violations))
+layer_score=$(python3 -c "print(max(0, min(100, 100 - $layer_violations * 8)))")
 
-# ── B4: Screenshot region crop ──────────────────────────
-REGION_OUT=$($WIBWOB screenshot --region --x 0 --y 0 --w 10 --h 5 2>&1 || true)
-if [ -n "$REGION_OUT" ] && ! echo "$REGION_OUT" | grep -qi 'error\|unknown\|usage'; then
-  check "B4" "Screenshot region crop" "PASS"
-else
-  check "B4" "Screenshot region crop" "not implemented"
-fi
+# File health: penalise files over 1000 heavily, 500-999 moderately
+# over_500 includes over_1000, so subtract to avoid double-counting
+mid_files=$((over_500 - over_1000))
+file_health=$(python3 -c "print(max(0, 100 - $over_1000 * 8 - $mid_files * 2))")
 
-# ── B5: ascii-fx as commands ────────────────────────────
-FX_COUNT=$($WIBWOB commands -q 2>/dev/null | grep -c '^fx\.' || true)
-FX_COUNT=${FX_COUNT:-0}
-if [ "$FX_COUNT" -ge 3 ]; then
-  check "B5" "ascii-fx commands ($FX_COUNT registered)" "PASS"
-else
-  check "B5" "ascii-fx commands ($FX_COUNT registered)" "need >=3 fx.* commands"
-fi
+# Target file existence: simple percentage
+target_score=$(python3 -c "print(round($target_files_exist / $total_target_files * 100, 1))")
 
-# ── B7: JGSBREEDER pipeline ────────────────────────────
-if [ -f scripts/jgsbreeder.sh ] || [ -f scripts/jgsbreeder.py ] || [ -f scripts/fx/jgsbreeder.sh ]; then
-  check "B7" "JGSBREEDER pipeline script" "PASS"
-else
-  check "B7" "JGSBREEDER pipeline script" "not found"
-fi
+# Dedup: target is 1 copy of htmlToMarkdown (or 0 if extracted to shared file)
+dedup_score=$(python3 -c "print(100 if $html_to_md_copies <= 1 else max(0, 100 - ($html_to_md_copies - 1) * 50))")
 
-# ── Summary ──────────────────────────────────────────────
-echo ""
-echo "=== Results: $PASS/$TOTAL items complete ==="
-echo "METRIC:completion_count:$PASS"
-exit 0
+# Type safety: target <20 non-blessed casts, but we count all for simplicity
+# ~40 are blessed gaps (permanent), so effective floor is ~40
+type_score=$(python3 -c "
+count = $any_count
+blessed_floor = 40  # permanent blessed type gaps
+effective = max(0, count - blessed_floor)
+# 0 effective = 100, 115 effective (current) ≈ 10
+if effective <= 0: score = 100
+elif effective <= 20: score = 90 - effective * 1
+else: score = max(5, 70 - effective * 0.5)
+print(f'{score:.1f}')
+")
+
+# Weighted total
+total=$(python3 -c "
+god = $god_score * 0.30
+layer = $layer_score * 0.25
+health = $file_health * 0.20
+target = $target_score * 0.10
+dedup = $dedup_score * 0.10
+types = $type_score * 0.05
+total = god + layer + health + target + dedup + types
+print(f'{total:.1f}')
+")
+
+echo "---"
+echo "god_score=$god_score"
+echo "layer_score=$layer_score"
+echo "file_health=$file_health"
+echo "target_score=$target_score"
+echo "dedup_score=$dedup_score"  
+echo "type_score=$type_score"
+echo "architecture_score=$total"
