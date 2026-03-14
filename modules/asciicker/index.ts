@@ -1089,6 +1089,41 @@ function openAsciicker(host: MicroappHost) {
   let tick = 0;
   const keys = new Set<string>();
 
+  // ─── Weather system ──────────────────────────────────
+  type Weather = "clear" | "rain" | "fog" | "storm";
+  let weather: Weather = "clear";
+  let weatherTimer = 200;
+  function updateWeather() {
+    weatherTimer--;
+    if (weatherTimer <= 0) {
+      const rng = hash2d(tick, tick * 7, 42);
+      if (rng < 0.4) weather = "clear";
+      else if (rng < 0.7) weather = "rain";
+      else if (rng < 0.9) weather = "fog";
+      else weather = "storm";
+      weatherTimer = 100 + Math.floor(hash2d(tick, 99, 11) * 200);
+    }
+  }
+
+  // ─── Item pickups scattered on terrain ────────────────
+  interface Item { x: number; y: number; kind: string; ch: string; fg: number; collected: boolean }
+  const items: Item[] = [];
+  const itemKinds = [
+    { kind: "gem", ch: "♦", fg: rgb6(5, 0, 0) },
+    { kind: "coin", ch: "○", fg: rgb6(5, 5, 0) },
+    { kind: "herb", ch: "♣", fg: rgb6(0, 5, 0) },
+    { kind: "scroll", ch: "≡", fg: rgb6(5, 5, 5) },
+  ];
+  for (let i = 0; i < 30; i++) {
+    const ix = Math.floor(hash2d(i * 23, worldSeed * 9, 33) * (terrain.w - 20)) + 10;
+    const iy = Math.floor(hash2d(worldSeed * 11, i * 37, 44) * (terrain.h - 20)) + 10;
+    const b = getBiome(terrain, ix, iy);
+    if (b === Biome.DEEP_WATER || b === Biome.WATER) continue;
+    const ik = itemKinds[i % itemKinds.length];
+    items.push({ x: ix, y: iy, ...ik, collected: false });
+  }
+  let inventory: Record<string, number> = { gem: 0, coin: 0, herb: 0, scroll: 0 };
+
   function getContentSize() {
     return {
       w: Math.max(8, Number(canvas.width) || 60),
@@ -1150,6 +1185,20 @@ function openAsciicker(host: MicroappHost) {
     cam.y += (playerY - cam.y) * 0.15;
     cam.z += (targetZ - cam.z) * 0.1;
 
+    // Update weather
+    updateWeather();
+
+    // Check item pickups
+    for (const item of items) {
+      if (item.collected) continue;
+      const d = Math.sqrt((item.x - playerX) ** 2 + (item.y - playerY) ** 2);
+      if (d < 2) {
+        item.collected = true;
+        inventory[item.kind]++;
+        showMessage(`Picked up ${item.kind}! (${inventory[item.kind]} total)`);
+      }
+    }
+
     // Update NPCs — simple patrol AI
     for (const npc of npcs) {
       npc.x += npc.dx;
@@ -1172,6 +1221,44 @@ function openAsciicker(host: MicroappHost) {
 
     // Render 3D scene
     const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs, npcs);
+
+    // Render items on ground
+    for (const item of items) {
+      if (item.collected) continue;
+      const dx = item.x - cam.x, dy = item.y - cam.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 20) continue;
+      const ih = getH(terrain, item.x, item.y);
+      const proj = projectPoint(item.x, item.y, ih / 8 + 1, cam, w, h);
+      if (proj.sx >= 0 && proj.sx < w && proj.sy >= 0 && proj.sy < h) {
+        const bidx = proj.sy * w + proj.sx;
+        // Pulsing glow effect
+        const pulse = Math.sin(tick * 0.2 + item.x) > 0;
+        buf[bidx] = { ...buf[bidx], glyph: item.ch, fg: pulse ? item.fg : grey(16) };
+      }
+    }
+
+    // Weather overlay — rain drops or fog
+    if (weather === "rain" || weather === "storm") {
+      const drops = weather === "storm" ? 40 : 15;
+      for (let i = 0; i < drops; i++) {
+        const rx = Math.floor(hash2d(tick * 5 + i, i * 19, 33) * w);
+        const ry = Math.floor(hash2d(i * 23, tick * 3, 44) * h);
+        if (rx >= 0 && rx < w && ry >= 0 && ry < h) {
+          const ridx = ry * w + rx;
+          buf[ridx] = { ...buf[ridx], glyph: weather === "storm" ? "┃" : "│", fg: rgb6(2, 3, 5) };
+        }
+      }
+    } else if (weather === "fog") {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          if (buf[idx].flags > 0 && hash2d(x + tick, y, 77) < 0.15) {
+            buf[idx] = { ...buf[idx], glyph: "░", fg: grey(16), bg: grey(8) };
+          }
+        }
+      }
+    }
     const dayProg = (tick * 0.003) % 1;
     const sunElev = Math.sin(dayProg * Math.PI * 2) * 0.5 + 0.5;
     const ansi = bufferToAnsi(buf, w, h, tick, sunElev);
@@ -1192,10 +1279,12 @@ function openAsciicker(host: MicroappHost) {
     // Tick message timer
     if (messageTimer > 0) messageTimer--;
     const msgDisplay = messageTimer > 0 ? `  💬 ${messageText}` : "";
+    const weatherIcons: Record<Weather, string> = { clear: "☀", rain: "🌧", fog: "🌫", storm: "⛈" };
+    const invStr = `♦${inventory.gem} ○${inventory.coin} ♣${inventory.herb} ≡${inventory.scroll}`;
     status.setContent(
       ` ⊕${Math.floor(playerX)},${Math.floor(playerY)}  ▲${alt}m  ${biomeName}  ` +
-      `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ☀${dayPhases[phaseIdx]}  ` +
-      `WASD:move Q/E:rotate Space:talk` +
+      `${weatherIcons[weather]}${dayPhases[phaseIdx]}  ${invStr}  ` +
+      `WASD Q/E ±zoom Space:talk` +
       msgDisplay
     );
 
@@ -1267,6 +1356,9 @@ function openAsciicker(host: MicroappHost) {
       worldSize: `${terrain.w}x${terrain.h}`,
       npcCount: npcs.length,
       objectCount: worldObjs.length,
+      weather,
+      inventory,
+      itemsRemaining: items.filter(i => !i.collected).length,
       tick,
     };
   });
