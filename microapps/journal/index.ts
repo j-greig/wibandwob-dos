@@ -273,7 +273,10 @@ export default function setup(host: MicroappHost) {
       let buffer: string[] = [];
 
       function flushBuffer() {
-        const text = buffer.join(" ").trim();
+        // Strip markdown bold markers and backticks for cleaner display
+        const text = buffer.join(" ").trim()
+          .replace(/\*\*(.*?)\*\*/g, "$1")
+          .replace(/`(.*?)`/g, "$1");
         if (text && text.length > 3) {
           // Extract file references
           const fileRefs = text.match(/(?:src\/|microapps\/|\.agents\/|\.planning\/)[^\s,)]+/g) || [];
@@ -591,9 +594,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
   if (entries.length === 0) {
     addEntry("journal initialised", "system");
-  } else {
-    addEntry("session resumed", "system");
   }
+  // Skip "session resumed" noise — the session start is implicit from timestamps
 
   win.setFocusTarget(inputBox);
 
