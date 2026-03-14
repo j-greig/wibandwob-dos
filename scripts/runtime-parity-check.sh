@@ -2,12 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-API="${WIBWOB_API:-http://127.0.0.1:8099}"
+source "$ROOT/scripts/lib/runtime-env.sh"
+API="$(ww_api_base)"
 MARKER="parity-$(date +%s)"
 FIGLET_TEXT="RUNTIME ${MARKER}"
 EDITOR_TITLE="Runtime Parity ${MARKER}"
 EDITOR_INITIAL="runtime parity check ${MARKER}"
-ARTIFACT_DIR="$ROOT/scratch/captures"
+ARTIFACT_DIR="$(ww_captures_dir)"
 OPENED_STATE=""
 OPENED_WINDOW_ID=""
 

@@ -21,7 +21,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-API="${WIBWOB_API:-http://127.0.0.1:8099}"
+source "$ROOT_DIR/scripts/lib/runtime-env.sh"
+API="$(ww_api_base)"
 TARGET=""
 WINDOW_ID=""
 DISPLAY_MODE="auto" # auto|all|<N>
@@ -174,7 +175,7 @@ fi
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 if [[ -z "$OUT_DIR" ]]; then
-  OUT_DIR="scratch/captures/app-proof-$STAMP"
+  OUT_DIR="$(ww_captures_dir)/app-proof-$STAMP"
 fi
 mkdir -p "$OUT_DIR/text"
 

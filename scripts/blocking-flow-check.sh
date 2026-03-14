@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-API="${WIBWOB_API:-http://127.0.0.1:8099}"
-ARTIFACT_DIR="$ROOT/scratch/captures"
+source "$ROOT/scripts/lib/runtime-env.sh"
+API="$(ww_api_base)"
+ARTIFACT_DIR="$(ww_captures_dir)"
 MARKER="blocking-flow-$(date +%s)"
 
 api_get() {

@@ -4,7 +4,8 @@
 > patterns: `.agents/shell-dev/specs/state-and-api.md`
 
 
-Local HTTP API on `http://127.0.0.1:8099`.
+Local HTTP API on the configured runtime base URL.
+Default: `http://127.0.0.1:8099`
 
 Always `GET /state` before acting on specific windows — use real ids from live state, never guessed ones.
 Use `GET /help` or `GET /openapi.json` for the live authoritative endpoint catalogue with body field shapes.
@@ -24,6 +25,23 @@ GET /screenshot/text              clean readable text screenshot (ANSI + chrome 
 GET /screenshot/text?id=…         clean text of one window (captureText if available, else stripped crop)
 GET /screenshot/ansi              raw ANSI text screenshot (blessed screen dump, escapes preserved)
 GET /screenshot/ansi?id=…         raw ANSI crop of one window rect
+```
+
+`GET /health` now also returns runtime-node metadata:
+
+```json
+{
+  "ok": true,
+  "port": 8099,
+  "requestedPort": 8099,
+  "host": "127.0.0.1",
+  "instanceId": "abc",
+  "instanceLabel": "main",
+  "scratchBase": "/abs/.../scratch",
+  "capturesDir": "/abs/.../scratch/captures",
+  "workspacesDir": "/abs/.../scratch/workspaces",
+  "statePath": "/abs/.../scratch/app-state.json"
+}
 ```
 
 ## Core Writes
@@ -99,6 +117,7 @@ API command execution is non-interactive by default. If a command would normally
 Window geometry APIs now accept canonical fields only: `left/top/width/height`.
 Workspace save/load semantics are owned by `RuntimeWorkspaceService`, so TUI prompts and `/workspace/*` now follow the same current-name behavior.
 `GET /runtime/inspection` now includes `ui.blocked` and `ui.blockers[]` so agents can see whether menus, overlays, or picker windows are blocking the desktop and which escape/continue commands apply.
+Shell scripts that need runtime paths should source `scripts/lib/runtime-env.sh` instead of hard-coding `:8099` or `scratch/captures`.
 
 ## Window Openers
 

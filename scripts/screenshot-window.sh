@@ -13,7 +13,9 @@
 
 set -euo pipefail
 
-API="${WIBWOB_API:-http://127.0.0.1:8099}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/lib/runtime-env.sh"
+API="$(ww_api_base)"
 ARG="${1:-}"
 
 if [[ -z "$ARG" ]]; then

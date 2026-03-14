@@ -5,8 +5,12 @@
 
 set -euo pipefail
 
-STATE=$(curl -sf http://127.0.0.1:8099/state 2>/dev/null) || {
-  echo "WibWob-DOS not running (port 8099 unreachable)" >&2
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/lib/runtime-env.sh"
+API="$(ww_api_base)"
+
+STATE=$(curl -sf "$API/state" 2>/dev/null) || {
+  echo "WibWob-DOS not running (API unreachable at $API)" >&2
   exit 1
 }
 
@@ -23,7 +27,7 @@ print(' '.join(ids))
     BUF_JSON="{"
     first=1
     for tid in $TERM_IDS; do
-      raw=$(curl -sf "http://127.0.0.1:8099/windows/text?id=$tid" 2>/dev/null || echo '{}')
+      raw=$(curl -sf "$API/windows/text?id=$tid" 2>/dev/null || echo '{}')
       text=$(python3 -c "import json,sys; d=json.loads(sys.argv[1]); print(json.dumps(d.get('text','')))" "$raw" 2>/dev/null || echo '""')
       [ $first -eq 0 ] && BUF_JSON="$BUF_JSON,"
       BUF_JSON="$BUF_JSON\"$tid\":$text"

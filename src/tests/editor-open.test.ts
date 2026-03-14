@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const API = "http://localhost:8099";
+const API = process.env.API_URL ?? process.env.WW_API ?? "http://localhost:8099";
 
 async function post(path: string, body?: Record<string, unknown>) {
   const res = await fetch(`${API}${path}`, {

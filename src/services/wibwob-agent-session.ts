@@ -39,6 +39,7 @@ import nodePath from "node:path";
 import { access, readFile, writeFile, mkdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import { execFile } from "node:child_process";
+import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
 
 // -- Path jailing: agent cannot escape REPO_ROOT --
 
@@ -259,7 +260,7 @@ function loadBasePrompt(): string {
 function buildSenderInfo(windowId: number): string {
   return JSON.stringify({
     sessionName: "wibwob-tui",
-    replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
+    replyVia: `POST ${buildLocalControlApiBaseUrl()}/windows/agent-message`,
     windowId,
   });
 }

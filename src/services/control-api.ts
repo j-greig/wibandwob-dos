@@ -48,7 +48,17 @@ interface ControlApiDeps {
   workspace: RuntimeWorkspaceService;
 }
 
-type ControlApiIdentity = Pick<InstanceDescriptor, "instanceId" | "instanceLabel">;
+type RuntimeControlApiIdentity = Pick<
+  InstanceDescriptor,
+  | "instanceId"
+  | "instanceLabel"
+  | "host"
+  | "apiPort"
+  | "scratchBase"
+  | "capturesDir"
+  | "workspacesDir"
+  | "statePath"
+>;
 
 // ---------------------------------------------------------------------------
 // Endpoint catalogue — single source of truth for GET / and /openapi.json
@@ -168,7 +178,7 @@ export class ControlApiService {
   constructor(
     private readonly port: number,
     private readonly deps: ControlApiDeps,
-    private readonly identity: ControlApiIdentity,
+    private readonly identity: RuntimeControlApiIdentity,
   ) {}
 
   start(): void {
@@ -248,8 +258,14 @@ export class ControlApiService {
         ok: true,
         service: "wibwob-ts-tui-control-api",
         port: this.actualPort,
+        requestedPort: this.identity.apiPort,
+        host: this.identity.host,
         instanceLabel: this.identity.instanceLabel,
         instanceId: this.identity.instanceId,
+        scratchBase: this.identity.scratchBase,
+        capturesDir: this.identity.capturesDir,
+        workspacesDir: this.identity.workspacesDir,
+        statePath: this.identity.statePath,
         docs: "GET /openapi.json for full OpenAPI 3.0 spec",
         endpoints: ENDPOINT_CATALOGUE,
       });
@@ -270,8 +286,14 @@ export class ControlApiService {
       return Response.json({
         ok: true,
         port: this.actualPort,
+        requestedPort: this.identity.apiPort,
+        host: this.identity.host,
         instanceLabel: this.identity.instanceLabel,
         instanceId: this.identity.instanceId,
+        scratchBase: this.identity.scratchBase,
+        capturesDir: this.identity.capturesDir,
+        workspacesDir: this.identity.workspacesDir,
+        statePath: this.identity.statePath,
       });
     }
 
@@ -687,7 +709,9 @@ export class ControlApiService {
       const text = this.deps.windows.captureText(id);
       if (!text) return Response.json({ ok: false, path: null });
       // File export is a control-API concern, not a facade concern
-      const capturesDir = path.join(process.cwd(), "scratch", "captures");
+      const capturesDir = this.identity.capturesDir
+        ? path.resolve(this.identity.capturesDir)
+        : path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
       const name = typeof (body as any).name === "string" ? (body as any).name
         : typeof (body as any).label === "string" ? (body as any).label

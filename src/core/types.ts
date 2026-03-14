@@ -189,10 +189,15 @@ export interface DesktopState {
     mode: string;
     cwd: string;
     statePath: string;
+    scratchBase?: string;
+    capturesDir?: string;
+    workspacesDir?: string;
+    logsDir?: string;
     instanceLabel?: string;
     instanceId?: string;
     deployProfile?: string | null;
     controlApiEnabled?: boolean;
+    controlApiRequestedPort?: number;
     controlApiPort?: number;
     controlApiHost?: string;
     controlApiBaseUrl?: string;

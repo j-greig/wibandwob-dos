@@ -35,10 +35,15 @@ DesktopState (types.ts:192) — returned by GET /state and tui_get_state:
     mode: string
     cwd: string
     statePath: string
+    scratchBase?: string
+    capturesDir?: string
+    workspacesDir?: string
+    logsDir?: string
     instanceLabel?: string
     instanceId?: string
     theme?: string
     controlApiEnabled?: boolean
+    controlApiRequestedPort?: number
     controlApiPort?: number
     controlApiHost?: string
     controlApiBaseUrl?: string
@@ -78,9 +83,9 @@ CRITICAL field names agents get wrong:
 
 ## Control API Endpoints
 
-Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
+Base URL: configured runtime API base URL (default `http://127.0.0.1:8099`)
 
-  GET  /health          → { ok: true, port, instanceId, instanceLabel? }
+  GET  /health          → { ok: true, port, requestedPort, host, instanceId, instanceLabel?, scratchBase?, capturesDir?, workspacesDir?, statePath? }
   GET  /state           → DesktopState (full live snapshot)
   GET  /runtime/inspection → { ok: true, snapshot } where snapshot includes
                              state, stats, ui.menu, ui.overlay, scramble, history
@@ -103,6 +108,7 @@ Full catalogue: src/services/control-api.ts:70
 
 Always GET /health before any other call to confirm the app is ready.
 Always GET /state to get real window IDs before targeting windows.
+If a shell script needs API base URL or runtime capture/workspace paths, source `scripts/lib/runtime-env.sh` and read them from the live runtime rather than guessing repo-root paths.
 
 ## describeState() Contract
 

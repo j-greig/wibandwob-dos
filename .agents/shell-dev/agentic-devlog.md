@@ -1211,3 +1211,40 @@ Rule for agents:
 2. inspect `/runtime/inspection`
 3. drive the blocker with the listed commands
 4. in live tests, use `try/finally` and always send `desktop.clear-all`
+
+---
+
+## 2026-03-14: Runtime-node metadata should drive shell scripts, not guessed paths
+
+Problem pattern:
+
+- shell scripts assumed `http://127.0.0.1:8099` and `scratch/captures`
+- the runtime already knew `instanceId`, state path, capture path, and requested control port
+- that made alt-instance or future multi-instance work look harder than it actually is
+
+What shipped:
+
+- `src/runtime/runtime-node.ts`
+  - canonical runtime-node descriptor for `instanceId`, control host/port, scratch/captures/workspaces/state paths
+- `/health` now reports:
+  - `instanceId`
+  - `requestedPort`
+  - `host`
+  - `scratchBase`
+  - `capturesDir`
+  - `workspacesDir`
+  - `statePath`
+- `GET /state.app.*` now includes:
+  - `scratchBase`
+  - `capturesDir`
+  - `workspacesDir`
+  - `logsDir`
+  - `controlApiRequestedPort`
+- `scripts/lib/runtime-env.sh`
+  - shared helper for resolving API base URL, instance id, captures dir, and workspaces dir from the live runtime first
+
+Rule for agents:
+
+1. if you need API base URL or capture/workspace paths in shell, source `scripts/lib/runtime-env.sh`
+2. prefer live runtime metadata over guessed repo-root paths
+3. keep live restart and live API smoke tests serial, never parallel

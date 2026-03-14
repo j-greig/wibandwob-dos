@@ -18,11 +18,8 @@ import {
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
-  SCRATCH_BASE,
   SPIKE_NOTES_PATH,
   SPIKE_ROOT,
-  STATE_PATH,
-  WORKSPACES_DIR,
 } from "./config.js";
 import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
@@ -171,6 +168,10 @@ import type {
   RuntimeOverlayInspection,
   RuntimeUiBlockerInspection,
 } from "../domain/runtime-inspection.js";
+import {
+  createRuntimeNode,
+  type RuntimeNodeDescriptor,
+} from "../runtime/runtime-node.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -209,7 +210,7 @@ export class TsTuiMvpApp {
   private readonly overlays: OverlayManager;
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
-  private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
+  private readonly workspace: WorkspaceService;
   private readonly geometry: DesktopGeometryService;
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
@@ -225,10 +226,19 @@ export class TsTuiMvpApp {
   private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
+  private readonly runtimeNode: RuntimeNodeDescriptor;
 
-  constructor(opts?: { instanceLabel?: string; instanceId?: string }) {
-    this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
-    this.instanceId = opts?.instanceId?.trim() || "???";
+  constructor(opts?: {
+    instanceLabel?: string;
+    instanceId?: string;
+    runtimeNode?: RuntimeNodeDescriptor;
+  }) {
+    this.runtimeNode = opts?.runtimeNode ?? createRuntimeNode({
+      instanceLabel: opts?.instanceLabel,
+      instanceId: opts?.instanceId?.trim() || "???",
+    });
+    this.instanceLabel = this.runtimeNode.instanceLabel;
+    this.instanceId = this.runtimeNode.instanceId;
     log.setIdentity(this.getInstanceDisplayLabel());
     patchBlessedUnicode();
     this.screen = blessed.screen({
@@ -332,6 +342,7 @@ export class TsTuiMvpApp {
       this.windowManager.restoreWindowFocus(),
     );
     capabilityService.probe();
+    this.workspace = new WorkspaceService(this.runtimeNode.workspacesDir);
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
     this.menuUi = new MenuOverlayManager(
@@ -417,19 +428,14 @@ export class TsTuiMvpApp {
         windows: this.runtimeWindows,
         workspace: this.runtimeWorkspace,
       },
-      {
-        instanceLabel: this.instanceLabel,
-        instanceId: this.instanceId,
-      },
+      this.runtimeNode,
     );
     this.state = new StateService(
       {
         appName: "WibWob-DOS TS MVP",
         appMode: "terminal-native",
         cwd: REPO_ROOT,
-        statePath: STATE_PATH,
-        instanceLabel: this.instanceLabel,
-        instanceId: this.instanceId,
+        runtimeNode: this.runtimeNode,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -441,7 +447,7 @@ export class TsTuiMvpApp {
     );
 
     // Set scramble session log path
-    const scrambleLogDir = path.join(SCRATCH_BASE, "scramble-sessions");
+    const scrambleLogDir = path.join(this.runtimeNode.scratchBase, "scramble-sessions");
     fs.mkdirSync(scrambleLogDir, { recursive: true });
     this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
     this.scrambleBrain.startSessionSocket();
@@ -1411,7 +1417,7 @@ export class TsTuiMvpApp {
       this.overlays.flash("No text to export from this window.");
       return;
     }
-    const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
+    const capturesDir = this.runtimeNode.capturesDir;
     fs.mkdirSync(capturesDir, { recursive: true });
     const slug = (label ?? windowTitle)
       .replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -1480,7 +1486,7 @@ export class TsTuiMvpApp {
         screen: this.screen,
         windowManager: this.windowManager,
         state: this.state,
-        statePath: STATE_PATH,
+        statePath: this.runtimeNode.statePath,
       });
     });
   }
@@ -1594,7 +1600,7 @@ export class TsTuiMvpApp {
     promptForWorkspaceLoad({
       overlays: this.overlays,
       workspace: this.runtimeWorkspace,
-      workspaceDir: WORKSPACES_DIR,
+      workspaceDir: this.runtimeNode.workspacesDir,
       onResult: (result) => this.flashWorkspaceResult("load", result),
     });
   }

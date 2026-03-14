@@ -1,5 +1,7 @@
 import os from "node:os";
+import fs from "node:fs";
 import { parseAppFlags, printHelp } from "./core/cli.js";
+import { createRuntimeNode } from "./runtime/runtime-node.js";
 
 if (!process.env.TERM || process.env.TERM.includes("ghostty")) {
   process.env.TERM = "xterm-256color";
@@ -19,7 +21,9 @@ function randomInstanceId(): string {
 
 const instanceLabel = process.env.WIBWOB_INSTANCE_LABEL?.trim() || undefined;
 const instanceId = randomInstanceId();
-process.env.WIBWOB_INSTANCE_ID = instanceId;
+const runtimeNode = createRuntimeNode({ instanceLabel, instanceId });
+process.env.WIBWOB_INSTANCE_ID = runtimeNode.instanceId;
+process.env.WIBWOB_API_BASE_URL = runtimeNode.apiBaseUrl;
 
 // Set process title so `pkill wibwob-dos` works and ps output is readable.
 // Include instance label so dual-instance is distinguishable: wibwob-dos-main, wibwob-dos-zuk
@@ -28,24 +32,18 @@ process.env.WIBWOB_INSTANCE_ID = instanceId;
 process.title = [
   "wibwob-dos",
   instanceLabel,
-  instanceId,
+  runtimeNode.instanceId,
 ].filter(Boolean).join("-");
 
 // Write PID file so agents can kill cleanly: kill $(cat scratch/wibwob.pid)
 // Respects SCRATCH_DIR for dual-instance isolation.
-import fs from "node:fs";
-import path from "node:path";
-const scratchBase = process.env.SCRATCH_DIR
-  ? path.resolve(process.env.SCRATCH_DIR)
-  : path.join(process.cwd(), "scratch");
-const pidFile = path.join(scratchBase, "wibwob.pid");
-fs.mkdirSync(scratchBase, { recursive: true });
-fs.writeFileSync(pidFile, String(process.pid), "utf8");
-const removePid = () => { try { fs.unlinkSync(pidFile); } catch {} };
+fs.mkdirSync(runtimeNode.scratchBase, { recursive: true });
+fs.writeFileSync(runtimeNode.pidPath, String(process.pid), "utf8");
+const removePid = () => { try { fs.unlinkSync(runtimeNode.pidPath); } catch {} };
 process.once("exit", removePid);
 process.once("SIGTERM", () => { removePid(); process.exit(0); });
 process.once("SIGINT",  () => { removePid(); process.exit(0); });
 
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 
-await new TsTuiMvpApp({ instanceLabel, instanceId }).run();
+await new TsTuiMvpApp({ runtimeNode }).run();

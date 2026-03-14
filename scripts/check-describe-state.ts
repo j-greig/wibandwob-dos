@@ -7,10 +7,10 @@
  * and reasonable metadata.
  *
  * Usage: bun run scripts/check-describe-state.ts
- * Requires: app running on http://127.0.0.1:8099
+ * Requires: app running on the configured control API.
  */
 
-const BASE = "http://127.0.0.1:8099";
+const BASE = process.env.API_URL ?? process.env.WW_API ?? "http://127.0.0.1:8099";
 
 interface DesktopState {
   windows: Array<{
@@ -73,7 +73,7 @@ async function main() {
   try {
     await get("/health");
   } catch {
-    console.error("ERROR: App not running on port 8099. Start it first.");
+    console.error(`ERROR: App not running on ${BASE}. Start it first.`);
     process.exit(1);
   }
 

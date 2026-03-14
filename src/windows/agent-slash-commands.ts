@@ -1,6 +1,9 @@
 import { exec } from "node:child_process";
 import path from "node:path";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
+import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
+
+const CONTROL_API_BASE_URL = buildLocalControlApiBaseUrl();
 
 const HELP_TEXT =
   "[commands]\n" +
@@ -94,7 +97,7 @@ export async function dispatchSlashCommand(
   }
 
   if (trimmed === "/dance") {
-    fetch("http://127.0.0.1:" + (process.env.CONTROL_API_PORT ?? "8099") + "/commands/run", {
+    fetch(`${CONTROL_API_BASE_URL}/commands/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: "microapp.wibwob.glitchbox.glitchbox.open" }),
@@ -105,7 +108,7 @@ export async function dispatchSlashCommand(
   }
 
   if (trimmed === "/state") {
-    fetch("http://127.0.0.1:8099/state")
+    fetch(`${CONTROL_API_BASE_URL}/state`)
       .then((r) => r.json())
       .then((d: any) => {
         const app = d.app ?? {};

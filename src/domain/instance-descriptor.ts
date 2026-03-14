@@ -7,8 +7,14 @@ export interface InstanceDescriptor {
   instanceLabel?: string;
   host?: string;
   apiPort?: number;
+  apiBaseUrl?: string;
   cliPort?: number;
   runtimeVersion?: string;
   workspacePath?: string;
+  scratchBase?: string;
+  capturesDir?: string;
+  workspacesDir?: string;
+  statePath?: string;
+  logsDir?: string;
   lifecycleMode?: RuntimeLifecycleMode;
 }

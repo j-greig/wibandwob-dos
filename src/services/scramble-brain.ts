@@ -116,7 +116,7 @@ export class ScrambleBrain {
     pet: () => "she allows it",
     who: () => "i'm scramble. recursive cat. i live here now. /ᐠ｡ꞈ｡ᐟ\\",
     dance: () => {
-      fetch("http://127.0.0.1:" + (process.env.CONTROL_API_PORT ?? "8099") + "/commands/run", {
+      fetch(buildLocalControlApiBaseUrl() + "/commands/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: "microapp.wibwob.glitchbox.glitchbox.open" }),
@@ -366,3 +366,4 @@ export class ScrambleBrain {
     return undefined;
   }
 }
+import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";

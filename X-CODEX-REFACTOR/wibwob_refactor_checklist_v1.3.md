@@ -91,11 +91,11 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 4: Runtime Node and Instance-Scoped Paths
 
-- `[ ]` Define the runtime node object that owns stateful runtime services
-- `[ ]` Make scratch/export/workspace paths instance-aware where low-risk
-- `[ ]` Remove remaining single-instance assumptions from scripts and captures where practical
-- `[ ]` Ensure `/health`, `/state`, `/runtime/inspection`, and scripts report `instanceId` consistently
-- `[ ]` Leave seams for future registry work without building the registry
+- `[x]` Define the runtime node object that owns stateful runtime services
+- `[x]` Make scratch/export/workspace paths instance-aware where low-risk
+- `[x]` Remove remaining single-instance assumptions from scripts and captures where practical
+- `[x]` Ensure `/health`, `/state`, `/runtime/inspection`, and scripts report `instanceId` consistently
+- `[x]` Leave seams for future registry work without building the registry
 
 ### Slice 5: SDK Boundary Extraction
 
@@ -226,12 +226,12 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ## Phase 5: Make Runtime State Instance-Scoped
 
-- `[ ]` Define the runtime node object that owns stateful services
+- `[x]` Define the runtime node object that owns stateful services
 - `[x]` Decide how canonical `instance_id` relates to current `sessionId` and `instanceLabel`
-- `[ ]` Remove assumptions that `127.0.0.1:8099` is the only active runtime
-- `[ ]` Make export / scratch paths instance-aware where needed
-- `[~]` Ensure control surfaces report instance identity consistently
-- `[ ]` Prepare a lightweight runtime registry seam without building full orchestration yet
+- `[x]` Remove assumptions that `127.0.0.1:8099` is the only active runtime where low-risk shell/runtime seams were still hard-coded
+- `[x]` Make export / scratch paths instance-aware where needed
+- `[x]` Ensure control surfaces report instance identity consistently
+- `[x]` Prepare a lightweight runtime registry seam without building full orchestration yet
 
 ## Phase 6: Extract the SDK Boundary
 

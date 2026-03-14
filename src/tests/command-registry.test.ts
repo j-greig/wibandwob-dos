@@ -23,6 +23,10 @@ describe("control API health", () => {
     const { status, data } = await api("/health");
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
+    expect(typeof data.instanceId).toBe("string");
+    expect(typeof data.requestedPort).toBe("number");
+    expect(typeof data.statePath).toBe("string");
+    expect(typeof data.capturesDir).toBe("string");
   });
 });
 
@@ -129,6 +133,11 @@ describe("state service", () => {
   test("returns valid desktop state", async () => {
     const { status, data } = await api("/state");
     expect(status).toBe(200);
+    expect(typeof data.app.instanceId).toBe("string");
+    expect(typeof data.app.statePath).toBe("string");
+    expect(typeof data.app.scratchBase).toBe("string");
+    expect(typeof data.app.capturesDir).toBe("string");
+    expect(typeof data.app.workspacesDir).toBe("string");
     expect(data.screen).toBeDefined();
     expect(typeof data.screen.width).toBe("number");
     expect(typeof data.screen.height).toBe("number");
@@ -157,6 +166,7 @@ describe("state service", () => {
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
     expect(typeof data.snapshot.state.app.instanceId).toBe("string");
+    expect(typeof data.snapshot.state.app.capturesDir).toBe("string");
     expect(typeof data.snapshot.ui.menu.open).toBe("boolean");
     expect(data.snapshot.ui.overlay === null || typeof data.snapshot.ui.overlay.type === "string").toBe(true);
     expect(typeof data.snapshot.ui.blocked).toBe("boolean");
