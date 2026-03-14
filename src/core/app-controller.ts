@@ -149,8 +149,14 @@ import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
-import { createRuntimeCommandService } from "../application/runtime-command-service.js";
-import { createRuntimeInspectionService } from "../application/runtime-inspection-service.js";
+import {
+  createRuntimeCommandService,
+  type RuntimeCommandService,
+} from "../application/runtime-command-service.js";
+import {
+  createRuntimeInspectionService,
+  type RuntimeInspectionService,
+} from "../application/runtime-inspection-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -194,6 +200,8 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly runtimeCommands: RuntimeCommandService;
+  private readonly runtimeInspection: RuntimeInspectionService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
@@ -328,7 +336,7 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
-    const runtimeCommands = createRuntimeCommandService({
+    this.runtimeCommands = createRuntimeCommandService({
       listCommands: (
         surface?: CommandSurface,
         opts?: { includeUnavailable?: boolean },
@@ -336,7 +344,7 @@ export class TsTuiMvpApp {
       runCommand: (id: string, args?: Record<string, unknown>) =>
         this.commands.run(id, args),
     });
-    const runtimeInspection = createRuntimeInspectionService({
+    this.runtimeInspection = createRuntimeInspectionService({
       getState: () => this.getDesktopState(),
       syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
@@ -360,8 +368,8 @@ export class TsTuiMvpApp {
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
-        commands: runtimeCommands,
-        inspection: runtimeInspection,
+        commands: this.runtimeCommands,
+        inspection: this.runtimeInspection,
         windows: this.windowManager,
       },
       {
@@ -662,9 +670,9 @@ export class TsTuiMvpApp {
   /** Build TuiToolContext, create the agent session, and open/focus the native agent window. */
   private openWibWobAgentWindow(): WindowRecord | undefined {
     const tuiContext: TuiToolContext = {
-      getState: () => this.state.sync(),
-      listCommands: () => this.commands.list("agent"),
-      runCommand: (id, args) => this.commands.run(id, args),
+      getState: () => this.runtimeInspection.syncState(),
+      listCommands: () => this.runtimeCommands.list("agent"),
+      runCommand: (id, args) => this.runtimeCommands.run(id, args),
       openWindow: (type) => {
         const map: Record<string, () => WindowRecord | undefined> = {
           editor: () => this.editor.openWindow(),
