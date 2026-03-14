@@ -82,6 +82,32 @@ a function call.
 | Two commands in one module both create different windows, but only one opens | `focusOrCreate` uses `moduleId` as the key — if `multiInstance` is false (the default), the second command just focuses the first command's existing window. Set `multiInstance: true` on commands that create distinct windows, or provide args that skip the picker entirely. |
 | Module manifest has `multiInstance: false` but commands set `multiInstance: true` | The command-level flag wins — `def.multiInstance ?? manifest.multiInstance ?? false`. But check both levels if windows aren't opening. |
 
+## God file prevention
+
+| Signal | Action |
+|--------|--------|
+| `index.ts` crosses ~300 lines | Stop adding. Extract the next system into its own file before continuing. |
+| You are adding a NEW system (not extending an existing one) | New file. Terrain gen, render pipeline, NPC AI, weather, particle system — each is a separate concern. |
+| Two sections have no shared mutable state | They can be separate files. Pass data through function args, not shared closure variables. |
+| You want to add "just one more thing" to a 500+ line file | That impulse is exactly how god files happen. Split first, add second. |
+
+Modules support relative imports between files in the same directory:
+```typescript
+// modules/myapp/render.ts
+export function renderScene(...) { ... }
+
+// modules/myapp/index.ts
+import { renderScene } from "./render.js";
+```
+
+The module loader uses dynamic `import()` on `index.ts` — sibling files
+are loaded as normal ES module imports. Use `.js` extension in import paths
+(TypeScript compiles `.ts` to `.js`).
+
+**Split early, not late.** Extracting from a 1400-line file is painful and
+risky. Extracting from a 300-line file is trivial. The best time to split
+is when the file is small enough that the split is boring.
+
 ## Testing and restarts
 
 | Mistake | Fix |

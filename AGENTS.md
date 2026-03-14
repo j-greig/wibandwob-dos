@@ -14,6 +14,9 @@ Most agents arrive here to build a module addon. Start here.
 2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
 3. Edit the scaffold, `bun run typecheck`, restart app
 
+**Split early:** if `index.ts` crosses ~300 lines or gains a second distinct
+system, extract to a sibling file before continuing. See pitfalls.md § God file prevention.
+
 Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
 
 ### Which example for which pattern
