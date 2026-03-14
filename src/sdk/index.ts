@@ -2,6 +2,12 @@ export {
   createAnimationClock,
   createLayoutReporter,
 } from "./runtime-helpers.js";
+export {
+  fetchRuntimeCommands,
+  fetchRuntimeHealth,
+  fetchRuntimeInspection,
+  getRuntimeControlApiBaseUrl,
+} from "./runtime-client.js";
 
 export type {
   AnimationClock,
@@ -10,6 +16,11 @@ export type {
   LayoutReport,
   LayoutReporter,
 } from "./runtime-helpers.js";
+export type {
+  RuntimeCommandsEnvelope,
+  RuntimeHealthEnvelope,
+  RuntimeInspectionEnvelope,
+} from "./runtime-client.js";
 
 export type {
   MicroappHost,

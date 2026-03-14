@@ -1305,3 +1305,37 @@ Rule for agents:
 1. if you are testing the CLI, prefer `scripts/cli-parity-check.sh`
 2. treat the CLI as an external shell client over the live API, not as an internal TypeScript library
 3. keep CLI features thin and aligned to shared runtime/API semantics
+
+---
+
+## 2026-03-14: The first proof microapp should consume the runtime seam like any other client
+
+Problem pattern:
+
+- it is easy to "prove" a runtime seam by giving a built-in tool private host access
+- that does not prove the platform is coherent for future microapps
+- the first proof tool needs to succeed through the shared inspection surface itself
+
+What shipped:
+
+- `src/sdk/runtime-client.ts`
+  - `getRuntimeControlApiBaseUrl()`
+  - `fetchRuntimeHealth()`
+  - `fetchRuntimeInspection()`
+  - `fetchRuntimeCommands()`
+- exported through `src/services/microapp-sdk.ts`
+- new module: `modules/runtime-inspector/`
+  - command: `microapp.wibwob.runtime-inspector.open`
+  - reads `/runtime/inspection` and `/commands/list`
+  - shows instance identity, blocker state, windows, stats, and command catalogue summary
+
+Important correction:
+
+- in-process runtime clients must prefer `WIBWOB_API_BASE_URL` over shell-oriented `WW_API`
+- otherwise a module can accidentally point at the wrong runtime
+
+Rule for agents:
+
+1. if a microapp needs runtime reads, use the SDK runtime-client helpers
+2. prefer proving seams through shared APIs over reaching into host internals
+3. do not broaden one proof microapp into a mass built-in migration

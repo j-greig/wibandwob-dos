@@ -57,6 +57,12 @@ export {
   createAnimationClock,
   createLayoutReporter,
 } from "../sdk/runtime-helpers.js";
+export {
+  fetchRuntimeCommands,
+  fetchRuntimeHealth,
+  fetchRuntimeInspection,
+  getRuntimeControlApiBaseUrl,
+} from "../sdk/runtime-client.js";
 
 export type {
   AnimationClock,
@@ -65,6 +71,11 @@ export type {
   LayoutReport,
   LayoutReporter,
 } from "../sdk/runtime-helpers.js";
+export type {
+  RuntimeCommandsEnvelope,
+  RuntimeHealthEnvelope,
+  RuntimeInspectionEnvelope,
+} from "../sdk/runtime-client.js";
 
 // Canonical type-only import surface for module authors.
 // Runtime capabilities still flow through the host object itself.

@@ -114,11 +114,11 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 7: Runtime Inspector Proof Microapp
 
-- `[ ]` Use Runtime Inspector as the first proof microapp
-- `[ ]` Consume the shared runtime inspection seam rather than host internals directly
-- `[ ]` Show state, menu/overlay status, stats, and instance identity from the shared snapshot
-- `[ ]` Keep host-owned runtime responsibilities in the host
-- `[ ]` Avoid broad built-in migration in the same slice
+- `[x]` Use Runtime Inspector as the first proof microapp
+- `[x]` Consume the shared runtime inspection seam rather than host internals directly
+- `[x]` Show state, menu/overlay status, stats, and instance identity from the shared snapshot
+- `[x]` Keep host-owned runtime responsibilities in the host
+- `[x]` Avoid broad built-in migration in the same slice
 
 ### Slice 8: Legacy Pruning, Docs Consolidation, and Stable-State Tooling
 

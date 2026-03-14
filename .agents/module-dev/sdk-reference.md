@@ -16,7 +16,7 @@ API surface for module authors. Import everything from
 | **Feedback** | createProgressBar, createSpinner |
 | **Animation** | createAnimationClock, tween, EASINGS |
 | **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
-| **Diagnostics** | createLayoutReporter (canonical responsive layout report) |
+| **Diagnostics** | createLayoutReporter (canonical responsive layout report), fetchRuntimeInspection, fetchRuntimeCommands, fetchRuntimeHealth |
 
 All components follow the [component contract](component-contract.md).
 
@@ -104,6 +104,28 @@ host.ui.applyRect(node, rect)
 // host.ui is a curated subset (createStack, createRow, bars, applyRect).
 // For grid, scroll, responsive, and composition: import from microapp-sdk directly.
 ```
+
+## Runtime client helpers
+
+Use these when a microapp needs the same shared runtime inspection surface that CLI/API use:
+
+```typescript
+import {
+  fetchRuntimeHealth,
+  fetchRuntimeInspection,
+  fetchRuntimeCommands,
+} from "../../src/services/microapp-sdk.js";
+
+const health = await fetchRuntimeHealth();
+const inspection = await fetchRuntimeInspection();
+const commands = await fetchRuntimeCommands({ surface: "agent" });
+```
+
+Rules:
+
+- these are read-only helpers over the shared control API
+- prefer them over private host internals when building operator/debugging tools
+- in-process modules automatically prefer the shell's own `WIBWOB_API_BASE_URL`
 
 ## MicroappWindowHandle API
 
