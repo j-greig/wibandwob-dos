@@ -61,6 +61,46 @@ Implication:
 - The first vertical slice should strengthen that path rather than replacing it wholesale.
 - TUI and API can converge on one shared execution seam before CLI is fully reworked.
 
+### Example: What `desktop.clear-all` Actually Is
+
+`desktop.clear-all` is a runtime command id, not a shell command.
+
+That distinction matters because the same runtime command can be invoked from several surfaces:
+
+- shell/CLI:
+  - `wibwob cmd desktop.clear-all`
+  - shell command = `wibwob`
+  - runtime command id = `desktop.clear-all`
+- HTTP/API:
+  - `POST /commands/run`
+  - body = `{"id":"desktop.clear-all","args":{"all":true}}`
+- agent:
+  - `tui_run_command("desktop.clear-all", { all: true })`
+- TUI:
+  - menu/palette item mapped to the same command metadata
+
+Concrete path for the API case:
+
+```text
+script / CLI / curl
+  -> POST /commands/run
+  -> src/services/control-api.ts runApiCommand()
+  -> src/application/runtime-command-service.ts
+  -> src/core/command-registry.ts run()
+  -> src/core/command-catalog.ts definition for "desktop.clear-all"
+  -> actionKey "clearDesktop"
+  -> src/core/app-controller.ts clearDesktop()
+  -> overlay cancel + menu close + windowManager.closeWindow(...)
+  -> Blessed window frames removed from the live TUI
+```
+
+So:
+
+- shell command = transport/client command
+- runtime command id = semantic action inside WibWob
+- command registry = dispatch layer
+- app-controller/window manager = concrete TUI mutation path
+
 ### State / Inspection Path
 
 Current inspection and state ownership is split across:

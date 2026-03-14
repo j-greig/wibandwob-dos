@@ -273,6 +273,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Update scripts and local skills when the refactor changes assumptions they encode
 - `[~]` Consolidate overlapping markdown into fewer, clearer agent-friendly docs when ownership is obvious
 - `[ ]` Move retired or superseded markdown into `.trash/` once replacement docs are clearly better
+- `[x]` Capture concrete command-surface examples in the refactor docs when they clarify how shell/CLI/API/runtime commands differ
 
 ## Resolved With Author
 
