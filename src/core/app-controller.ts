@@ -118,9 +118,6 @@ import {
 import { ScrambleBrain } from "../services/scramble-brain.js";
 
 
-import {
-  type PlasmaModifiers,
-} from "../services/plasma-engine.js";
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
 // Editor window factory now used via EditorCoordinator
@@ -1039,17 +1036,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openPatternWindow(): WindowRecord | undefined {
-    const result = this.commands.runDynamic("microapp.wibwob.generative.pattern");
-    if (!result.ok) this.overlays.flash(result.error);
-    return undefined;
-  }
-
-  private openContourWindow(): WindowRecord | undefined {
-    const result = this.commands.runDynamic("microapp.wibwob.contour.open");
-    if (!result.ok) this.overlays.flash(result.error);
-    return undefined;
-  }
+  // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
   private openTerrainLabWindow(): WindowRecord | undefined {
     return this.focusOrCreate("terrain-lab", () => {
@@ -1061,26 +1048,7 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openPlasmaWindow(
-    mood?: string,
-    renderMode?: string,
-    _options?: {
-      primerName?: string;
-      primerText?: string;
-      reason?: string;
-      modifiers?: PlasmaModifiers;
-    },
-  ): void {
-    const args: Record<string, unknown> = {};
-    if (mood) args.mood = mood;
-    if (renderMode) args.renderMode = renderMode;
-    if (_options?.primerName) args.primerName = _options.primerName;
-    if (_options?.primerText) args.primerText = _options.primerText;
-    if (_options?.reason) args.reason = _options.reason;
-    if (_options?.modifiers) args.modifiers = _options.modifiers;
-    const result = this.commands.runDynamic("microapp.wibwob.plasma.open", args);
-    if (!result.ok) this.overlays.flash(result.error);
-  }
+  // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
 
   private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
     if (filePath) {
@@ -1103,10 +1071,7 @@ export class TsTuiMvpApp {
     return undefined;
   }
 
-  private openPlasmaFromPrimer(filePath?: string): void {
-    const result = this.commands.runDynamic("microapp.wibwob.plasma.from-primer", filePath ? { filePath } : undefined);
-    if (!result.ok) this.overlays.flash(result.error);
-  }
+  // openPlasmaFromPrimer — removed, migrated to microapp.wibwob.plasma.from-primer
 
   private openMusicPlayerWindow(restore?: {
     filePath?: string;
@@ -1270,11 +1235,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openArtWindow(): WindowRecord | undefined {
-    const result = this.commands.runDynamic("microapp.wibwob.generative.art");
-    if (!result.ok) this.overlays.flash(result.error);
-    return undefined;
-  }
+  // openArtWindow — removed, migrated to microapp.wibwob.generative.art
 
   private openMonsterCam(): WindowRecord | undefined {
     return this.focusOrCreate("monster-cam", () => {
@@ -1482,7 +1443,6 @@ export class TsTuiMvpApp {
         this.commands.runDynamic("microapp.wibwob.figlet.open", { text, font });
         return undefined; // microapp creates its own window
       },
-      openPatternWindow: () => this.openPatternWindow(),
       openPrimerGalleryWindow: (restore) =>
         this.openPrimerGalleryWindow(restore),
       openPrimerBrowserWindow: (restore) =>
@@ -1500,7 +1460,6 @@ export class TsTuiMvpApp {
       openChromeBrowserWindow: (restore) =>
         this.openChromeBrowserWindow(restore?.url),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
-      openArtWindow: () => this.openArtWindow(),
       openMonsterCamWindow: () => this.openMonsterCam(),
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
       windows: this.windowManager,
@@ -1872,20 +1831,7 @@ export class TsTuiMvpApp {
             : undefined;
         this.exportFocusedWindowText(id, name);
       },
-      openArtWindow: () => this.openArtWindow(),
-      openContourWindow: () => this.openContourWindow(),
       openTerrainLab: () => this.openTerrainLabWindow(),
-      openPlasmaWindow: (args) => {
-        const mood = typeof args?.mood === "string" ? args.mood : undefined;
-        const renderMode =
-          typeof args?.renderMode === "string" ? args.renderMode : undefined;
-        this.openPlasmaWindow(mood, renderMode);
-      },
-      openPlasmaFromPrimer: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" ? args.filePath : undefined;
-        this.openPlasmaFromPrimer(filePath);
-      },
       openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
         const filePath =
@@ -2084,13 +2030,6 @@ export class TsTuiMvpApp {
             : undefined;
         this.openChromeBrowserWindow(url);
       },
-      openFigletBanner: (args) => {
-        const result = this.commands.runDynamic("microapp.wibwob.figlet.open", args);
-        if (!result.ok) this.overlays.flash(result.error);
-      },
-      listFigletFonts: () => {
-        return this.commands.runDynamic("microapp.wibwob.figlet.fonts");
-      },
       openMusicPlayer: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -2104,7 +2043,6 @@ export class TsTuiMvpApp {
           this.overlays.flash(result.error);
         }
       },
-      openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openScrambleSmol: () => { this.openScrambleSmol(); },
       openScrambleFloating: () => { this.openScrambleFloating(); },

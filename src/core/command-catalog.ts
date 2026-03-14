@@ -39,8 +39,6 @@ export interface AppMenuActions {
   loadWorkspacePrompt: () => void;
   copyFocusedWindowText: () => void;
   exportFocusedWindowText: (args?: Record<string, unknown>) => void;
-  openArtWindow: () => void;
-  openContourWindow: () => void;
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
@@ -64,11 +62,8 @@ export interface AppMenuActions {
   openGallery: () => void;
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
-  openFigletBanner: (args?: Record<string, unknown>) => void;
-  listFigletFonts: () => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
-  openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openScrambleSmol: () => void;
   openScrambleFloating: () => void;
@@ -97,9 +92,6 @@ export interface AppMenuActions {
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
-  // ── Plasma ─────────────────────────────────────────────
-  openPlasmaWindow: (args?: Record<string, unknown>) => void;
-  openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   openMarkdownViewer: (args?: Record<string, unknown>) => void;
   openMarkdownPicker: () => unknown;
   toggleMarkdownFiglet: () => void;
@@ -137,9 +129,10 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "edit", label: "Edit", key: "e", left: 8 },
   { category: "view", label: "View", key: "v", left: 15 },
   { category: "window", label: "Window", key: "w", left: 22 },
-  { category: "applications", label: "Applications", key: "a", left: 31 },
-  { category: "demos", label: "Demos", key: "d", left: 47 },
-  { category: "help", label: "Help", key: "h", left: 55 }
+  { category: "core", label: "Core Apps", key: "c", left: 31 },
+  { category: "applications", label: "Applications", key: "a", left: 42 },
+  { category: "demos", label: "Demos", key: "d", left: 57 },
+  { category: "help", label: "Help", key: "h", left: 65 }
 ];
 
 /**
@@ -888,91 +881,11 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     api: true,
     agent: true
   },
-  {
-    id: "art.open",
-    label: "Generative Art",
-    description: "Open an animated generative art window.",
-    group: "surface",
-    actionKey: "openArtWindow",
-    menuPlacements: [{ category: "demos", order: 60 }],
-    api: true,
-    agent: true
-  },
-
-  {
-    id: "figlet.open",
-    label: "Figlet Banner",
-    description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
-    group: "surface",
-    actionKey: "openFigletBanner",
-    requires: ["bin.figlet"],
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
-    palettePlacement: { order: 50, label: "Figlet Banner" },
-    api: true,
-    agent: true,
-    returns: "json",
-    params: z.object({
-      text: z.string().describe("Text to render as FIGlet"),
-      font: z.string().optional().describe("FIGlet font name"),
-    })
-  },
-  {
-    id: "figlet.fonts",
-    label: "Figlet Fonts",
-    description: "List available FIGlet fonts with default and metadata. Useful for API-driven figlet flows that skip interactive prompts.",
-    group: "inspect",
-    actionKey: "listFigletFonts",
-    requires: ["bin.figlet"],
-    api: true,
-    agent: true
-  },
-  {
-    id: "pattern.open",
-    label: "Plasma Patterns",
-    description: "Open a pattern field window.",
-    group: "surface",
-    actionKey: "openPatternWindow",
-    menuPlacements: [{ category: "applications", order: 80 }],
-    palettePlacement: { order: 60 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "plasma.open",
-    label: "Plasma",
-    description: "Open animated plasma colour-field screensaver. Args: mood (circuit|void|chaos|aurora|sunset|acid|deep-space|chrome), renderMode (plain|emoji|ansi).",
-    group: "surface",
-    actionKey: "openPlasmaWindow",
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 82 }],
-    palettePlacement: { order: 52 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "plasma.from-primer",
-    label: "Plasma: From Primer",
-    description: "Open a plasma screensaver tuned to a primer file's mood. Args: filePath (string). Analyses the text and picks a matching plasma mood.",
-    group: "surface",
-    actionKey: "openPlasmaFromPrimer",
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 83 }],
-    palettePlacement: { order: 53 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "contour.open",
-    label: "Contour Studio",
-    description: "Open animated contour map studio. Three modes: chaos (organic contours), order (binary grids), hybrid (mixed).",
-    group: "surface",
-    actionKey: "openContourWindow",
-    menuPlacements: [{ category: "applications", order: 85 }],
-    palettePlacement: { order: 55 },
-    api: true,
-    agent: true
-  },
+  // ── Migrated to microapps (no backward compat shims) ──────────────
+  // figlet.open, figlet.fonts     → microapp.wibwob.figlet.*
+  // contour.open                  → microapp.wibwob.contour.open
+  // plasma.open, plasma.from-primer → microapp.wibwob.plasma.*
+  // pattern.open, art.open        → microapp.wibwob.generative.*
   {
     id: "terrain-lab.open",
     label: "Terrain Lab",

@@ -183,12 +183,7 @@ function restoreWindowEntry(
         entry.url ? { url: entry.url } : undefined,
       );
 
-    case "art":
-    case "plasma":
-      return actions.openArtWindow();
-
-    case "pattern":
-      return actions.openPatternWindow();
+    // art, plasma, pattern — migrated to microapps, restored via dynamic snapshots
 
     case "companion":
       return actions.openCompanionWindow();

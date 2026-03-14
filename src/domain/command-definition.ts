@@ -7,6 +7,7 @@ export type AppCommandCategory =
   | "edit"
   | "view"
   | "window"
+  | "core"
   | "applications"
   | "demos"
   | "help";

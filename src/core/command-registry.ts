@@ -54,6 +54,15 @@ export interface DynamicCommandDefinition {
 }
 
 const LEGACY_COMMAND_ALIASES: Record<string, string> = {
+  // ── Short aliases for migrated microapps (ergonomics, not compat) ──
+  "figlet.open": "microapp.wibwob.figlet.open",
+  "figlet.fonts": "microapp.wibwob.figlet.fonts",
+  "contour.open": "microapp.wibwob.contour.open",
+  "plasma.open": "microapp.wibwob.plasma.open",
+  "plasma.from-primer": "microapp.wibwob.plasma.from-primer",
+  "pattern.open": "microapp.wibwob.generative.pattern",
+  "art.open": "microapp.wibwob.generative.art",
+  // ── Legacy renames ──
   "file.browse_primers": "primer.browse",
   "file.open_file_manager": "finder.open",
   "file.open_primer_prompt": "primer.open",

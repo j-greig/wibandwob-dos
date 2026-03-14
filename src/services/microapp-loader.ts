@@ -191,8 +191,9 @@ function createMicroappHost(
         description: def.description,
         action: def.direct ? def.action : (args) => focusOrCreate(microappId, () => def.action(args), multiInstance),
         multiInstance,
+        // Core-tier microapps go into "core" menu category (host decides, not author)
         menuPlacements: (showMenu && Array.isArray(def.menu)) ? def.menu.map(m => ({
-          category: m.category as MenuPlacement["category"],
+          category: (tier === "core" ? "core" : m.category) as MenuPlacement["category"],
           order: m.order,
           label: m.label,
         })) : undefined,

@@ -116,14 +116,12 @@ export type PersistableAppType =
   | "primer-gallery"
   | "figlet-banner"
   | "text-editor"
-  | "generative-art"
   | "companion-widget"
   | "backrooms-tv"
   | "monster-cam"
   | "wibwob-agent"
   | "primer-viewer"
-  | "reader-viewer"
-  | "pattern-animation";
+  | "reader-viewer";
 
 /**
  * Window types that are transient — never saved to workspace files.
@@ -154,7 +152,7 @@ export const viewerAppType: Record<"primer", PersistableAppType> = {
   primer: "primer-viewer",
 };
 
-export const animationAppType: Record<"pattern", PersistableAppType> = {
+export const animationAppType: Record<"pattern", string> = {
   pattern: "pattern-animation",
 };
 
