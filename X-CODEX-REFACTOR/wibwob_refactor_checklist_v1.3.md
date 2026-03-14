@@ -60,6 +60,73 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Stable SDK import path remains `src/services/microapp-sdk.ts`
 - `[x]` CLI must not diverge architecturally, but does not need full parity in pass 1
 
+## Execution Slices v1.4
+
+### Slice 1: Duplicate-Path Audit and Godfile Closure
+
+- `[x]` Write the Godfile list with reasons in the refactor docs
+- `[x]` Identify the main duplicate behaviors across TUI / API / CLI / agent
+- `[x]` Identify the highest-value direct widget mutation hotspots that still bypass shared semantics
+- `[x]` Mark duplicate paths as keep, move, delete, or defer in the architecture mapping
+- `[~]` Retire or merge stale docs only when the replacement text is already better
+
+### Slice 2: Workspace Service Convergence
+
+- `[x]` Create a workspace application service under `src/application/`
+- `[x]` Route boot restore, TUI prompt flows, command actions, and control API workspace endpoints through it
+- `[x]` Keep the current workspace file format unchanged
+- `[x]` Keep snapshot/restore callbacks in the host rather than inventing a second owner
+- `[x]` Verify save/load semantics are shared across TUI prompts and API
+
+### Slice 3: File/Open and Overlay State Hardening
+
+- `[ ]` Inventory all file-open and picker-style flows
+- `[ ]` Decide for each flow whether shared overlay control is enough, an explicit command seam is needed, or the flow should be removed
+- `[ ]` Ensure every blocking state has a canonical continue/select/cancel path or `desktop.clear-all`
+- `[ ]` Expose blocked-state info through runtime inspection where it matters
+- `[ ]` Prefer command ids over bespoke new HTTP endpoints
+
+### Slice 4: Runtime Node and Instance-Scoped Paths
+
+- `[ ]` Define the runtime node object that owns stateful runtime services
+- `[ ]` Make scratch/export/workspace paths instance-aware where low-risk
+- `[ ]` Remove remaining single-instance assumptions from scripts and captures where practical
+- `[ ]` Ensure `/health`, `/state`, `/runtime/inspection`, and scripts report `instanceId` consistently
+- `[ ]` Leave seams for future registry work without building the registry
+
+### Slice 5: SDK Boundary Extraction
+
+- `[ ]` Move clear SDK-owned exports into `src/sdk/`
+- `[ ]` Keep `src/services/microapp-sdk.ts` as the stable import path
+- `[ ]` Stop module-facing leakage from unrelated core/services files
+- `[ ]` Separate public SDK exports from host-internal helpers
+- `[ ]` Push Blessed-specific internals behind host/runtime boundaries where practical
+
+### Slice 6: CLI Convergence
+
+- `[ ]` Route CLI work through the same command and inspection semantics already used by the API
+- `[ ]` Add CLI coverage for the stabilized window/control behaviors
+- `[ ]` Remove CLI references to retired aliases and pre-refactor field names
+- `[ ]` Keep the CLI thin instead of growing a second architecture
+
+### Slice 7: Runtime Inspector Proof Microapp
+
+- `[ ]` Use Runtime Inspector as the first proof microapp
+- `[ ]` Consume the shared runtime inspection seam rather than host internals directly
+- `[ ]` Show state, menu/overlay status, stats, and instance identity from the shared snapshot
+- `[ ]` Keep host-owned runtime responsibilities in the host
+- `[ ]` Avoid broad built-in migration in the same slice
+
+### Slice 8: Legacy Pruning, Docs Consolidation, and Stable-State Tooling
+
+- `[ ]` Remove dead command paths, shims, and docs once the replacement seams are proven
+- `[ ]` Move uncertain files/docs into `.trash/` instead of leaving them ambiguously active
+- `[ ]` Consolidate overlapping markdown into fewer stronger agent-facing docs
+- `[ ]` Update `.planning` to match the landed architecture
+- `[ ]` Fold the stable refactor shape into scripts and `bun run dev` workflows
+- `[ ]` Preserve text-first whole-TUI capture as the default evidence path and PNG as secondary evidence
+- `[ ]` Turn the Ghostty-vs-terminal-microapp agent efficiency comparison into a concrete later tooling task
+
 ## Phase 1: Architecture Mapping
 
 - `[x]` Produce a current-state diagram for the actual runtime path: `src/app.ts` -> `src/core/app-controller.ts` -> services/windows/core
@@ -80,24 +147,24 @@ This file is the execution surface for the refactor. The masterplan stays concep
   - `src/services/module-loader.ts`
   - `src/services/microapp-sdk.ts`
   - representative modules under `modules/`
-- `[ ]` Identify duplicate behaviors implemented separately in TUI / API / CLI
-- `[ ]` Identify direct widget mutations that bypass shared semantics
+- `[x]` Identify duplicate behaviors implemented separately in TUI / API / CLI
+- `[x]` Identify direct widget mutations that bypass shared semantics
 - `[x]` Confirm current single-instance assumptions:
   - fixed API port behavior
   - process identity
   - scratch/workspace paths
   - global singleton services
-- `[ ]` Write the Godfile list with reasons
+- `[x]` Write the Godfile list with reasons
 
 ### Likely Godfiles / Hotspots
 
-- `[ ]` `src/core/app-controller.ts`
-- `[ ]` `src/core/ui-parts.ts`
-- `[ ]` `src/windows/browser-windows.ts`
-- `[ ]` `src/core/command-catalog.ts`
-- `[ ]` `src/services/control-api.ts`
-- `[ ]` `src/services/module-loader.ts`
-- `[ ]` `src/services/wibwob-agent-session.ts`
+- `[x]` `src/core/app-controller.ts`
+- `[x]` `src/core/ui-parts.ts`
+- `[x]` `src/windows/browser-windows.ts`
+- `[x]` `src/core/command-catalog.ts`
+- `[x]` `src/services/control-api.ts`
+- `[x]` `src/services/module-loader.ts`
+- `[x]` `src/services/wibwob-agent-session.ts`
 
 ## Phase 2: Extract Pure Logic Into Domain
 
@@ -131,7 +198,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Define the first service layer under `src/application/`
 - `[~]` Promote shared verbs out of interface handlers and into service functions
 - `[x]` Establish one command execution path shared by TUI / API / CLI where practical
-- `[ ]` Establish one workspace save / load path shared by all interfaces
+- `[x]` Establish one workspace save / load path shared by all interfaces (`src/application/runtime-workspace-service.ts`)
 - `[x]` Establish one runtime inspection path shared by all interfaces
 
 ### First Verbs To Stabilize
@@ -140,8 +207,8 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` `closeWindow`
 - `[x]` `focusWindow`
 - `[x]` `runCommand`
-- `[ ]` `saveWorkspace`
-- `[ ]` `loadWorkspace`
+- `[x]` `saveWorkspace`
+- `[x]` `loadWorkspace`
 - `[x]` `listCommands`
 - `[x]` `inspectRuntime`
 

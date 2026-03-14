@@ -130,15 +130,72 @@ Implication:
 
 These are scaffolding targets, not a reason to build a registry yet.
 
-## Likely Godfiles / Hotspots
+## Duplicate Path Audit
+
+### Canonical Owners After The First Parcels
+
+- Command listing and execution:
+  - owner: `src/application/runtime-command-service.ts`
+  - consumers: control API, agent tools, command registry bridge
+  - status: keep consolidating; CLI still converges later
+- Window verbs:
+  - owner: `src/application/runtime-window-service.ts`
+  - consumers: control API, agent tools
+  - status: shared for API/agent; TUI still owns raw widget interactions
+- Runtime inspection:
+  - owner: `src/application/runtime-inspection-service.ts`
+  - consumers: control API, agent tools, future Runtime Inspector
+  - status: keep; expand typed snapshot rather than new ad hoc endpoints
+- Workspace save/load:
+  - owner: `src/application/runtime-workspace-service.ts`
+  - consumers: TUI prompt flows, command actions, control API
+  - status: shared; CLI convergence deferred
+
+### Duplicate Or Legacy Paths And Their Disposition
+
+- `/view/*` open routes:
+  - disposition: keep for now
+  - reason: useful operator convenience aliases, but not canonical architecture
+- `/commands/run`:
+  - disposition: keep as canonical command execution endpoint
+  - reason: single runtime command path
+- prompt-driven `File -> Open` flows:
+  - disposition: move or harden in Slice 3
+  - reason: several still strand the UI without symmetric API exits
+- direct app-controller workspace restore/save logic:
+  - disposition: moved into application service
+  - reason: was duplicated across boot, commands, and API-adjacent paths
+- CLI command semantics:
+  - disposition: defer to Slice 6
+  - reason: currently thin HTTP client, should converge after API/TUI seams settle
+
+### Direct Widget Mutation Hotspots That Still Bypass Shared Semantics
 
 - `src/core/app-controller.ts`
-- `src/core/ui-parts.ts`
+  - menu actions still open many windows directly and mix orchestration with widget concerns
 - `src/windows/browser-windows.ts`
-- `src/core/command-catalog.ts`
-- `src/services/control-api.ts`
+  - file/open and picker-style surfaces still own too much interaction state locally
+- `src/windows/generative-windows.ts`
+  - inspector/workspace-manager UI remains host-driven and not yet service-backed
 - `src/services/module-loader.ts`
+  - host bridge still exposes more runtime detail than the future SDK boundary should allow
+
+## Godfiles / Hotspots With Reasons
+
+- `src/core/app-controller.ts`
+  - still the largest mixed owner: startup, commands, window creation, restore, agent wiring
+- `src/services/control-api.ts`
+  - broad endpoint surface, legacy convenience aliases, and response-shape drift risk
+- `src/core/command-catalog.ts`
+  - command metadata source of truth, but still carries too much argument semantics inline
+- `src/services/module-loader.ts`
+  - real host/module boundary and the likely place SDK leakage must be reduced
+- `src/windows/browser-windows.ts`
+  - concentration of picker/file-browser state that can trap the UI
 - `src/services/wibwob-agent-session.ts`
+  - large agent integration owner with potential duplicate control semantics
+- `src/core/ui-parts.ts`
+  - still likely retireable or shrinkable, but lower priority than the files above
 
 ## First Slice Recommendation
 
