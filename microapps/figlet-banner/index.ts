@@ -52,8 +52,8 @@ export default function setup(host: MicroappHost) {
         });
       }
     },
-    palette: true,
-    menu: true,
+    palette: { order: 50, label: "Figlet Banner" },
+    menu: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     direct: true,
   });
 

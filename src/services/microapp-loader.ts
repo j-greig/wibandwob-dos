@@ -178,12 +178,12 @@ function createMicroappHost(
         description: def.description,
         action: def.direct ? def.action : (args) => focusOrCreate(microappId, () => def.action(args), multiInstance),
         multiInstance,
-        menuPlacements: def.menu?.map(m => ({
+        menuPlacements: Array.isArray(def.menu) ? def.menu.map(m => ({
           category: m.category as MenuPlacement["category"],
           order: m.order,
           label: m.label,
-        })),
-        palettePlacement: def.palette ? {
+        })) : undefined,
+        palettePlacement: (def.palette && typeof def.palette === "object") ? {
           order: def.palette.order,
           label: def.palette.label,
         } : undefined,

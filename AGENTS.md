@@ -275,6 +275,22 @@ or edit the spec body directly if the finding is clearly correct.
 
 ## Control Loop
 
+**CLI first, curl second.** Source `~/.wibwob` for aliases and env vars:
+
+```bash
+source ~/.wibwob
+wibwob cmd figlet.open --text "HELLO"   # run any command
+wibwob commands                          # list all commands
+wibwob state                             # desktop state JSON
+wibwob windows -q                        # window IDs only
+ww-clear                                 # clear desktop
+ww-theme wibwob-dark-nord                # switch theme
+ww-state                                 # state via jq
+```
+
+The CLI (`src/cli/wibwob.ts`) is a pure HTTP client over the control API —
+faster to type than curl, auto-discovers microapp commands, jq-pipeable output.
+
 API on `http://127.0.0.1:8099`. Full reference: `.agents/shell-dev/control-api.md`.
 
 Always `GET /state` first — use real window ids, never guessed ones.

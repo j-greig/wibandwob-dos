@@ -1974,3 +1974,90 @@ rate in ~20 WPM steps (documented in build-ident.sh header).
 - [ ] `figlet.open` should accept `--x`/`--y` position args
 - [ ] `wibwob batch` CLI subcommand (batch positioning still needs raw curl)
 - [ ] agg aspect ratio: currently portrait-ish, may need ffmpeg landscape post-scale
+
+## 2026-03-14 — COAT migration: host → microapp migration pattern
+
+### Context
+
+Migrating built-in window types from `src/windows/*.ts` to proper microapps under
+`microapps/`. First candidate: figlet-banner. Goal: prove the COAT pattern works
+for real migrations, not just proof microapps.
+
+### COAT = Command Once, Adapt Thin
+
+New architectural shorthand added to AGENTS.md. Four shared seams (command,
+inspection, window, workspace) — TUI/CLI/API/agent/microapps are thin adapters.
+No adapter owns semantics.
+
+### What worked well (figlet migration)
+
+- **Scaffold → edit → typecheck is clean.** `scripts/scaffold-microapp.sh` produces
+  a runnable skeleton in seconds. The microapp.json manifest + SDK imports are the
+  right authoring surface.
+- **SDK already exports most figlet utilities.** `renderFiglet`, `measureFiglet`,
+  `responsiveFiglet` were already in `microapp-sdk.ts`. Only had to add 4 more
+  exports (`getFigletCatalogue`, `getFigletFontChoices`, `getDefaultFigletFont`,
+  `getFigletWindowContentSize`).
+- **Backward compat shim pattern is straightforward.** Keep the old command IDs
+  (`figlet.open`, `figlet.fonts`) in the catalog with actionKey handlers that
+  delegate to `commands.runDynamic("microapp.wibwob.figlet.open", args)`. Same
+  pattern as sy2-chronicles. Zero breaking change for API callers.
+- **Snapshot restore works through command dispatch.** The `openFigletWindow` action
+  in snapshot-registry now calls `runDynamic` instead of the deleted private method.
+  Workspace save/restore still works.
+
+### SDK gaps discovered
+
+1. **`host.pickFromList()` missing.** The host exposes `pickFile()`, `promptValue()`,
+   `flash()` but no generic list picker. Old code used `OverlayManager.openListPrompt()`
+   (host-internal). Microapp had to build an inline blessed list. Every microapp
+   needing a picker will hit this. Should be a shared SDK method.
+
+2. **`host.windows.resizeToContent(id, {width, height})` missing.** Old code used
+   `applyMeasuredWindowSize()` which knows about chrome modes. Microapp has to
+   manually add chrome padding (+4w, +6h). Fragile if chrome changes.
+
+3. **Manifest `requires` field missing.** Old catalog entry had `requires: ["bin.figlet"]`.
+   Microapp manifests can't declare binary dependencies. The figlet-service handles
+   fallback gracefully, but the gap is real.
+
+4. **Misplaced code discovered.** `openBrowserReaderWindow()` lived in
+   `figlet-windows.ts` despite being a browser reader function. Relocated to
+   `browser-windows.ts` during migration. Lesson: old window files often contain
+   misplaced functions — check all exports before deleting.
+
+### Ideas for making future COAT migrations easier
+
+- [ ] **`bun run check:coat`** — single script that runs import boundary lint
+  (microapps must not import from `src/core/*` except via SDK), orphan actionKey
+  check, manifest completeness check. Would catch COAT violations at typecheck time.
+
+- [ ] **`host.pickFromList(title, choices, opts)` SDK method** — generic list picker
+  so microapps don't reinvent pickers. Would make font pickers, file pickers,
+  theme pickers all use the same shared overlay seam.
+
+- [ ] **Migration scaffold script** — `scripts/migrate-window-to-microapp.sh <window-file>`
+  that: reads the existing command catalog entries for that file, scaffolds the
+  microapp, generates backward compat shims, and prints the manual steps remaining.
+  Would halve the migration time per built-in.
+
+- [ ] **Command ID aliasing** — instead of keeping shim entries in the catalog forever,
+  add an `aliases` field to `microapp.json` so `figlet.open` resolves directly to
+  `microapp.wibwob.figlet.open` in the command registry. Cleaner than permanent shims.
+
+- [ ] **Consolidate `bun run` scripts** — currently too many separate scripts. One
+  `bun run check` that runs typecheck + COAT checks + theme checks. Single gate for
+  all verification.
+
+### Migration map
+
+Full classification and recommended order at
+`X-CODEX-REFACTOR/host-to-microapp-migration-map.md`. 12 candidates, 4 non-candidates,
+~20 already-microapps. Simplest first: figlet → contour → plasma → generative →
+monster-cam → terrain-lab → text → backrooms → music → browser → chrome-browser.
+
+### COAT enforcement notes
+
+Running scratchpad at `.planning/refactor-docs/030-coat-enforcement-notes.md`.
+Categories: deterministic code checks, bun scripts, agent skills, AI inference checks.
+Updated with figlet observations.

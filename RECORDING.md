@@ -37,6 +37,97 @@ bash scripts/wibwob-record.sh export scratch/recordings/rec-XXXX.cast \
 └─────────────┘     └──────────────┘                     └────────────┘
 ```
 
+## Single-Timeline Format: `.scpt.md`
+
+The audio-video sync problem (two independent clocks drifting apart) is solved by
+using a **single timeline** that drives both audio and visuals. The format already
+exists in [`wibandwob-heartbeat`](file:///Users/james/Repos/wibandwob-heartbeat/):
+
+- **Spec & pipeline:** `~/Repos/wibandwob-heartbeat/scripts/build-ident.sh` (header has full spec)
+- **Examples:** `~/Repos/wibandwob-heartbeat/output/*/voiceover.scpt.md` (~30 scripts)
+- **Compiler:** `~/Repos/wibandwob-heartbeat/scripts/compile-narrated-reel.py`
+- **Docs:** `~/Repos/wibandwob-heartbeat/WIB-WOB-VIDEO-MAKER.md`
+
+### Format (original)
+
+```markdown
+@config
+rate = 180
+pause = 0.2
+scene_gap = 0.3
+wib = Samantha
+wob = Daniel
+
+@content
+[frame: course-01]
+wob: The feast begins.
+---
+[frame: course-02]
+wib: Seventy two hours. Distilled to gold.
+```
+
+`build-ident.sh` renders this → MP3 + `.timecodes` (one timestamp per `[frame:]` marker).
+`compile-narrated-reel.py` composites PNG frames at those timecodes → MP4.
+
+### Adaptation for ASCII cinema
+
+The original format drives **static PNG slideshows + voice**. Our use case
+needs **live TUI commands + SFX + voice**. Proposed extensions:
+
+```markdown
+@config
+rate = 170
+pause = 0.3
+scene_gap = 0.6
+wib = Samantha
+wob = Daniel
+sfx_dir = scratch/cli-experiments/sfx
+
+@content
+[frame: intro]
+[theme: wibwob-dark]
+[cmd: primer.open --filePath primers/wibbwob-dual-portrait.txt --x 55 --y 3]
+[sfx: hit-art.wav]
+wib: wib
+[sfx: hit-word.wav]
+[cmd: figlet.open --text "wib" --font doom]
+wob: wob
+[sfx: hit-word.wav]
+[cmd: figlet.open --text "wob" --font banner]
+---
+[frame: menagerie]
+[sfx: hit-clear.wav]
+[cmd: desktop.clear-all]
+[theme: wibwob-dark-nord]
+wob: The menagerie. [V:Zarvox]
+[sfx: hit-art.wav]
+[cmd: primer.open --filePath cat-0000-3.txt --x 2 --y 2]
+---
+[frame: destruction]
+[sfx: boom-final.wav]
+[cmd: desktop.clear-all]
+wob: Destruction. [V:Bells]
+```
+
+New markers (prefixed with `[` to match existing `[frame:]` convention):
+- `[cmd: ...]` — wibwob CLI command to execute at this point
+- `[sfx: file.wav]` — SFX to play AND log in the audio mix
+- `[theme: name]` — shorthand for `[cmd: theme.set --name ...]`
+- `[batch: {...}]` — batch window positioning JSON
+- `[capture]` — grab a screen frame for the cast at this exact moment
+
+**Pipeline (proposed):**
+1. `build-ident.sh` renders voice + SFX → single MP3 + `.timecodes`
+2. A new `replay-scpt.sh` reads the `.scpt.md`, plays `[cmd:]` actions
+   timed to the `.timecodes`, and captures frames via `/screenshot/ansi`
+3. `compile-narrated-reel.py` or ffmpeg composites frames + audio → MP4
+
+The key insight: audio is rendered FIRST (deterministic), then visuals
+replay against the audio's timecodes. One clock. Zero drift.
+
+**Status:** Not yet implemented. Current pipeline uses the two-clock approach
+(`wibwob-record.sh` + `cues.tsv`), which works but drifts over time.
+
 ## How We Got Here
 
 ### Problem: tmux capture-pane produces garbled output
