@@ -8,10 +8,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/runtime-env.sh"
 
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-  echo "No tmux session '$SESSION' found. Start the app first:"
-  echo "  tmux new-session -d -s $SESSION -x 205 -y 55"
-  echo "  tmux send-keys -t $SESSION 'cd ~/Repos/wibandwob-dos && bun run dev:world' Enter"
-  exit 1
+  echo "No tmux session '$SESSION'. Starting..."
+  bash "$ROOT/scripts/ensure-running.sh" --session "$SESSION"
 fi
 
 # Show current instance id from API (non-fatal if app not up yet)

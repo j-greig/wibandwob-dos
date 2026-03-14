@@ -1,14 +1,18 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { createStack, createNodePart } from "../../src/services/microapp-sdk.js";
+import { renderFiglet } from "../../src/services/microapp-sdk.js";
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
+
+// ── Types ───────────────────────────────────────────────────────────
 
 interface JournalEntry {
   peer: "human" | "agent" | "system";
   text: string;
-  ts: string; // ISO timestamp
+  ts: string;
 }
+
+// ── Data ────────────────────────────────────────────────────────────
 
 function journalPath(host: MicroappHost): string {
   return join(host.repoRoot, "scratch", "journal.jsonl");
@@ -30,11 +34,45 @@ function appendEntry(path: string, entry: JournalEntry) {
   appendFileSync(path, JSON.stringify(entry) + "\n");
 }
 
-function formatEntry(e: JournalEntry): string {
-  const tag = e.peer === "human" ? "[H]" : e.peer === "agent" ? "[A]" : "[S]";
-  const time = new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return `${tag} ${time}  ${e.text}`;
+// ── Formatting ──────────────────────────────────────────────────────
+
+const PEER_GLYPH = { human: "▸", agent: "▹", system: "·" } as const;
+const PEER_LABEL = { human: "HUMAN", agent: "AGENT", system: "SYS" } as const;
+
+function peerColor(peer: string, t: any): string {
+  if (peer === "human") return t.body.fg || "white";
+  if (peer === "agent") return t.selected?.fg || "#b48ead";
+  return t.muted?.fg || "#555";
 }
+
+function formatTime(ts: string): string {
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function dayKey(ts: string): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function formatDayDivider(dateStr: string, width: number, t: any): string {
+  const muted = t.muted?.fg || "#555";
+  const label = ` ${dateStr} `;
+  const remaining = Math.max(0, width - label.length);
+  const left = "━".repeat(Math.floor(remaining / 2));
+  const right = "━".repeat(Math.ceil(remaining / 2));
+  return `{${muted}-fg}${left}${label}${right}{/${muted}-fg}`;
+}
+
+function formatEntryLine(e: JournalEntry, t: any): string {
+  const glyph = PEER_GLYPH[e.peer] || "·";
+  const tag = PEER_LABEL[e.peer] || "???";
+  const time = formatTime(e.ts);
+  const fg = peerColor(e.peer, t);
+  const muted = t.muted?.fg || "#555";
+  return `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${tag.padEnd(5)}{/${muted}-fg}  ${e.text}`;
+}
+
+// ── Setup ───────────────────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -45,53 +83,120 @@ export default function setup(host: MicroappHost) {
     palette: { order: 155, label: "Open Journal" },
     action: () => openJournal(host),
   });
+
+  host.registerCommand({
+    id: "append",
+    label: "Append to Journal",
+    description: "Append an entry to the journal. Args: { text, peer? }",
+    direct: true,
+    action: (args: any) => {
+      const text = args?.text;
+      if (!text || typeof text !== "string") {
+        return { ok: false, error: "text is required" };
+      }
+      const peer = (args?.peer === "agent" || args?.peer === "system") ? args.peer : "human";
+      const entry: JournalEntry = { peer, text, ts: new Date().toISOString() };
+      appendEntry(journalPath(host), entry);
+      return { ok: true, entry };
+    },
+  });
 }
 
 function openJournal(host: MicroappHost) {
-  const win = host.createWindow({ title: "Journal", width: 72, height: 24 });
+  const geo = host.geometry;
+  const winW = Math.max(80, Math.floor(geo.width * 0.95));
+  const winH = Math.max(20, Math.floor(geo.height * 0.90));
+  const winL = Math.max(0, Math.floor((geo.width - winW) / 2));
+  const winT = Math.max(1, Math.floor((geo.height - winH) / 2));
+
+  const win = host.createWindow({
+    title: "Journal",
+    width: winW, height: winH, left: winL, top: winT,
+  });
+
   const t = () => host.theme();
   const fp = journalPath(host);
   let entries = loadEntries(fp);
 
-  // --- log view ---
+  // ── Header ────────────────────────────────────────────────────
+  const headerBox = blessed.box({
+    parent: win.body,
+    top: 0, left: 0, right: 0, height: 3,
+    tags: true,
+    style: t().body,
+  });
+
+  // ── Log ───────────────────────────────────────────────────────
   const logBox = blessed.box({
     parent: win.body,
+    top: 3, left: 0, right: 0, bottom: 2,
+    tags: true,
     scrollable: true,
     alwaysScroll: true,
     mouse: true,
     keys: true,
     vi: true,
-    scrollbar: { ch: "│", style: { fg: t().muted.fg } },
+    scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
     style: t().body,
   });
 
-  // --- input line ---
-  const inputBox = blessed.textbox({
+  // ── Status bar ────────────────────────────────────────────────
+  const statusBar = blessed.box({
     parent: win.body,
-    height: 1,
-    inputOnFocus: true,
-    style: {
-      fg: t().body.fg,
-      bg: t().selected.bg,
-    },
+    bottom: 1, left: 0, right: 0, height: 1,
+    tags: true,
+    style: { fg: t().muted?.fg || "#666", bg: t().body.bg },
   });
 
-  // --- layout ---
-  const logPart = createNodePart(logBox);
-  const inputPart = createNodePart(inputBox);
-  const root = createStack(win.body, [
-    { key: "log", basis: "1fr", part: logPart },
-    { key: "input", basis: 1, part: inputPart },
-  ]);
+  // ── Input ─────────────────────────────────────────────────────
+  const inputBox = blessed.textbox({
+    parent: win.body,
+    bottom: 0, left: 0, right: 0, height: 1,
+    inputOnFocus: true,
+    style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+  });
 
+  // ── Render ────────────────────────────────────────────────────
   function render() {
     const w = Math.max(1, Number(win.body.width) || 0);
-    const h = Math.max(1, Number(win.body.height) || 0);
-    root.layout({ top: 0, left: 0, width: w, height: h });
+    const th = t();
+    const muted = th.muted?.fg || "#555";
+    const accent = th.selected?.fg || "#b48ead";
 
-    const lines = entries.map(formatEntry);
+    // Header: JRNL figlet + tagline
+    let fig = "";
+    try { fig = renderFiglet("JRNL", "small"); } catch { fig = "JRNL"; }
+    const figLines = fig.split("\n").filter(l => l.trim()).slice(0, 2);
+    const tagline = `{${muted}-fg}symbient logbook // dual-authored record{/${muted}-fg}`;
+    headerBox.setContent([...figLines, tagline].join("\n"));
+
+    // Log: entries with day dividers
+    const logW = Math.max(10, w - 4);
+    const lines: string[] = [];
+    let lastDay = "";
+    for (const e of entries) {
+      const day = dayKey(e.ts);
+      if (day !== lastDay) {
+        if (lastDay) lines.push("");
+        lines.push(formatDayDivider(day, logW, th));
+        lines.push("");
+        lastDay = day;
+      }
+      lines.push(formatEntryLine(e, th));
+    }
+    if (lines.length === 0) {
+      lines.push(`  {${muted}-fg}no entries yet. type below.{/${muted}-fg}`);
+    }
     logBox.setContent(lines.join("\n"));
     logBox.setScrollPerc(100);
+
+    // Status bar
+    const humans = entries.filter(e => e.peer === "human").length;
+    const agents = entries.filter(e => e.peer === "agent").length;
+    statusBar.setContent(
+      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} total  ━━━{/${muted}-fg}`
+    );
+
     host.screen.render();
   }
 
@@ -102,7 +207,7 @@ function openJournal(host: MicroappHost) {
     render();
   }
 
-  // --- input handling ---
+  // ── Input handling ────────────────────────────────────────────
   inputBox.on("submit", (value: string) => {
     const trimmed = (value || "").trim();
     if (trimmed) addEntry(trimmed, "human");
@@ -110,35 +215,38 @@ function openJournal(host: MicroappHost) {
     inputBox.focus();
   });
 
-  // system entry on open
+  // System entry
   if (entries.length === 0) {
-    addEntry("Journal created.", "system");
+    addEntry("journal initialised", "system");
   } else {
-    addEntry("Session started.", "system");
+    addEntry("session resumed", "system");
   }
 
   win.setFocusTarget(inputBox);
 
-  // --- lifecycle hooks ---
+  // ── Lifecycle ─────────────────────────────────────────────────
   win.describeState(() => ({
     summary: `Journal — ${entries.length} entries`,
     lastEntry: entries.length > 0 ? entries[entries.length - 1]!.text : null,
     entryCount: entries.length,
   }));
 
-  win.captureText(() => entries.map(formatEntry).join("\n"));
+  win.captureText(() => entries.map(e => {
+    const glyph = PEER_GLYPH[e.peer] || "·";
+    return `${glyph} ${formatTime(e.ts)}  ${e.text}`;
+  }).join("\n"));
 
   win.onRestyle(() => {
-    logBox.style = t().body;
-    inputBox.style = { fg: t().body.fg, bg: t().selected.bg };
+    const th = t();
+    headerBox.style = th.body;
+    logBox.style = th.body;
+    statusBar.style = { fg: th.muted?.fg || "#666", bg: th.body.bg };
+    inputBox.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
     render();
   });
 
   win.onResize(() => render());
-
-  win.onCleanup(() => {
-    root.destroy();
-  });
+  win.onCleanup(() => {});
 
   render();
   win.focus();

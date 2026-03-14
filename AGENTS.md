@@ -344,7 +344,9 @@ Scripts and skills that exist to help agents work are **agent tooling**. When ag
 |------|--------------|
 | **typecheck** | `bun run typecheck` — minimum gate before any commit |
 | **smoke** | Manual or scripted run through key surfaces (menus, windows, API) |
-| **restart** | `bash scripts/restart.sh` — clean SIGTERM → wait → launch → poll `/health` |
+| **ensure-running** | `bash scripts/ensure-running.sh` — idempotent start (handles all cases) |
+| **restart** | `bash scripts/restart.sh` — SIGTERM → wait → launch → poll `/health` (delegates to ensure-running if no tmux) |
+| **reload-microapp** | `bash scripts/reload-microapp.sh <id>` — close → reload code → reopen (solves reload ≠ reopen) |
 | **API parity** | `/state` response matches what is visually on screen |
 | **screenshot** | `./scripts/screenshot-window.sh "Title"` — TEXT crop of a window (not PNG) |
 | **system-png** | `./scripts/capture-tui-png.sh --display 2` — macOS display PNG (valid only when WibWob is visibly attached there) |

@@ -1,1 +1,2 @@
 {"type":"config","name":"Symbient Journal — MVP to v5","metricName":"journal_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"eab74e3","metric":33,"metrics":{"feature_score":18,"ui_layout":3,"ui_readability":4,"ui_aesthetic":2,"ui_coherence":4,"ui_character":2},"status":"keep","description":"Baseline: MVP journal with .jsonl persistence, input line, system entries. feature=18 ui=15","timestamp":1773527385029,"segment":0}

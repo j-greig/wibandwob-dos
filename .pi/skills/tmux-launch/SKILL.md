@@ -7,6 +7,32 @@ description: Launch WibWob-DOS + API server in a tmux session. Kills existing pr
 
 Launch, restart, and manage WibWob-DOS instances inside tmux.
 
+## Preferred scripts (use these, not raw tmux commands)
+
+| Script | What | Idempotent? |
+|--------|------|-------------|
+| `bash scripts/ensure-running.sh` | Start if not running, no-op if alive | ✅ Yes |
+| `bash scripts/restart.sh` | Stop → relaunch → verify new instance | No (kills first) |
+| `bash scripts/reload-microapp.sh <id>` | Close windows → reload code → reopen | ✅ Yes |
+| `bash scripts/attach.sh` (alias: `wwdos`) | Attach to tmux (starts if needed) | ✅ Yes |
+
+**`ensure-running.sh` handles ALL cases:** no tmux server, no session, session
+exists but app dead, app already running. Multiple agents can call it safely —
+first wins, rest see "already running."
+
+**`restart.sh` delegates to `ensure-running.sh`** when no tmux session exists.
+No more "no server running" crashes.
+
+**`reload-microapp.sh` solves reload ≠ reopen.** `microapps.reload` only
+refreshes code registrations — it does NOT close/reopen existing windows.
+This script does the full cycle: close → reload → reopen.
+
+## ⚠ Multi-agent rule
+
+If another agent owns the tmux session, do NOT restart or kill processes.
+Use API calls only (`curl http://127.0.0.1:8099/...`) for inspection.
+Check with the human before running `restart.sh` or `ensure-running.sh`.
+
 ## Session name
 
 The working session is **`wibwob`** (one window per instance).
