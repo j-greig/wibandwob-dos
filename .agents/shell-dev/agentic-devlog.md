@@ -1278,3 +1278,30 @@ Rule for agents:
 1. public module authoring contract belongs in `src/sdk/*`
 2. `src/services/microapp-sdk.ts` stays as the stable import path until an intentional public migration
 3. do not add new module-author types back into `module-loader.ts`
+
+---
+
+## 2026-03-14: CLI parity should be tested as a shell client, not a TS-internal unit
+
+Problem pattern:
+
+- the CLI is intentionally a thin shell-facing HTTP client
+- Bun-driven child-process tests were flaky in this repo's TypeScript test environment
+- that risked proving the test runner instead of proving the actual CLI usage path
+
+What shipped:
+
+- CLI now exposes the runtime inspection seam directly: `wibwob inspection`
+- `wibwob commands` can filter by `--surface` and `--includeUnavailable`
+- canonical geometry examples now use `left/top/width/height`, not `x/y/w/h`
+- `scripts/cli-parity-check.sh`
+  - verifies `health`
+  - verifies `inspection`
+  - opens, moves, resizes, focuses, and closes a real window through the CLI
+- `scripts/ci-cli-test.sh` now runs the canonical shell parity harness
+
+Rule for agents:
+
+1. if you are testing the CLI, prefer `scripts/cli-parity-check.sh`
+2. treat the CLI as an external shell client over the live API, not as an internal TypeScript library
+3. keep CLI features thin and aligned to shared runtime/API semantics

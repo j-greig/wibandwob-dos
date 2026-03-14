@@ -107,10 +107,10 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 6: CLI Convergence
 
-- `[ ]` Route CLI work through the same command and inspection semantics already used by the API
-- `[ ]` Add CLI coverage for the stabilized window/control behaviors
-- `[ ]` Remove CLI references to retired aliases and pre-refactor field names
-- `[ ]` Keep the CLI thin instead of growing a second architecture
+- `[x]` Route CLI work through the same command and inspection semantics already used by the API
+- `[x]` Add CLI coverage for the stabilized window/control behaviors
+- `[x]` Remove CLI references to retired aliases and pre-refactor field names
+- `[x]` Keep the CLI thin instead of growing a second architecture
 
 ### Slice 7: Runtime Inspector Proof Microapp
 
