@@ -28,7 +28,7 @@ import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
 import type { MicroappHostDeps } from "../services/module-loader.js";
 import type { AppMenuActions } from "./command-catalog.js";
-import { CommandRegistry } from "./command-registry.js";
+import { CommandRegistry, type CommandSurface } from "./command-registry.js";
 import {
   buildDesktopContextMenu,
   buildWindowContextMenu,
@@ -149,6 +149,8 @@ import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
+import { createRuntimeCommandService } from "../application/runtime-command-service.js";
+import { createRuntimeInspectionService } from "../application/runtime-inspection-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -326,31 +328,41 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
+    const runtimeCommands = createRuntimeCommandService({
+      listCommands: (
+        surface?: CommandSurface,
+        opts?: { includeUnavailable?: boolean },
+      ) => this.commands.list(surface, opts),
+      runCommand: (id: string, args?: Record<string, unknown>) =>
+        this.commands.run(id, args),
+    });
+    const runtimeInspection = createRuntimeInspectionService({
+      getState: () => this.getDesktopState(),
+      syncState: () => this.state.sync(),
+      getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
+      screenshotText: () => (this.screen as any).screenshot() as string,
+      getRuntimeStats: () => this.runtimeStats.snapshot(),
+      getScrambleState: () => ({
+        status: this.scrambleBrain.status,
+        sleeping: this.scrambleBrain.sleeping,
+        model: this.scrambleBrain.modelName,
+        sessionId: this.scrambleBrain.sessionId,
+        messageCount: this.scrambleBrain.history.length,
+        lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+        logPath: this.scrambleBrain.logPath ?? null,
+      }),
+      getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+      })),
+    });
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
-        getState: () => this.getDesktopState(),
-        syncState: () => this.state.sync(),
-        getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
-        listCommands: (surface, opts) => this.commands.list(surface, opts),
-        runCommand: (id, args) => this.commands.run(id, args),
+        commands: runtimeCommands,
+        inspection: runtimeInspection,
         windows: this.windowManager,
-        screenshotText: () => (this.screen as any).screenshot() as string,
-        getRuntimeStats: () => this.runtimeStats.snapshot(),
-        getScrambleState: () => ({
-          status: this.scrambleBrain.status,
-          sleeping: this.scrambleBrain.sleeping,
-          model: this.scrambleBrain.modelName,
-          sessionId: this.scrambleBrain.sessionId,
-          messageCount: this.scrambleBrain.history.length,
-          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
-          logPath: this.scrambleBrain.logPath ?? null,
-        }),
-        getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-        })),
       },
       {
         instanceLabel: this.instanceLabel,

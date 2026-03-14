@@ -128,11 +128,11 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ## Phase 4: Introduce Application Services
 
-- `[ ]` Define the first service layer under `src/application/`
-- `[ ]` Promote shared verbs out of interface handlers and into service functions
-- `[ ]` Establish one command execution path shared by TUI / API / CLI where practical
+- `[x]` Define the first service layer under `src/application/`
+- `[~]` Promote shared verbs out of interface handlers and into service functions
+- `[~]` Establish one command execution path shared by TUI / API / CLI where practical
 - `[ ]` Establish one workspace save / load path shared by all interfaces
-- `[ ]` Establish one runtime inspection path shared by all interfaces
+- `[~]` Establish one runtime inspection path shared by all interfaces
 
 ### First Verbs To Stabilize
 
@@ -195,6 +195,8 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Record architecture decisions in the refactor docs as they solidify
 - `[x]` Update `.agents/` or relevant skill docs if the refactor reveals repeated agent failure modes
 - `[x]` Update scripts and local skills when the refactor changes assumptions they encode
+- `[~]` Consolidate overlapping markdown into fewer, clearer agent-friendly docs when ownership is obvious
+- `[ ]` Move retired or superseded markdown into `.trash/` once replacement docs are clearly better
 
 ## Resolved With Author
 
