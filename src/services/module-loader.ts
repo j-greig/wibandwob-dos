@@ -27,20 +27,31 @@ import type { WindowManager } from "../core/window-manager.js";
 import type { WindowFacade } from "../core/window-facade.js";
 import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-registry.js";
 import type { MenuPlacement, PalettePlacement } from "../domain/command-definition.js";
-import type {
-  Chatspot,
-  WorldChannel,
-  WorldChatChangeEvent,
-} from "./world-chat-service.js";
-import type { WorldChatTransportStatus } from "./world-chat-transport.js";
 import {
   createStack, createRow,
   createHeaderBar, createStatusBar, createTextBlock,
   createRule, createFigletDisplay, createAnimatedPanel,
   createButtonBar, applyRect,
 } from "../core/ui-parts.js";
-import type { Rect, LayoutPart, FlexChild, GridChild } from "../core/ui-parts.js";
-import type { OverlayManager } from "../core/overlay-manager.js";
+import type {
+  MicroappHost,
+  MicroappHostDeps,
+  MicroappStateDetails,
+  MicroappWindowHandle,
+} from "../sdk/microapp-host.js";
+
+export type {
+  MicroappHost,
+  MicroappHostDeps,
+  MicroappSnapshotWindow,
+  MicroappWindowHandle,
+  MicroappStateDetails,
+  WorldChatHostAccess,
+  Rect,
+  LayoutPart,
+  FlexChild,
+  GridChild,
+} from "../sdk/microapp-host.js";
 
 // ---------------------------------------------------------------------------
 // Manifest types
@@ -67,151 +78,6 @@ interface MicroappManifestConfig {
   palette?: { order: number; label?: string };
   agent?: boolean;
   api?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// MicroappHost — the API surface a microapp's setup() function receives.
-// ---------------------------------------------------------------------------
-
-export interface MicroappHost {
-  createWindow(init: {
-    title: string;
-    width?: number;
-    height?: number;
-    left?: number;
-    top?: number;
-  }): MicroappWindowHandle;
-
-  registerCommand(def: {
-    id: string;
-    label: string;
-    description?: string;
-    action: (args?: Record<string, unknown>) => void;
-    multiInstance?: boolean;
-    /** If true, action is called directly — no focusOrCreate wrapper. Use for control commands on existing windows. */
-    direct?: boolean;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-
-  registerSnapshot(handlers: {
-    serialize: (window: WindowRecord) => Record<string, unknown> | undefined;
-    restore: (snapshot: WindowSnapshot, payload: Record<string, unknown>) => void;
-  }): void;
-
-  registerTheme(variant: ThemeVariant): void;
-
-  /** Run a microapp-local command (id is prefixed with microapp.<module>.). */
-  runCommand(localId: string, args?: Record<string, unknown>): void;
-  /** Run any global system command by its full id (e.g. "markdown.open"). */
-  runGlobalCommand(id: string, args?: Record<string, unknown>): void;
-
-  readonly screen: blessed.Widgets.Screen;
-  readonly geometry: { width: number; height: number; cellAspect: number };
-  readonly theme: () => ThemeTokens;
-  readonly windows: WindowFacade;
-  readonly worldChat: WorldChatHostAccess;
-
-  /** Layout + content primitives. Import these instead of reaching into src/. */
-  readonly ui: {
-    createStack: typeof createStack;
-    createRow: typeof createRow;
-    createHeaderBar: typeof createHeaderBar;
-    createStatusBar: typeof createStatusBar;
-    createTextBlock: typeof createTextBlock;
-    createRule: typeof createRule;
-    createFigletDisplay: typeof createFigletDisplay;
-    createAnimatedPanel: typeof createAnimatedPanel;
-    /** 1-row bar: left hint text + N right-aligned clickable mode buttons. */
-    createButtonBar: typeof createButtonBar;
-    /** Position a blessed box within a Rect. Use instead of re-implementing in each microapp. */
-    applyRect: typeof applyRect;
-  };
-
-  // ── Overlays — prompts and pickers available to modules ──
-
-  /**
-   * Open a file browser prompt. User navigates directories and picks a file.
-   * @param label - Title shown on the overlay
-   * @param startDir - Initial directory to browse
-   * @param onSelect - Called with the selected file's absolute path
-   * @param options - Optional file filter and preview settings
-   */
-  pickFile(label: string, startDir: string, onSelect: (filePath: string) => void, options?: {
-    fileFilter?: (filePath: string, isDirectory: boolean) => boolean;
-    previewLimit?: number;
-    directoriesOnly?: boolean;
-  }): void;
-
-  /** Show a transient flash/toast message on the TUI overlay layer. */
-  flash(message: string): void;
-
-  /** Prompt the user for a single text value. */
-  promptValue(label: string, defaultValue: string, onSubmit: (value: string) => void): void;
-
-  // ── Environment ──
-
-  /** Absolute path to the WibWob-DOS repo root. Use for resolving relative paths. */
-  readonly repoRoot: string;
-}
-
-/** Re-exported types for microapp authors who need them in annotations. */
-export type { Rect, LayoutPart, FlexChild, GridChild };
-
-/** Window object passed to a microapp's registerSnapshot serialize handler. */
-export type MicroappSnapshotWindow = { describeState?: () => Record<string, unknown> };
-
-export interface MicroappWindowHandle {
-  readonly id: number;
-  readonly body: blessed.Widgets.BoxElement;
-
-  onCleanup(fn: () => void): void;
-  onRestyle(fn: () => void): void;
-  /** Called after window geometry changes. Use this as the microapp's re-layout seam. */
-  onResize(fn: () => void): void;
-  onInput(fn: (input: string) => void): void;
-  /** Semantic state only — this feeds /state and workspace snapshots. */
-  describeState(fn: () => MicroappStateDetails): void;
-  captureText(fn: () => string): void;
-
-  focus(): void;
-  close(): void;
-  /** Redirect window focus to a specific child widget (e.g. a terminal emulator). */
-  setFocusTarget(widget: blessed.Widgets.BlessedElement): void;
-  /** Update the window's title bar text. */
-  setTitle(title: string): void;
-}
-
-interface MicroappStateDetails {
-  summary?: string;
-  contentPreview?: string;
-  [key: string]: unknown;
-}
-
-export interface WorldChatHostAccess {
-  ensureWorld(worldKey: string, width: number, height: number): Chatspot[];
-  nearestChatspot(x: number, y: number): Chatspot | undefined;
-  listChannels(): WorldChannel[];
-  readChannel(channelId: string): WorldChannel | undefined;
-  joinChannel(agentId: string, channelId: string): WorldChannel | undefined;
-  sendMessage(agentId: string, channelId: string, text: string): WorldChannel | undefined;
-  getTransportStatus(): WorldChatTransportStatus;
-  subscribe(listener: (event: WorldChatChangeEvent) => void): () => void;
-}
-
-// ---------------------------------------------------------------------------
-// MicroappHost dependencies — provided by app-controller.ts
-// ---------------------------------------------------------------------------
-
-export interface MicroappHostDeps {
-  screen: blessed.Widgets.Screen;
-  windowManager: WindowManager;
-  commands: CommandRegistry;
-  geometry: { width: number; height: number; cellAspect: number };
-  focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
-  worldChat: WorldChatHostAccess;
-  overlays?: OverlayManager;
-  repoRoot?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -1248,3 +1248,33 @@ Rule for agents:
 1. if you need API base URL or capture/workspace paths in shell, source `scripts/lib/runtime-env.sh`
 2. prefer live runtime metadata over guessed repo-root paths
 3. keep live restart and live API smoke tests serial, never parallel
+
+---
+
+## 2026-03-14: `module-loader` should not own the public microapp contract
+
+Problem pattern:
+
+- the public `MicroappHost` contract lived in `src/services/module-loader.ts`
+- the stable module import path was already `src/services/microapp-sdk.ts`
+- that meant the public SDK contract leaked out of a host-internal service owner
+
+What shipped:
+
+- moved public microapp host types into `src/sdk/microapp-host.ts`
+- moved reusable SDK helpers into `src/sdk/runtime-helpers.ts`
+- added `src/sdk/index.ts` as the internal SDK ownership anchor
+- kept `src/services/microapp-sdk.ts` as the stable public facade
+- updated `module-loader.ts` to consume/re-export the moved host contract instead of owning it
+
+Verification:
+
+- `bun run typecheck`
+- `bash scripts/restart.sh`
+- open a real module through the command surface (`microapp.wibwob.example.hello.open`)
+
+Rule for agents:
+
+1. public module authoring contract belongs in `src/sdk/*`
+2. `src/services/microapp-sdk.ts` stays as the stable import path until an intentional public migration
+3. do not add new module-author types back into `module-loader.ts`

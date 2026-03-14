@@ -23,7 +23,7 @@ import {
 } from "./config.js";
 import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
-import type { MicroappHostDeps } from "../services/module-loader.js";
+import type { MicroappHostDeps } from "../sdk/microapp-host.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry, type CommandSurface } from "./command-registry.js";
 import {

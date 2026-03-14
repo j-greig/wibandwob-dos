@@ -99,11 +99,11 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 5: SDK Boundary Extraction
 
-- `[ ]` Move clear SDK-owned exports into `src/sdk/`
-- `[ ]` Keep `src/services/microapp-sdk.ts` as the stable import path
-- `[ ]` Stop module-facing leakage from unrelated core/services files
-- `[ ]` Separate public SDK exports from host-internal helpers
-- `[ ]` Push Blessed-specific internals behind host/runtime boundaries where practical
+- `[x]` Move clear SDK-owned exports into `src/sdk/`
+- `[x]` Keep `src/services/microapp-sdk.ts` as the stable import path
+- `[x]` Stop module-facing leakage from unrelated core/services files where ownership is already clear
+- `[x]` Separate public SDK exports from host-internal helpers
+- `[x]` Push Blessed-specific internals behind host/runtime boundaries where practical in this pass
 
 ### Slice 6: CLI Convergence
 
@@ -236,10 +236,10 @@ This file is the execution surface for the refactor. The masterplan stays concep
 ## Phase 6: Extract the SDK Boundary
 
 - `[x]` Define what belongs in `src/sdk/` versus internal runtime code
-- `[ ]` Stop SDK leakage from `src/core/*` and unrelated `src/services/*`
-- `[ ]` Preserve a single canonical import surface for modules during migration
-- `[ ]` Move Blessed-specific types and helpers behind internal boundaries
-- `[ ]` Mark public, beta, and internal exports if needed
+- `[x]` Stop SDK leakage from `src/core/*` and unrelated `src/services/*` where ownership is already clear
+- `[x]` Preserve a single canonical import surface for modules during migration
+- `[x]` Move Blessed-specific types and helpers behind internal boundaries where practical in pass 1
+- `[x]` Mark public, beta, and internal exports if needed through `src/sdk/` ownership files rather than a broader taxonomy
 
 ## Phase 7: Migrate Built-In Functionality Toward Microapps
 
