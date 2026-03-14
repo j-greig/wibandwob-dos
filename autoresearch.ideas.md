@@ -15,6 +15,16 @@
 - Monospaced data table for stats in header area
 - ASCII art sidebar divider between stats and log areas
 
+## BIG PIVOT: JRNL → AGENT DEVLOG
+- Mine `.agents/shell-dev/agentic-devlog.md` as seed content
+- Each devlog section = journal entry with agent attribution (actor field)
+- Parse markdown headings → structured entries with kinds (observation, decision, discovery)
+- Auto-extract file references from devlog → linked files in repo
+- Show which agent wrote which devlog entry and why
+- Backlinks: entry references a file → clicking shows the file path
+- Import command: `journal.import-devlog` parses agentic-devlog.md into entries
+- This makes the Journal a real working tool, not a demo — COAT in action
+
 ## Future Features
 - Entry pinning — mark entries as important, always visible at top
 - Mood/sentiment tracking — simple emoji or keyword per entry

@@ -124,9 +124,9 @@ function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
   const result = wrapped.map((line, i) =>
     i === 0 ? `${prefix}${line}` : `${indent}${line}`
   );
-  // Append tags to last line
-  if ((tagStr || refStr) && result.length > 0) {
-    result[result.length - 1] += tagStr + refStr;
+  // Tags and refs on their own line for visibility
+  if (tagStr || refStr) {
+    result.push(`${indent}${tagStr}${refStr}`);
   }
   return result;
 }
@@ -458,8 +458,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const humans = entries.filter(e => e.peer === "human").length;
     const agents = entries.filter(e => e.peer === "agent").length;
     const days = new Set(entries.map(e => dayKey(e.ts))).size;
+    const filterHint = filterByPeer !== "all" ? `  FILTER:${filterByPeer}` : "";
     statusBar.setContent(
-      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} entries  ${days} day${days !== 1 ? "s" : ""}  │  j/k scroll  g/G jump{/${muted}-fg}`
+      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} entries  ${days} day${days !== 1 ? "s" : ""}  │  j/k scroll  g/G jump  / filter${filterHint}{/${muted}-fg}`
     );
 
     host.screen.render();
