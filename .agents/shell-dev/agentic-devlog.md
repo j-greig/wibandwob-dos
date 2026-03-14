@@ -2124,3 +2124,39 @@ monster-cam → terrain-lab → text → backrooms → music → browser → chr
 Running scratchpad at `.planning/refactor-docs/030-coat-enforcement-notes.md`.
 Categories: deterministic code checks, bun scripts, agent skills, AI inference checks.
 Updated with figlet observations.
+
+### Migration boundary: where COAT stops being mechanical
+
+4 simple migrations completed mechanically (figlet, contour, plasma, generative-art).
+But text-windows.ts and browser-windows.ts hit a wall:
+
+**text-windows.ts** is coupled to `EditorCoordinator` (247 lines in `src/core/`),
+`WindowRecord.editor` (a special mutable property on the frame), and `frame.filePath`.
+The editor widget lifecycle is managed by the coordinator, not by the window itself.
+This can't be naively ported to SDK — the coordinator would need to become an SDK
+service, or the editor would need its own host-level abstraction.
+
+**browser-windows.ts** is a 2082-line god-file containing primer browser, primer
+gallery, file manager, and text viewer factory all mixed together. Each function
+takes different deps, shares internal helpers, and uses host-internal APIs
+(WindowManager.createFrame, OverlayManager, ContentService). Decomposition is
+a prerequisite — you can't migrate a function that shares 400 lines of helper
+code with three other functions in the same file.
+
+**Lesson:** COAT migration works great for self-contained surfaces (one file,
+one function, clear boundary). For surfaces that are deeply woven into host
+internals, migration requires upstream refactoring first. This isn't a failure —
+it's the correct boundary recognition.
+
+**What makes a surface COAT-migratable:**
+- Single entry-point function with clear deps
+- No shared mutable state with other surfaces
+- No special WindowRecord properties (editor, filePath)
+- No direct WindowManager/OverlayManager coupling beyond what SDK provides
+- Self-contained rendering and keyboard handling
+
+**What blocks migration:**
+- EditorCoordinator pattern (shared editor lifecycle management)
+- God-file shared helpers (primer browser + file manager in one file)
+- WindowRecord mutations that the SDK doesn't surface
+- Overlay flows that microapps can't drive (list prompts, file pickers with preview)

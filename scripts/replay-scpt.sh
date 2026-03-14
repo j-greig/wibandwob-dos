@@ -596,6 +596,7 @@ for ev in timeline:
                 print(f"  batch resolve error: {e}")
 
         try:
+            print(f"  batch json: {batch_json[:120]}")
             batch_data = json.loads(batch_json)
             req = urllib.request.Request(
                 f"{api}/windows/batch",

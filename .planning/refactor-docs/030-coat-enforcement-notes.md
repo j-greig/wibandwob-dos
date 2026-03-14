@@ -98,3 +98,26 @@ These could be PR review prompts, or a periodic "COAT audit" skill.
 
 - **Log location**: App logs go to `logs/tui-app/YYYY-MM-DD.log`, NOT `scratch/logs/app.log`.
   The scratch log is stale/legacy. Agents should check the dated log.
+
+### generative-art migration
+
+- **Partial file migration is OK.** `generative-windows.ts` contains both migratable
+  surfaces (pattern, art) and host-internal surfaces (palette, workspace manager,
+  state inspector). Migrated the surfaces, left the host internals. The file stays
+  but with dead code (old pattern/art functions no longer called).
+
+- **`multiInstance: false` + multiple commands = confusing.** The loader wraps all
+  commands in the same `focusOrCreate`, so opening "art" after "pattern" just focused
+  the pattern window. Fix: set `multiInstance: true` and use `direct: true` on commands.
+
+### text-windows.ts assessment (deferred)
+
+- **Not migratable as-is.** Deeply coupled to `EditorCoordinator` (src/core/,
+  247 lines), `WindowRecord.editor` property, and host-internal overlay/save flows.
+  Would need EditorCoordinator to become an SDK service first.
+
+### browser-windows.ts assessment (deferred)
+
+- **God-file needs decomposition first.** 2082 lines containing 4+ different window
+  factories sharing internal helpers. Can't extract one function without untangling
+  the shared code. Separate refactor track.
