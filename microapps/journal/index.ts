@@ -520,7 +520,22 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     let fig = "";
     try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
     const figLines = fig.split("\n").filter(l => l.trim());
-    const tagline = `{${muted}-fg}symbient logbook // dual-authored record{/${muted}-fg}`;
+
+    // Mood indicator based on entry composition
+    const qs = entries.filter(e => e.kind === "question").length;
+    const ds = entries.filter(e => e.kind === "decision").length;
+    const disc = entries.filter(e => e.kind === "discovery").length;
+    const moodWord = qs > ds && qs > disc ? "curious"
+      : disc > ds ? "exploring"
+      : ds > 0 ? "decisive"
+      : entries.length > 20 ? "productive"
+      : entries.length > 0 ? "beginning"
+      : "empty";
+    const hCount = entries.filter(e => e.peer === "human").length;
+    const aCount = entries.filter(e => e.peer === "agent").length;
+    const ratio = hCount > 0 && aCount > 0 ? "symbient" : hCount > 0 ? "human-led" : aCount > 0 ? "agent-led" : "quiet";
+
+    const tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord}{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
     // Separator

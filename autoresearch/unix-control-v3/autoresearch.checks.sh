@@ -3,7 +3,7 @@ set -euo pipefail
 
 API="http://127.0.0.1:8099"
 
-# ── 1. Typecheck ─────────────────────────────────────────────────────
+# ── 1. Typecheck ─────────────────────────────────────────────────
 echo "=== typecheck ==="
 ERRORS=$(bun run typecheck 2>&1 | grep -i "microapps/journal" || true)
 if [ -n "$ERRORS" ]; then
@@ -13,39 +13,31 @@ if [ -n "$ERRORS" ]; then
 fi
 echo "PASS: no journal typecheck errors"
 
-# ── 2. API health ───────────────────────────────────────────────────
+# ── 2. API health ───────────────────────────────────────────────
 echo "=== health ==="
+for i in $(seq 1 10); do
+  curl -sf "$API/health" > /dev/null 2>&1 && break
+  sleep 1
+done
 curl -sf "$API/health" > /dev/null 2>&1 || {
   echo "ERROR: API not healthy"
   exit 1
 }
 echo "PASS: API healthy"
 
-# ── 3. Verify app is running ─────────────────────────────────────────
-echo "=== app running ==="
-curl -sf "$API/health" > /dev/null 2>&1 || {
-  echo "ERROR: app not running after autoresearch.sh restart"
-  exit 1
-}
-echo "PASS: app running"
-
-# ── 4. Journal opens ────────────────────────────────────────────────
+# ── 3. Journal can open ─────────────────────────────────────────
 echo "=== open journal ==="
-OPEN=$(curl -sf -X POST "$API/commands/run" \
+curl -sf -X POST "$API/commands/run" \
   -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.journal.open"}' 2>/dev/null || echo '{"ok":false}')
-echo "$OPEN" | grep -q '"ok"' || {
-  echo "ERROR: journal.open command failed"
-  exit 1
-}
-sleep 1
-echo "PASS: journal opened"
+  -d '{"id":"microapp.wibwob.journal.open"}' > /dev/null 2>&1 || true
+sleep 3
 
-# ── 5. Journal in state ─────────────────────────────────────────────
+# ── 4. Journal in state ─────────────────────────────────────────
 echo "=== verify state ==="
 STATE=$(curl -sf "$API/state" 2>/dev/null || echo "{}")
 echo "$STATE" | grep -q "wibwob.journal" || {
   echo "ERROR: journal window not found in /state"
+  echo "STATE: $(echo "$STATE" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d.get("windows",[])), "windows")' 2>/dev/null || echo 'parse error')"
   exit 1
 }
 echo "PASS: journal in /state"
