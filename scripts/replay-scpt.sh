@@ -467,9 +467,18 @@ def api_post(endpoint, body=None):
 def api_get(endpoint):
     try:
         with urllib.request.urlopen(f"{api}{endpoint}", timeout=5) as r:
-            return r.read().decode()
+            return r.read().decode("utf-8", errors="replace")
     except:
         return ""
+
+def api_get_json(endpoint):
+    try:
+        with urllib.request.urlopen(f"{api}{endpoint}", timeout=5) as r:
+            raw = r.read().decode("utf-8", errors="replace")
+            return json.loads(raw)
+    except Exception as e:
+        print(f"  JSON parse error on {endpoint}: {e}")
+        return {}
 
 def capture_frame(cast_file, timestamp):
     """Capture current TUI state as a cast frame."""
@@ -507,7 +516,10 @@ def run_cmd(command):
                     pass
             # Resolve paths
             if key == "filePath":
-                val = resolve_path(str(val))
+                if str(val) == "LAST_SMEAR":
+                    val = last_capture_path
+                else:
+                    val = resolve_path(str(val))
             args[key] = val
             i += 2
         else:
@@ -563,17 +575,13 @@ for ev in timeline:
 
     elif typ == "batch":
         batch_json = ev["json"]
-        # Resolve LAST_FIGLET placeholder
-        if "LAST_FIGLET" in batch_json:
-            state = json.loads(api_get("/state").replace("'", '"') if api_get("/state") else "{}")
-            # This is tricky — skip for now, use raw IDs
-            pass
         # Resolve FIGLET:N and LAST_FIGLET placeholders
         if "FIGLET:" in batch_json or "LAST_FIGLET" in batch_json:
             try:
-                state_resp = urllib.request.urlopen(f"{api}/state", timeout=5)
-                state = json.loads(state_resp.read().decode("utf-8", errors="replace"))
-                figlet_ids = [w["id"] for w in state.get("windows", []) if w.get("kind") == "figlet"]
+                state = api_get_json("/state")
+                figlet_ids = [w["id"] for w in state.get("windows", [])
+                             if w.get("kind") == "figlet" or
+                                (w.get("kind") == "microapp" and "Banner:" in w.get("title", ""))]
                 if "LAST_FIGLET" in batch_json and figlet_ids:
                     batch_json = batch_json.replace('"LAST_FIGLET"', str(figlet_ids[-1]))
                 def replace_figlet_ref(m):

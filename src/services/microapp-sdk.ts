@@ -330,6 +330,10 @@ export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
 export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
+// Plasma engine
+export { createPlasmaPlayer, moodNames, RENDER_MODES, extractMoodFromText, getMood } from "./plasma-engine.js";
+export type { PlasmaModifiers, PlasmaRenderMode, PlasmaPlayer, PlasmaMood, MoodAnalysis } from "./plasma-engine.js";
+
 // Contour / terrain engine
 export { renderContourFromHills } from "./contour-engine.js";
 export type { ContourMode, ContourPlayer } from "./contour-engine.js";

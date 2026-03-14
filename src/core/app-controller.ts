@@ -119,9 +119,8 @@ import {
 } from "../windows/scramble-window.js";
 import { ScrambleBrain } from "../services/scramble-brain.js";
 
-import { openPlasmaWindow as openPlasmaStudioWindow } from "../windows/plasma-window.js";
+
 import {
-  extractMoodFromText,
   type PlasmaModifiers,
 } from "../services/plasma-engine.js";
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
@@ -1070,28 +1069,22 @@ export class TsTuiMvpApp {
   private openPlasmaWindow(
     mood?: string,
     renderMode?: string,
-    options?: {
+    _options?: {
       primerName?: string;
       primerText?: string;
       reason?: string;
       modifiers?: PlasmaModifiers;
     },
   ): void {
-    openPlasmaStudioWindow(
-      {
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      },
-      {
-        mood,
-        renderMode: renderMode as any,
-        primerName: options?.primerName,
-        primerText: options?.primerText,
-        reason: options?.reason,
-        modifiers: options?.modifiers,
-      },
-    );
+    const args: Record<string, unknown> = {};
+    if (mood) args.mood = mood;
+    if (renderMode) args.renderMode = renderMode;
+    if (_options?.primerName) args.primerName = _options.primerName;
+    if (_options?.primerText) args.primerText = _options.primerText;
+    if (_options?.reason) args.reason = _options.reason;
+    if (_options?.modifiers) args.modifiers = _options.modifiers;
+    const result = this.commands.runDynamic("microapp.wibwob.plasma.open", args);
+    if (!result.ok) this.overlays.flash(result.error);
   }
 
   private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
@@ -1116,37 +1109,8 @@ export class TsTuiMvpApp {
   }
 
   private openPlasmaFromPrimer(filePath?: string): void {
-    if (filePath) {
-      this.spawnPlasmaForFile(filePath);
-      return;
-    }
-    // No path — open a file picker so the menu item actually works
-    promptForPrimerFile({
-      overlays: this.overlays,
-      content: this.content,
-      repoRoot: REPO_ROOT,
-      onOpenPrimer: (picked) => this.spawnPlasmaForFile(picked),
-    });
-  }
-
-  private spawnPlasmaForFile(filePath: string): void {
-    try {
-      const text = fs.readFileSync(filePath, "utf8");
-      const analysis = extractMoodFromText(text);
-      this.openPlasmaWindow(analysis.mood.name, undefined, {
-        primerName: path.basename(filePath),
-        primerText: text,
-        reason: analysis.reason,
-        modifiers: {
-          density: analysis.density,
-          entropy: analysis.entropy,
-          dominantRatio: analysis.dominantRatio,
-        },
-      });
-      this.overlays.flash(`Plasma: ${analysis.mood.name} — ${analysis.reason}`);
-    } catch {
-      this.openPlasmaWindow();
-    }
+    const result = this.commands.runDynamic("microapp.wibwob.plasma.from-primer", filePath ? { filePath } : undefined);
+    if (!result.ok) this.overlays.flash(result.error);
   }
 
   private openMusicPlayerWindow(restore?: {

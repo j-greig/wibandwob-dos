@@ -49,7 +49,11 @@ fs.writeFileSync(runtimeNode.pidPath, String(process.pid), "utf8");
 // or leave unset to skip. Only runs from the canonical repo path.
 const ghosttyShaderScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "ghostty-shader.sh");
 const ghosttyShader = process.env.WIBWOB_GHOSTTY_SHADER;
-const isGhostty = (process.env.TERM_PROGRAM || "").toLowerCase().includes("ghostty");
+// Detect Ghostty: TERM_PROGRAM may say "zed" or "tmux" if nested,
+// so also check GHOSTTY_RESOURCES_DIR (always set by Ghostty) or allow force via env.
+const isGhostty = (process.env.TERM_PROGRAM || "").toLowerCase().includes("ghostty")
+  || !!process.env.GHOSTTY_RESOURCES_DIR
+  || process.env.WIBWOB_GHOSTTY_FORCE === "1";
 
 function activateGhosttyShader() {
   if (!ghosttyShader || !isGhostty) return;
