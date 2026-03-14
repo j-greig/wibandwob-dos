@@ -1157,3 +1157,38 @@ The runtime remains small and legible; complexity emerges from composition rathe
 The SDK remains radically simple, the primitives canonical, the internals free to evolve, and the outcomes unexpectedly rich.
 
 Remember: every interface is just another client of the runtime.
+
+## Addendum: Peer Provenance and Change Attribution
+
+This is not required for the current thin refactor slices, but the architecture should leave room for it.
+
+Future runtime work may need a lightweight provenance model for changes made by different peers:
+
+* human peers with usernames
+* agent peers with ids or handles
+* system peers for autosave, maintenance, migration, or recovery actions
+
+The important distinction is:
+
+* `instance_id` identifies the Runtime Node
+* peer identity identifies the actor that made a change inside or against that node
+
+Likely first targets for provenance:
+
+* workspace save/load history
+* document edits
+* persistent history logs
+* maintenance actions that mutate runtime-owned state
+
+The first pass should stay lightweight:
+
+* define a small actor/peer descriptor shape
+* allow save/log events to optionally carry `actor`
+* record append-only event metadata before attempting full collaborative history
+* avoid building Google-Docs-style diff history or CRDT sync as part of this refactor
+
+When this becomes active work, evaluate canonical TypeScript-native patterns and libraries from the perspective of:
+
+* append-only audit/event logs
+* actor metadata propagation through commands and saves
+* optional future collaboration rather than mandatory real-time collaboration now

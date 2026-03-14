@@ -127,6 +127,14 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[ ]` Preserve text-first whole-TUI capture as the default evidence path and PNG as secondary evidence
 - `[ ]` Turn the Ghostty-vs-terminal-microapp agent efficiency comparison into a concrete later tooling task
 
+## Deferred Cross-Cutting Track: Peer Provenance / Attribution
+
+- `[ ]` Define a lightweight peer/actor descriptor separate from runtime `instanceId`
+- `[ ]` Distinguish human, agent, and system-originated mutations in runtime-owned events
+- `[ ]` Add optional actor metadata seams to workspace saves, document edits, and persistent history logs
+- `[ ]` Prefer append-only provenance metadata before any full collaborative-edit history
+- `[ ]` Evaluate canonical TypeScript-native event/audit approaches when this work becomes active
+
 ## Phase 1: Architecture Mapping
 
 - `[x]` Produce a current-state diagram for the actual runtime path: `src/app.ts` -> `src/core/app-controller.ts` -> services/windows/core
@@ -181,6 +189,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[ ]` Layout rules
 - `[~]` Command definition / argument schema
 - `[ ]` Workspace snapshot
+- `[ ]` Peer / actor descriptor
 - `[x]` Instance descriptor
 - `[x]` Runtime inspection shapes
 
