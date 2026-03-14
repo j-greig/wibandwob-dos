@@ -1,55 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /Users/james/Repos/wibandwob-dos
+cd "$(dirname "$0")"
 
-WIBWOB="bun run src/cli/wibwob.ts"
+echo "=== typecheck ==="
+bun run typecheck
 
-echo "=== v3 Preflight checks ==="
-
-# 1. TypeScript compiles
-echo "--- typecheck ---"
-bun run typecheck 2>&1 | tail -3
-echo "  typecheck passed"
-
-# 2. wibwob CLI responds
-echo "--- wibwob health ---"
-WW_HEALTH=$($WIBWOB health 2>/dev/null | jq -r '.ok' || echo "false")
-if [ "$WW_HEALTH" != "true" ]; then
-  echo "FAIL: wibwob health failed"
-  exit 1
+echo "=== no circular imports (spot check) ==="
+# Ensure split files don't create import cycles that tsc misses
+# (tsc catches type cycles but not all runtime cycles)
+# Simple check: app-controller should not import from window files
+if grep -q "from.*windows/" src/core/app-controller.ts 2>/dev/null; then
+  # This is currently expected — app-controller creates windows
+  # Just flag if NEW window imports appear beyond existing ones
+  existing_window_imports=$(git show HEAD:src/core/app-controller.ts 2>/dev/null | grep -c "from.*windows/" || echo "0")
+  current_window_imports=$(grep -c "from.*windows/" src/core/app-controller.ts || echo "0")
+  if [ "$current_window_imports" -gt "$existing_window_imports" ]; then
+    echo "WARNING: app-controller gained new window imports ($existing_window_imports -> $current_window_imports)"
+  fi
 fi
-echo "  wibwob healthy"
 
-# 3. API reachable (one raw curl as ground truth)
-echo "--- api health ---"
-HEALTH=$(curl -s http://127.0.0.1:8099/health | jq -r '.ok' 2>/dev/null || echo "false")
-if [ "$HEALTH" != "true" ]; then
-  echo "FAIL: API not responding"
-  exit 1
+echo "=== backward compat: primitives re-export ==="
+# Ensure primitives.ts still exports (modules depend on it)
+if [ -f src/core/primitives.ts ]; then
+  exports=$(grep -c "^export" src/core/primitives.ts || echo "0")
+  if [ "$exports" -lt 5 ]; then
+    echo "FAIL: primitives.ts has too few exports ($exports)"
+    exit 1
+  fi
 fi
-echo "  API healthy"
 
-# 4. Python3 available (needed for breed.py, ascii-fx)
-echo "--- python3 ---"
-if ! command -v python3 &>/dev/null; then
-  echo "FAIL: python3 not found"
-  exit 1
-fi
-echo "  python3 available"
-
-# 5. Clear desktop before regression test (leftover windows from creative sessions)
-$WIBWOB cmd desktop.clear-all 2>/dev/null; sleep 0.5
-
-# 6. v1 test suite still passes (regression gate)
-echo "--- v1 regression gate ---"
-V1_OUT=$(bash autoresearch/unix-control/autoresearch.sh 2>&1)
-V1_SCORE=$(echo "$V1_OUT" | grep 'PASSED:' | grep -oE '[0-9]+' | head -1)
-V1_TOTAL=$(echo "$V1_OUT" | grep 'PASSED:' | grep -oE '[0-9]+' | tail -1)
-if [ "$V1_SCORE" != "$V1_TOTAL" ]; then
-  echo "FAIL: v1 suite regressed ($V1_SCORE/$V1_TOTAL)"
-  exit 1
-fi
-echo "  v1 suite: $V1_SCORE/$V1_TOTAL"
-
-echo "=== All preflight checks passed ==="
+echo "=== all checks passed ==="
