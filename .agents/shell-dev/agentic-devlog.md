@@ -1486,3 +1486,318 @@ Rule for agents:
   - **Watcher note:** `watch-microapp.ts` with `--strategy reload` now works
     end-to-end for real hot reload. The default `--strategy restart` is the safe
     fallback but kills the whole app. For microapp dev iteration, use reload.
+
+---
+
+## 2026-03-14: CLI-as-music-video — creative pipe scripting session
+
+### What happened
+
+Built three creative pipe scripts (`scratch/cli-experiments/`) that use the wibwob
+CLI + curl + smear.py to compose recursive visual art on the live TUI:
+
+- `ouroboros.sh` — 5-layer recursive self-portrait (desktop screenshots itself,
+  glitches the text, feeds it back as a primer, repeat)
+- `concrete-poetry-glitchfest.sh` — 20 figlet words in asymmetric cluster on
+  a 4-phase glitched palimpsest
+- `creature-word-bomb.sh` — Joan Stark animals + wibwob primers + 20-word
+  figlet bomb across 5 themed phases with pauses for human eye
+
+These follow the patterns documented in `src/cli/CREATIVE_PIPES.md`.
+
+### What worked well
+
+- **`/windows/batch` is the hero.** Positioning 20 figlets individually would be
+  20 HTTP calls with sleeps. Batch does it in one. The jq-to-batch pattern from
+  CREATIVE_PIPES.md is genuinely powerful — query state, shape with jq, POST batch.
+- **`smear.py` composes perfectly.** stdin→file, text domain only, no images.
+  Glitch + shear modes create real visual texture. The recursive screenshot→transform→
+  reopen loop produces genuine palimpsest effects where window chrome from iteration 0
+  is visible as ghosts through 4 layers of corruption.
+- **Theme switching between phases** gives each act a distinct visual character.
+  Nord (cold creatures) → phosphor (green corruption) → pastel (dream) → phosphor
+  (deep glitch) → pastel (finale). Themes are an underused creative tool.
+- **Joan Stark art + wibwob primers layer well.** Small ASCII creatures (cat, frog,
+  butterfly) act as clipart scattered through the composition. Larger primers
+  (devil-terminal, awoooo) act as set pieces. The size contrast matters.
+- **Pauses for human eye** (`sleep 1.5`) between complex phases made the
+  composition watchable as a performance, not just a batch job.
+
+### What caused friction
+
+- **`.env` WIBWOB_API pointed at hosted VPS.** The CLI (`bun run src/cli/wibwob.ts`)
+  picked up `WIBWOB_API=https://dos.wibandwob.com/api` from `.env` and hit 401 on
+  every call. `curl` to localhost worked fine. Root cause: Bun auto-loads `.env`,
+  and the env var name collides with the CLI's resolution chain. Fix: commented out
+  the hosted URL, set `WIBWOB_API=http://127.0.0.1:8099`. **Longer-term fix needed:**
+  rename the hosted var to `WIBWOB_HOSTED_API` or make the CLI prefer localhost when
+  a local instance is running.
+- **JSON escaping in bash is brutal.** Every `cmd()` call requires manual JSON with
+  escaped quotes: `cmd "{\"id\":\"primer.open\",\"args\":{\"filePath\":\"$JGS/cat-0000-3.txt\",\"x\":2,\"y\":2}}"`.
+  This is error-prone, hard to read, and the main reason the scripts are longer than
+  they need to be. The CLI's dot syntax (`wibwob primer.open --filePath ... --x 2 --y 2`)
+  is much cleaner but the scripts used `curl` directly because of the initial 401
+  issue. **Now that the CLI works, v2 scripts should use CLI syntax exclusively.**
+- **No way to get a window ID back from open commands.** `figlet.open` returns
+  `{ok: true}` but not the window ID. To batch-position figlets, you have to query
+  `/state` after opening them all and filter by kind. This works but is fragile if
+  other figlets already exist. A `{ok: true, windowId: N}` return would make
+  targeted positioning trivial.
+- **Batch positioning requires knowing window IDs.** The pattern is: open N windows →
+  query state → extract IDs → build batch JSON → POST. This is 3 steps that could be
+  1 if open commands accepted position args that actually worked. (`--x` and `--y` are
+  accepted by `primer.open` but figlet.open ignores position args.)
+- **Sleep timing is guesswork.** `sleep 0.3` after each open, `sleep 0.5` after batch.
+  Too short and the screenshot captures incomplete state. Too long and the performance
+  drags. No way to know when a window has finished rendering. A `/ready` endpoint or
+  window-level render-complete signal would eliminate timing hacks.
+
+### Ideas for making this smoother
+
+- **CLI-native scripts, not curl.** v2 of all scripts should use:
+  ```bash
+  wibwob primer.open --filePath "$JGS/cat-0000-3.txt" --x 2 --y 2
+  wibwob figlet.open --text "SPAWN" --font shadow
+  ```
+  instead of `curl -s -X POST ... -d '{"id":"primer.open","args":{...}}'`.
+  The CLI already supports this syntax. It's just that the initial 401 bug
+  pushed us to curl and we never switched back.
+
+- **`figlet.open` should return the window ID** so scripts can position it
+  immediately without querying state.
+
+- **`figlet.open` should accept `--x` and `--y`** like `primer.open` does.
+  Currently figlets always open at default position and need a separate
+  move/batch call.
+
+- **A `wibwob batch` subcommand** that reads a JSON batch payload from stdin:
+  ```bash
+  wibwob windows | jq '[... position logic ...]' | wibwob batch
+  ```
+  Currently the batch step has to drop down to raw curl because the CLI
+  has no batch verb.
+
+- **Chiptune sync for v2.** Next step is timed audio — a chiptune stinger per
+  visual event (word appear, art appear, theme shift, glitch transform). The
+  chiptune-studio skill (`bricks` library) can generate per-event WAV hits.
+  The shell script would `ffplay` the composed audio and sync visual cues to
+  the audio timeline. This turns the script into an actual music video.
+
+### Human note
+
+**Q: Does `cmd "{\"id\":\"primer.open\",\"args\":{...}}"` = shell command or JSON/API?**
+
+It's JSON/API. The `cmd()` function in the scripts is a bash wrapper around `curl`:
+```bash
+cmd() { curl -s -X POST "$API/commands/run" -H 'Content-Type: application/json' -d "$1" >/dev/null; }
+```
+
+The **CLI equivalent** is cleaner and already works:
+```bash
+wibwob primer.open --filePath "/path/to/file.txt" --x 2 --y 2
+wibwob figlet.open --text "SPAWN" --font shadow
+wibwob cmd desktop.clear-all
+wibwob theme.set --name wibwob-phosphor
+```
+
+v2 scripts should use CLI syntax throughout. The curl approach was a workaround
+for the `.env` 401 bug, not a design choice.
+
+---
+
+## Session: 2026-03-14 — SFX creature word bomb v2
+
+### What got built
+
+Full 8-phase creature word bomb with chiptune SFX (`creature-word-bomb-sfx.sh`):
+- **Phase 0: Intro** — wibwob dual portrait + "wib & wob presents..." with `say` TTS sync
+- **Phases 1–5**: menagerie → corruption → shear → deep glitch → 20-word bomb (same as v1 but with SFX)
+- **Phase 6: Destruction** — 3-wave explosion sequence (cartoon → crackle+zap → low boom → final)
+- **Phase 7: FIN** — shark ASCII art + `fin.` figlet + descending Eb minor micromelody
+- Desktop clears at end for clean loop
+
+### SFX pipeline
+
+13 WAV files generated from chiptune-studio bricks via 4 generator scripts:
+- `gen-sfx.py` — 6 core hits (word, art, glitch, theme, clear, stinger-finale)
+- `gen-explosions.py` — 5 explosion variants (low, crackle, cartoon, zap, final)
+- `gen-arrange.py` — rapid ascending tile-snap (plays when batch position fires)
+- `gen-fin-melody.py` — 3-note Bb4→Gb4→Eb4 lullaby with low pad resolve
+
+SFX auto-generate on first run if missing. Pattern: `sfx() { ffplay -nodisp -autoexit "$1" 2>/dev/null & }`
+
+### Friction / observations
+
+1. **Agent runs ad-hoc commands directly in bash** — for the "proof of concept" demo
+   (pipe a previous run's text dump back into the TUI as a primer), I wrote the commands
+   directly into a `bash` tool call rather than saving a script file first. This is fine
+   for one-off proofs but means the work is ephemeral — lost in session logs, not
+   replayable. For anything worth showing again: write a script file.
+
+2. **`say` command (macOS TTS) as an SFX source** — works great for intro voiceover.
+   Fire-and-forget with `say -v Samantha "wib" &`. Different voices per character
+   (Samantha for wib, Daniel for wob) gives personality. Zero setup, already on every Mac.
+
+3. **Explosion sync requires sound-before-action** — first attempt had boom sounds
+   arriving after windows were already closed (the bang lagged the visual). Fix: fire
+   `sfx` then `sleep 0.05` then close windows. The tiny delay lets the audio buffer
+   start before the visual event lands.
+
+4. **`hit-arrange.wav` is the most satisfying SFX** — rapid ascending clicks that
+   accelerate, then a low "lock" thud. Plays when 5–20 windows snap from stacked
+   default positions into their composed mosaic layout via `/windows/batch`. Makes
+   the batch-position moment feel intentional and mechanical.
+
+5. **Text dump round-tripping works** — `wibwob screenshot > file.txt` captures the
+   full terminal state, then `wibwob primer.open --filePath file.txt` reopens it as
+   a primer. Smear transforms (`--mode glitch`, `--mode shear`) applied to these
+   dumps create palimpsest layers. The recursive loop (capture → transform → reopen
+   → capture again) is the core creative engine.
+
+6. **Script self-bootstraps its SFX** — if any WAV is missing, the script runs the
+   relevant `gen-*.py` via `uv run`. First run takes ~2s for pip installs, subsequent
+   runs are instant. Good pattern for distributable scripts.
+
+### Ideas for future
+
+- **Pre-composed audio track** — instead of individual SFX hits, render a single
+  mixed WAV/MP3 that contains all sounds at their correct timestamps. Play it once
+  at script start, then the visual events just need to be timed to match. Simpler,
+  more reliable sync, and the audio can be mastered properly.
+- **Looping mode** — the script already clears at the end. Add `while true; do ... done`
+  wrapper with theme rotation per loop for installation/exhibition use.
+- **Record mode** — see recording feature idea below.
+
+### Recording feature — user story sketch (not yet epic'd)
+
+**Trigger:** View → Record (or `recording.start` via CLI/API)
+
+**What happens:**
+1. `RecordingService` owns all state (idle/recording, output path, cue log, start time)
+2. Service spawns `asciinema rec` against the current terminal (or a built-in capture)
+3. Top-right chrome shows blinking `● REC` indicator (like QuickTime's red dot)
+4. Clicking the dot OR View → Stop Recording OR `recording.stop` ends the session
+5. Service writes `.cast` + optional `cues.tsv` (if SFX were fired during recording)
+6. Post-recording: service can trigger export pipeline (cast→gif, mix audio, composite mp4)
+
+**Architecture (respecting refactor canon):**
+- `src/services/recording-service.ts` — one owner, one state path
+- Command catalog: `recording.start`, `recording.stop`, `recording.status`
+- Control API: `POST /recording/start`, `POST /recording/stop`, `GET /recording/status`
+- CLI: `wibwob recording.start` / `wibwob recording.stop` — pure HTTP, zero shell imports
+- TUI: menu items + chrome indicator — thin adapter over the service
+- No logic in CLI, no logic in API handler, no logic in menu callback
+
+**Open questions:**
+- Does asciinema need to wrap the whole process, or can it attach to a running TTY?
+  (If it needs to wrap, recording must start before the app — different flow)
+- Alternative: built-in terminal capture (read the PTY buffer on a timer) — no asciinema dep
+- Should the `● REC` dot be in the kaomoji area or a separate chrome element?
+- Export pipeline: inline (View → Export Recording) or always-manual (scripts)?
+- Cue log integration: should `sfx()` in creative pipe scripts POST cues to the API
+  so the recording service captures them automatically?
+
+**Not yet epic'd.** This is a parking lot idea. Promote to `.planning/` when ready.
+
+### Audio recording pipeline
+
+Loopback Audio (Rogue Amoeba) routes system audio into QuickTime screen recordings.
+Key setup: macOS Sound Output must be set to "Loopback Audio" — not the speakers.
+Pass-Thru in Loopback forwards everything. If output is set to Studio Display Speakers
+(USB), ffplay/say audio bypasses the virtual device entirely and QuickTime records silence.
+
+### Cue logging + offline audio mix
+
+The `sfx()` function now dual-writes: plays via ffplay AND logs `timestamp_ms\twav_path`
+to `cues.tsv`. At script end, `mix-sfx-track.py` reads the cue file and renders all
+86 hits into a single `soundtrack.mp3` placed at their real timestamps. This means:
+- Any screen recording (QuickTime, OBS, asciinema) can be post-synced with the audio
+- The audio mix is deterministic — re-run from the same cues.tsv = identical track
+- Script also supports `--record` (asciinema) and `--export` (cast→gif + audio→mp4)
+
+### macOS `say` as creative SFX
+
+Apple's built-in TTS voices are surprisingly good for phase announcements:
+- Zarvox (alien robot) for "the menagerie"
+- Bad News (ominous) for "corruption"
+- Whisper (creepy quiet) for "shear"
+- Trinoids (robotic trio) for "deep glitch"
+- Boing (bouncy cartoon) for "the word bomb"
+- Bells (church bells) for "destruction"
+- Cellos (orchestral) for "fin"
+- Wobble (wobbly) for "presents" in the intro
+
+`say -v VoiceName "text" &` is fire-and-forget, same pattern as `sfx()`.
+There's literally a voice called "Wobble" on macOS — perfect for wob.
+
+### Ad-hoc vs scripted work
+
+When doing a quick proof-of-concept (e.g. piping a previous run's text dump back
+into the TUI), I wrote commands directly into a bash tool call rather than saving a
+script. This is fine for one-off proofs but the work is ephemeral — lost in session
+logs. Rule: if it's worth showing twice, write a script file.
+
+### Future optimisations and CLI ergonomics ideas
+
+**Shell aliases / PATH setup:**
+The script header has boilerplate that every creative pipe script duplicates:
+```bash
+W="bun run src/cli/wibwob.ts"
+SMEAR="python3 .pi/skills/vj-timeline/scripts/smear.py"
+SFX="scratch/cli-experiments/sfx"
+JGS="/Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples"
+```
+These could live in `~/.zshrc` or a `~/.wibwob-env.sh` that scripts source:
+```bash
+export PATH="$REPO/src/cli:$PATH"  # so `wibwob` just works
+alias smear="python3 $REPO/.pi/skills/vj-timeline/scripts/smear.py"
+alias jgs="ls $JGS"
+```
+Or the CLI itself could ship these as subcommands: `wibwob smear`, `wibwob sfx`.
+
+**CLI syntax gaps — things that still need curl:**
+- `wibwob batch` — no CLI verb for `/windows/batch`. Every script falls back to
+  raw curl for multi-window positioning. This is the #1 friction point.
+- `wibwob window <id> move --x 5 --y 10` — individual window positioning exists
+  via API but no CLI verb.
+- `wibwob windows` returns JSON but no `--ids-only` or `--kind figlet` filter —
+  every script does `jq -r '.[] | select(.kind=="figlet") | .id'` inline.
+
+**SFX pipeline improvements:**
+- `wibwob sfx play hit-word` — built-in SFX player, looks up from a known dir
+- `wibwob sfx generate` — regenerate all WAVs from the gen-*.py scripts
+- `wibwob sfx mix cues.tsv output.mp3` — mix from cue file
+- The sfx() function could be a proper shell function in a sourced library
+
+**Sequence DSL — the big one:**
+Instead of imperative bash with sleep/sfx/wibwob interleaved, a declarative format:
+```yaml
+- at: 0s
+  do: [clear, theme wibwob-dark, say "wib" Samantha]
+  sfx: hit-art
+- at: 0.8s
+  do: [figlet "wib" doom, position {left: 20, top: 22, w: 40, h: 10}]
+  sfx: hit-word
+- at: 1.4s
+  do: [figlet "wob" banner]
+  sfx: hit-word
+```
+This would enable: pre-rendering the audio track before visual playback,
+timeline scrubbing, loop points, BPM sync, and deterministic replay.
+The vj-timeline system already has some of this — could converge.
+
+**figlet.open improvements needed:**
+- Return window ID on creation (currently doesn't — forces a /state query)
+- Accept `--x` / `--y` position args (primer.open supports this, figlet doesn't)
+- Accept `--width` / `--height` for initial sizing
+- These three gaps cause ~50% of the boilerplate in creative scripts
+
+**Smear as a first-class CLI verb:**
+`wibwob smear --mode glitch --intensity 0.5 --input phase1.txt --output phase1-glitched.txt`
+Instead of knowing the python path. Could also smear the live screenshot directly:
+`wibwob smear --live --mode glitch` (screenshot → transform → open as primer)
+
+**asciinema integration:**
+- `wibwob record start` / `wibwob record stop` — wraps asciinema
+- `wibwob record export --audio cues.tsv` — renders cast+audio→mp4
+- Could auto-start recording when a creative pipe script runs
