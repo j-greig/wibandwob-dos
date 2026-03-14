@@ -26,7 +26,7 @@ Do NOT skip ahead. Do NOT implement multiple stories at once. One step, verify, 
 ## Environment
 
 - **Repo root**: `../` (parent of this ralph-sdk/ directory)
-- **Modules**: `../modules/` (microapp entry points)
+- **Modules**: `../microapps/` (microapp entry points)
 - **SDK source**: `../src/services/microapp-sdk.ts` (MicroappHost, MicroappWindowHandle)
 - **UI primitives**: `../src/core/ui-parts.ts` (UiPart<Props>, createStack, createColumns)
 - **Theme tokens**: access via `host.getTheme()` — never hardcode colors
@@ -58,21 +58,21 @@ Also exists: `../src/windows/glitchbox-window.ts` — ASCII skeleton + generativ
 
 ### Story 1: Poetry Clock SDK Rewrite (P1 brownfield proof)
 
-Rewrite `modules/wibwob-poetry-clock/` to use ZERO direct `../src/` imports.
+Rewrite `microapps/wibwob-poetry-clock/` to use ZERO direct `../src/` imports.
 Everything must come through the SDK surface: `MicroappHost`, `createStack`, etc.
 
 **Done conditions:**
 ```bash
 # Zero imports from ../src
-test "$(grep -c 'from.*\.\./src' ../modules/wibwob-poetry-clock/index.ts 2>/dev/null || echo 999)" -eq 0
+test "$(grep -c 'from.*\.\./src' ../microapps/wibwob-poetry-clock/index.ts 2>/dev/null || echo 999)" -eq 0
 
-# Module still loads (check /modules/list after app restart)
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "wibwob-poetry-clock"
+# Module still loads (check /microapps/list after app restart)
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "wibwob-poetry-clock"
 ```
 
 ---
 
-### Story 2: ModuleRuntimeService + /modules/list
+### Story 2: ModuleRuntimeService + /microapps/list
 
 Create `../src/services/module-runtime-service.ts` that tracks:
 - Module name, version, status (loaded/error/unloaded)
@@ -80,7 +80,7 @@ Create `../src/services/module-runtime-service.ts` that tracks:
 - Registered commands
 - Cleanup hooks
 
-Wire into app startup. Expose via `GET /modules/list`.
+Wire into app startup. Expose via `GET /microapps/list`.
 
 **Done conditions:**
 ```bash
@@ -88,17 +88,17 @@ Wire into app startup. Expose via `GET /modules/list`.
 ls ../src/services/module-runtime-service.ts
 
 # Endpoint returns valid JSON array
-curl -sf http://127.0.0.1:8099/modules/list | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d,list)"
+curl -sf http://127.0.0.1:8099/microapps/list | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d,list)"
 
 # Each module has required fields
-curl -sf http://127.0.0.1:8099/modules/list | python3 -c "import sys,json; d=json.load(sys.stdin); assert all('name' in m and 'status' in m for m in d)"
+curl -sf http://127.0.0.1:8099/microapps/list | python3 -c "import sys,json; d=json.load(sys.stdin); assert all('name' in m and 'status' in m for m in d)"
 ```
 
 ---
 
 ### Story 3: Module Unload
 
-`POST /modules/unload {"name":"module-name"}` tears down:
+`POST /microapps/unload {"name":"module-name"}` tears down:
 - All windows owned by the module
 - All commands registered by the module
 - Calls cleanup hooks
@@ -107,17 +107,17 @@ curl -sf http://127.0.0.1:8099/modules/list | python3 -c "import sys,json; d=jso
 **Done conditions:**
 ```bash
 # Endpoint exists and accepts POST
-curl -sf -X POST http://127.0.0.1:8099/modules/unload -H "Content-Type: application/json" -d '{"name":"hello-world"}' | grep -qE "(ok|error|not.found)"
+curl -sf -X POST http://127.0.0.1:8099/microapps/unload -H "Content-Type: application/json" -d '{"name":"hello-world"}' | grep -qE "(ok|error|not.found)"
 
 # After unload, module status changes
-curl -sf http://127.0.0.1:8099/modules/list | grep -q '"unloaded"'
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q '"unloaded"'
 ```
 
 ---
 
 ### Story 4: Module Reload
 
-`POST /modules/reload {"name":"module-name"}` does:
+`POST /microapps/reload {"name":"module-name"}` does:
 1. Unload (via Story 3 mechanism)
 2. Re-import from disk (bust cache)
 3. Re-run module init
@@ -126,17 +126,17 @@ curl -sf http://127.0.0.1:8099/modules/list | grep -q '"unloaded"'
 **Done conditions:**
 ```bash
 # Endpoint exists
-curl -sf -X POST http://127.0.0.1:8099/modules/reload -H "Content-Type: application/json" -d '{"name":"hello-world"}' | grep -qE "(ok|error)"
+curl -sf -X POST http://127.0.0.1:8099/microapps/reload -H "Content-Type: application/json" -d '{"name":"hello-world"}' | grep -qE "(ok|error)"
 
-# Module reloads with fresh timestamp (check logs or /modules/list loadedAt field)
-curl -sf http://127.0.0.1:8099/modules/list | python3 -c "import sys,json; d=json.load(sys.stdin); print([m.get('loadedAt') for m in d])"
+# Module reloads with fresh timestamp (check logs or /microapps/list loadedAt field)
+curl -sf http://127.0.0.1:8099/microapps/list | python3 -c "import sys,json; d=json.load(sys.stdin); print([m.get('loadedAt') for m in d])"
 ```
 
 ---
 
 ### Story 5: File-Watch Dev Loop
 
-In dev mode (`DEV=true` or `bun run dev`), watch `modules/` directory.
+In dev mode (`DEV=true` or `bun run dev`), watch `microapps/` directory.
 On .ts file change, debounce 500ms, then auto-reload the changed module.
 Log to console: `[module-watch] reloading <name>`.
 
@@ -303,27 +303,27 @@ curl -sf http://127.0.0.1:8099/commands/list | grep -q "module"
 
 ### Story 13: Demo — Module Observatory
 
-Create `../modules/module-observatory/`:
+Create `../microapps/module-observatory/`:
 - Live runtime dashboard
 - Tree component showing module hierarchy
 - Sparklines of window/command counts per module
 - Reload Button per module
-- Polls `/modules/list` every 2s
+- Polls `/microapps/list` every 2s
 - Connection graph overlay (if ports exist)
 
 **Done conditions:**
 ```bash
-ls ../modules/module-observatory/index.ts
-grep -q "Tree\|Sparkline" ../modules/module-observatory/index.ts
-grep -q "modules/list\|/modules" ../modules/module-observatory/index.ts
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "module-observatory"
+ls ../microapps/module-observatory/index.ts
+grep -q "Tree\|Sparkline" ../microapps/module-observatory/index.ts
+grep -q "microapps/list\|/modules" ../microapps/module-observatory/index.ts
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "module-observatory"
 ```
 
 ---
 
 ### Story 14: Demo — Terrain Studio
 
-Create `../modules/terrain-studio/`:
+Create `../microapps/terrain-studio/`:
 - Uses existing `../src/services/contour-engine.ts`
 - Gauge sliders for parameters (scale, octaves, persistence)
 - List for preset selection
@@ -333,17 +333,17 @@ Create `../modules/terrain-studio/`:
 
 **Done conditions:**
 ```bash
-ls ../modules/terrain-studio/index.ts
-grep -q "contour\|Contour" ../modules/terrain-studio/index.ts
-grep -q "SplitPane\|Gauge" ../modules/terrain-studio/index.ts
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "terrain-studio"
+ls ../microapps/terrain-studio/index.ts
+grep -q "contour\|Contour" ../microapps/terrain-studio/index.ts
+grep -q "SplitPane\|Gauge" ../microapps/terrain-studio/index.ts
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "terrain-studio"
 ```
 
 ---
 
 ### Story 15: Demo — Primer Gallery
 
-Create `../modules/primer-gallery/`:
+Create `../microapps/primer-gallery/`:
 - Tabs for categories (joan-stark, wibwob, monsters, isometric)
 - Scrollable List of .txt filenames from `../primers/`
 - Large preview panel rendering selected file
@@ -353,17 +353,17 @@ Create `../modules/primer-gallery/`:
 
 **Done conditions:**
 ```bash
-ls ../modules/primer-gallery/index.ts
-grep -q "Tabs" ../modules/primer-gallery/index.ts
-grep -q "primers\|\.txt" ../modules/primer-gallery/index.ts
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "primer-gallery"
+ls ../microapps/primer-gallery/index.ts
+grep -q "Tabs" ../microapps/primer-gallery/index.ts
+grep -q "primers\|\.txt" ../microapps/primer-gallery/index.ts
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "primer-gallery"
 ```
 
 ---
 
 ### Story 16: Demo — Symbient Composer
 
-Create `../modules/symbient-composer/`:
+Create `../microapps/symbient-composer/`:
 - TextInput for Wib prompt, TextInput for Wob prompt
 - Conversation history List (scrollable)
 - Send Button fires actual agent session
@@ -373,18 +373,18 @@ Create `../modules/symbient-composer/`:
 
 **Done conditions:**
 ```bash
-ls ../modules/symbient-composer/index.ts
-grep -q "TextInput" ../modules/symbient-composer/index.ts
-grep -q "agent\|session\|symbient" ../modules/symbient-composer/index.ts
-grep -q "port\|Port\|declarePorts" ../modules/symbient-composer/index.ts
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "symbient-composer"
+ls ../microapps/symbient-composer/index.ts
+grep -q "TextInput" ../microapps/symbient-composer/index.ts
+grep -q "agent\|session\|symbient" ../microapps/symbient-composer/index.ts
+grep -q "port\|Port\|declarePorts" ../microapps/symbient-composer/index.ts
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "symbient-composer"
 ```
 
 ---
 
 ### Story 17: SDK Explorer Microapp
 
-Create `../modules/sdk-explorer/`:
+Create `../microapps/sdk-explorer/`:
 - Interactive documentation surface
 - Tabs: Quick Start / Components / Examples / Architecture
 - Examples tab renders live components
@@ -393,10 +393,10 @@ Create `../modules/sdk-explorer/`:
 
 **Done conditions:**
 ```bash
-ls ../modules/sdk-explorer/index.ts
-grep -q "Tabs" ../modules/sdk-explorer/index.ts
-grep -q "Quick.*Start\|Components\|Examples" ../modules/sdk-explorer/index.ts
-curl -sf http://127.0.0.1:8099/modules/list | grep -q "sdk-explorer"
+ls ../microapps/sdk-explorer/index.ts
+grep -q "Tabs" ../microapps/sdk-explorer/index.ts
+grep -q "Quick.*Start\|Components\|Examples" ../microapps/sdk-explorer/index.ts
+curl -sf http://127.0.0.1:8099/microapps/list | grep -q "sdk-explorer"
 ```
 
 ---
@@ -430,7 +430,7 @@ When all 18 stories pass, run this final check:
 
 ```bash
 cd .. && bun run typecheck && \
-curl -sf http://127.0.0.1:8099/modules/list | python3 -c "
+curl -sf http://127.0.0.1:8099/microapps/list | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 names=[m['name'] for m in d]
@@ -458,7 +458,7 @@ When this passes, output:
 - **Wob code**: precise types, minimal comments, every line earns its place
 - **Both**: theme-aware colors, consistent spacing, UiPart patterns, clean exports
 
-The SDK is a gift to future module authors. Make it a joy to use.
+The SDK is a gift to future microapp authors. Make it a joy to use.
 
 ---
 

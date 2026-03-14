@@ -32,14 +32,14 @@ const FALLBACK_FONT = "standard";
 
 function resolveFontJsonPath(): string {
   for (const candidate of [
-    path.join(REPO_ROOT, "modules-private", "wibwob-figlet-fonts", "fonts.json"),
-    path.join(REPO_ROOT, "modules", "wibwob-figlet-fonts", "fonts.json")
+    path.join(REPO_ROOT, "microapps-private", "wibwob-figlet-fonts", "fonts.json"),
+    path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json")
   ]) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
   }
-  return path.join(REPO_ROOT, "modules", "wibwob-figlet-fonts", "fonts.json");
+  return path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json");
 }
 
 export function getFigletCatalogue(): FigletCatalogue {

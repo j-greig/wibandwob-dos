@@ -17,13 +17,13 @@ seed/seaLevel/terrainIdx — visual consistency with the left contour pane.
 Separate cache (hybridIsoArtifact/hybridIsoCacheKey) invalidates on resize.
 Standalone ISO cache (hybridArtifact/hybridCacheKey) unchanged.
 ---
- modules/wibwobworld/index.ts | 29 +++++++++++++++++++++--------
+ microapps/wibwobworld/index.ts | 29 +++++++++++++++++++++--------
  1 file changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/modules/wibwobworld/index.ts b/modules/wibwobworld/index.ts
+diff --git a/microapps/wibwobworld/index.ts b/microapps/wibwobworld/index.ts
 index adebaaf..a0e140c 100644
---- a/modules/wibwobworld/index.ts
-+++ b/modules/wibwobworld/index.ts
+--- a/microapps/wibwobworld/index.ts
++++ b/microapps/wibwobworld/index.ts
 @@ -202,6 +202,9 @@ export default function setup(host: MicroappHost) {
      let latestJoinedChannelId = "";
      let hybridCacheKey = "";

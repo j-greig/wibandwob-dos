@@ -34,8 +34,8 @@ Treat this as a feasibility spike with real surfaces, not a design doc in code f
 - [/Users/james/Repos/wibwob-dos/.agents/control-api.md](/Users/james/Repos/wibwob-dos/.agents/control-api.md)
 
 Relevant code:
-- [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
-- [src/services/module-loader.ts](/Users/james/Repos/wibwob-dos/src/services/module-loader.ts)
+- [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
+- [src/services/microapp-loader.ts](/Users/james/Repos/wibwob-dos/src/services/microapp-loader.ts)
 - [src/services/state-service.ts](/Users/james/Repos/wibwob-dos/src/services/state-service.ts)
 - [src/services/control-api.ts](/Users/james/Repos/wibwob-dos/src/services/control-api.ts)
 - [src/services/wibwob-agent-session.ts](/Users/james/Repos/wibwob-dos/src/services/wibwob-agent-session.ts)
@@ -128,7 +128,7 @@ No IRC. No persistence. No threading. No server. Just prove the seams.
 ### 3. Chatroom Frontend
 
 Add a new surface for one channel:
-- either `modules-private/world-chatroom/`
+- either `microapps-private/world-chatroom/`
 - or a built-in window if that is materially simpler
 
 Preference:

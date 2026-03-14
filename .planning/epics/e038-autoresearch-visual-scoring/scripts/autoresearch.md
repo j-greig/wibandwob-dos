@@ -27,7 +27,7 @@ the PNG to score it.
 
 ## Files in Scope
 
-- `modules/llm-orch-studio/index.ts` — the module source (layout, components, styling)
+- `microapps/llm-orch-studio/index.ts` — the module source (layout, components, styling)
 
 That is the ONLY file you may modify. Do not touch theme files, other
 modules, core shell code, or SDK internals.
@@ -35,7 +35,7 @@ modules, core shell code, or SDK internals.
 ## Off Limits
 
 - `src/` — shell internals
-- `modules/` other than llm-orch-studio
+- `microapps/` other than llm-orch-studio
 - Theme files
 - SDK source (`src/services/microapp-sdk.ts`)
 - `scripts/` — build/infra scripts
@@ -90,11 +90,11 @@ Report all five sub-scores as secondary metrics in log_experiment.
 | Feedback   | createProgressBar, createSpinner |
 | Animation  | createAnimationClock, tween, EASINGS |
 
-Full reference: `.agents/module-dev/sdk-reference.md`
+Full reference: `.agents/microapp-dev/sdk-reference.md`
 Example modules to study for patterns:
-- `modules/demo-e026-demo/` — SDK sampler, many component patterns
-- `modules/demo-heartbeat/` — animated, clean timer/cleanup
-- `modules/demo-wibwob-poetry-clock/` — AI integration, modes
+- `microapps/demo-e026-demo/` — SDK sampler, many component patterns
+- `microapps/demo-heartbeat/` — animated, clean timer/cleanup
+- `microapps/demo-wibwob-poetry-clock/` — AI integration, modes
 
 ## Terminal Design Principles
 

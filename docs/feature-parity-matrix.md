@@ -175,7 +175,7 @@
 
 | Feature | TV | TS | Notes |
 |---------|----|----|-------|
-| Primer Discovery | ✅ `findPrimerDir()` | ✅ `ContentService` | TS scans modules/modules-private |
+| Primer Discovery | ✅ `findPrimerDir()` | ✅ `ContentService` | TS scans microapps/modules-private |
 | Frame Delimiter | `----` lines | `# frame N` comments | Different format |
 | FIGlet Font Catalogue | ✅ Category submenus | ✅ `fonts.json` catalogue | |
 | FIGlet sendText → Editor | ✅ Renders FIGlet into editor | ❌ | |

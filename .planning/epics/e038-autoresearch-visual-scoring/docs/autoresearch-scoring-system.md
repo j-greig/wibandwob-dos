@@ -25,7 +25,7 @@ Each axis tracked as a secondary metric so you see what improved and what degrad
 
 ## The Loop
 
-1. Agent edits `modules/llm-orch-studio/index.ts`
+1. Agent edits `microapps/llm-orch-studio/index.ts`
 2. `autoresearch.sh` runs: typecheck, restart app in tmux, wait for /health, open the window, capture PNG screenshot
 3. `autoresearch.checks.sh` runs: typecheck + verify window exists in /state
 4. Agent reads the screenshot PNG via Pi's Read tool (image attachment)

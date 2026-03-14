@@ -9,10 +9,10 @@ Use this skill when adding a new window type or microapp surface to WibWob-DOS.
 It prevents the most common drift patterns: missing state contracts, orphaned
 openers, duplicate patterns, and parity gaps.
 
-For microapps under `modules/`, start with:
+For microapps under `microapps/`, start with:
 
 ```bash
-bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"
+bash scripts/scaffold-microapp.sh microapps/<name> <app-id> "<Title>"
 ```
 
 Then edit the generated files against the canonical SDK surface:

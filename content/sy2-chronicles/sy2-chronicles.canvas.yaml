@@ -134,7 +134,7 @@ panels:
   - id: sy2-portrait
     type: ascii-art
     title: "Portrait"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-portrait-1.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-portrait-1.txt
     col: 1
     w: 50
     h: 20
@@ -152,7 +152,7 @@ panels:
   - id: sy2-space-cat
     type: ascii-art
     title: "Space Cat"
-    asciiFile: modules-private/wibwob-primers/primers/space-cat.txt
+    asciiFile: microapps-private/wibwob-primers/primers/space-cat.txt
     col: 2
     w: 52
     h: 14
@@ -160,7 +160,7 @@ panels:
   - id: sy2-chaos-vs-order
     type: ascii-art
     title: "Chaos vs Order"
-    asciiFile: modules-private/wibwob-primers/primers/chaos-vs-order.txt
+    asciiFile: microapps-private/wibwob-primers/primers/chaos-vs-order.txt
     col: 2
     w: 52
     h: 14
@@ -168,7 +168,7 @@ panels:
   - id: sy2-two-cats
     type: ascii-art
     title: "Two Cats"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-two-cats.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-two-cats.txt
     col: 2
     w: 52
     h: 18

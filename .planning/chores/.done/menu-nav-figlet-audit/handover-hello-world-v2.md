@@ -2,7 +2,7 @@
 
 ## What exists now (working)
 
-The module is at `modules/hello-world/index.ts`. It typechecks. The app
+The module is at `microapps/hello-world/index.ts`. It typechecks. The app
 runs. The following works:
 
 - Responsive layout with 4 breakpoints: XL, L, M, S
@@ -18,7 +18,7 @@ runs. The following works:
   app label, compass buttons, regen button, mode indicator.
   CONFIRMED RENDERING in latest screenshot.
 - Status bar: bottom row, always visible, shows mode/size/debug info
-- multiInstance: false in module.json (prevents duplicate windows)
+- multiInstance: false in microapp.json (prevents duplicate windows)
 
 ## What needs fixing
 

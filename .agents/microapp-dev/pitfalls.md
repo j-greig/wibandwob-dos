@@ -1,0 +1,97 @@
+# Microapp Pitfalls
+
+Common mistakes and gotchas when building microapps. Check this if something
+isn't working and you can't see why.
+
+## Lifecycle hooks
+
+| Mistake | What happens | Fix |
+|---------|-------------|-----|
+| Missing `describeState()` | Window shows no summary in /state, agents can't read it | Always return at least `{ summary: "..." }` |
+| Missing `captureText()` | Text export and /windows/text return empty | Return the visible text content |
+| Missing `onCleanup()` | Timers and connections leak when window closes | Clear all timers, destroy tree widgets, close connections |
+| Missing `onRestyle()` | Window keeps old colours when theme changes | Re-apply `host.theme()` to all styled widgets |
+
+The scaffold generates an empty `onCleanup()` stub. Fill it in when your
+microapp creates timers, players, subscriptions, or any resource that outlives
+a function call.
+
+## Timers
+
+| Mistake | Fix |
+|---------|-----|
+| Raw `setInterval` / `setTimeout` | Use `createTimer(fn, ms, timers)` from the SDK |
+| Forgetting the timer set | `const timers = new Set<ReturnType<typeof setInterval>>()` at module scope |
+| Cleanup without `clearTimers` | `win.onCleanup(() => clearTimers(timers))` |
+
+## Widget parenting
+
+| Mistake | Fix |
+|---------|-----|
+| Widgets added to `win.frame` | Always add to `win.body` |
+| Grandchildren of scrollable box render blank | Set `fixed: true` on grandchildren — blessed's `_getCoords` double-subtracts scroll offset |
+| `setContent` on a scrollable node with width=0 | Infinite loop — blessed word-wrap divides by width. Guard: `if (Number(node.width) > 0)` |
+
+## Theme
+
+| Mistake | Fix |
+|---------|-----|
+| `host.theme()` called once at startup, stored in variable | Call `host.theme()` fresh inside `onRestyle` and in render functions |
+| `win.screen` for rendering | Use `host.screen` — there is no `win.screen` |
+| Passing partial nested `style` objects to raw blessed widgets | Normalize nested shapes like `style.item` / `style.selected` before constructing the widget, or blessed can crash on missing fields |
+
+## Commands
+
+| Mistake | Fix |
+|---------|-----|
+| Query command returns `{ok:true}` but caller gets nothing | Add `direct: true` to `registerCommand` — without it, `focusOrCreate` wraps the action and swallows the return value |
+| `host.windowManager()` | Use `host.windows` |
+
+## Imports
+
+| Mistake | Fix |
+|---------|-----|
+| Importing from `src/core/app-controller.ts` | Never — use the host API |
+| Importing from `src/core/*` directly | Import from `../../src/services/microapp-sdk.js` — if something is missing, add the re-export there |
+| Importing from `src/services/syntax-highlight.js` | Use `highlightCode` from the SDK |
+| Importing from `src/core/theme/types.js` | Use `ThemeVariant` from the SDK |
+| Importing from `src/services/figlet-service.js` | Use `renderFigletLines` etc from the SDK (already re-exported) |
+| `spawnSync("figlet", ...)` | Use `renderFiglet` from the SDK — cached, safe fallback |
+| Hand-built tab bar + key bindings | Use `createTabs` from the SDK |
+| Copy-pasting pattern generators | Import from `PATTERNS` or individual named exports |
+
+## Persistence
+
+| Mistake | Fix |
+|---------|-----|
+| `persist: true` in manifest but no `registerSnapshot` | Either add the handler or set `persist: false` |
+| Serializing widget state directly | Serialize your own state model, not blessed widget properties |
+
+## Interstitial pickers and prompts (API automation)
+
+| Mistake | Fix |
+|---------|-----|
+| Opening flow starts with a local blessed picker/prompt but exposes no command hooks | Add microapp commands for picker state + actions (e.g. `picker.info`, `picker.select`, `picker.confirm`, `picker.cancel`) |
+| Picker exists outside shared overlay manager, so `overlay.confirm/cancel` do nothing | Either use shared overlay primitives, or provide microapp-local confirm/cancel commands explicitly |
+| "Open" command returns ok but no final app window appears (stuck on interstitial) | Treat interstitial as first-class state: expose current selection + deterministic next-step commands |
+| Automation can open only default/first option | Support index-based selection in commands (`args.index`) before confirm |
+
+## Multi-command microapps
+
+| Mistake | Fix |
+|---------|-----|
+| Two commands in one microapp both create different windows, but only one opens | `focusOrCreate` uses `microappId` as the key — if `multiInstance` is false (the default), the second command just focuses the first command's existing window. Set `multiInstance: true` on commands that create distinct windows, or provide args that skip the picker entirely. |
+| Microapp manifest has `multiInstance: false` but commands set `multiInstance: true` | The command-level flag wins — `def.multiInstance ?? manifest.multiInstance ?? false`. But check both levels if windows aren't opening. |
+
+## Testing and restarts
+
+| Mistake | Fix |
+|---------|-----|
+| Code changes have no effect after restart | The old process is still alive on the port. Check the session ID: `curl /health` — if it matches the old one, the kill didn't work. Use `kill -9 $(lsof -ti:8099)` as last resort, then `reset` the terminal. |
+| `kill $(cat scratch/wibwob.pid)` and restart, but same session ID | PID file is stale or SIGTERM was ignored. Always verify the session ID changed after restart. |
+
+## Input ownership
+
+| Mistake | Fix |
+|---------|-----|
+| Assuming bare `Tab` is reserved by the shell for app cycling | It is microapp territory now. Use `Tab` locally when helpful. Shell-level app cycling moved to `Meta-Tab` / `Meta-Shift-Tab`. |

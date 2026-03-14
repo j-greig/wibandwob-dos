@@ -53,7 +53,7 @@ demos serve a diminished purpose.
 **Options:**
 - A) Keep all — they serve as regression tests and reference examples
 - B) Keep one per concept pair (pick Pi or Codex winner), delete the other
-- C) Archive all to a `modules/_archive/` directory
+- C) Archive all to a `microapps/_archive/` directory
 - D) Delete all — the real modules are the proof now
 
 **Recommendation:** Option B. Keep the stronger of each pair:

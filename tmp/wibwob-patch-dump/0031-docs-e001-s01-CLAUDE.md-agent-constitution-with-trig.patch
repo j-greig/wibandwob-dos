@@ -34,15 +34,15 @@ index 0000000..721f52d
 +- TUI: blessed (terminal widget library)
 +- API server: FastAPI (Python) — `src/api/`
 +- Multiplayer: PartyKit — `src/services/party-*.ts`
-+- Module system: dynamic microapps loaded at startup from `modules/` and `modules-private/`
++- Module system: dynamic microapps loaded at startup from `microapps/` and `microapps-private/`
 +
 +**Key directories:**
 +```
 +src/core/          — app controller, window manager, command catalog/registry, theme
 +src/services/      — state, control API, workspace, content, agent session, file actions
 +src/windows/       — window factory functions (one per window type)
-+modules/           — public microapp modules (each has module.json + index.ts)
-+modules-private/   — private modules (git submodule, never commit here without separate submodule commit)
++microapps/           — public microapp modules (each has microapp.json + index.ts)
++microapps-private/   — private modules (git submodule, never commit here without separate submodule commit)
 +.agents/           — machine-readable specs: architecture.md, invariants.md, control-api.md
 +.pi/skills/        — specialist skill files loaded on demand by the agent
 +.planning/         — epics, features, stories, spikes, refactor docs
@@ -169,12 +169,12 @@ index 0000000..721f52d
 +
 +### 3.4 Module System
 +
-+**Files:** `src/services/module-loader.ts`, each `modules/*/module.json`
++**Files:** `src/services/microapp-loader.ts`, each `microapps/*/microapp.json`
 +
-+Modules are directories with `module.json` and `index.ts`. They register
++Modules are directories with `microapp.json` and `index.ts`. They register
 +window types, commands, themes, and snapshot handlers dynamically at startup.
 +
-+`module.json` declares `name`, `type` (`microapp` | `theme` | `primers`),
++`microapp.json` declares `name`, `type` (`microapp` | `theme` | `primers`),
 +`entry` (default `index.ts`), and type-specific config.
 +
 +The loader calls `setup(host: MicroappHost)` on `index.ts`'s default export.
@@ -182,7 +182,7 @@ index 0000000..721f52d
 +hooks workspace save/restore. `host.createWindow()` creates blessed windows.
 +
 +**Gotchas:**
-+- `modules-private/` is a git submodule — NEVER `git add modules-private/` in
++- `microapps-private/` is a git submodule — NEVER `git add microapps-private/` in
 +  the parent repo. Changes need a separate commit inside the submodule.
 +- Theme modules export a `ThemeVariant` as either default or named export
 +- Microapp commands use LOCAL IDs (`"open"`) — the registry prefixes them with
@@ -235,7 +235,7 @@ index 0000000..721f52d
 +
 +### 3.7 Theme System
 +
-+**Files:** `src/core/theme/resolver.ts`, `src/core/theme/types.ts`, `src/core/theme/{dark,light,dark-pastel,dark-nord}.ts`, `modules-private/wibwob-theme-*/theme.ts`
++**Files:** `src/core/theme/resolver.ts`, `src/core/theme/types.ts`, `src/core/theme/{dark,light,dark-pastel,dark-nord}.ts`, `microapps-private/wibwob-theme-*/theme.ts`
 +
 +`ThemeTokens` defines the full semantic token set (23 tokens). Every window
 +uses `theme().body`, `theme().header`, etc. — never raw blessed colour strings.
@@ -285,8 +285,8 @@ index 0000000..721f52d
 +| Touch window-manager.ts | `src/core/types.ts` (WindowRecord), `src/core/window-chrome.ts` | Do not re-enable shadow; do not add size math inline |
 +| Touch workspace save/restore | `src/core/snapshot-registry.ts`, `src/core/workspace-snapshots.ts` | Serialize params not paths; appType required for snapshot guard |
 +| Touch theme system | `src/core/theme/types.ts` (ThemeTokens), `src/core/theme/resolver.ts` | All 23 tokens required; call `applyTheme()` after any `setThemeVariant()` |
-+| Add a new module | `src/services/module-loader.ts`, `modules/example-primers/` | module.json required; modules-private is a submodule — separate commit |
-+| Edit modules-private/ | Nothing to read — just remember: submodule commit first | NEVER `git add modules-private/` in parent repo |
++| Add a new module | `src/services/microapp-loader.ts`, `microapps/example-primers/` | microapp.json required; modules-private is a submodule — separate commit |
++| Edit microapps-private/ | Nothing to read — just remember: submodule commit first | NEVER `git add microapps-private/` in parent repo |
 +| Touch control API | `.agents/control-api.md` | Check existing endpoints before adding; `describeState()` and API should evolve together |
 +| Touch agent session | `src/services/wibwob-agent-session.ts` (read fully) | Multi-turn transcript lifecycle is subtle — re-read the event order comments |
 +| Work on planning docs | `.pi/skills/planning-update/SKILL.md`, `.pi/skills/simplify-planning/SKILL.md` | Checkbox format `[x]/[~]/[ ]/[-]`, frontmatter status values, never duplicate in GitHub issues |
@@ -379,9 +379,9 @@ index 0000000..721f52d
 +  ephemeral (gitignored). Serialize `{ seed, terrainIdx, seaLevel, levels }`.
 +  This regression was fixed in commit 5b1e255.
 +
-+- **DO NOT** commit changes to `modules-private/` via the parent repo.
++- **DO NOT** commit changes to `microapps-private/` via the parent repo.
 +  The submodule has its own git history. Stage and commit inside
-+  `modules-private/` first, then update the parent's submodule pointer.
++  `microapps-private/` first, then update the parent's submodule pointer.
 +
 +- **DO NOT** add a second measurement path for a caller that already has one.
 +  One measurement function per content type. If you need measurement
@@ -505,7 +505,7 @@ index 0000000..721f52d
 +### Writing a microapp module
 +
 +```typescript
-+// modules/my-module/index.ts
++// microapps/my-module/index.ts
 +export default function setup(host: MicroappHost) {
 +  host.registerCommand({
 +    id: "open",            // local ID — becomes "microapp.my-module.open" globally
@@ -529,7 +529,7 @@ index 0000000..721f52d
 +```
 +
 +```json
-+// modules/my-module/module.json
++// microapps/my-module/microapp.json
 +{
 +  "name": "wibwob.my-module",
 +  "type": "microapp",
@@ -614,7 +614,7 @@ index 0000000..721f52d
 +### "Module changes not picked up after restart"
 +
 +Module loader scans at startup only. Restart the app after changing
-+`module.json` or `index.ts` in a module directory. For `modules-private/`,
++`microapp.json` or `index.ts` in a module directory. For `microapps-private/`,
 +also check the submodule pointer is updated in the parent repo.
 +
 +### "TypeScript errors after adding a new actionKey"

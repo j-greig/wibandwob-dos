@@ -228,7 +228,7 @@ interface AgentSnapshot {
 
 type Listener = (snapshot: AgentSnapshot) => void;
 
-/** Load prompt fragments from modules-private/wibwob-prompts/*.md, sorted by filename. Falls back to legacy single-file path. */
+/** Load prompt fragments from microapps-private/wibwob-prompts/*.md, sorted by filename. Falls back to legacy single-file path. */
 function loadBasePrompt(): string {
   // Load all .md files from the wibwob-prompts module, sorted by filename.
   // This lets identity.md and other fragments live alongside the machinery file

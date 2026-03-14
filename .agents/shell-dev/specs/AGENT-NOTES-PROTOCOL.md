@@ -25,7 +25,7 @@ Types: `failure-mode` · `invariant` · `correction` · `gotcha` · `do-dont`
 Finding format: `symptom: cause → fix` in one line.
 
 Example:
-| 2026-03-10 | gotcha | state-and-api | GET /state stale after module reload: sync() not called → wait 500ms or call sync() manually | modules.reload returned ok but /state showed old commands |
+| 2026-03-10 | gotcha | state-and-api | GET /state stale after module reload: sync() not called → wait 500ms or call sync() manually | microapps.reload returned ok but /state showed old commands |
 
 ## Consolidation
 

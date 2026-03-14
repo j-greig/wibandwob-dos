@@ -25,7 +25,7 @@ Migrate raw toolbar/header blessed boxes to `createHeaderBar` (and SDK paths) so
 - `src/windows/backrooms-windows.ts`
 - `src/windows/chrome-browser-window.ts`
 - `src/windows/music-player-window.ts`
-- `modules/sy2-chronicles/*` (SDK import path fix)
+- `microapps/sy2-chronicles/*` (SDK import path fix)
 
 ## Tasks
 

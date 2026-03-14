@@ -21,9 +21,9 @@ Replace raw interval usage in modules with SDK timer helpers so teardown is cons
 
 ## Files to change
 
-- `modules/wibwob-poetry-clock/index.ts`
-- `modules/touchlab-mvp/index.ts`
-- `modules/glitchbox/index.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
+- `microapps/touchlab-mvp/index.ts`
+- `microapps/glitchbox/index.ts`
 
 ## Tasks
 

@@ -161,7 +161,7 @@ This is a hook candidate — pre-commit hook on .planning/epics/ should auto-run
 
 ### content-loader.ts — do not rewrite what already exists
 
-Before writing any YAML/panel parsing: check modules/sy2-chronicles/content-loader.ts.
+Before writing any YAML/panel parsing: check microapps/sy2-chronicles/content-loader.ts.
 It already exports loadCanvas() for .canvas.yaml files.
 panel-layout.ts, panel-types.ts, grid-canvas.ts — all exist. Read before writing.
 

@@ -1,5 +1,5 @@
 /**
- * microapp-sdk.ts — the ONE canonical import surface for module authors.
+ * microapp-sdk.ts — the ONE canonical import surface for microapp authors.
  *
  * Modules should import types and helpers from this file:
  *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
@@ -77,7 +77,7 @@ export type {
   RuntimeInspectionEnvelope,
 } from "../sdk/runtime-client.js";
 
-// Canonical type-only import surface for module authors.
+// Canonical type-only import surface for microapp authors.
 // Runtime capabilities still flow through the host object itself.
 export type {
   MicroappHost,
@@ -108,7 +108,7 @@ export type AnimatedPanelPlayer = LazyMountedPlayer & {
   attachTarget?(target: blessed.Widgets.BoxElement): void;
 };
 
-// Shared runtime helpers that module authors should import from the SDK surface
+// Shared runtime helpers that microapp authors should import from the SDK surface
 // rather than reaching directly into core/service paths.
 export {
   applyRect,
@@ -130,7 +130,7 @@ export {
 };
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
-// See modules/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
+// See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
 // ── ui-parts — layout primitives, directly importable ────────────────────────
 // These are also available on host.ui.* but can be imported directly for
 // cleaner module-level imports. host.ui.createButtonBar(...) and

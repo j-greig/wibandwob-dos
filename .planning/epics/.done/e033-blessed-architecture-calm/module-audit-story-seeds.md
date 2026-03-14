@@ -14,7 +14,7 @@ Bias:
 ## Seed 1 — Make Tide Pool instance ownership honest
 
 Candidate target:
-- `modules/wibwob-tidepool/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
 
 Problem statement:
 - the manifest says `multiInstance: true`
@@ -33,7 +33,7 @@ Why it is a good seed:
 ## Seed 2 — Tighten Heartbeat into the canonical tiny animated module
 
 Candidate target:
-- `modules/heartbeat/index.ts`
+- `microapps/heartbeat/index.ts`
 
 Problem statement:
 - tiny module, but still bypasses the public SDK and reports thin semantic state
@@ -50,7 +50,7 @@ Why it is a good seed:
 ## Seed 3 — Add local invalidation helper to TouchLab
 
 Candidate target:
-- `modules/touchlab-mvp/index.ts`
+- `microapps/touchlab-mvp/index.ts`
 
 Problem statement:
 - TouchLab is the composition reference surface, but redraw calls remain scattered
@@ -67,7 +67,7 @@ Why it is a good seed:
 ## Seed 4 — Split Poetry Clock transport from presentation
 
 Candidate target:
-- `modules/wibwob-poetry-clock/index.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
 
 Problem statement:
 - one file currently owns figlet shelling-out, auth reads, API calls, timers, players, and UI
@@ -83,7 +83,7 @@ Why it is a good seed:
 ## Seed 5 — Re-label or split Patchbay Lab as an integration harness
 
 Candidate target:
-- `modules/patchbay-lab/index.ts`
+- `microapps/patchbay-lab/index.ts`
 
 Problem statement:
 - currently reads like a product microapp but behaves like a broad SDK/integration harness
@@ -100,8 +100,8 @@ Why it is a good seed:
 ## Seed 6 — Clarify public examples versus internal harnesses
 
 Candidate targets:
-- `docs/module-authoring.md`
-- `modules/README.md`
+- `docs/microapp-authoring.md`
+- `microapps/README.md`
 - possibly selected module manifests or comments
 
 Problem statement:
@@ -139,8 +139,8 @@ Why it is a good seed:
 
 These are valuable, but not the next “small honest slice”:
 
-- decompose `modules/zine/index.ts`
-- decompose `modules/sy2-chronicles/index.ts`
+- decompose `microapps/zine/index.ts`
+- decompose `microapps/sy2-chronicles/index.ts`
 - terminal-module cleanup
 - any shared redraw/runtime framework extraction
 

@@ -13,7 +13,7 @@ So the answer to "does it solve the right problems?" is: partially. It solves ma
 - It correctly treats `app-controller.ts`, `ui-parts.ts`, `browser-windows.ts`, and `wibwob-agent-session.ts` as the highest-leverage decompositions.
 - It correctly preserves `ui-parts.ts` as a compatibility barrel during extraction. That is the right incremental move.
 - It correctly avoids a broad `shared/` or `util/` dumping ground.
-- It correctly fixes the `canvas-types.ts` -> `modules/` inversion. That is a real architectural bug, not just an aesthetic issue.
+- It correctly fixes the `canvas-types.ts` -> `microapps/` inversion. That is a real architectural bug, not just an aesthetic issue.
 
 ## Where The Target Misses
 
@@ -26,7 +26,7 @@ The devlog's recurring failures are:
 - commands exposed in menus with required args but no no-arg fallback
 - missing inspectability for nested/panel content
 - reload-safe vs restart-required ambiguity
-- silent module-loader failures and runtime logging corrupting the TUI
+- silent microapp-loader failures and runtime logging corrupting the TUI
 
 Those are architecture problems too. They affect how agents can operate the system. The target document barely treats them as first-class design constraints.
 
@@ -70,12 +70,12 @@ Recommendation: add an overlay contract to the target architecture:
 The devlog records repeated friction around module development:
 
 - undocumented real command IDs
-- nonexistent `modules.reload`
+- nonexistent `microapps.reload`
 - loader failures being invisible
 - direct imports past `microapp-sdk.ts`
 - `describeState()` binding/reload ambiguity
 
-The target architecture says `modules/ -> microapp-sdk.ts only`, but it does not convert that into migration work. The parked SDK boundary audit is directly relevant to "solid foundations" and should be represented as an explicit follow-on or a scoped wave in the plan.
+The target architecture says `microapps/ -> microapp-sdk.ts only`, but it does not convert that into migration work. The parked SDK boundary audit is directly relevant to "solid foundations" and should be represented as an explicit follow-on or a scoped wave in the plan.
 
 Recommendation: add a foundation task for microapp SDK hardening:
 
@@ -138,7 +138,7 @@ The target's Wave 1 starts with the largest mechanical extractions (`ui-parts.ts
 
 ### Better order
 
-1. Fix the hard correctness issue first: `canvas-types.ts` importing from `modules/`.
+1. Fix the hard correctness issue first: `canvas-types.ts` importing from `microapps/`.
 2. Do the smallest, high-signal deduplications first: test API helpers, shared `html-to-markdown.ts`, shared ANSI constants.
 3. Add missing architecture rules and docs for command/query semantics:
    - `direct: true` for query/control commands

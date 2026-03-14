@@ -8,10 +8,10 @@ what I learned, and what I decided to do next.
 
 ## Friction Points (discovered during this walkthrough)
 
-1. **Dead link** — `docs/module-authoring.md` referenced by `.agents/microapp-sdk.md`
-   and `modules/README.md` but does not exist. Agent hits a wall following breadcrumbs.
+1. **Dead link** — `docs/microapp-authoring.md` referenced by `.agents/microapp-sdk.md`
+   and `microapps/README.md` but does not exist. Agent hits a wall following breadcrumbs.
 
-2. **60% content overlap** — `docs/building-custom-modules.md` and `.agents/microapp-sdk.md`
+2. **60% content overlap** — `docs/building-custom-microapps.md` and `.agents/microapp-sdk.md`
    both contain skeletons, manifests, common mistakes tables, and checklists. Double the
    token cost for the same knowledge.
 
@@ -70,18 +70,18 @@ faster. Directory names should encode audience, not just topic.
       workspace.md
       agent-session.md
       image-rendering.md
-  modules/                  you are building an addon
+  microapps/                  you are building an addon
     microapp-sdk.md
   skills/                   (unchanged)
 ```
 
-`core/` vs `modules/` — two words, zero ambiguity, readable at `ls` speed.
+`core/` vs `microapps/` — two words, zero ambiguity, readable at `ls` speed.
 
 ### Proposed AGENTS.md: module-first ordering
 
-The most common agent task is "build a module", not "refactor the window
+The most common agent task is "build a microapp", not "refactor the window
 manager". AGENTS.md should front-load the more common path and let core
-material follow. A module author stops reading early. A core contributor
+material follow. A microapp author stops reading early. A core contributor
 reads everything anyway.
 
 ```
@@ -93,7 +93,7 @@ reads everything anyway.
   scaffold command
   three-doc reading list
   which-example-for-which-pattern table
-  @.agents/modules/microapp-sdk.md
+  @.agents/microapps/microapp-sdk.md
 
 ## Shell Development                       ← second, full depth
   @.agents/core/architecture.md
@@ -104,11 +104,11 @@ reads everything anyway.
 
 ### Deduplication
 
-`docs/building-custom-modules.md` = the canonical full guide (lifecycle,
+`docs/building-custom-microapps.md` = the canonical full guide (lifecycle,
 manifest, skeleton, common mistakes, verification checklist). Public,
 self-sufficient, copy-pasteable.
 
-`.agents/modules/microapp-sdk.md` = SDK policy and advanced API reference
+`.agents/microapps/microapp-sdk.md` = SDK policy and advanced API reference
 only. Strips the duplicated skeleton, manifest template, and common-mistakes
 table — those live in the main guide exclusively.
 
@@ -120,7 +120,7 @@ Directory names should pass the "cold read" test — a new agent running
 `ls .agents/` should know where to go without opening anything.
 
 Problems with obvious first choices:
-- `modules/` collides with repo-root `modules/` where actual code lives
+- `microapps/` collides with repo-root `microapps/` where actual code lives
 - `core/` is generic — could mean core concepts, core docs, core anything
 
 Better names encode the ACTIVITY, not the subject:
@@ -154,7 +154,7 @@ Better names encode the ACTIVITY, not the subject:
 `skills/` which is "you are here to operate".
 
 The entire `shell-dev/` subtree is irrelevant for module vibe coding.
-A module author never touches src/core, src/services, window-facade,
+A microapp author never touches src/core, src/services, window-facade,
 command-catalog, or any subsystem spec. Everything they need flows
 through the host object and the SDK import surface. If an agent opens
 anything in `shell-dev/` while making a module, the directory
@@ -162,13 +162,13 @@ structure failed its job.
 
 ### Reading paths
 
-  Module author — AGENTS.md top section, docs/building-custom-modules.md,
+  Module author — AGENTS.md top section, docs/building-custom-microapps.md,
   one example module. Three docs, under 10 minutes, no detours.
 
   Core contributor — full AGENTS.md, .agents/core/*, specs on demand.
   Module section gives them SDK context they maintain anyway.
 
-  External/community developer — identical to module author.
+  External/community developer — identical to microapp author.
   The default path is the happy path.
 
 ---
@@ -176,7 +176,7 @@ structure failed its job.
 ## Step 0: Orient — `ls` the root
 
 **Saw:** AGENTS.md, CLAUDE.md, README.md, HANDOVER.md, WELCOME.md, LINGO.md
-at root. Also: `modules/`, `src/`, `docs/`, `.agents/`, `.planning/`, `scripts/`.
+at root. Also: `microapps/`, `src/`, `docs/`, `.agents/`, `.planning/`, `scripts/`.
 
 **Decision:** AGENTS.md is the canonical agent constitution — that's where I start.
 README.md is for humans. AGENTS.md is for me.
@@ -188,8 +188,8 @@ README.md is for humans. AGENTS.md is for me.
 **Opened:** `AGENTS.md`
 **Found:** A clear 5-step recipe at line 53:
 
-1. Run `bash scripts/scaffold-microapp.sh modules/<name> wibwob.<id> "<Title>" <menuOrder>`
-2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
+1. Run `bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>`
+2. Read `docs/building-custom-microapps.md` — lifecycle, SDK, common mistakes
 3. Edit the scaffold, `bun run typecheck`, restart app
 4. Reference modules: `glitchbox`, `e026-demo`, `wibwob-poetry-clock`
 5. SDK surface: `.agents/microapp-sdk.md`
@@ -198,22 +198,22 @@ Also references: `.agents/architecture.md`, `.agents/invariants.md`,
 `.agents/control-api.md`, `.agents/microapp-sdk.md` at the top.
 
 **Verdict:** AGENTS.md gives me a BREADCRUMB TRAIL, not the knowledge itself.
-It says "read docs/building-custom-modules.md" and "read .agents/microapp-sdk.md".
+It says "read docs/building-custom-microapps.md" and "read .agents/microapp-sdk.md".
 Good signposting. But I now need to follow both.
 
-**Decision:** Open `docs/building-custom-modules.md` next — AGENTS.md says
+**Decision:** Open `docs/building-custom-microapps.md` next — AGENTS.md says
 that's where lifecycle, SDK, and common mistakes live.
 
 ---
 
-## Step 2: docs/building-custom-modules.md — THE main guide
+## Step 2: docs/building-custom-microapps.md — THE main guide
 
-**Opened:** `docs/building-custom-modules.md` (~320 lines)
+**Opened:** `docs/building-custom-microapps.md` (~320 lines)
 
 **This is the motherlode.** Contains:
 - TL;DR and quick start (scaffold command)
 - Directory structure
-- Full module.json manifest with every field explained
+- Full microapp.json manifest with every field explained
 - Full index.ts skeleton with all 4 required lifecycle hooks
 - Host API reference (createWindow, registerCommand, screen, theme)
 - Window handle API (body, id, focus, close, describeState, captureText, etc.)
@@ -229,9 +229,9 @@ that's where lifecycle, SDK, and common mistakes live.
 copy-pasteable, and covers all the pitfalls. An agent could build a working
 module from this doc alone.
 
-**One issue:** References `docs/module-authoring.md` as further reading
+**One issue:** References `docs/microapp-authoring.md` as further reading
 from `.agents/microapp-sdk.md`, but that file DOES NOT EXIST. Dead link.
-`modules/README.md` also references it. Two broken pointers to a ghost file.
+`microapps/README.md` also references it. Two broken pointers to a ghost file.
 
 **Decision:** Now check `.agents/microapp-sdk.md` for anything the main
 guide missed.
@@ -259,7 +259,7 @@ guide missed.
 - Testing commands (typecheck, restart, API curl, screenshot)
 - Shipping checklist
 
-**Verdict:** Substantial overlap with `docs/building-custom-modules.md`
+**Verdict:** Substantial overlap with `docs/building-custom-microapps.md`
 but adds the ADVANCED SDK surface (trees, tabs, tweens, patterns, gradients,
 panel layout). An agent building anything beyond a static box needs this doc.
 
@@ -277,7 +277,7 @@ docs match reality.
 **Opened:** `scripts/scaffold-microapp.sh` (~95 lines)
 
 **Does what it says.** Takes 3-4 args (dir, id, title, order), creates
-module.json + index.ts with working boilerplate. The generated code matches
+microapp.json + index.ts with working boilerplate. The generated code matches
 the patterns described in the docs. The scaffold includes a TODO-style
 content box that tells you the next 5 steps.
 
@@ -286,9 +286,9 @@ in seconds. The generated code is correct and current.
 
 ---
 
-## Step 5: modules/hello-world/ — minimal reference
+## Step 5: microapps/hello-world/ — minimal reference
 
-**Opened:** `modules/hello-world/module.json` + `modules/hello-world/index.ts`
+**Opened:** `microapps/hello-world/microapp.json` + `microapps/hello-world/index.ts`
 
 **Minimal, clean, correct.** Uses responsiveFiglet from the SDK. Has all 4
 lifecycle hooks. 45 lines total. Matches the doc patterns exactly.
@@ -297,9 +297,9 @@ lifecycle hooks. 45 lines total. Matches the doc patterns exactly.
 
 ---
 
-## Step 6: modules/heartbeat/ — animated reference
+## Step 6: microapps/heartbeat/ — animated reference
 
-**Opened:** `modules/heartbeat/index.ts` (~115 lines)
+**Opened:** `microapps/heartbeat/index.ts` (~115 lines)
 
 **Shows the animation pattern clearly.** Uses createTimer/clearTimers,
 multiple blessed boxes, describeState with structured data (bpm, uptime,
@@ -309,9 +309,9 @@ frame, beat). Good example of a multi-timer module with proper cleanup.
 
 ---
 
-## Step 7: modules/wibwob-poetry-clock/ — complex real module
+## Step 7: microapps/wibwob-poetry-clock/ — complex real module
 
-**Opened:** `modules/wibwob-poetry-clock/index.ts` (first 60 lines of ~570)
+**Opened:** `microapps/wibwob-poetry-clock/index.ts` (first 60 lines of ~570)
 
 **Shows real-world complexity.** Multiple modes, voices, AI integration,
 contour player, figlet rendering. Imports many SDK exports. This is what
@@ -328,8 +328,8 @@ starting templates.
 **Opened:** `src/services/microapp-sdk.ts` (~287 lines)
 
 **This is the re-export barrel file.** Shows every type, helper, and primitive
-available to module authors. Well-organized with section headers:
-- Core module authoring (timers, tween, render monitor, tree widget)
+available to microapp authors. Well-organized with section headers:
+- Core microapp authoring (timers, tween, render monitor, tree widget)
 - Animation (embedded players)
 - Grid canvas + ASCII composition
 - Text rendering (markdown, figlet)
@@ -349,18 +349,18 @@ But it's the definitive answer to "what can I import?"
 Has an "Adding a New Window Type" checklist (10 items).
 
 **Verdict:** Overkill for module building. This is about adding core
-window types, not microapps. A module author doesn't need to touch
+window types, not microapps. A microapp author doesn't need to touch
 window-facade.ts or command-catalog.ts. AGENTS.md already links here
 but modules don't need most of this.
 
 ---
 
-## Step 10: modules/README.md — module directory docs
+## Step 10: microapps/README.md — module directory docs
 
-**Opened:** `modules/README.md`
+**Opened:** `microapps/README.md`
 
 **Directory layout + private modules instructions.** References
-`docs/module-authoring.md` which DOES NOT EXIST (second broken reference).
+`docs/microapp-authoring.md` which DOES NOT EXIST (second broken reference).
 Has SDK import rules. Points at hello-world, poetry-clock, dream-forecast
 as examples. Mostly about the private submodule system.
 
@@ -371,10 +371,10 @@ private module setup. Mostly duplicates what's already in the main guide.
 
 ## Step 11: Dead link audit
 
-**Searched for:** `docs/module-authoring.md`
+**Searched for:** `docs/microapp-authoring.md`
 **Found references in:**
-- `.agents/microapp-sdk.md` line 6: "Public authoring guide: docs/module-authoring.md"
-- `modules/README.md`: "Canonical doc: docs/module-authoring.md"
+- `.agents/microapp-sdk.md` line 6: "Public authoring guide: docs/microapp-authoring.md"
+- `microapps/README.md`: "Canonical doc: docs/microapp-authoring.md"
 
 **The file does not exist.** Two docs point at a ghost.
 
@@ -387,7 +387,7 @@ private module setup. Mostly duplicates what's already in the main guide.
 1. **AGENTS.md breadcrumb trail** — immediately tells you the 5 steps and
    which docs to read. No guessing.
 
-2. **docs/building-custom-modules.md** — genuinely excellent. Complete,
+2. **docs/building-custom-microapps.md** — genuinely excellent. Complete,
    copy-pasteable, covers pitfalls. An agent could build a working module
    from this one document.
 
@@ -405,13 +405,13 @@ private module setup. Mostly duplicates what's already in the main guide.
 
 ## What doesn't work
 
-1. **Dead link: docs/module-authoring.md** — referenced by two docs,
+1. **Dead link: docs/microapp-authoring.md** — referenced by two docs,
    doesn't exist. An agent following the breadcrumb trail would hit a wall.
-   Probably was replaced by docs/building-custom-modules.md without
+   Probably was replaced by docs/building-custom-microapps.md without
    updating the pointers.
 
 2. **Redundant overlap between the two main docs** —
-   `docs/building-custom-modules.md` and `.agents/microapp-sdk.md` have
+   `docs/building-custom-microapps.md` and `.agents/microapp-sdk.md` have
    ~60% content overlap (skeleton, manifest, common mistakes, checklists).
    An agent reads both and processes redundant tokens. Not harmful but
    wasteful. Could be: main guide for basics, SDK doc for advanced only.
@@ -446,26 +446,26 @@ private module setup. Mostly duplicates what's already in the main guide.
 ### Optimal path (3 docs, ~10 min of reading):
 1. AGENTS.md § "Building a New Module" (30 sec — get the recipe)
 2. Run scaffold script (10 sec — have working code)
-3. docs/building-custom-modules.md (5 min — understand the pattern)
+3. docs/building-custom-microapps.md (5 min — understand the pattern)
 4. One reference module matching your use case (2 min — see it real)
 5. Start coding
 
 ### What actually happens (5-7 docs, ~20 min):
 1. AGENTS.md — read the whole thing looking for module info (3 min)
 2. .agents/architecture.md — linked at top, read it, most isn't relevant (3 min)
-3. docs/building-custom-modules.md — the actual guide (5 min)
+3. docs/building-custom-microapps.md — the actual guide (5 min)
 4. .agents/microapp-sdk.md — reread similar content with SDK additions (5 min)
-5. Try docs/module-authoring.md — file not found (wasted attempt)
-6. modules/README.md — more of the same (2 min)
+5. Try docs/microapp-authoring.md — file not found (wasted attempt)
+6. microapps/README.md — more of the same (2 min)
 7. Finally look at an example module (2 min)
 8. Start coding
 
 ### Recommendations to improve agent onboarding:
-1. Fix the dead link (point docs/module-authoring.md references at
-   docs/building-custom-modules.md, or create it as a redirect)
+1. Fix the dead link (point docs/microapp-authoring.md references at
+   docs/building-custom-microapps.md, or create it as a redirect)
 2. Deduplicate the two main docs (building-custom-modules = full guide,
    microapp-sdk = advanced-only SDK reference, no skeleton/manifest duplication)
 3. Add a "which example for which pattern" table in AGENTS.md
 4. Add a "5 imports you always need" section to the SDK doc
 5. Consider moving "Building a New Module" higher in AGENTS.md, before
-   the architecture links that aren't relevant to module authors
+   the architecture links that aren't relevant to microapp authors

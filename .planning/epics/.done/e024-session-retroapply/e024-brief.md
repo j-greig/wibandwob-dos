@@ -25,7 +25,7 @@ Patch dump for reference: `tmp/wibwob-patch-dump/` (patches 0001-0032).
 
 - Transcript leak fix (#112) — currentAssistantId already in wibwob-agent-session.ts
 - E022 S04 microapp geometry restore — registrySerialize already in workspace-snapshots.ts
-- Poetry clock fallback — already in modules/wibwob-poetry-clock
+- Poetry clock fallback — already in microapps/wibwob-poetry-clock
 
 ---
 
@@ -50,10 +50,10 @@ Adds existsSync preflight before spawning Python worker. No UI change.
 Serialisation only — no UI change. Fixes workspace restore breaking when a tmp
 terrain file path no longer exists. Instead saves seed/seaLevel/levels/terrainIdx.
 
-Patch targets `modules/wibwobworld-iso/index.ts` (migration path, wrong).
-Must be applied to `modules-private/wibwobworld-iso/index.ts` instead.
+Patch targets `microapps/wibwobworld-iso/index.ts` (migration path, wrong).
+Must be applied to `microapps-private/wibwobworld-iso/index.ts` instead.
 
-- [ ] Read patch 0011, apply change manually to `modules-private/wibwobworld-iso/index.ts`
+- [ ] Read patch 0011, apply change manually to `microapps-private/wibwobworld-iso/index.ts`
 - [ ] Commit inside modules-private: `fix(e022-s03): iso serialises terrain params not file path`
 - [ ] Update submodule ref in main repo, commit: `fix(e022-s03): update modules-private submodule ref`
 
@@ -66,32 +66,32 @@ Must be applied to `modules-private/wibwobworld-iso/index.ts` instead.
 Adds a separate `hybridIsoCacheKey` + world sized to the iso pane, not the full
 contour world. Prevents stride compression / squashed iso in hybrid view.
 
-Patch targets `modules/wibwobworld/index.ts` (migration path, wrong).
-Must be applied to `modules-private/wibwobworld/index.ts` instead.
+Patch targets `microapps/wibwobworld/index.ts` (migration path, wrong).
+Must be applied to `microapps-private/wibwobworld/index.ts` instead.
 
-- [ ] Read patch 0016, apply change manually to `modules-private/wibwobworld/index.ts`
+- [ ] Read patch 0016, apply change manually to `microapps-private/wibwobworld/index.ts`
 - [ ] Commit inside modules-private: `fix(e022-s05): hybrid iso pane uses pane-sized world`
 - [ ] Update submodule ref in main repo
 
 ---
 
-### S05 — Move wibwobworld + world-chatroom to modules/, delete wibwobworld-iso
+### S05 — Move wibwobworld + world-chatroom to microapps/, delete wibwobworld-iso
 **Status: done**
 **Depends on: S02 + S03 (E022 fixes must be in modules-private first)**
 
-Move the two world modules out of the submodule into the main repo's modules/.
+Move the two world modules out of the submodule into the main repo's microapps/.
 Delete wibwobworld-iso entirely — its renderIso function is imported directly
 by wibwobworld, so move that import inline or copy the needed code across.
 
-- [ ] Copy `modules-private/wibwobworld/` → `modules/wibwobworld/`
-- [ ] Copy `modules-private/world-chatroom/` → `modules/world-chatroom/`
-- [ ] Delete `modules-private/wibwobworld-iso/` from submodule
-- [ ] Delete `modules-private/wibwobworld/` from submodule
-- [ ] Delete `modules-private/world-chatroom/` from submodule
+- [ ] Copy `microapps-private/wibwobworld/` → `microapps/wibwobworld/`
+- [ ] Copy `microapps-private/world-chatroom/` → `microapps/world-chatroom/`
+- [ ] Delete `microapps-private/wibwobworld-iso/` from submodule
+- [ ] Delete `microapps-private/wibwobworld/` from submodule
+- [ ] Delete `microapps-private/world-chatroom/` from submodule
 - [ ] Fix the `import { renderIso } from "../wibwobworld-iso/index.js"` in wibwobworld
       — either inline renderIso or copy wibwobworld-iso/index.ts into wibwobworld/
 - [ ] Commit inside modules-private (just primers/prompts/phosphor-theme remain)
-- [ ] Commit modules/ additions + submodule ref update in main repo
+- [ ] Commit microapps/ additions + submodule ref update in main repo
 - [ ] typecheck passes
 
 ---
@@ -117,7 +117,7 @@ Patch 0023 fixes the epic table parse bug. Both are new files, clean apply.
 - [ ] Workspace restore opens WibWobWorld in correct renderMode (not forced to contours)
 - [ ] Hybrid view iso pane not squashed
 - [ ] `bun run handover` generates doc with populated epic table
-- [ ] wibwobworld + world-chatroom in modules/, not modules-private
+- [ ] wibwobworld + world-chatroom in microapps/, not modules-private
 - [ ] wibwobworld-iso deleted entirely
 - [ ] modules-private contains only wibwob-primers, wibwob-prompts, wibwob-theme-phosphor
 - [ ] PR fix/session-retroapply → main, squash merge, close E024

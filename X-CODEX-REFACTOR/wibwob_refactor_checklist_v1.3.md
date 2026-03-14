@@ -156,9 +156,9 @@ This file is the execution surface for the refactor. The masterplan stays concep
   - `src/core/workspace-snapshots.ts`
   - `src/core/snapshot-registry.ts`
 - `[x]` Trace the microapp boundary across:
-  - `src/services/module-loader.ts`
+  - `src/services/microapp-loader.ts`
   - `src/services/microapp-sdk.ts`
-  - representative modules under `modules/`
+  - representative modules under `microapps/`
 - `[x]` Identify duplicate behaviors implemented separately in TUI / API / CLI
 - `[x]` Identify direct widget mutations that bypass shared semantics
 - `[x]` Confirm current single-instance assumptions:
@@ -175,7 +175,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` `src/windows/browser-windows.ts`
 - `[x]` `src/core/command-catalog.ts`
 - `[x]` `src/services/control-api.ts`
-- `[x]` `src/services/module-loader.ts`
+- `[x]` `src/services/microapp-loader.ts`
 - `[x]` `src/services/wibwob-agent-session.ts`
 
 ## Phase 2: Extract Pure Logic Into Domain

@@ -14,13 +14,13 @@ Repo root: `../` from this directory.
 
 Key files for this work:
 - `../AGENTS.md` — architecture invariants, single-owner rules, canon
-- `../src/services/module-loader.ts` — current module loading seam
+- `../src/services/microapp-loader.ts` — current module loading seam
 - `../src/core/ui-parts.ts` — UiPart primitives (E016, done)
 - `../src/services/state-service.ts` — desktop state
 - `../src/services/control-api.ts` — HTTP control surface
-- `../modules/` — existing microapps
-- `../modules/wibwob-poetry-clock/index.ts` — P1 brownfield proof target
-- `../modules/hello-world/index.ts` — canonical scaffold template
+- `../microapps/` — existing microapps
+- `../microapps/wibwob-poetry-clock/index.ts` — P1 brownfield proof target
+- `../microapps/hello-world/index.ts` — canonical scaffold template
 - `../src/microapp-sdk.ts` or `../src/core/microapp-sdk/` — SDK export path (may not exist yet)
 - `../.planning/spikes/spk-agentic-tui-runtime-roadmap/spk-agentic-tui-runtime-roadmap.md` — the full spec
 
@@ -30,7 +30,7 @@ From P1/W1 SDK foundation (committed):
 - Single canonical SDK export path exists
 - Local MicroappHost redefinitions replaced with imports
 - Direct `../../src/...` imports removed from modules
-- `modules/hello-world` is the canonical scaffold template
+- `microapps/hello-world` is the canonical scaffold template
 - Scaffolding script exists
 
 From last 12 hours:
@@ -43,5 +43,5 @@ From last 12 hours:
 1. `cd .. && bun run typecheck` after EVERY change. Zero errors required.
 2. Commands go in `../src/core/command-catalog.ts` FIRST.
 3. One user story per iteration. Read state, pick lowest unstarted story, move it forward.
-4. Check `../src/services/module-loader.ts` before implementing runtime features — extend it, don't duplicate.
+4. Check `../src/services/microapp-loader.ts` before implementing runtime features — extend it, don't duplicate.
 5. Log and diary every iteration even if just scaffolding. No silent iterations.

@@ -21,7 +21,7 @@ Migrate world-chatroom’s right fixed-26 sidebar to `createSidebarPanel` to eli
 
 ## Files to change
 
-- `modules/world-chatroom/index.ts` (and related view file if split) — replace raw sidebar construction with primitive
+- `microapps/world-chatroom/index.ts` (and related view file if split) — replace raw sidebar construction with primitive
 
 ## Tasks
 

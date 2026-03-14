@@ -69,7 +69,7 @@ Checklist — every item is mandatory:
 
 When adding new app/game/chat windows, copy the structural pattern of existing modular windows such as:
 - `src/windows/wibwob-agent-window.ts`
-- microapps under `modules-private/`
+- microapps under `microapps-private/`
 
 The preferred shape is:
 - service-owned logic/state

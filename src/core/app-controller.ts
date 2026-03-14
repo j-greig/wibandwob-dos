@@ -22,7 +22,7 @@ import {
   SPIKE_ROOT,
 } from "./config.js";
 import { appFlags } from "./cli.js";
-import { loadModules, reloadMicroapps } from "../services/module-loader.js";
+import { loadMicroapps, reloadMicroapps } from "../services/microapp-loader.js";
 import type { MicroappHostDeps } from "../sdk/microapp-host.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry, type CommandSurface } from "./command-registry.js";
@@ -464,7 +464,7 @@ export class TsTuiMvpApp {
     // Load external modules (themes + microapps) before workspace restore
     // so that external themes and commands are available for restoration.
     this.microappDeps = this.buildMicroappDeps();
-    await loadModules(this.microappDeps);
+    await loadMicroapps(this.microappDeps);
 
     // Rebuild menus after microapps may have registered dynamic commands
     this.rebuildMenusFromCommands();
@@ -502,7 +502,7 @@ export class TsTuiMvpApp {
     this.menus.push(...this.commands.buildMenus());
   }
 
-  private async reloadModulesFromDisk(): Promise<{
+  private async reloadMicroappsFromDisk(): Promise<{
     reloaded: number;
     clearedCommands: number;
     clearedSnapshots: number;
@@ -2023,8 +2023,8 @@ export class TsTuiMvpApp {
             this.overlays.flash(`Agent reload failed: ${message}`);
           });
       },
-      reloadModules: () => {
-        void this.reloadModulesFromDisk()
+      reloadMicroapps: () => {
+        void this.reloadMicroappsFromDisk()
           .then((result) => {
             this.overlays.flash(
               `Reloaded microapps: ${result.reloaded} cmds · cleared ${result.clearedCommands} cmds/${result.clearedSnapshots} snaps`,

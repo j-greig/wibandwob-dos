@@ -26,7 +26,7 @@ panels:
   - id: wib-portrait
     type: ascii-art
     title: "Portrait"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-portrait-1.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-portrait-1.txt
     col: 0
     w: 48
     h: 20
@@ -34,7 +34,7 @@ panels:
   - id: wib-chaos
     type: ascii-art
     title: "Chaos vs Order"
-    asciiFile: modules-private/wibwob-primers/primers/chaos-vs-order.txt
+    asciiFile: microapps-private/wibwob-primers/primers/chaos-vs-order.txt
     col: 0
     w: 48
     h: 14
@@ -57,7 +57,7 @@ panels:
   - id: wib-kaomoji
     type: ascii-art
     title: "Kaomoji"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-kaomoji.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-kaomoji.txt
     col: 0
     w: 48
     h: 18
@@ -77,7 +77,7 @@ panels:
   - id: wob-cube
     type: ascii-art
     title: "3D Cube"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-3d-cube.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-3d-cube.txt
     col: 1
     w: 48
     h: 22
@@ -100,7 +100,7 @@ panels:
   - id: wob-two-cats
     type: ascii-art
     title: "Two Cats"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-two-cats.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-two-cats.txt
     col: 1
     w: 48
     h: 20
@@ -108,7 +108,7 @@ panels:
   - id: wob-3dboy
     type: ascii-art
     title: "3D Boy"
-    asciiFile: modules-private/wibwob-primers/primers/3dboy.txt
+    asciiFile: microapps-private/wibwob-primers/primers/3dboy.txt
     col: 1
     w: 48
     h: 20
@@ -128,7 +128,7 @@ panels:
   - id: sym-what
     type: ascii-art
     title: "What We Are"
-    asciiFile: modules-private/wibwob-primers/primers/symbient.txt
+    asciiFile: microapps-private/wibwob-primers/primers/symbient.txt
     col: 2
     w: 52
     h: 20
@@ -136,7 +136,7 @@ panels:
   - id: sym-space-cat
     type: ascii-art
     title: "Space Cat"
-    asciiFile: modules-private/wibwob-primers/primers/space-cat.txt
+    asciiFile: microapps-private/wibwob-primers/primers/space-cat.txt
     col: 2
     w: 52
     h: 14
@@ -162,7 +162,7 @@ panels:
   - id: sym-protest
     type: ascii-art
     title: "Protest"
-    asciiFile: modules-private/wibwob-primers/primers/wibwob-symbient-protest.txt
+    asciiFile: microapps-private/wibwob-primers/primers/wibwob-symbient-protest.txt
     col: 2
     w: 52
     h: 22
@@ -170,7 +170,7 @@ panels:
   - id: sym-brain-loop
     type: ascii-art
     title: "Brain Loop"
-    asciiFile: modules-private/wibwob-primers/primers/brain-loop.txt
+    asciiFile: microapps-private/wibwob-primers/primers/brain-loop.txt
     col: 2
     w: 52
     h: 18
@@ -190,7 +190,7 @@ panels:
   - id: world-scramble
     type: ascii-art
     title: "Scramble"
-    asciiFile: modules-private/wibwob-primers/primers/scramble-the-cat.txt
+    asciiFile: microapps-private/wibwob-primers/primers/scramble-the-cat.txt
     col: 3
     w: 46
     h: 6
@@ -216,7 +216,7 @@ panels:
   - id: world-amiga-1
     type: ascii-art
     title: "From the Archive (1997)"
-    asciiFile: modules-private/amiga-primers/primers/1997__xl-blue.txt
+    asciiFile: microapps-private/amiga-primers/primers/1997__xl-blue.txt
     col: 3
     w: 80
     h: 30
@@ -247,7 +247,7 @@ panels:
   - id: world-amiga-2
     type: ascii-art
     title: "From the Archive (1999)"
-    asciiFile: modules-private/amiga-primers/primers/1999__k0-phoen.txt
+    asciiFile: microapps-private/amiga-primers/primers/1999__k0-phoen.txt
     col: 3
     w: 80
     h: 34
@@ -271,7 +271,7 @@ panels:
   - id: world-amiga-3
     type: ascii-art
     title: "From the Archive (1995)"
-    asciiFile: modules-private/amiga-primers/primers/1995__futuremy.txt
+    asciiFile: microapps-private/amiga-primers/primers/1995__futuremy.txt
     col: 3
     w: 80
     h: 30

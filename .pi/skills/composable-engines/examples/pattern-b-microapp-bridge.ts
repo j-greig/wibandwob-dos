@@ -6,7 +6,7 @@
  * use createLazyMountedPlayer() to adapt the engine's onFrame callback into
  * the attachTarget/setRunning interface that createAnimatedPanel expects.
  *
- * Copied from: modules/wibwob-poetry-clock/index.ts (terrain voice)
+ * Copied from: microapps/wibwob-poetry-clock/index.ts (terrain voice)
  *
  * Key points:
  *   - createLazyMountedPlayer() owns the attach/destroy/start-stop lifecycle.

@@ -19,7 +19,7 @@ Blessed (the TUI framework) has limited ANSI colour fidelity:
 | Hex tags | `{#rrggbb-fg}` | BROKEN — same as 24-bit, bad quantisation |
 
 **Always use `-c 256` with chafa.** This was proven via the ANSI Lab
-test suite (`modules/demo-ansi-lab/`).
+test suite (`microapps/demo-ansi-lab/`).
 
 ## Chafa flags
 
@@ -94,7 +94,7 @@ renderer entirely for image content.
 | `src/services/image-hydrator.mjs` | Standalone Node subprocess — curl+chafa per image |
 | `src/services/chrome-browser-service.ts` | `renderImagesAsAscii()` spawns hydrator, `imageToAscii()` fallback |
 | `src/windows/chrome-browser-window.ts` | `postProcessImages()` async hydration, `spliceImages()` cache-aware splice |
-| `modules/demo-ansi-lab/` | 10-test colour rendering diagnostic module |
+| `microapps/demo-ansi-lab/` | 10-test colour rendering diagnostic module |
 
 ## Agent Notes
 

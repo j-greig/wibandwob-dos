@@ -10,7 +10,7 @@ Focus: reusable UI components, layout/system primitives, form controls, widget m
 
 ## 1) What we already have (strong baseline)
 
-Current SDK/component baseline is good for layout composition and custom module authoring:
+Current SDK/component baseline is good for layout composition and custom microapp authoring:
 - Layout primitives: `createStack`, `createRow`, `createGrid`, `createScrollViewport`
 - Composition contract: `LayoutPart`, `createNodePart`
 - Responsive helper: `pickBreakpoint`
@@ -18,7 +18,7 @@ Current SDK/component baseline is good for layout composition and custom module 
 - Content helpers: `createTextBlock`, `createMessageHistory`, `createContentStack`, `createCollapsibleBlock`, `createSelectableList`, `createInlineSearch`, `createTabs`
 - Styling primitives: `createScrollbar`, `scrollableStyle`, `safeSetStyle` (internal)
 
-This is already enough to build rich custom modules, but it is still a "composition toolkit" more than a full design system.
+This is already enough to build rich custom microapps, but it is still a "composition toolkit" more than a full design system.
 
 ## 2) Gap matrix (design-system perspective)
 
@@ -65,7 +65,7 @@ Strongest differentiators vs current SDK:
 - Familiar grid-based dashboard ergonomics and data widgets
 
 Opportunity for WibWob:
-- Provide canonical SDK wrappers/adapters around blessed-contrib widgets so module authors don’t hand-roll setup/restyle/resize glue repeatedly
+- Provide canonical SDK wrappers/adapters around blessed-contrib widgets so microapp authors don’t hand-roll setup/restyle/resize glue repeatedly
 
 ## 4) Missing "design system" layers in WibWob SDK
 

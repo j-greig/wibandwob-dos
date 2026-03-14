@@ -18,7 +18,7 @@ Build the smallest believable composition proof:
 
 ## Acceptance Checklist
 
-- [x] Scaffold `modules/touchlab-mvp`
+- [x] Scaffold `microapps/touchlab-mvp`
 - [x] Open one parent `TouchLab MVP` window
 - [x] Render four nested subwindows inside the parent canvas
 - [x] Make at least three nested source subwindows draggable by mouse

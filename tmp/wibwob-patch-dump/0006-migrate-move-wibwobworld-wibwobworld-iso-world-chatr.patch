@@ -11,26 +11,26 @@ These three microapps contain no sensitive data and belong in the main repo
 so all commits are visible in a single git log. Remaining modules-private
 modules (wibwob-primers, wibwob-prompts, wibwob-theme-phosphor) stay private.
 
-Import paths unchanged — depth from modules/ is identical to modules-private/.
+Import paths unchanged — depth from microapps/ is identical to microapps-private/.
 Cross-module import ../wibwobworld-iso/index.js resolves correctly since both
 land in the same parent directory.
 
 Includes E022 S01+S02 changes already committed to modules-private.
 ---
- modules/wibwobworld-iso/index.ts    |  369 ++++++++++
- modules/wibwobworld-iso/module.json |   19 +
- modules/wibwobworld/debug.ts        |   33 +
- modules/wibwobworld/index.ts        | 1006 +++++++++++++++++++++++++++
- modules/wibwobworld/module.json     |   19 +
- modules/world-chatroom/index.ts     |  442 ++++++++++++
- modules/world-chatroom/module.json  |   19 +
+ microapps/wibwobworld-iso/index.ts    |  369 ++++++++++
+ microapps/wibwobworld-iso/microapp.json |   19 +
+ microapps/wibwobworld/debug.ts        |   33 +
+ microapps/wibwobworld/index.ts        | 1006 +++++++++++++++++++++++++++
+ microapps/wibwobworld/microapp.json     |   19 +
+ microapps/world-chatroom/index.ts     |  442 ++++++++++++
+ microapps/world-chatroom/microapp.json  |   19 +
  7 files changed, 1907 insertions(+)
 
-diff --git a/modules/wibwobworld-iso/index.ts b/modules/wibwobworld-iso/index.ts
+diff --git a/microapps/wibwobworld-iso/index.ts b/microapps/wibwobworld-iso/index.ts
 new file mode 100644
 index 0000000..4c676fa
 --- /dev/null
-+++ b/modules/wibwobworld-iso/index.ts
++++ b/microapps/wibwobworld-iso/index.ts
 @@ -0,0 +1,369 @@
 +import blessed from "blessed";
 +import fs from "node:fs";
@@ -44,7 +44,7 @@ index 0000000..4c676fa
 +import { BIOME_COLORS, BIOME_GLYPHS } from "../../src/services/terrain-render.js";
 +import { applyRect } from "../../src/core/ui-parts.js";
 +import type { Rect, UiPart, StackChild } from "../../src/core/ui-parts.js";
-+import type { MicroappSnapshotWindow } from "../../src/services/module-loader.js";
++import type { MicroappSnapshotWindow } from "../../src/services/microapp-loader.js";
 +
 +type MicroappWindowHandle = {
 +  readonly id: number;
@@ -401,11 +401,11 @@ index 0000000..4c676fa
 +    },
 +  });
 +}
-diff --git a/modules/wibwobworld-iso/module.json b/modules/wibwobworld-iso/module.json
+diff --git a/microapps/wibwobworld-iso/microapp.json b/microapps/wibwobworld-iso/microapp.json
 new file mode 100644
 index 0000000..687b961
 --- /dev/null
-+++ b/modules/wibwobworld-iso/module.json
++++ b/microapps/wibwobworld-iso/microapp.json
 @@ -0,0 +1,19 @@
 +{
 +  "name": "wibwobworld-iso",
@@ -426,11 +426,11 @@ index 0000000..687b961
 +    "api": true
 +  }
 +}
-diff --git a/modules/wibwobworld/debug.ts b/modules/wibwobworld/debug.ts
+diff --git a/microapps/wibwobworld/debug.ts b/microapps/wibwobworld/debug.ts
 new file mode 100644
 index 0000000..4412c05
 --- /dev/null
-+++ b/modules/wibwobworld/debug.ts
++++ b/microapps/wibwobworld/debug.ts
 @@ -0,0 +1,33 @@
 +import fs from "node:fs";
 +import path from "node:path";
@@ -465,11 +465,11 @@ index 0000000..4412c05
 +    context,
 +  });
 +}
-diff --git a/modules/wibwobworld/index.ts b/modules/wibwobworld/index.ts
+diff --git a/microapps/wibwobworld/index.ts b/microapps/wibwobworld/index.ts
 new file mode 100644
 index 0000000..adebaaf
 --- /dev/null
-+++ b/modules/wibwobworld/index.ts
++++ b/microapps/wibwobworld/index.ts
 @@ -0,0 +1,1006 @@
 +import blessed from "blessed";
 +import fs from "node:fs";
@@ -489,7 +489,7 @@ index 0000000..adebaaf
 +import { debugWibWobWorld, debugWibWobWorldError } from "./debug.js";
 +import { applyRect, createNodePart } from "../../src/core/ui-parts.js";
 +import type { Rect, UiPart, StackChild } from "../../src/core/ui-parts.js";
-+import type { MicroappSnapshotWindow } from "../../src/services/module-loader.js";
++import type { MicroappSnapshotWindow } from "../../src/services/microapp-loader.js";
 +import { renderIso } from "../wibwobworld-iso/index.js";
 +
 +type WorldRenderMode = TerrainRenderMode | "iso";
@@ -1477,11 +1477,11 @@ index 0000000..adebaaf
 +    },
 +  });
 +}
-diff --git a/modules/wibwobworld/module.json b/modules/wibwobworld/module.json
+diff --git a/microapps/wibwobworld/microapp.json b/microapps/wibwobworld/microapp.json
 new file mode 100644
 index 0000000..e5af9fa
 --- /dev/null
-+++ b/modules/wibwobworld/module.json
++++ b/microapps/wibwobworld/microapp.json
 @@ -0,0 +1,19 @@
 +{
 +  "name": "wibwobworld",
@@ -1502,18 +1502,18 @@ index 0000000..e5af9fa
 +    "api": true
 +  }
 +}
-diff --git a/modules/world-chatroom/index.ts b/modules/world-chatroom/index.ts
+diff --git a/microapps/world-chatroom/index.ts b/microapps/world-chatroom/index.ts
 new file mode 100644
 index 0000000..eef7e1c
 --- /dev/null
-+++ b/modules/world-chatroom/index.ts
++++ b/microapps/world-chatroom/index.ts
 @@ -0,0 +1,442 @@
 +import blessed from "blessed";
 +
 +import { worldChatService } from "../../src/services/world-chat-service.js";
 +import { applyRect } from "../../src/core/ui-parts.js";
 +import type { Rect, UiPart, StackChild } from "../../src/core/ui-parts.js";
-+import type { MicroappSnapshotWindow } from "../../src/services/module-loader.js";
++import type { MicroappSnapshotWindow } from "../../src/services/microapp-loader.js";
 +
 +type MicroappWindowHandle = {
 +  readonly id: number;
@@ -1950,11 +1950,11 @@ index 0000000..eef7e1c
 +    },
 +  });
 +}
-diff --git a/modules/world-chatroom/module.json b/modules/world-chatroom/module.json
+diff --git a/microapps/world-chatroom/microapp.json b/microapps/world-chatroom/microapp.json
 new file mode 100644
 index 0000000..18a080c
 --- /dev/null
-+++ b/modules/world-chatroom/module.json
++++ b/microapps/world-chatroom/microapp.json
 @@ -0,0 +1,19 @@
 +{
 +  "name": "world-chatroom",

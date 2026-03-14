@@ -77,7 +77,7 @@ Includes content dimensions for frame_player windows and animated flag. Agent se
 
 ### 6. Primer sizing workflow — prompt instructions
 
-Both `.pi/APPEND_SYSTEM.md` and `modules-private/wibwob-prompts/wibandwob.prompt.md` include:
+Both `.pi/APPEND_SYSTEM.md` and `microapps-private/wibwob-prompts/wibandwob.prompt.md` include:
 
 1. Call `gallery_list` — get dimensions per primer
 2. Pick primers, use `recommended_w` / `recommended_h` as window size
@@ -95,7 +95,7 @@ Both `.pi/APPEND_SYSTEM.md` and `modules-private/wibwob-prompts/wibandwob.prompt
 | `.claude/hooks/desktop-state.sh` | Auto-inject state per Claude Code turn |
 | `.claude/settings.json` | Hook wired as UserPromptSubmit |
 | `.pi/APPEND_SYSTEM.md` | Sizing workflow for pi agent |
-| `modules-private/wibwob-prompts/wibandwob.prompt.md` | Sizing workflow for Wib&Wob |
+| `microapps-private/wibwob-prompts/wibandwob.prompt.md` | Sizing workflow for Wib&Wob |
 
 ## Not yet done
 

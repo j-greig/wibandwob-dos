@@ -62,7 +62,7 @@ Wired to win.body.on("resize") -- should migrate to win.onResize() when
 SDK primitive is ready.
 
 Files changed:
-  modules/hello-world/index.ts  (full rewrite, responsive)
+  microapps/hello-world/index.ts  (full rewrite, responsive)
 
 
 ## CHORE 5: Extract SDK primitives for responsive figlet
@@ -98,9 +98,9 @@ callback but the callback does not receive the current width. Two options:
 ### 5f. Consolidate raw spawnSync("figlet") calls in modules
 Three modules roll their own spawnSync("figlet"...) when the SDK already
 exports renderFiglet:
-  modules/hello-world/index.ts        (has tryFiglet, should use SDK)
-  modules/wibwob-poetry-clock/index.ts (has renderFigletTime, should use SDK)
-  modules/dashboard-xxl/index.ts      (has figlet(), should use SDK)
+  microapps/hello-world/index.ts        (has tryFiglet, should use SDK)
+  microapps/wibwob-poetry-clock/index.ts (has renderFigletTime, should use SDK)
+  microapps/dashboard-xxl/index.ts      (has figlet(), should use SDK)
 
 Also: hello-world uses body.on("resize") instead of win.onResize(). Should
 migrate to the SDK hook once the primitive is ready.

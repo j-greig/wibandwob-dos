@@ -239,7 +239,7 @@ Proposed pattern: `details.panels: [{ id, title, contentLines, nonEmptyLines }]`
 
 ### focusOrCreate swallows return values — use direct:true for query commands
 
-module-loader.ts:261 — without `direct: true`, registerCommand wraps the action
+microapp-loader.ts:261 — without `direct: true`, registerCommand wraps the action
 in focusOrCreate() and discards the return value. Caller gets `{ok:true}` with no data.
 ALL query/control commands on already-open windows must use `direct: true`:
 

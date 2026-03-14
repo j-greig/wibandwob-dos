@@ -105,7 +105,7 @@ const SKIP_TYPES: PersistableAppType[] = [
 
 /** Open a window for a given PersistableAppType. */
 async function openWindowForAppType(appType: PersistableAppType): Promise<boolean> {
-  const primerPath = path.join(REPO_ROOT, "modules/example-primers/primers/hello-world.txt");
+  const primerPath = path.join(REPO_ROOT, "microapps/example-primers/primers/hello-world.txt");
   const openers: Partial<Record<PersistableAppType, () => Promise<any>>> = {
     "primer-viewer": () => post("/view/primer/open", { filePath: primerPath }),
     "text-editor": () => post("/commands/run", { id: "editor.new" }),

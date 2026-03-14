@@ -10,7 +10,7 @@
 set -e
 PORT=${WIBWOB_PORT:-8099}
 BASE="http://127.0.0.1:$PORT"
-CUSTOM_PROMPT="modules-private/wibwob-prompts/wibwob-custom.prompt.md"
+CUSTOM_PROMPT="microapps-private/wibwob-prompts/wibwob-custom.prompt.md"
 
 echo "=== Testing agent.reload_prompt ==="
 

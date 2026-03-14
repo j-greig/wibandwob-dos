@@ -39,7 +39,7 @@
 **Imports:**
 - External: `blessed`, `node:fs`, `node:os`, `node:path`, `node:child_process`
 - Same-folder: `config.js`, `cli.js`, `command-registry.js`, `context-menu-items.js`, `desktop-geometry.js`, `menu-overlay-manager.js`, `overlay-manager.js`, `theme/resolver.js`, `ui-primitives.js`, `workspace-snapshots.js`, `snapshot-registry.js`, `types.js`, `window-chrome.js`, `window-manager.js`, `render-scheduler.js`, `shell-chrome.js`, `runtime-stats.js`, `custom-cursor.js`, `editor-coordinator.js`, `unicode-patch.js`
-- Other src/: `services/app-logger.js`, `services/module-loader.js`, `services/content-measurement.js`, `services/control-api.js`, `services/content-service.js`, `services/figlet-service.js`, `services/file-actions.js`, `services/state-service.js`, `services/capability-service.js`, `services/workspace-ui.js`, `services/workspace-service.js`, `services/canvas-document.js`, `services/plasma-engine.js`, `services/scramble-brain.js`, `services/chrome-browser-service.js`, `services/wibwob-agent-session.js`, `services/world-chat-service.js`, `windows/backrooms-windows.js`, `windows/browser-windows.js`, `windows/figlet-windows.js`, `windows/generative-windows.js`, `windows/scramble-window.js`, `windows/contour-window.js`, `windows/plasma-window.js`, `windows/music-player-window.js`, `windows/terrain-lab-window.js`, `windows/text-windows.js`, `windows/wibwob-agent-window.js`, `windows/chrome-browser-window.js`, `windows/monster-cam-window.js`
+- Other src/: `services/app-logger.js`, `services/microapp-loader.js`, `services/content-measurement.js`, `services/control-api.js`, `services/content-service.js`, `services/figlet-service.js`, `services/file-actions.js`, `services/state-service.js`, `services/capability-service.js`, `services/workspace-ui.js`, `services/workspace-service.js`, `services/canvas-document.js`, `services/plasma-engine.js`, `services/scramble-brain.js`, `services/chrome-browser-service.js`, `services/wibwob-agent-session.js`, `services/world-chat-service.js`, `windows/backrooms-windows.js`, `windows/browser-windows.js`, `windows/figlet-windows.js`, `windows/generative-windows.js`, `windows/scramble-window.js`, `windows/contour-window.js`, `windows/plasma-window.js`, `windows/music-player-window.js`, `windows/terrain-lab-window.js`, `windows/text-windows.js`, `windows/wibwob-agent-window.js`, `windows/chrome-browser-window.js`, `windows/monster-cam-window.js`
 
 **Responsibilities:** ⚠️ **MANY (SRP violation)**
 1. Service graph construction (constructor)
@@ -100,12 +100,12 @@
 **Exports:** `ZineItemType`, `ZineSourceType`, `ZineItem`, `ZineLayoutResult`, `CanvasColumnDef`, `CanvasDocument`
 
 **Imports:**
-- Other: `../../modules/sy2-chronicles/panel-types.js` (CEPanelDef)
+- Other: `../../microapps/sy2-chronicles/panel-types.js` (CEPanelDef)
 
 **Responsibilities:** 1 — Type definitions.
 
 **Code Smells:**
-- **Inappropriate intimacy**: Imports from `modules/sy2-chronicles/panel-types.js` — a core type file depending on a module is an architectural inversion.
+- **Inappropriate intimacy**: Imports from `microapps/sy2-chronicles/panel-types.js` — a core type file depending on a module is an architectural inversion.
 
 **Type Safety:** ✅ Pure types.
 
@@ -879,7 +879,7 @@
 | File | Suggested Location | Reason |
 |------|-------------------|--------|
 | `skeleton-renderer.ts` | `src/services/` or `src/renderers/` | Domain-specific pose rendering, not core infrastructure |
-| `canvas-types.ts` | `src/types/` or kept but fix module dependency | Imports from `modules/` — architectural inversion |
+| `canvas-types.ts` | `src/types/` or kept but fix module dependency | Imports from `microapps/` — architectural inversion |
 | `grid-canvas.ts` | `src/services/` or `src/util/` | Pure utility, not core infrastructure |
 | Pattern generators (in ui-parts.ts) | `src/core/patterns.ts` | Unrelated to layout primitives |
 | Colour helpers (in ui-parts.ts) | `src/core/colour-utils.ts` | Unrelated to layout primitives |
@@ -913,7 +913,7 @@ render-scheduler.ts ←── app-controller.ts, window-manager.ts, editor-coord
 ### Cross-Folder Dependencies
 - **core → services/**: Heavy dependency from `app-controller.ts` (15+ service imports), `editor-coordinator.ts`, `snapshot-registry.ts`, `primitives.ts`
 - **core → windows/**: Heavy dependency from `app-controller.ts` only (10+ window factory imports) — this is correct composition root behavior
-- **core → modules/**: `canvas-types.ts` imports from `modules/sy2-chronicles/panel-types.js` — **this is wrong** (core should not depend on modules)
+- **core → microapps/**: `canvas-types.ts` imports from `microapps/sy2-chronicles/panel-types.js` — **this is wrong** (core should not depend on modules)
 
 ### Top 5 Priority Refactoring Actions
 
@@ -923,6 +923,6 @@ render-scheduler.ts ←── app-controller.ts, window-manager.ts, editor-coord
 
 3. **Break up `overlay-manager.ts` (937 lines)** — Each overlay type (browser prompt, file browser, centered list) is 100-170 lines of self-contained UI logic. Extract into `src/core/overlays/` directory with one file per prompt type. Impact: reduces the god-class to a thin coordinator. Effort: medium.
 
-4. **Fix `canvas-types.ts` module dependency** — Core should not import from `modules/`. Either move `CEPanelDef` into core/types or create a shared interface that the module implements. Impact: fixes architectural layering violation. Effort: low.
+4. **Fix `canvas-types.ts` module dependency** — Core should not import from `microapps/`. Either move `CEPanelDef` into core/types or create a shared interface that the module implements. Impact: fixes architectural layering violation. Effort: low.
 
 5. **Extract window-manager interaction logic** — Split `createFrame()` chrome creation and drag/resize mouse handling from `window-manager.ts` into focused modules. Impact: makes the 730-line manager more maintainable and testable. Effort: medium.

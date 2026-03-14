@@ -11,7 +11,7 @@ diff --git a/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief
 index a36ce6a..7a72add 100644
 --- a/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
 +++ b/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
-@@ -65,24 +65,24 @@ _Files:_ `modules/wibwobworld/index.ts`
+@@ -65,24 +65,24 @@ _Files:_ `microapps/wibwobworld/index.ts`
  ## Stories
  
  ### S01 — Strip debug breadcrumbs (RC-6)

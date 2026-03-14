@@ -118,7 +118,7 @@ enum Alignment {
 ### Migration Cost
 
 **Files affected:**
-- `modules/hello-world/index.ts` — 50 lines (compass buttons, alignment logic)
+- `microapps/hello-world/index.ts` — 50 lines (compass buttons, alignment logic)
 - `src/core/ui-parts.ts` — ~5 lines if compass positioning becomes a reusable primitive
 
 **Scope:** ~60 lines  
@@ -240,11 +240,11 @@ export function layoutPanelGrid(panels: PanelDef[], maxWidth: number, opts?: Col
 - `src/core/ui-parts.ts` — 2 lines (function rename)
 - `src/core/panel-layout.ts` — 2 lines (function rename)
 - **All imports:** ~15 files use `createColumns` or `layoutColumns`
-  - `modules/glitchbox/index.ts`
-  - `modules/dashboard/index.ts`
-  - `modules/sy2-chronicles/index.ts`
-  - `modules/tr808/index.ts`
-  - `modules/tidepool/index.ts`
+  - `microapps/glitchbox/index.ts`
+  - `microapps/dashboard/index.ts`
+  - `microapps/sy2-chronicles/index.ts`
+  - `microapps/tr808/index.ts`
+  - `microapps/tidepool/index.ts`
   - etc.
 
 **Scope:** ~40 lines of imports + 2 lines of definition  
@@ -383,7 +383,7 @@ const LAYOUT_BREAKPOINTS: Breakpoint<ResponsiveSize>[] = [
 ### Migration Cost
 
 **Files affected:**
-- `modules/hello-world/index.ts` — ~20 lines (breakpoint defs, mode-based rendering)
+- `microapps/hello-world/index.ts` — ~20 lines (breakpoint defs, mode-based rendering)
 - Any future modules using responsive breaks
 
 **Scope:** ~50 lines globally if we adopt new naming  
@@ -653,7 +653,7 @@ const grid = createGrid(root, {
 ### Migration Cost
 
 **Files affected:**
-- `modules/hello-world/index.ts` — ~10 lines (grid setup)
+- `microapps/hello-world/index.ts` — ~10 lines (grid setup)
 - `src/core/ui-parts.ts` — ~5 lines (if extracted)
 - Any future modules using grid
 

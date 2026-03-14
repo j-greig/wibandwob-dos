@@ -118,8 +118,8 @@ describe("command registry", () => {
     expect(r2.data.ok).toBe(true);
   });
 
-  test("modules.reload executes without error", async () => {
-    const result = await api("/commands/run", "POST", { id: "modules.reload" });
+  test("microapps.reload executes without error", async () => {
+    const result = await api("/commands/run", "POST", { id: "microapps.reload" });
     expect(result.status).toBe(200);
     expect(result.data.ok).toBe(true);
   });

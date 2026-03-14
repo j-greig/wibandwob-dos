@@ -47,8 +47,8 @@ Do not rewrite the engine. Shim the renderer and input layer to blessed. Keep RO
 Split:
 
 ```
-modules-private/wibwob-rogue/
-  module.json              — microapp registration
+microapps-private/wibwob-rogue/
+  microapp.json              — microapp registration
   rogue-window.ts          — blessed window factory; owns focus, cleanup, describeState()
   rogue-renderer.ts        — replaces ROT.Display; draws tiles to blessed box
   rogue-input.ts           — maps blessed key events to game commands
@@ -134,7 +134,7 @@ AC: an agent can navigate from castle to forest to mountain via the API and read
 - Player sprite improved for terminal (single-cell or narrow multi-cell)
 - Window chrome, focus, resize, close all work cleanly
 - `bun run typecheck` clean
-- Committed to `modules-private/`
+- Committed to `microapps-private/`
 
 AC: opens, plays, closes, `/state` parity, typecheck clean.
 

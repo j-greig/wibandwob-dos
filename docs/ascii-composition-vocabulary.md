@@ -11,7 +11,7 @@ Current reusable path:
 - animated subsurface bridge: `createEmbeddedLivePlayer(...)`
 - layer compositor: `composeAsciiLayers(...)`
 - text block helper: `renderAsciiTextBlock(...)`
-- canonical proving surface: `modules/demo-touchlab-mvp/`
+- canonical proving surface: `microapps/demo-touchlab-mvp/`
 
 Current judgement on Blessed custom stream routing:
 
@@ -158,7 +158,7 @@ Still local to TouchLab MVP for now:
 
 Real adopter landed:
 
-- `modules/demo-touchlab-mvp/`
+- `microapps/demo-touchlab-mvp/`
   - GEN is a source using the embedded animation bridge
   - TEXT is a source
   - INPUT is a parameter/source hybrid
@@ -166,7 +166,7 @@ Real adopter landed:
 
 Explicit blocker / defer:
 
-- `modules/zine/`
+- `microapps/zine/`
   - Zine already has a central live-panel tick loop tied to canvas items
   - moving it to per-panel embedded animated players would need a mount and
     lifecycle registry for many dynamic content nodes

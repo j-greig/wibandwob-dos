@@ -30,8 +30,8 @@ refactor-epoch-plan
 | Item | Reason |
 |---|---|
 | .agents/, .claude/, .codex/, .github/, .pi/, .planning/, .zed/, .zilla/ | Repo governance dot-dirs |
-| modules/ | Public content modules |
-| modules-private/ | Private content submodule |
+| microapps/ | Public content modules |
+| microapps-private/ | Private content submodule |
 | vendor/claude-system | Reference submodule |
 | logs/ | Runtime logs |
 | scratch/ | Ephemeral local state (gitignored) |

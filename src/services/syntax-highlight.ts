@@ -1,7 +1,7 @@
 /**
  * syntax-highlight.ts — Terminal syntax highlighter (Rich/Monokai-inspired palette).
  *
- * Ported from pi-markdown-reader prototype (wibwob-sdk/modules/pi-markdown-reader/highlight.ts).
+ * Ported from pi-markdown-reader prototype (wibwob-sdk/microapps/pi-markdown-reader/highlight.ts).
  * Regex-based tokeniser per language. Covers Python, TypeScript/JavaScript, Bash/Shell.
  * Returns ANSI-styled lines ready for setContent on a Blessed box with tags:false.
  */

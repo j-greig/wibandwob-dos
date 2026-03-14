@@ -2,7 +2,7 @@
  * ui-parts-data.ts — Data display component primitives.
  *
  * Module authors: import from ../../src/services/microapp-sdk.js
- * All components follow the component contract (.agents/module-dev/component-contract.md)
+ * All components follow the component contract (.agents/microapp-dev/component-contract.md)
  * All return LayoutPart for composition with createStack/createRow/createGrid.
  */
 import blessed from "blessed";

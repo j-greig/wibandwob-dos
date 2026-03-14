@@ -20,7 +20,7 @@ Poetry Clock with zero manual coordinate mutation.
 ## Read First
 
 - [AGENTS.md](/Users/james/Repos/wibandwob-dos/AGENTS.md) — architecture invariants and single-owner rules
-- [modules/wibwob-poetry-clock/index.ts](/Users/james/Repos/wibandwob-dos/modules/wibwob-poetry-clock/index.ts) — current microapp proving ground
+- [microapps/wibwob-poetry-clock/index.ts](/Users/james/Repos/wibandwob-dos/microapps/wibwob-poetry-clock/index.ts) — current microapp proving ground
 - [src/core/window-chrome.ts](/Users/james/Repos/wibandwob-dos/src/core/window-chrome.ts) — existing chrome sizing seam
 - [src/core/theme/safe-set-style.ts](/Users/james/Repos/wibandwob-dos/src/core/theme/safe-set-style.ts) — safe restyle path
 - [src/core/theme/index.ts](/Users/james/Repos/wibandwob-dos/src/core/theme/index.ts) — theme token ownership
@@ -170,7 +170,7 @@ reflow, with zero direct `top`, `left`, `width`, or `height` mutation.
 
 Status: not-started
 
-Expose the primitives from the microapp host so module authors import from the
+Expose the primitives from the microapp host so microapp authors import from the
 host contract instead of reaching into relative core paths.
 
 - [x] Add primitives exports to `MicroappHost`
@@ -184,7 +184,7 @@ paths into `src/`.
 
 AC-2: Host exposure does not create a second primitives API path.
 Test: There is one documented import surface for microapp primitives and no
-parallel direct-import recommendation for module authors.
+parallel direct-import recommendation for microapp authors.
 
 ## Dependencies
 

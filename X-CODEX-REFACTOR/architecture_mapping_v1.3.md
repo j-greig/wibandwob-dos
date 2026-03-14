@@ -128,13 +128,13 @@ Implication:
 Current microapp boundary is:
 
 ```text
-src/services/module-loader.ts
+src/services/microapp-loader.ts
   -> module discovery, loading, manifest handling, host bridge
 
 src/services/microapp-sdk.ts
-  -> canonical module author import surface
+  -> canonical microapp author import surface
 
-modules/*
+microapps/*
   -> current external/built-in microapps import from microapp-sdk.ts
 ```
 
@@ -217,7 +217,7 @@ These are scaffolding targets, not a reason to build a registry yet.
   - file/open and picker-style surfaces still own too much interaction state locally
 - `src/windows/generative-windows.ts`
   - inspector/workspace-manager UI remains host-driven and not yet service-backed
-- `src/services/module-loader.ts`
+- `src/services/microapp-loader.ts`
   - host bridge still exposes more runtime detail than the future SDK boundary should allow
 
 ## Godfiles / Hotspots With Reasons
@@ -228,7 +228,7 @@ These are scaffolding targets, not a reason to build a registry yet.
   - broad endpoint surface, legacy convenience aliases, and response-shape drift risk
 - `src/core/command-catalog.ts`
   - command metadata source of truth, but still carries too much argument semantics inline
-- `src/services/module-loader.ts`
+- `src/services/microapp-loader.ts`
   - real host/module boundary and the likely place SDK leakage must be reduced
 - `src/windows/browser-windows.ts`
   - concentration of picker/file-browser state that can trap the UI

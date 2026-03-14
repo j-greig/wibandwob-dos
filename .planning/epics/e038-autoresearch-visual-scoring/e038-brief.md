@@ -52,9 +52,9 @@ baseline comparison.
 
 ### Module metadata
 
-`modules/llm-orch-studio/module.json` — added `externalDependencies` field
+`microapps/llm-orch-studio/microapp.json` — added `externalDependencies` field
 documenting the llm-orchestrator repo and claude-code binary. Convention
-defined in `.agents/module-dev/sdk-reference.md`.
+defined in `.agents/microapp-dev/sdk-reference.md`.
 
 ### The Five-Axis Rubric
 
@@ -99,7 +99,7 @@ All five axes reached 8/10 in the final iteration (run 14).
 - [x] F02 autoresearch.md rubric and session rules
 - [x] F03 autoresearch.sh benchmark script (restart, screenshot, archive)
 - [x] F04 autoresearch.checks.sh (typecheck + module-load verification)
-- [x] F05 externalDependencies convention in module.json and SDK docs
+- [x] F05 externalDependencies convention in microapp.json and SDK docs
 - [x] F06 First scoring session on LLM Orch Studio (baseline 3.6 to 8.0)
 - [~] F07 Refine rubric based on first session learnings
 - [ ] F08 Generalise: make scoring pipeline reusable for any module
@@ -149,8 +149,8 @@ Test: Introduce deliberate breakage, confirm checks reject.
 - pi-autoresearch skill: `~/.pi/agent/git/github.com/davebcn87/pi-autoresearch/skills/autoresearch-create/SKILL.md`
 - pi-autoresearch extension: `~/.pi/agent/git/github.com/davebcn87/pi-autoresearch/extensions/pi-autoresearch/index.ts`
 - Anthropic frontend-design skill: https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md
-- SDK component reference: `.agents/module-dev/sdk-reference.md`
-- Module examples by tier: `.agents/module-dev/examples-by-tier.md`
+- SDK component reference: `.agents/microapp-dev/sdk-reference.md`
+- Module examples by tier: `.agents/microapp-dev/examples-by-tier.md`
 - Feasibility study: `scratch/autoresearch-visual-scoring-feasibility.md`
 - Scoring system summary: `scratch/autoresearch-scoring-system.md`
 - Screenshot scripts: `scripts/screenshot-window.sh`, `scripts/capture-tui-png.sh`

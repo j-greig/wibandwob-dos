@@ -57,7 +57,7 @@ Legend:
 
 - Audit status: complete.
 - Result: low risk.
-- `module.json` is honestly content-only, so the usual window lifecycle and redraw anti-patterns do not apply here.
+- `microapp.json` is honestly content-only, so the usual window lifecycle and redraw anti-patterns do not apply here.
 - Watch-out: if loader-side behaviour is ever added, either keep this strictly data-oriented or rename it so the manifest remains truthful.
 
 ## Module: glitchbox
@@ -133,7 +133,7 @@ Legend:
 
 - Audit status: complete.
 - Result: low risk.
-- `module.json` is honestly data-only and does not pretend to be a runtime microapp.
+- `microapp.json` is honestly data-only and does not pretend to be a runtime microapp.
 - Watch-out: if font rendering helpers are ever added later, keep catalogue data separate from font-discovery/runtime behaviour.
 
 ## Module: wibwob-poetry-clock

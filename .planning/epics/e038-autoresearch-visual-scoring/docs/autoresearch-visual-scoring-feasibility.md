@@ -258,7 +258,7 @@ Score the TUI screenshot on these axes (each 1-10, average = primary metric):
    via dual-capture test 2025-03-13.
 
 2. WHAT IS BEING OPTIMISED? RESOLVED: LLM Orch Studio window only.
-   File in scope: `modules/llm-orch-studio/index.ts`.
+   File in scope: `microapps/llm-orch-studio/index.ts`.
    See section "Additions" item 7 for full scoping.
 
 3. SCORING CONSISTENCY: LLMs are notoriously inconsistent at numeric
@@ -355,7 +355,7 @@ createKeyValuePanel would be better" requires knowing createKeyValuePanel
 exists. The autoresearch.md must include or reference the SDK component
 families table.
 
-Source: `.agents/module-dev/sdk-reference.md` (Component families table,
+Source: `.agents/microapp-dev/sdk-reference.md` (Component families table,
 Forms section, Data Display section, Navigation section, Feedback section)
 
 ### 2. Terminal-adapted design principles
@@ -444,9 +444,9 @@ autoresearch.md:
 
 - Path to baseline screenshot (captured before any changes)
 - Names of well-designed modules to study for patterns:
-  `modules/demo-e026-demo/` (SDK sampler, many component patterns),
-  `modules/dashboard-xxl/` (figlet + grid + animation),
-  `modules/demo-wibwob-poetry-clock/` (AI integration, modes, snapshot)
+  `microapps/demo-e026-demo/` (SDK sampler, many component patterns),
+  `microapps/dashboard-xxl/` (figlet + grid + animation),
+  `microapps/demo-wibwob-poetry-clock/` (AI integration, modes, snapshot)
 
 The agent should Read these module source files before its first
 iteration to calibrate its sense of "good terminal UI".
@@ -457,7 +457,7 @@ For this specific run: optimise the rendering and layout of the
 LLM Orch Studio window ONLY. Not theme files, not desktop arrangement,
 not other modules.
 
-- Files in scope: `modules/llm-orch-studio/index.ts`
+- Files in scope: `microapps/llm-orch-studio/index.ts`
 - Window title to screenshot: "LLM Orch Studio"
 - Score what THIS window looks like, not the whole desktop
 - Use `scripts/screenshot-window.sh "LLM Orch Studio"` for text crop
@@ -468,7 +468,7 @@ not other modules.
 - pi-autoresearch skill: `~/.pi/agent/git/github.com/davebcn87/pi-autoresearch/skills/autoresearch-create/SKILL.md`
 - pi-autoresearch extension: `~/.pi/agent/git/github.com/davebcn87/pi-autoresearch/extensions/pi-autoresearch/index.ts`
 - Anthropic frontend-design skill: https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md
-- SDK reference (component catalogue): `.agents/module-dev/sdk-reference.md`
-- Module examples by tier: `.agents/module-dev/examples-by-tier.md`
+- SDK reference (component catalogue): `.agents/microapp-dev/sdk-reference.md`
+- Module examples by tier: `.agents/microapp-dev/examples-by-tier.md`
 - WibWob-DOS screenshot scripts: `scripts/screenshot-window.sh`, `scripts/capture-tui-png.sh`
 - WibWob-DOS restart: `scripts/restart.sh`

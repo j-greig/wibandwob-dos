@@ -449,7 +449,7 @@ These findings should be reflected in the subsystem specs:
 |---|---|---|
 | `.agents/specs/window-system.md` | Window geometry & layout | Note the createGrid proposal and adoption of Textual naming for grid properties |
 | `.agents/specs/state-and-api.md` | State schema for windows | When grid is implemented, window state should include grid config |
-| `docs/building-custom-modules.md` | Layout primitives section | Add createGrid() example once implemented |
+| `docs/building-custom-microapps.md` | Layout primitives section | Add createGrid() example once implemented |
 | `.agents/AGENTS.md` | Layout Primitives section (chore-audit-layout-primitives) | Update with priority order and phase breakdown |
 
 ---

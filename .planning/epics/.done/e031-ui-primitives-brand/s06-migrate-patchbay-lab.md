@@ -21,7 +21,7 @@ Migrate Patchbay Lab’s left sidebar (`32%` clamped `24–36`) to `createSideba
 
 ## Files to change
 
-- `modules/patchbay-lab/index.ts` — sidebar migration and mode gating wiring
+- `microapps/patchbay-lab/index.ts` — sidebar migration and mode gating wiring
 
 ## Tasks
 

@@ -172,7 +172,7 @@ Rules:
 **progressive disclosure by filepath**
 - directory names encode audience so an agent can determine relevance from `ls` alone, before opening any file
 - value: agents skip entire subtrees they don't need; the filepath IS the table of contents
-- the test: if a module author opens anything in `shell-dev/`, the signposting failed
+- the test: if a microapp author opens anything in `shell-dev/`, the signposting failed
 
 **transitive dep / transitive dependency**
 - a package you don't directly depend on, but one of your direct dependencies pulls it in

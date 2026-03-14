@@ -187,7 +187,7 @@ graph TB
         end
 
         subgraph "Module System"
-            ML["module-loader.ts"]
+            ML["microapp-loader.ts"]
         end
     end
 
@@ -301,7 +301,7 @@ graph TB
 │  ↓ imports only: external packages, other core/ files       │
 │  NEVER imports from services/ or windows/                   │
 ├─────────────────────────────────────────────────────────────┤
-│                    modules/                                  │
+│                    microapps/                                  │
 │  Microapps loaded at runtime                                 │
 │  ↓ imports only: microapp-sdk.ts (barrel)                   │
 └─────────────────────────────────────────────────────────────┘
@@ -330,7 +330,7 @@ graph TB
 | `ansi-utils.ts` | **KEEP** | Exemplary utility. No changes. |
 | `app-controller.ts` | **SPLIT** | The big one. See breakdown below. |
 | `appearance-service.ts` | **KEEP** | 24 lines, harmless stub. Inline into `theme/resolver.ts` only if light mode never ships. |
-| `canvas-types.ts` | **EXTRACT** | Remove `CEPanelDef` import from `modules/`. Define the shape in core; module conforms to it. Fixes layer inversion. |
+| `canvas-types.ts` | **EXTRACT** | Remove `CEPanelDef` import from `microapps/`. Define the shape in core; module conforms to it. Fixes layer inversion. |
 | `cli.ts` | **KEEP** | Clean. Absorb `randomSessionId()` from `app.ts`. |
 | `command-catalog.ts` | **KEEP (E039 zone)** | E039 will rethink this. Don't restructure — but DO split `APP_COMMANDS` data array into `command-definitions.ts` once E039 lands. Leave file alone until then. |
 | `command-registry.ts` | **KEEP (E039 zone)** | Same — E039 will evolve this. Extract `LEGACY_COMMAND_ALIASES` to `command-legacy-aliases.ts` as prep work. |
@@ -438,7 +438,7 @@ Current: 2,395 lines, 17 responsibility groups, 80+ exports.
 | `file-actions.ts` | **KEEP** | Clean. |
 | `markdown-service.ts` | **EXTRACT** | Move `getFileMtime` → shared filesystem utility. |
 | `microapp-sdk.ts` | **EXTRACT** | Extract `AnimationClock`, `LayoutReporter` implementations to their own files — SDK should only re-export. |
-| `module-loader.ts` | **EXTRACT** | Extract `createMicroappHost` → `microapp-host-factory.ts`. Extract module discovery → `module-discovery.ts`. |
+| `microapp-loader.ts` | **EXTRACT** | Extract `createMicroappHost` → `microapp-host-factory.ts`. Extract module discovery → `module-discovery.ts`. |
 | `monster-cam-service.ts` | **KEEP** | Clean. |
 | `monster-cam-worker.ts` | **KEEP** | Clean. |
 | `motion-service.ts` | **KEEP** | Import `WindowFacade` type properly instead of duck-typing. |
@@ -488,8 +488,8 @@ Current: 1,063 lines, 7+ responsibilities.
 | `audio-analyser.ts` | FFT, spectrum binning, `fftInPlace` | Extract from `music-player-window.ts` — pure DSP belongs in services |
 | `fx-service.ts` | Python FX script execution, text smear | Extract from `app-controller.ts` |
 | `clipboard-service.ts` | `copyFocusedWindowText`, `exportFocusedWindowText` | Extract from `app-controller.ts` |
-| `microapp-host-factory.ts` | `createMicroappHost()` factory | Extract from `module-loader.ts` |
-| `module-discovery.ts` | Scan `modules/` dirs, parse manifests | Extract from `module-loader.ts` |
+| `microapp-host-factory.ts` | `createMicroappHost()` factory | Extract from `microapp-loader.ts` |
+| `module-discovery.ts` | Scan `microapps/` dirs, parse manifests | Extract from `microapp-loader.ts` |
 | `pi-session-client.ts` | Socket RPC client, session discovery | Split from `pi-session-bridge.ts` |
 | `pi-session-server.ts` | Session server implementation | Split from `pi-session-bridge.ts` |
 | `terrain-render-firstperson.ts` | First-person 3D voxel renderer | Extract from `terrain-render.ts` |
@@ -651,7 +651,7 @@ cli/   → services/control-api only   cli/ → core/, windows/
 
 core/  → core/ (internal)            core/ → services/  ← CRITICAL FIX
 core/  → external packages           core/ → windows/
-                                     core/ → modules/   ← CRITICAL FIX (canvas-types)
+                                     core/ → microapps/   ← CRITICAL FIX (canvas-types)
 
 services/ → core/                    services/ → windows/
 services/ → services/ (internal)     services/ → app-controller
@@ -661,9 +661,9 @@ windows/ → core/                     windows/ → app-controller
 windows/ → services/                 windows/ → windows/ (only for declared partnerships*)
 windows/ → external packages
 
-modules/ → microapp-sdk.ts ONLY      modules/ → core/ (direct)
-                                     modules/ → services/ (direct)
-                                     modules/ → windows/
+microapps/ → microapp-sdk.ts ONLY      microapps/ → core/ (direct)
+                                     microapps/ → services/ (direct)
+                                     microapps/ → windows/
 
 tests/ → anything in src/            (no restrictions for tests)
 ```
@@ -691,15 +691,15 @@ tests/ → anything in src/            (no restrictions for tests)
 | `core/window-openers.ts` | Everything (window creation) | — |
 | `services/*.ts` | `core/*`, `services/*` peers | windows/ |
 | `services/microapp-sdk.ts` | `core/*`, `services/*` (barrel) | windows/ |
-| `services/module-loader.ts` | `core/*`, `services/*` | windows/ |
+| `services/microapp-loader.ts` | `core/*`, `services/*` | windows/ |
 | `windows/*.ts` | `core/*`, `services/*` | `core/app-controller.ts` |
-| `modules/*/index.ts` | `services/microapp-sdk.ts` only | Everything else |
+| `microapps/*/index.ts` | `services/microapp-sdk.ts` only | Everything else |
 
 ### Currently Violated Rules (to fix)
 
 | Violation | Files | Fix |
 |-----------|-------|-----|
-| **core → modules/** | `canvas-types.ts` imports `modules/sy2-chronicles/panel-types.js` | Define `CEPanelDef` shape in `core/canvas-types.ts`. Module conforms to it. |
+| **core → microapps/** | `canvas-types.ts` imports `microapps/sy2-chronicles/panel-types.js` | Define `CEPanelDef` shape in `core/canvas-types.ts`. Module conforms to it. |
 | **core → services/** (37 imports) | `app-controller.ts` (15 service imports), `editor-coordinator.ts`, `snapshot-registry.ts`, `primitives.ts` | `app-controller.ts` violations are LEGAL (composition root). `editor-coordinator.ts` → accept (coordinator pattern). `snapshot-registry.ts` → accept (1 import, figlet-service for snapshot rendering). `primitives.ts` → accept (barrel). |
 | **core → windows/** (13 imports) | All from `app-controller.ts` | Move to `window-openers.ts` which is explicitly the composition-layer file allowed to bridge windows → core. |
 
@@ -804,7 +804,7 @@ Verification: same behavior, smaller file-manager core, cleaner test seams.
 | God objects | 4 (`app-controller`, `ui-parts`, `browser-windows`, `wibwob-agent-session`) | 0 |
 | `core → services/` imports | 37 | concentrated in composition layer only |
 | `core → windows/` imports | 13 | concentrated in composition layer only (`window-openers.ts`) |
-| `core → modules/` imports | 1 | 0 |
+| `core → microapps/` imports | 1 | 0 |
 | Files > 1,000 lines | 7 | 0 |
 | Files with 5+ responsibilities | 4 | 0 |
 | Duplicated `htmlToMarkdown` | 2 copies | 1 shared |

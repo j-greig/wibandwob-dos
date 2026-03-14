@@ -21,8 +21,8 @@ Deduplicate Tidepool sidebar width policy into one shared constant used by both 
 
 ## Files to change
 
-- `modules/wibwob-tidepool/index.ts` — consume shared sizing constant
-- `modules/wibwob-tidepool/renderer.ts` — consume shared sizing constant
+- `microapps/wibwob-tidepool/index.ts` — consume shared sizing constant
+- `microapps/wibwob-tidepool/renderer.ts` — consume shared sizing constant
 - (new Tidepool constants file if needed)
 
 ## Tasks

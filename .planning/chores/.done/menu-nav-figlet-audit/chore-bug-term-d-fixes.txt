@@ -128,7 +128,7 @@ WHAT:  Hello World renders "HELLO WORLD" in larry3d at module load
        Medium window -> equivalent of H2 font "small" (~5 lines tall)
        Narrow window -> equivalent of H5/H6 plain CAPS + underline
 
-WHERE: modules/hello-world/index.ts
+WHERE: microapps/hello-world/index.ts
 
 HOW IT WORKS IN MARKDOWN TODAY (for reference):
   markdown-service.ts renderFigletHeading() takes a width param.
@@ -183,7 +183,7 @@ SHAPE of a skill:
            "consolidation audit for X"
 
   Steps:
-  1. Grep modules/*/index.ts for the component name
+  1. Grep microapps/*/index.ts for the component name
   2. Grep src/services/microapp-sdk.ts for the export
   3. Grep src/core/ui-parts.ts for the implementation
   4. For each module hit, extract: how it's called, what args,

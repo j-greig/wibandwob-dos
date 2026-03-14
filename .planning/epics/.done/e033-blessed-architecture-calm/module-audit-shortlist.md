@@ -25,7 +25,7 @@ Each candidate is judged on:
 ### 1. Make Tide Pool multi-instance state honest
 
 Target:
-- `modules/wibwob-tidepool/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
 
 Why it ranks first:
 - manifest says `multiInstance: true`
@@ -45,7 +45,7 @@ Why it matters:
 ### 2. Calm TouchLab local redraw and nested-panel sprawl
 
 Target:
-- `modules/touchlab-mvp/index.ts`
+- `microapps/touchlab-mvp/index.ts`
 
 Why it ranks high:
 - TouchLab is now a canonical composition-adjacent surface
@@ -64,7 +64,7 @@ Why it matters:
 ### 3. Split Patchbay Lab into named local benches
 
 Target:
-- `modules/patchbay-lab/index.ts`
+- `microapps/patchbay-lab/index.ts`
 
 Why it ranks high:
 - enormous integration harness
@@ -83,7 +83,7 @@ Why it matters:
 ### 4. Separate Poetry Clock transport concerns from presentation
 
 Target:
-- `modules/wibwob-poetry-clock/index.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
 
 Why it ranks high:
 - combines UI, timers, auth reads, API calls, figlet shelling-out, and animation
@@ -101,7 +101,7 @@ Why it matters:
 ### 5. Tighten Heartbeat as the minimal canonical animated microapp
 
 Target:
-- `modules/heartbeat/index.ts`
+- `microapps/heartbeat/index.ts`
 
 Why it ranks high:
 - very small and low-risk
@@ -122,7 +122,7 @@ Why it matters:
 ### TR-808 state ownership tidy
 
 Target:
-- `modules/wibwob-tr808/index.ts`
+- `microapps/wibwob-tr808/index.ts`
 
 Good candidate because engine/audio separation already exists.
 Main issue is module-scope mutable runtime state and some local shadow types.
@@ -131,7 +131,7 @@ Useful, but slightly larger than Tide Pool.
 ### World Chatroom local rendering helpers
 
 Target:
-- `modules/world-chatroom/index.ts`
+- `microapps/world-chatroom/index.ts`
 
 Already fairly tidy.
 Best improvement would be local helper extraction around transcript, input, and status.
@@ -140,7 +140,7 @@ Worth doing, but not as urgent as dishonest lifecycle state elsewhere.
 ### WibWobWorld local controller split
 
 Target:
-- `modules/wibwobworld/index.ts`
+- `microapps/wibwobworld/index.ts`
 
 Large payoff, but broader and easier to sprawl.
 Good later candidate once smaller wins have landed.
@@ -150,7 +150,7 @@ Good later candidate once smaller wins have landed.
 ### Zine decomposition pass
 
 Target:
-- `modules/zine/index.ts`
+- `microapps/zine/index.ts`
 
 Very valuable, but large.
 It mixes file browser, canvas runtime, hot reload, edit flow, and writeback.
@@ -159,7 +159,7 @@ Should probably be split by local concern, but this is not the first “small ho
 ### §y² Chronicles decomposition pass
 
 Target:
-- `modules/sy2-chronicles/index.ts`
+- `microapps/sy2-chronicles/index.ts`
 
 Also very valuable, also very large.
 This is almost a subsystem disguised as a module.
@@ -206,16 +206,16 @@ Likely direction:
 
 ## Suggested execution order when a lane is free
 
-1. `modules/wibwob-tidepool/index.ts`
-2. `modules/heartbeat/index.ts`
-3. `modules/touchlab-mvp/index.ts`
-4. `modules/wibwob-poetry-clock/index.ts`
-5. `modules/patchbay-lab/index.ts`
-6. `modules/world-chatroom/index.ts`
-7. `modules/wibwob-tr808/index.ts`
-8. `modules/wibwobworld/index.ts`
-9. `modules/zine/index.ts`
-10. `modules/sy2-chronicles/index.ts`
+1. `microapps/wibwob-tidepool/index.ts`
+2. `microapps/heartbeat/index.ts`
+3. `microapps/touchlab-mvp/index.ts`
+4. `microapps/wibwob-poetry-clock/index.ts`
+5. `microapps/patchbay-lab/index.ts`
+6. `microapps/world-chatroom/index.ts`
+7. `microapps/wibwob-tr808/index.ts`
+8. `microapps/wibwobworld/index.ts`
+9. `microapps/zine/index.ts`
+10. `microapps/sy2-chronicles/index.ts`
 
 ## Not a recommendation right now
 

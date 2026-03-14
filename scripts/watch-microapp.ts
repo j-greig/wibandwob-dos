@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-interface ModuleManifest {
+interface MicroappManifest {
   name?: string;
   entry?: string;
   microapp?: {
@@ -29,10 +29,10 @@ interface RuntimeWindowState {
   };
 }
 
-const DEFAULT_WATCH = ["index.ts", "module.json"];
+const DEFAULT_WATCH = ["index.ts", "microapp.json"];
 
 function usage(): never {
-  console.error("Usage: bun run scripts/watch-microapp.ts <module-dir> [--open] [--debounce <ms>] [--api <url>]");
+  console.error("Usage: bun run scripts/watch-microapp.ts <microapp-dir> [--open] [--debounce <ms>] [--api <url>]");
   process.exit(1);
 }
 
@@ -64,7 +64,7 @@ async function api(apiBase: string, pathname: string, method = "GET", body?: unk
 function parseArgs(argv: string[]) {
   if (argv.length === 0) usage();
   const args = [...argv];
-  const moduleDir = path.resolve(args.shift()!);
+  const microappDir = path.resolve(args.shift()!);
   let debounceMs = 250;
   let open = false;
   let apiBase = process.env.MICROAPP_WATCH_API ?? "http://127.0.0.1:8099";
@@ -88,26 +88,26 @@ function parseArgs(argv: string[]) {
     }
     usage();
   }
-  return { moduleDir, debounceMs, open, apiBase };
+  return { microappDir, debounceMs, open, apiBase };
 }
 
-function loadManifest(moduleDir: string): ModuleManifest {
-  const manifestPath = path.join(moduleDir, "module.json");
+function loadManifest(microappDir: string): MicroappManifest {
+  const manifestPath = path.join(microappDir, "microapp.json");
   const raw = fs.readFileSync(manifestPath, "utf8");
-  return JSON.parse(raw) as ModuleManifest;
+  return JSON.parse(raw) as MicroappManifest;
 }
 
-function uniqueParentDirs(moduleDir: string, watchEntries: string[]): string[] {
+function uniqueParentDirs(microappDir: string, watchEntries: string[]): string[] {
   return [...new Set(
-    watchEntries.map((entry) => path.dirname(path.resolve(moduleDir, entry))),
+    watchEntries.map((entry) => path.dirname(path.resolve(microappDir, entry))),
   )];
 }
 
-function matchesWatchedFile(moduleDir: string, watchEntries: string[], directory: string, filename?: string | null): boolean {
+function matchesWatchedFile(microappDir: string, watchEntries: string[], directory: string, filename?: string | null): boolean {
   if (!filename) return true;
   const absoluteChanged = path.resolve(directory, filename.toString());
   return watchEntries
-    .map((entry) => path.resolve(moduleDir, entry))
+    .map((entry) => path.resolve(microappDir, entry))
     .some((watched) => absoluteChanged === watched || absoluteChanged.startsWith(`${watched}${path.sep}`));
 }
 
@@ -122,7 +122,7 @@ async function waitForCommand(apiBase: string, commandId: string, attempts = 20)
   throw new Error(`Timed out waiting for command ${commandId}`);
 }
 
-async function listModuleWindows(apiBase: string, appType: string): Promise<RuntimeWindowState[]> {
+async function listMicroappWindows(apiBase: string, appType: string): Promise<RuntimeWindowState[]> {
   const state = await api(apiBase, "/state") as { windows: RuntimeWindowState[] };
   return state.windows.filter((window) => window.details?.appType === appType);
 }
@@ -130,7 +130,7 @@ async function listModuleWindows(apiBase: string, appType: string): Promise<Runt
 async function waitForClosedWindows(apiBase: string, ids: number[], appType: string, attempts = 20): Promise<void> {
   if (ids.length === 0) return;
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const current = await listModuleWindows(apiBase, appType);
+    const current = await listMicroappWindows(apiBase, appType);
     const openIds = new Set(current.map((window) => window.id));
     if (ids.every((id) => !openIds.has(id))) {
       return;
@@ -144,7 +144,7 @@ async function closeWindow(apiBase: string, id: number): Promise<void> {
   await api(apiBase, "/windows/close", "POST", { id });
 }
 
-async function reopenModuleWindows(
+async function reopenMicroappWindows(
   apiBase: string,
   reopenCommand: string,
   reopenArgs: Record<string, unknown>,
@@ -152,14 +152,14 @@ async function reopenModuleWindows(
   appType: string,
 ): Promise<void> {
   if (windows.length === 0) return;
-  const before = new Set((await listModuleWindows(apiBase, appType)).map((window) => window.id));
+  const before = new Set((await listMicroappWindows(apiBase, appType)).map((window) => window.id));
   for (const window of windows) {
     await api(apiBase, "/commands/run", "POST", {
       id: reopenCommand,
       args: reopenArgs,
     });
     await sleep(250);
-    const current = await listModuleWindows(apiBase, appType);
+    const current = await listMicroappWindows(apiBase, appType);
     const reopened = current.find((candidate) => !before.has(candidate.id));
     if (!reopened) {
       continue;
@@ -178,28 +178,28 @@ async function reopenModuleWindows(
   }
 }
 
-async function reloadModule(moduleDir: string, apiBase: string, openOnBoot: boolean): Promise<void> {
-  const manifest = loadManifest(moduleDir);
+async function reloadMicroapp(microappDir: string, apiBase: string, openOnBoot: boolean): Promise<void> {
+  const manifest = loadManifest(microappDir);
   const appType = manifest.microapp?.id;
   if (!appType) {
-    throw new Error(`Missing microapp.id in ${path.join(moduleDir, "module.json")}`);
+    throw new Error(`Missing microapp.id in ${path.join(microappDir, "microapp.json")}`);
   }
   const reopenCommand = manifest.dev?.reopenCommand ?? `microapp.${appType}.open`;
   const reopenArgs = manifest.dev?.reopenArgs ?? {};
-  const priorWindows = await listModuleWindows(apiBase, appType);
+  const priorWindows = await listMicroappWindows(apiBase, appType);
 
   for (const window of priorWindows) {
     await closeWindow(apiBase, window.id);
   }
   await waitForClosedWindows(apiBase, priorWindows.map((window) => window.id), appType);
 
-  const result = await api(apiBase, "/commands/run", "POST", { id: "modules.reload" });
+  const result = await api(apiBase, "/commands/run", "POST", { id: "microapps.reload" });
   await waitForCommand(apiBase, reopenCommand);
 
   if (openOnBoot && priorWindows.length === 0) {
     await api(apiBase, "/commands/run", "POST", { id: reopenCommand, args: reopenArgs });
   } else {
-    await reopenModuleWindows(apiBase, reopenCommand, reopenArgs, priorWindows, appType);
+    await reopenMicroappWindows(apiBase, reopenCommand, reopenArgs, priorWindows, appType);
   }
 
   const stamp = new Date().toLocaleTimeString();
@@ -207,10 +207,10 @@ async function reloadModule(moduleDir: string, apiBase: string, openOnBoot: bool
 }
 
 async function main() {
-  const { moduleDir, debounceMs, open, apiBase } = parseArgs(process.argv.slice(2));
-  const manifest = loadManifest(moduleDir);
+  const { microappDir, debounceMs, open, apiBase } = parseArgs(process.argv.slice(2));
+  const manifest = loadManifest(microappDir);
   const watchEntries = manifest.dev?.watch?.length ? manifest.dev.watch : DEFAULT_WATCH;
-  const parentDirs = uniqueParentDirs(moduleDir, watchEntries);
+  const parentDirs = uniqueParentDirs(microappDir, watchEntries);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let reloadInFlight = false;
   let queued = false;
@@ -221,7 +221,7 @@ async function main() {
       return;
     }
     reloadInFlight = true;
-    void reloadModule(moduleDir, apiBase, open)
+    void reloadMicroapp(microappDir, apiBase, open)
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`[watch-microapp] reload failed: ${message}`);
@@ -237,7 +237,7 @@ async function main() {
 
   for (const directory of parentDirs) {
     fs.watch(directory, { persistent: true }, (_eventType, filename) => {
-      if (!matchesWatchedFile(moduleDir, watchEntries, directory, filename)) {
+      if (!matchesWatchedFile(microappDir, watchEntries, directory, filename)) {
         return;
       }
       if (timer) {
@@ -247,12 +247,12 @@ async function main() {
     });
   }
 
-  console.log(`[watch-microapp] watching ${moduleDir}`);
+  console.log(`[watch-microapp] watching ${microappDir}`);
   console.log(`[watch-microapp] files: ${watchEntries.join(", ")}`);
   console.log(`[watch-microapp] api: ${apiBase}`);
 
   if (open) {
-    await reloadModule(moduleDir, apiBase, true);
+    await reloadMicroapp(microappDir, apiBase, true);
   }
 }
 

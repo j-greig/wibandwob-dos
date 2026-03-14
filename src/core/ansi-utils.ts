@@ -2,7 +2,7 @@
  * ansi-utils.ts — ANSI-aware text measurement and word-wrapping.
  *
  * Ported from @mariozechner/pi-tui (MIT License, badlogic/pi-mono) via the
- * pi-markdown-reader prototype (wibwob-sdk/modules/pi-markdown-reader/utils.ts).
+ * pi-markdown-reader prototype (wibwob-sdk/microapps/pi-markdown-reader/utils.ts).
  *
  * Use these instead of string-width anywhere ANSI codes may be present —
  * string-width does not preserve ANSI codes across line breaks.

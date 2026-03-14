@@ -700,7 +700,7 @@ Two rendering modes for the test pattern background:
 
 ### 11.8 Primer Sync (`backrooms_tv_view.cpp`)
 
-- `syncModulePrimers()` — at startup, scans `modules-private/*/primers/` and symlinks each file into `wibandwob-backrooms/primers/`.
+- `syncModulePrimers()` — at startup, scans `microapps-private/*/primers/` and symlinks each file into `wibandwob-backrooms/primers/`.
 - Enables module-specific primers to be available to the Backrooms CLI without manual setup.
 - `g_modulePrimerPaths` — global `map<name, path>` populated by dialog open, consumed by `BackroomsBridge::start()`.
 
@@ -771,7 +771,7 @@ struct BackroomsChannel {
 ### Primer types
 
 1. **File primers:** `.txt` files in `wibandwob-backrooms/primers/`
-2. **Module primers:** from `modules-private/*/primers/` — symlinked at startup
+2. **Module primers:** from `microapps-private/*/primers/` — symlinked at startup
 3. **Custom text primers:** pasted inline, split by `---`, written as temp files per session
 4. **Primer size cap:** 500,000 chars (raised from 15,000)
 

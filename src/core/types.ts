@@ -260,7 +260,7 @@ export interface WindowRecord {
   // Finder-specific (set by browser-windows.ts)
   finder?: FinderController;
 
-  // Microapp-specific (set by module-loader.ts via MicroappHost)
+  // Microapp-specific (set by microapp-loader.ts via MicroappHost)
   microappId?: string;
 
   // Maximize state (set by WindowManager on double-click titlebar)

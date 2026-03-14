@@ -12,11 +12,11 @@
   [96m                              /_/   /_/                            [0m             
                                                                                   
   How to build a microapp window for WibWob-DOS. Read this before touching        
-  any file in [38;5;223m[48;5;236m modules/ [0m or [38;5;223m[48;5;236m modules-private/ [0m.                                   
+  any file in [38;5;223m[48;5;236m microapps/ [0m or [38;5;223m[48;5;236m microapps-private/ [0m.                                   
                                                                                   
-  Reference implementation: [38;5;223m[48;5;236m modules/hello-world/ [0m (minimal)                      
-  Full example with all primitives: [38;5;223m[48;5;236m modules/e026-demo/ [0m (F03/F05/F06/F07)        
-  Public authoring guide: [38;5;223m[48;5;236m docs/module-authoring.md [0m                              
+  Reference implementation: [38;5;223m[48;5;236m microapps/hello-world/ [0m (minimal)                      
+  Full example with all primitives: [38;5;223m[48;5;236m microapps/e026-demo/ [0m (F03/F05/F06/F07)        
+  Public authoring guide: [38;5;223m[48;5;236m docs/microapp-authoring.md [0m                              
                                                                                   
   [38;5;238m──────────────────────────────────────────────────────────────────────────────[0m  
                                                                                   
@@ -55,8 +55,8 @@
   [94m|_| |_|_\___| /__/\__|_|  \_,_\__|\__|\_,_|_| \___|[0m                             
                                                                                   
   [38;5;238m```                                                                           [0m  
-  [38;5;252m[48;5;234m  modules/my-app/                                                             [0m  
-  [38;5;252m[48;5;234m    module.json   — manifest (id, title, commands, menu placement)            [0m  
+  [38;5;252m[48;5;234m  microapps/my-app/                                                             [0m  
+  [38;5;252m[48;5;234m    microapp.json   — manifest (id, title, commands, menu placement)            [0m  
   [38;5;252m[48;5;234m    index.ts      — export default function setup(host: MicroappHost)         [0m  
   [38;5;238m```                                                                           [0m  
                                                                                   
@@ -242,7 +242,7 @@
   [94m                       |_|                                          |__/ [0m       
                                                                                   
   Import these from [38;5;223m[48;5;236m ../../src/services/microapp-sdk.js [0m, not from scattered      
-  [38;5;223m[48;5;236m src/core/* [0m paths. The SDK surface is the stable contract for module authors.  
+  [38;5;223m[48;5;236m src/core/* [0m paths. The SDK surface is the stable contract for microapp authors.  
                                                                                   
   [95m|~)| _  _ _ _  _|    . _| _  _ _|_ _[0m                                            
   [95m|_)|(/__\_\(/_(_|  VV|(_|(_|(/_ | _\[0m                                            
@@ -330,7 +330,7 @@
                                                                                   
                                                                                   
   Keys 1-9 are wired automatically. Pass [38;5;223m[48;5;236m { keys: false } [0m as the third           
-  argument to disable. Reference adopter: [38;5;223m[48;5;236m modules/dashboard/index.ts [0m.           
+  argument to disable. Reference adopter: [38;5;223m[48;5;236m microapps/dashboard/index.ts [0m.           
                                                                                   
   [95m| . |` _  _   _| _   _|_. _ _  _  _ _   /|~/X /\ [0m                               
   [95m|_|~|~(/_(_\/(_|(/_   | || | |(/_| _\  | |~X/(_)|[0m                               
@@ -457,7 +457,7 @@
                                                                                   
                                                                                   
   Use this when one panel inside a larger microapp should animate independently.  
-  Reference adopter: [38;5;223m[48;5;236m modules/touchlab-mvp/index.ts [0m.                             
+  Reference adopter: [38;5;223m[48;5;236m microapps/touchlab-mvp/index.ts [0m.                             
   Composition vocabulary note: [38;5;223m[48;5;236m docs/ascii-composition-vocabulary.md [0m.            
                                                                                   
   [95m|\/| _  _|  _| _    _     . _    _  _   /|~/X'~)\ [0m                              
@@ -748,7 +748,7 @@
   [94m          |_|  |_|         |___/ [0m                                               
                                                                                   
   [36m- [0m[38;5;223m[48;5;236m bun run typecheck [0m passes                                                    
-  [36m- [0m[38;5;223m[48;5;236m module.json [0m has unique [38;5;223m[48;5;236m id [0m (no collision with existing modules)            
+  [36m- [0m[38;5;223m[48;5;236m microapp.json [0m has unique [38;5;223m[48;5;236m id [0m (no collision with existing modules)            
   [36m- [0m[38;5;223m[48;5;236m win.onCleanup() [0m clears all timers and destroys tree widgets                 
   [36m- [0m[38;5;223m[48;5;236m win.onRestyle() [0m re-applies [38;5;223m[48;5;236m host.theme() [0m to all styled widgets             
   [36m- [0m[38;5;223m[48;5;236m win.describeState() [0m returns a useful [38;5;223m[48;5;236m summary [0m                              

@@ -21,7 +21,7 @@ Move ZINE’s left fixed sidebar (with `[` toggle) to `createSidebarPanel`, pres
 
 ## Files to change
 
-- `modules/zine/index.ts` — migrate sidebar construction and toggle wiring
+- `microapps/zine/index.ts` — migrate sidebar construction and toggle wiring
 
 ## Tasks
 

@@ -2,12 +2,12 @@
 
 ## Objective
 
-Improve the visual quality of the Antopolis microapp window (modules/terrarium/index.ts).
+Improve the visual quality of the Antopolis microapp window (microapps/terrarium/index.ts).
 Score screenshots against a 5-axis rubric. Higher is better. Target: beat baseline convincingly.
 
 ## Files in Scope
 
-ONLY `modules/terrarium/index.ts` may be modified. No other source files.
+ONLY `microapps/terrarium/index.ts` may be modified. No other source files.
 
 ## Rubric — Five Axes (each 1-10)
 

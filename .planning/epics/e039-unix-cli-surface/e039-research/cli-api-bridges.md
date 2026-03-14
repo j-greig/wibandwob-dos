@@ -746,7 +746,7 @@ const output = formatter.table(result.data)
 **Target:** Like Kubernetes CRDs — modules explicitly export commands
 
 ```typescript
-// In modules/demo-hello-world/index.ts:
+// In microapps/demo-hello-world/index.ts:
 export const commands = [
   {
     name: "demo.hello.configure",

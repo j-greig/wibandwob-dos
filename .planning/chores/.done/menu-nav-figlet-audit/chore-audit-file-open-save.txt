@@ -15,7 +15,7 @@ and which SDK component (if any) powers it.
 |                         |        |        |                            |  openFileBrowserPrompt()   |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | Slap Editor (module)    | YES    | YES    | Command palette / Apps     | EditorEngine (custom)      |
-|  modules/slap-editor    |        |        | menu. filePath arg on      | engine.loadFile()          |
+|  microapps/slap-editor    |        |        | menu. filePath arg on      | engine.loadFile()          |
 |                         |        |        | launch. Ctrl-S save.       | engine.saveFile()          |
 |                         |        |        | No file picker UI.         | No SDK file picker.        |
 +-------------------------+--------+--------+----------------------------+----------------------------+
@@ -35,13 +35,13 @@ and which SDK component (if any) powers it.
 |                         |        |        | Direct filePath arg.       | Opens as primer window.    |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | Zine (module)           | YES    | no     | SIDEBAR (createSidebar     | createSidebarPanel() SDK   |
-|  modules/zine           |        |        | Panel + createSelectable   | createSelectableList() SDK |
+|  microapps/zine           |        |        | Panel + createSelectable   | createSelectableList() SDK |
 |                         |        |        | List). Watches a zine      | fs.watch on directory.     |
 |                         |        |        | directory. Also toolbar    | Double-click opens in      |
 |                         |        |        | toggle "[  ] Files".       | editor.open command.       |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | Patchbay Lab (module)   | YES    | no     | SIDEBAR for primer         | createSidebarPanel via     |
-|  modules/patchbay-lab   |        |        | gallery. Lists primer      | resolveSidebarWidth().     |
+|  microapps/patchbay-lab   |        |        | gallery. Lists primer      | resolveSidebarWidth().     |
 |                         |        |        | files from scratch/        | Custom sidebar, not SDK    |
 |                         |        |        | primers directory.         | createSidebarPanel.        |
 +-------------------------+--------+--------+----------------------------+----------------------------+
@@ -60,12 +60,12 @@ and which SDK component (if any) powers it.
 |  kind: "browser"        |        |        | file open.                 |                            |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | WibWobWorld (module)    | no     | YES*   | Sidebar for terrain info.  | resolveSidebarWidth() SDK  |
-|  modules/wibwobworld    |        |        | *Saves terrain artifacts   | Saves to scratch/worlds/   |
+|  microapps/wibwobworld    |        |        | *Saves terrain artifacts   | Saves to scratch/worlds/   |
 |                         |        |        | automatically to scratch/  | via custom save logic.     |
 |                         |        |        | worlds/.                   |                            |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | World Chatroom (module) | no     | no     | Sidebar for participants.  | createSidebarPanel() SDK   |
-|  modules/world-chatroom |        |        | No file open/save.         |                            |
+|  microapps/world-chatroom |        |        | No file open/save.         |                            |
 +-------------------------+--------+--------+----------------------------+----------------------------+
 | Backrooms Browser       | YES    | no     | Built-in session list      | createSelectableList()     |
 |  kind: "backrooms"      |        |        | sidebar. Reads from        | from ui-parts.ts.          |

@@ -5,7 +5,7 @@
  * row-flowing grid. Used by microapps that render panel-based UIs like
  * §y² Chronicles.
  *
- * Extracted from modules/sy2-chronicles/index.ts.
+ * Extracted from microapps/sy2-chronicles/index.ts.
  */
 
 import type blessed from "blessed";

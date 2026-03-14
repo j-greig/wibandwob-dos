@@ -86,7 +86,7 @@ UI primitive. Takes a renderText callback (text -> string).
 Does NOT receive width in the callback. Not responsive.
 Exported via SDK (microapp-sdk.ts, primitives.ts).
 
-### src/services/module-loader.ts
+### src/services/microapp-loader.ts
 Wires createFigletDisplay into the host.ui namespace for modules.
 
 
@@ -121,36 +121,36 @@ Not responsive. Decorative use.
 
 ## 4. Modules (dynamically loaded microapps)
 
-### modules/hello-world/index.ts
+### microapps/hello-world/index.ts
 NEWLY responsive (this chore). Has local tryFiglet and responsiveFiglet
 with font cascade: larry3d -> slant -> small -> smslant -> digital -> CAPS.
 Uses raw spawnSync. Should migrate to SDK primitives.
 
-### modules/wibwob-poetry-clock/index.ts
+### microapps/wibwob-poetry-clock/index.ts
 Fixed font ("chunky"). Local renderFigletTime using raw spawnSync.
 Uses createFigletDisplay SDK primitive but not responsive.
 Should use SDK renderFiglet instead of raw spawnSync.
 
-### modules/dashboard/index.ts
+### microapps/dashboard/index.ts
 Uses SDK renderFiglet for clock and marquee (big, slant fonts).
 Static figlet cells in mosaic grid. Not responsive.
 
-### modules/dashboard/index_v0.ts
+### microapps/dashboard/index_v0.ts
 Legacy version. Local figlet() using raw spawnSync.
 Same mosaic pattern. Should be deleted or migrated.
 
-### modules/dashboard-xxl/index.ts
+### microapps/dashboard-xxl/index.ts
 Virtual canvas mosaic. Local figlet() using raw spawnSync.
 Static cells pre-rendered at build time. Not responsive.
 Should use SDK renderFiglet.
 
-### modules/sy2-chronicles/index.ts + panel-types.ts
+### microapps/sy2-chronicles/index.ts + panel-types.ts
 Multi-panel narrative. Uses SDK renderFiglet via panel-types.ts.
 Panel type "figlet" with configurable font per panel definition.
 renderFigletPanel calls renderFiglet(text, font, width).
 Has width-awareness but no font cascade. Good citizen.
 
-### modules/zine/index.ts
+### microapps/zine/index.ts
 Only a scaffold slot comment for future figlet panel type.
 No actual figlet usage yet.
 
@@ -214,10 +214,10 @@ Test mock for openFigletBanner.
 Files that bypass figlet-service and call the CLI directly:
 
   src/services/markdown-service.ts:95    tryFiglet (private, cached)
-  modules/hello-world/index.ts:25        tryFiglet (local)
-  modules/wibwob-poetry-clock/index.ts:60  renderFigletTime (local)
-  modules/dashboard-xxl/index.ts:79      figlet() (local)
-  modules/dashboard/index_v0.ts:40       figlet() (local, legacy)
+  microapps/hello-world/index.ts:25        tryFiglet (local)
+  microapps/wibwob-poetry-clock/index.ts:60  renderFigletTime (local)
+  microapps/dashboard-xxl/index.ts:79      figlet() (local)
+  microapps/dashboard/index_v0.ts:40       figlet() (local, legacy)
 
 Five call sites. All should route through figlet-service.ts.
 markdown-service.ts is special (needs caching + null return) but

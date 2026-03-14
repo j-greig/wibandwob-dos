@@ -1,13 +1,13 @@
 # PRD: WibWobWorld Hybrid Iso Mode (Contour + Isometric Split)
 
 ## Goal
-Implement a **single-window hybrid render mode** in `modules-private/wibwobworld/index.ts` where:
+Implement a **single-window hybrid render mode** in `microapps-private/wibwobworld/index.ts` where:
 - LEFT pane shows the existing contour/terrain map view.
 - RIGHT pane shows an isometric terrain projection derived from the same world.
 - Both panes update from the same world state and remain side-by-side in the WibWobWorld window.
 
 ## Root Cause (Intent Gap)
-The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `modules-private/wibwobworld-iso/index.ts` (`renderIso`).
+The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `microapps-private/wibwobworld-iso/index.ts` (`renderIso`).
 
 ## Product Behavior
 
@@ -72,10 +72,10 @@ Hard bail from render pass when layout is not drawable:
 - `if (innerW < 1 || innerH < 1) return;`
 - For hybrid pane draws, also require computed pane widths/heights >= 1 before calling renderers.
 
-## Exact File Changes (`modules-private/wibwobworld/index.ts`)
+## Exact File Changes (`microapps-private/wibwobworld/index.ts`)
 
 ### Add
-1. `renderIso(...)` helper (ported from `modules-private/wibwobworld-iso/index.ts`, no file IO code).
+1. `renderIso(...)` helper (ported from `microapps-private/wibwobworld-iso/index.ts`, no file IO code).
 2. Iso constants/helpers used by `renderIso`:
    - `ISO_EXAGGERATION`
    - biome color/glyph lookup helpers.

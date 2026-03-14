@@ -6,7 +6,7 @@ scratch/
 .pi/
 art/
 vendor/
-modules-private/.git/
+microapps-private/.git/
 deploy/test_agent_key
 *.log
 *.cast

@@ -21,10 +21,10 @@ Normalize module `appType` strings to `wibwob.slug` format so workspace restore/
 
 ## Files to change
 
-- `modules/glitchbox/index.ts`
-- `modules/wibwob-tidepool/index.ts`
-- `modules/sy2-chronicles/index.ts`
-- `modules/zine/index.ts`
+- `microapps/glitchbox/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
+- `microapps/sy2-chronicles/index.ts`
+- `microapps/zine/index.ts`
 
 ## Tasks
 

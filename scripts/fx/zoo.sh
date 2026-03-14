@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 
 WIBWOB="bun run src/cli/wibwob.ts"
 SMEAR=".pi/skills/vj-timeline/scripts/smear.py"
-PRIMER_DIR="$(cd "$(dirname "$0")/../.." && pwd)/modules-private/ascii-art-farts/primers"
+PRIMER_DIR="$(cd "$(dirname "$0")/../.." && pwd)/microapps-private/ascii-art-farts/primers"
 OUTDIR="scratch/captures/zoo-$(date +%s)"
 mkdir -p "$OUTDIR"
 

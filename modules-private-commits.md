@@ -5,13 +5,13 @@ They are NOT visible in a standalone clone of the submodule repo until pushed.
 
 ## Where the history lives
 
-- Working copy: `/Users/james/Repos/wibandwob-dos/modules-private/`
-- Git objects: `/Users/james/Repos/wibandwob-dos/.git/modules/modules-private/`
+- Working copy: `/Users/james/Repos/wibandwob-dos/microapps-private/`
+- Git objects: `/Users/james/Repos/wibandwob-dos/.git/microapps/microapps-private/`
 - Remote (now pushed): `https://github.com/j-greig/wibandwob-wwdos-modules-private`
 
-The `modules-private/.git` file contains `gitdir: ../.git/modules/modules-private`
+The `microapps-private/.git` file contains `gitdir: ../.git/microapps/modules-private`
 — it's a pointer, not a real `.git` folder. Tower should show this repo separately
-if you open `/Users/james/Repos/wibandwob-dos/modules-private/` as a repository.
+if you open `/Users/james/Repos/wibandwob-dos/microapps-private/` as a repository.
 
 ## Commits (newest first)
 

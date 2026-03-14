@@ -94,7 +94,7 @@ Opens a local file (typically markdown or plain text) in a scrollable, read-only
 | **Interactive** | Navigable list, Enter to open |
 | **Persistable** | Yes (selected index) |
 
-Simple single-pane list showing all primer files discovered from `modules/`, `modules-private/`, and `docs/`. `Enter` opens the selected file as a primer viewer. Vi-key scrolling.
+Simple single-pane list showing all primer files discovered from `microapps/`, `microapps-private/`, and `docs/`. `Enter` opens the selected file as a primer viewer. Vi-key scrolling.
 
 ---
 
@@ -447,13 +447,13 @@ Subscribes to `StateService` and renders the full `DesktopState` as pretty-print
 
 | Property | Value |
 |---|---|
-| **Source** | `src/services/module-loader.ts` |
+| **Source** | `src/services/microapp-loader.ts` |
 | **Kind** | `microapp` |
 | **AppType** | Module's `microapp.id` |
 | **Interactive** | Module-defined |
 | **Persistable** | Optional (if module calls `registerSnapshot`) |
 
-The module loader scans `modules/` and `modules-private/` for subdirectories containing `module.json` with `type: "microapp"`. Each microapp's `entry.ts` exports a `setup(host: MicroappHost)` function. The `MicroappHost` API provides:
+The module loader scans `microapps/` and `microapps-private/` for subdirectories containing `microapp.json` with `type: "microapp"`. Each microapp's `entry.ts` exports a `setup(host: MicroappHost)` function. The `MicroappHost` API provides:
 - `createWindow(init)` → `MicroappWindowHandle`
 - `registerCommand(def)` — adds menu/palette entries backed by command registry
 - `registerSnapshot(handlers)` — opts into workspace persistence
@@ -652,14 +652,14 @@ The VJ Timeline Service supports an `audio` field in timeline files specifying a
 
 ### 5.1 Primer Files
 
-Primers are `.txt` files in `modules/*/primers/`, `modules-private/*/primers/`, or `docs/`. They contain:
+Primers are `.txt` files in `microapps/*/primers/`, `microapps-private/*/primers/`, or `docs/`. They contain:
 - Static ASCII art or lore text
 - Multi-frame animations (delimited by `# frame N` comments)
 - Optional metadata comments (`# fps:8`, `# width:80`)
 
 ### 5.2 Content Service (`src/services/content-service.ts`)
 
-Walks `modules/` and `modules-private/` to discover:
+Walks `microapps/` and `microapps-private/` to discover:
 - `collectPrimerEntries()` — flat sorted list for the browser
 - `collectPrimerGroups()` — per-module groups for the gallery
 - `collectGalleryEntries()` — all gallery items
@@ -758,7 +758,7 @@ Selected via `ModelRegistry` from `@mariozechner/pi-coding-agent`. Models refere
 
 ### 8.4 System Prompt Loading
 
-`loadBasePrompt()` reads all `.md` files from `modules-private/wibwob-prompts/` sorted alphabetically, joining them as fragments. Falls back to `.pi/APPEND_SYSTEM.md`, then a minimal default. Hot-reloadable via `agent.reload_prompt` command or `/reload` slash command without restarting the session.
+`loadBasePrompt()` reads all `.md` files from `microapps-private/wibwob-prompts/` sorted alphabetically, joining them as fragments. Falls back to `.pi/APPEND_SYSTEM.md`, then a minimal default. Hot-reloadable via `agent.reload_prompt` command or `/reload` slash command without restarting the session.
 
 ### 8.5 Desktop State Injection
 
@@ -872,7 +872,7 @@ The agent is prompted as "Wib & Wob" — a two-voice system. Responses are expec
 - `wibwob-phosphor` — green phosphor terminal aesthetic
 - `wibwob-light` — light background theme
 
-Themes are **loaded dynamically** by `module-loader.ts` — external modules can register additional variants via `registerExternalTheme()`.
+Themes are **loaded dynamically** by `microapp-loader.ts` — external modules can register additional variants via `registerExternalTheme()`.
 
 **Semantic tokens** per theme (in `ThemeTokens`): `body`, `bodyAlt`, `header`, `footer`, `input`, `selected`, `muted`, `warning`, `accent`, `success`, `highlight`, `agentBg`, `windowShadow`, `windowBorder`, `windowTitle`.
 
@@ -1013,7 +1013,7 @@ REST calls to `https://api.search.brave.com/res/v1/web/search`. Requires `BRAVE_
 | `AnimationService` | `src/services/animation-service.ts` | `FramePlayer` primitives (pre-rendered + live + lazy-mounted) |
 | `PlasmaEngine` | `src/services/plasma-engine.ts` | Sinusoidal plasma maths, mood definitions, 3 render modes |
 | `ContourEngine` | `src/services/contour-engine.ts` | Seeded terrain generation, marching-squares, ContourPlayer |
-| `ModuleLoader` | `src/services/module-loader.ts` | Dynamic module discovery (themes, microapps), `MicroappHost` |
+| `ModuleLoader` | `src/services/microapp-loader.ts` | Dynamic module discovery (themes, microapps), `MicroappHost` |
 | `MonsterCamService` | `src/services/monster-cam-service.ts` | Python worker lifecycle, Unix socket frame parsing |
 | `ChromeBrowserService` | `src/services/chrome-browser-service.ts` | Puppeteer CDP, Readability, Turndown |
 | `BraveSearchService` | `src/services/brave-search-service.ts` | Brave Search REST API + content extraction |
@@ -1153,10 +1153,10 @@ A layout engine built on top of blessed that provides:
 
 Used by Plasma, Terrain Lab, Contour Triptych, and microapps. Each part exposes `layout(rect)`, `restyle()`, and `destroy()`. This is the foundation for composable "dashboard-style" windows.
 
-### 14.2 Microapp Module System (`src/services/module-loader.ts`)
+### 14.2 Microapp Module System (`src/services/microapp-loader.ts`)
 
-Drop-in TypeScript modules loaded at runtime from `modules/` or `modules-private/`:
-- `module.json` manifest declares type, id, entry, menu/palette/API visibility
+Drop-in TypeScript modules loaded at runtime from `microapps/` or `microapps-private/`:
+- `microapp.json` manifest declares type, id, entry, menu/palette/API visibility
 - `setup(host: MicroappHost)` function gets full access to screen, window manager, UI parts, commands, geometry, and theme
 - Can register commands, themes, and workspace snapshot handlers
 - Menu and palette entries are injected into the command registry dynamically

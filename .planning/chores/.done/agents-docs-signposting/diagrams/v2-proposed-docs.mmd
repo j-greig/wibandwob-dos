@@ -5,7 +5,7 @@ graph TD
         A_CORE["§2 Shell Development<br/><i>below the fold — core contributors only</i>"]
     end
 
-    subgraph MODDEV[".agents/module-dev/"]
+    subgraph MODDEV[".agents/microapp-dev/"]
         direction TB
         QUICK["quick-start.md<br/><i>30-second pattern + scaffold command<br/>the fast path Claude wanted</i>"]
         TIERS["examples-by-tier.md<br/><i>which module for which pattern:<br/>STATIC → ANIMATED → PERSISTENT → COMPLEX</i>"]
@@ -19,7 +19,7 @@ graph TD
         MODULE_AUTH["module-authoring.md<br/><i>EXISTS NOW — redirect or alias<br/>kills the dead link</i>"]
     end
 
-    subgraph MODULES["modules/ — examples by tier"]
+    subgraph MODULES["microapps/ — examples by tier"]
         direction LR
         T1["hello-world/<br/><i>TIER 1: static</i>"]
         T2["heartbeat/<br/><i>TIER 2: animated</i>"]
@@ -43,7 +43,7 @@ graph TD
 
     subgraph SDKSRC["src/services/ — source of truth"]
         SDK_TS["microapp-sdk.ts<br/><i>stable public exports marked<br/>internal exports flagged</i>"]
-        LOADER["module-loader.ts<br/><i>MicroappHost owner<br/>depth-first agents verify here</i>"]
+        LOADER["microapp-loader.ts<br/><i>MicroappHost owner<br/>depth-first agents verify here</i>"]
     end
 
     %% Module author path (green)

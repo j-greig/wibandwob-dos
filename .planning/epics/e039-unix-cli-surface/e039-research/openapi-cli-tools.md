@@ -406,7 +406,7 @@ Do you need a CLI tool right now?
 ### Research Path
 1. Implement commander.js MVP
 2. Test with WibWob API
-3. Document in `.agents/module-dev/openapi-cli-generator.md`
+3. Document in `.agents/microapp-dev/openapi-cli-generator.md`
 4. Evaluate oclif if CLI usage grows
 
 ---
@@ -414,11 +414,11 @@ Do you need a CLI tool right now?
 ## File Structure for MVP Implementation
 
 ```
-modules/wibwob-api-cli/
+microapps/wibwob-api-cli/
 ├── index.ts              # Module entry point
 ├── cli-builder.ts        # OpenAPI→command registration
 ├── command-executor.ts   # Execute commands, format output
-├── module.json           # Module metadata
+├── microapp.json           # Module metadata
 └── README.md             # Usage guide
 ```
 

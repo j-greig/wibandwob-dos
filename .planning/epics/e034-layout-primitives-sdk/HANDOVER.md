@@ -120,7 +120,7 @@ decisions. Read the corrections first.
 ### F00 — Layout vocabulary decision doc
 
 Write `layout-vocabulary.md` in this epic dir. This is the canon reference
-that module authors and agents read. Contents:
+that microapp authors and agents read. Contents:
 
 1. Two-primitive model (flex + grid) with when-to-use heuristic
 2. Full naming table (current → canon → CSS equivalent)
@@ -157,8 +157,8 @@ Responsive column collapse, auto-sized tracks. Port dashboard only.
 | src/core/ui-parts.ts | Current SDK layout primitives (createStack, createColumns, UiPart) |
 | src/services/microapp-sdk.ts | SDK re-exports |
 | src/core/panel-layout.ts | layoutColumns (zine pattern, stays here) |
-| modules/hello-world/index.ts | Proving ground with inlined createGrid, pickBreakpoint, compass |
-| modules/dashboard/index.ts | Main grid port candidate |
+| microapps/hello-world/index.ts | Proving ground with inlined createGrid, pickBreakpoint, compass |
+| microapps/dashboard/index.ts | Main grid port candidate |
 
 ---
 

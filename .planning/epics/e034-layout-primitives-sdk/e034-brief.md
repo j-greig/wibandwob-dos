@@ -142,5 +142,5 @@ Three primitives built inline and validated:
 ## Evidence
 
 - Layout audit: `.planning/chores/menu-nav-figlet-audit/chore-audit-layout-primitives.txt`
-- Hello-world v2 proving ground: `modules/hello-world/index.ts`
+- Hello-world v2 proving ground: `microapps/hello-world/index.ts`
 - Vendor comparison (blessed-contrib Grid, Textual Grid): audit section 3-4

@@ -54,7 +54,7 @@ This feature can respect that cleanly:
 - composition root: [src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts)
 - command source of truth: [src/core/command-catalog.ts](/Users/james/Repos/wibandwob-dos/src/core/command-catalog.ts)
 - command execution layer: [src/core/command-registry.ts](/Users/james/Repos/wibwob-dos/src/core/command-registry.ts)
-- dynamic microapps: [src/services/module-loader.ts](/Users/james/Repos/wibandwob-dos/src/services/module-loader.ts)
+- dynamic microapps: [src/services/microapp-loader.ts](/Users/james/Repos/wibandwob-dos/src/services/microapp-loader.ts)
 - canonical window operations: [src/core/window-facade.ts](/Users/james/Repos/wibandwob-dos/src/core/window-facade.ts)
 - canonical desktop state: [src/services/state-service.ts](/Users/james/Repos/wibandwob-dos/src/services/state-service.ts)
 - local HTTP control surface: [src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/src/services/control-api.ts)
@@ -80,7 +80,7 @@ Relevant files:
 
 - terrain model: [src/services/terrain-model.ts](/Users/james/Repos/wibwob-dos/src/services/terrain-model.ts)
 - terrain render: [src/services/terrain-render.ts](/Users/james/Repos/wibwob-dos/src/services/terrain-render.ts)
-- overworld microapp: [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
+- overworld microapp: [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
 
 ## External Reference: `pirc-extension`
 
@@ -230,7 +230,7 @@ It should eventually expose:
 - commands to move, inspect, and enter a chatspot
 
 This belongs in:
-- [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
+- [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
 
 But the world simulation and chat routing should stay in services.
 
@@ -240,13 +240,13 @@ The frontend should be a first-class WibWob-DOS surface.
 
 Good implementation options:
 - dedicated built-in window factory under `src/windows/`
-- or a private microapp under `modules-private/`
+- or a private microapp under `microapps-private/`
 
 Recommendation:
 - start as a private microapp for faster iteration, similar to `WibWobWorld`
 
 Example target:
-- `modules-private/world-chatroom/index.ts`
+- `microapps-private/world-chatroom/index.ts`
 
 What it shows:
 - channel title

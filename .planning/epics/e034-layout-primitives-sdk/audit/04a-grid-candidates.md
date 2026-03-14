@@ -20,7 +20,7 @@
 
 ## Detailed Audit
 
-### 1. modules/dashboard/index.ts
+### 1. microapps/dashboard/index.ts
 
 **File Size**: ~700 lines  
 **Primary Construct**: blessed-contrib grid system
@@ -126,7 +126,7 @@ grid.addChild("marquee", { row: 2, col: [0, 2] }, marqueeBox);
 
 ---
 
-### 2. modules/dashboard-xxl/index.ts
+### 2. microapps/dashboard-xxl/index.ts
 
 **File Size**: ~400 lines  
 **Primary Construct**: Custom virtual canvas + blessed positioning
@@ -213,7 +213,7 @@ This module uses three distinct layout systems:
 
 ---
 
-### 3. modules/wibwob-tr808/index.ts
+### 3. microapps/wibwob-tr808/index.ts
 
 **File Size**: ~450 lines  
 **Primary Construct**: `host.ui.createStack()` vertical flex layout
@@ -276,7 +276,7 @@ Pure 1D vertical stack:
 
 ---
 
-### 4. modules/wibwob-tidepool/index.ts
+### 4. microapps/wibwob-tidepool/index.ts
 
 **File Size**: ~350 lines  
 **Primary Construct**: `host.ui.createStack()` vertical flex layout
@@ -535,10 +535,10 @@ const marqueeBox = blessed.box({
 
 ## Files Reviewed
 
-1. `/Users/james/Repos/wibandwob-dos/modules/dashboard/index.ts` (700 lines)
-2. `/Users/james/Repos/wibandwob-dos/modules/dashboard-xxl/index.ts` (400 lines)
-3. `/Users/james/Repos/wibandwob-dos/modules/wibwob-tr808/index.ts` (450 lines)
-4. `/Users/james/Repos/wibandwob-dos/modules/wibwob-tidepool/index.ts` (350 lines)
+1. `/Users/james/Repos/wibandwob-dos/microapps/dashboard/index.ts` (700 lines)
+2. `/Users/james/Repos/wibandwob-dos/microapps/dashboard-xxl/index.ts` (400 lines)
+3. `/Users/james/Repos/wibandwob-dos/microapps/wibwob-tr808/index.ts` (450 lines)
+4. `/Users/james/Repos/wibandwob-dos/microapps/wibwob-tidepool/index.ts` (350 lines)
 
 **Total Analyzed**: ~2,000 lines of layout code.
 

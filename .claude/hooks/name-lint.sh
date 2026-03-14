@@ -16,7 +16,7 @@ fi
 
 # Skip vendored / generated / private paths (match both absolute and relative)
 case "$FILE_PATH" in
-  */vendor/*|vendor/*|*/node_modules/*|node_modules/*|*/build/*|build/*|*/.git/*|.git/*|*/modules-private/*|modules-private/*)
+  */vendor/*|vendor/*|*/node_modules/*|node_modules/*|*/build/*|build/*|*/.git/*|.git/*|*/microapps-private/*|microapps-private/*)
     exit 0
     ;;
 esac

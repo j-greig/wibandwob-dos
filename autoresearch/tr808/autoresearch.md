@@ -3,8 +3,8 @@
 ## Objective
 
 Improve the TR-808 drum machine visual quality. Two files in scope:
-- `modules/wibwob-tr808/renderer.ts` — pure text renderer (layout, colours, characters)
-- `modules/wibwob-tr808/index.ts` — microapp host wiring (window size, key bindings)
+- `microapps/wibwob-tr808/renderer.ts` — pure text renderer (layout, colours, characters)
+- `microapps/wibwob-tr808/index.ts` — microapp host wiring (window size, key bindings)
 
 Score screenshots against a 5-axis rubric. Higher is better.
 

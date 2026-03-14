@@ -1,0 +1,30 @@
+{
+  "name": "Runtime Inspector",
+  "version": "0.1.0",
+  "description": "Proof microapp that inspects the live runtime through shared inspection APIs.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": [
+      "index.ts",
+      "microapp.json"
+    ],
+    "reopenCommand": "microapp.wibwob.runtime-inspector.open"
+  },
+  "microapp": {
+    "id": "wibwob.runtime-inspector",
+    "title": "Runtime Inspector",
+    "description": "Inspect the live runtime through the shared inspection seam.",
+    "menu": [
+      {
+        "category": "applications",
+        "order": 165,
+        "label": "Runtime Inspector"
+      }
+    ],
+    "palette": {
+      "order": 165,
+      "label": "Runtime Inspector"
+    }
+  }
+}

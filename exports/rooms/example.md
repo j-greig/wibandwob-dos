@@ -7,7 +7,7 @@ layout_path: workspaces/scramble-demo.json
 api_key_source: env
 max_visitors: 1
 preload_files:
-  - modules/example-primers/primers/ascii-cat.txt
+  - microapps/example-primers/primers/ascii-cat.txt
 ---
 
 # Scramble Cat Demo
