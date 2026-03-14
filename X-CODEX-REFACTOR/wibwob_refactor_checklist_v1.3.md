@@ -125,6 +125,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[x]` Remove dead command paths, shims, and docs once the replacement seams are proven
 - `[x]` Move uncertain files/docs into `.trash/` instead of leaving them ambiguously active
 - `[x]` Consolidate overlapping markdown into fewer stronger agent-facing docs
+- `[x]` Review docs again for agentic-friendliness and explicitly signpost the related scripts and live verification tools agents actually need
 - `[x]` Update `.planning` to match the landed architecture
 - `[x]` Fold the stable refactor shape into scripts and `bun run dev` workflows
 - `[x]` Preserve text-first whole-TUI capture as the default evidence path and PNG as secondary evidence

@@ -127,6 +127,16 @@ for i in $(seq 5); do wibwob editor.new; done
 wibwob cmd window.tile && wibwob screenshot
 ```
 
+Saved recipes also live in `scripts/`:
+
+- `bash scripts/cli-runtime-triage.sh` — capture health, inspection, state, and text screenshot into one evidence folder
+- `bash scripts/cli-batch-relayout.sh` — open a stable three-window scene and lay it out with one canonical batch op
+- `bash scripts/cli-text-loop.sh mask` — capture the desktop as text, transform it, and feed it back in as a primer
+
+These helper scripts are local-runtime-first. Override the target with
+`WIBWOB_SCRIPT_API=http://127.0.0.1:8098` when you intentionally want a
+different instance.
+
 ## Agent workflows
 
 Agents (Claude, Codex, etc.) use `wibwob` instead of raw `curl` calls.

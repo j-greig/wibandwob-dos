@@ -7,6 +7,15 @@ Create a directory under `modules/` with a `module.json` manifest and an
 gives you window creation, command registration, theme access, and screen
 rendering. Restart the app and your module appears in the menus.
 
+Terminology:
+
+- repo folder name: `modules/`
+- runtime concept: `microapp`
+- manifest file: `module.json`
+
+This repo still says "module" in many filenames and scripts because that is the
+filesystem/container unit. At runtime these are microapps.
+
 ## Quick start
 
 Use the scaffold script to create a new module:
@@ -16,8 +25,17 @@ bash scripts/scaffold-microapp.sh modules/my-app wibwob.myapp "My App" 150
 ```
 
 This creates `modules/my-app/module.json` and `modules/my-app/index.ts` with
-working boilerplate. Restart the app and "My App" appears in the Applications
-menu and command palette.
+working boilerplate. Restart the app or run `wibwob cmd modules.reload` and
+"My App" appears in the Applications menu and command palette.
+
+Related scripts and tools:
+
+- `bash scripts/scaffold-microapp.sh ...` — scaffold a new microapp module
+- `wibwob cmd modules.reload` — canonical module-only reload path
+- `bun run watch:microapp -- modules/my-app --open` — best-effort reopen loop
+- `bash scripts/restart.sh` — required when you changed `src/` host code
+- `./scripts/screenshot-window.sh "My App"` — text-first visual proof
+- `tmux attach -t wibwob` — look at the actual TUI, not only `/state`
 
 ## Directory structure
 
@@ -62,6 +80,22 @@ Key fields:
 - `palette` — where the app appears in the command palette
 - `agent` — whether the Wib&Wob agent can open this app
 - `api` — whether the control API can open this app
+
+Optional top-level dev fields:
+
+- `dev.watch` — relative files or directories to watch for module-only reload
+- `dev.reopenCommand` — command to run after `modules.reload` when a watcher is
+  hot-reopening the module's windows
+- `dev.reopenArgs` — JSON args passed to that reopen command
+
+Example:
+
+```json
+"dev": {
+  "watch": ["index.ts", "module.json"],
+  "reopenCommand": "microapp.wibwob.myapp.open"
+}
+```
 
 ## The entry point: index.ts
 
@@ -175,6 +209,50 @@ host.registerCommand({
 
 Without `direct: true`, the host may focus/open a window and swallow the
 return value.
+
+## Fast reload loop
+
+Module-only changes do not need a full shell restart anymore.
+
+```bash
+bun run typecheck
+wibwob cmd modules.reload
+```
+
+For edit-save-reload during development, there is also an experimental watcher:
+
+```bash
+bun run watch:microapp -- modules/my-app --open
+```
+
+What it tries to do:
+
+- watches `dev.watch` entries from `module.json` or defaults to `index.ts,module.json`
+- runs `modules.reload`
+- if the module is already open, attempts a close → reload → reopen cycle using `dev.reopenCommand`
+- attempts to restore the reopened window geometry
+
+Current status:
+
+- `modules.reload` itself is stable and is the canonical module-only reload path
+- hot-swapping an already-open module window is still best-effort
+- reliable full window-state handoff is a later abstraction task, not part of
+  the stable refactor contract
+
+## Input ownership
+
+Global app cycling no longer owns bare `Tab`.
+
+- use `Tab` and `Shift-Tab` inside your microapp when they are useful
+- the shell-level app-cycle path is `Meta-Tab` / `Meta-Shift-Tab`
+- if your terminal does not send those chords cleanly, expose an in-app fallback
+  key as well
+- some modules can be reopened cleanly, but reliable state handoff needs a
+  higher-level host abstraction than this refactor should build
+
+Use the watcher as scaffolding during development, not as a guaranteed hot
+module runtime. If you need certainty, close the module window first or fall
+back to a shell restart.
 
 ### host.screen
 

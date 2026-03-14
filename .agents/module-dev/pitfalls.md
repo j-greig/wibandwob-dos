@@ -38,6 +38,7 @@ a function call.
 |---------|-----|
 | `host.theme()` called once at startup, stored in variable | Call `host.theme()` fresh inside `onRestyle` and in render functions |
 | `win.screen` for rendering | Use `host.screen` — there is no `win.screen` |
+| Passing partial nested `style` objects to raw blessed widgets | Normalize nested shapes like `style.item` / `style.selected` before constructing the widget, or blessed can crash on missing fields |
 
 ## Commands
 
@@ -88,3 +89,9 @@ a function call.
 |---------|-----|
 | Code changes have no effect after restart | The old process is still alive on the port. Check the session ID: `curl /health` — if it matches the old one, the kill didn't work. Use `kill -9 $(lsof -ti:8099)` as last resort, then `reset` the terminal. |
 | `kill $(cat scratch/wibwob.pid)` and restart, but same session ID | PID file is stale or SIGTERM was ignored. Always verify the session ID changed after restart. |
+
+## Input ownership
+
+| Mistake | Fix |
+|---------|-----|
+| Assuming bare `Tab` is reserved by the shell for app cycling | It is microapp territory now. Use `Tab` locally when helpful. Shell-level app cycling moved to `Meta-Tab` / `Meta-Shift-Tab`. |

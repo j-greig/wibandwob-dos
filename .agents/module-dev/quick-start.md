@@ -10,6 +10,10 @@ bash scripts/scaffold-microapp.sh modules/my-app wibwob.myapp "My App" 150
 
 Creates `modules/my-app/module.json` + `modules/my-app/index.ts`.
 
+Repo naming note:
+- files live under `modules/`
+- the runtime surface is a microapp
+
 ## 2. The five imports you always need
 
 ```typescript
@@ -58,9 +62,22 @@ function openMyApp(host: MicroappHost) {
 
 ```bash
 bun run typecheck
-bash scripts/restart.sh
+wibwob cmd modules.reload
 curl -s http://127.0.0.1:8099/state | grep -i myapp
+./scripts/screenshot-window.sh "My App"
 ```
+
+If you changed `src/` host code instead of `modules/*`, use `bash scripts/restart.sh`.
+
+Optional, experimental loop:
+
+```bash
+bun run watch:microapp -- modules/my-app --open
+```
+
+This builds on the stable `modules.reload` path but best-effort reopens the
+module window. Use it as development scaffolding, not as a guaranteed live
+state-preserving hot-reload system.
 
 ## Next steps
 
@@ -69,3 +86,6 @@ curl -s http://127.0.0.1:8099/state | grep -i myapp
 - Advanced SDK primitives: `sdk-reference.md`
 - Workspace persistence: `persistence.md`
 - Common mistakes: `pitfalls.md`
+- Visual TUI proof: `tmux attach -t wibwob`
+- Stable scaffold: `scripts/scaffold-microapp.sh`
+- Experimental reload loop: `scripts/watch-microapp.ts`

@@ -56,6 +56,37 @@ in real code. This is a reference catalogue, not a starting template.
 **Copy from it:** individual primitive usage patterns — grep for the
 one you need.
 
+## Tier 4b: Runtime utility — `modules/command-lab/`
+
+A small operator-first microapp that runs shared runtime commands and
+persists its own selected command/log state through workspace restore.
+
+**Shows:** `host.runGlobalCommand(...)`, list-driven command execution,
+workspace persistence via `registerSnapshot`, compact utility UI, and
+describeState fields that expose command/log semantics to the API.
+
+**Start here if:** your module is more about driving host services than
+inventing a big bespoke UI, or if you need a concrete example of
+snapshot/restore without external APIs.
+
+**Copy from it:** shared-command invocation, minimal snapshot payloads,
+utility-first text capture.
+
+## Tier 4c: Runtime inspection — `modules/runtime-inspector/`
+
+A proof microapp that reads the shared runtime inspection seam and
+renders it through tabs and scrollable panes.
+
+**Shows:** `fetchRuntimeInspection()`, `fetchRuntimeCommands()`,
+`createTabs`, scrollable panes, and structured `describeState` for a
+host-service consumer.
+
+**Start here if:** your module is a read-only or inspector-style surface
+that should consume host APIs rather than own host behavior.
+
+**Copy from it:** inspection fetch patterns, text-first debugging panes,
+tabbed operator UI.
+
 ## Other useful references
 
 | Module | What it shows |

@@ -43,6 +43,27 @@ The next quality bar for module development is agent ergonomics:
 - editing module TS and seeing the change reflected is as close to instant as the architecture safely allows
 - hot reload is either shipped as an explicit opt-in or clearly documented as not yet safe for certain module classes
 
+## Current Refactor Outcome
+
+- landed: canonical `modules.reload` command for module-only reloads
+- landed: `scripts/watch-microapp.ts` prototype and `dev.watch` / `dev.reopenCommand` manifest scaffolding
+- landed: richer Runtime Inspector proof microapp
+- landed: `modules/command-lab/` proof microapp covering shared command execution + snapshot restore
+- not yet claimed as solved: reliable hot-swapping of already-open module windows
+
+## Why Hot Reload Is Still Parked
+
+The remaining hard part is not command reload, it is safe window replacement:
+
+- identifying live windows by semantic module ownership
+- closing them without racing `focusOrCreate`
+- reopening them with correct geometry and state handoff
+- deciding when module-local state can be recreated vs must be restored
+
+That needs a slightly higher-level host/runtime abstraction than this refactor
+should invent mid-stream. Keep the scaffolding, but treat full hot window swap
+as a post-refactor follow-on.
+
 ## Notes
 
 - prefer module-only reload over full shell restart whenever the change is confined to `modules/*`

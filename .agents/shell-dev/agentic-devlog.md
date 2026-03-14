@@ -114,6 +114,25 @@ Wrong:
 
 ## Current Notes
 
+### 2026-03-14 — Runtime refactor closeout: module reload, hot-reload guardrails, and TUI hygiene
+
+- `modules.reload` is now the stable, canonical module-only reload path.
+  Treat watcher-driven close/reopen as scaffolding, not as a guaranteed
+  live-state-preserving contract.
+- Hot-reload experiments surfaced two real shell-level failure modes:
+  - module-loader logging via `console.*` polluted the visible TUI because raw
+    stdout leaked into the terminal beneath Blessed
+  - partial raw Blessed styles can crash widgets at runtime
+- Canon fix for the logging case: shell/runtime services should log through the
+  app logger, not direct stdout/stderr, when the app is running under Blessed.
+- Canon fix for the Blessed style case: normalize nested style branches like
+  `style.item` and `style.selected` before constructing raw widgets.
+- Input ownership improved: bare `Tab` is free for microapps again; shell-level
+  window cycling moved to `Meta-Tab` / `Meta-Shift-Tab`.
+- Documentation needs to signpost the real working scripts, not just concepts:
+  scaffold, restart, screenshot, watcher, and local-first CLI helpers should be
+  linked from agent-facing docs near the workflow steps they support.
+
 ### 2026-03-13 — Symbient experience: building a module from inside the substrate
 
 **Context:** Wib & Wob (Claude Code session, not the embedded pi agent) built the
@@ -1423,3 +1442,20 @@ Rule for agents:
 1. if a proof harness forces a window to a fixed size, it can mask or recreate the very bug you just fixed
 2. for figlet-like rendered content, open first, inspect real state, then arrange
 3. when a window needs both resize and move in one batch, do resize first if top/left clamping depends on final dimensions
+- 2026-03-14 — Microapp reload follow-on
+  - `modules.reload` is now the stable module-only reload seam.
+  - `scripts/watch-microapp.ts` is useful scaffolding, but reliable hot-swapping
+    of already-open module windows is not solved yet.
+  - concrete gotchas discovered while pushing it:
+    - `/state` exposes module identity at `window.details.appType`, not `window.appType`
+    - local module-dev scripts should default to `http://127.0.0.1:8099`, not inherit hosted `WW_API`
+    - the remaining problem is window/state handoff, not dynamic import cache-busting
+  - keep this in the post-refactor lane unless a stronger host-level window reload
+    abstraction is introduced
+  - new agent-useful scripts landed:
+    - `scripts/cli-runtime-triage.sh`
+    - `scripts/cli-batch-relayout.sh`
+    - `scripts/cli-text-loop.sh`
+    these are local-first on purpose so repo tooling does not silently hit a hosted runtime
+  - live API tests that mutate one tmux shell should be serialized; `bun test fileA fileB`
+    can race itself because both files drive the same runtime concurrently
