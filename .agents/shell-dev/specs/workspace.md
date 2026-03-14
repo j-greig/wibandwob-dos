@@ -1,8 +1,9 @@
 ---
 subsystem: workspace
-covers: WorkspaceService, workspace save/restore flow, WindowSnapshot schema, default.json
+covers: WorkspaceService, RuntimeWorkspaceService, workspace save/restore flow, WindowSnapshot schema, default.json
 files:
   - src/services/workspace-service.ts
+  - src/application/runtime-workspace-service.ts
   - src/core/app-controller.ts (saveWorkspace, restoreWorkspace, boot restore)
   - src/core/types.ts (WindowSnapshot)
 triggers:
@@ -13,15 +14,17 @@ triggers:
 ## Overview
 
 WorkspaceService handles named JSON workspace files in scratch/workspaces/.
-On boot, app-controller restores the default workspace. Windows serialise themselves via
-describeState() and restore via per-kind factory functions. The restore flow is synchronous
-per window but async callbacks exist; race conditions are the most common failure mode.
+RuntimeWorkspaceService owns save/load semantics across boot restore, TUI prompts,
+command actions, and control API endpoints.
+Windows serialise themselves via describeState() and restore via per-kind factory
+functions. The restore flow is synchronous per window but async callbacks exist; race
+conditions are the most common failure mode.
 
 ## Key Files
 
-- src/services/workspace-service.ts — save(), load(), list(), exists(), path getter
-- src/core/app-controller.ts:394 — boot restore (restoreFromWorkspace)
-- src/core/app-controller.ts:1719 — loadWorkspace (runtime load)
+- src/services/workspace-service.ts — disk owner: save(), load(), list(), exists(), path getter
+- src/application/runtime-workspace-service.ts — shared save/load semantics for TUI/API/boot
+- src/core/app-controller.ts:394 — boot restore entrypoint and restore callbacks
 - src/core/types.ts — WindowSnapshot interface
 
 ## Snapshot Schema
@@ -57,10 +60,10 @@ Alt instance path: scratch/alt/workspaces/default.json (SCRATCH_DIR env)
 
 ## Save Flow
 
-1. app-controller calls windowManager.getWindows() to get all WindowRecords
-2. For each record: calls record.describeState?.() to get WindowStateDetails
-3. Builds WindowSnapshot from record geometry (frame.left/top/width/height) + details
-4. WorkspaceService.save(snapshots, currentTheme) writes to <workspaceDir>/<name>.json
+1. RuntimeWorkspaceService asks app-controller for current WindowSnapshots
+2. app-controller calls windowManager.getWindows() and record.describeState?.()
+3. WorkspaceService.save(snapshots, currentTheme) writes to <workspaceDir>/<name>.json
+4. RuntimeWorkspaceService persists state and returns a structured result
 5. Transient window types (command-palette, workspace-manager etc) are excluded from save
 
 Windows that don't implement describeState() are saved with minimal state and may not
@@ -68,12 +71,13 @@ restore correctly (appType will be missing from details).
 
 ## Restore Flow
 
-1. On boot: app-controller checks workspaceService.exists() for default
+1. On boot/API/TUI load: RuntimeWorkspaceService checks workspaceService.exists()
 2. Loads WorkspaceFile via workspaceService.load()
 3. If theme present: applies theme before creating windows
-4. For each WindowSnapshot in order: calls per-kind restore factory
-5. The factory that gets the snapshot is determined by snapshot.kind (not appType)
-6. One window is marked focused: after all windows created, focused window gets focus()
+4. RuntimeWorkspaceService clears current non-workspace windows for normal loads
+5. For each WindowSnapshot in order: app-controller calls per-kind restore factory
+6. The factory that gets the snapshot is determined by snapshot.kind (not appType)
+7. One window is marked focused: after all windows created, focused window gets focus()
 
 Restore factories are registered in app-controller per WindowKind:
   "editor"    → restoreEditorWindow(snapshot)
@@ -95,12 +99,13 @@ where possible. If async, only call focus() after the full restore loop complete
 
 ## Invariants
 
-1. describeState() MUST return { appType } — workspace restore uses appType to select factory
-2. Window geometry at save time is frame.left/top/width/height (integers, pixels) — NOT blessed % values
-3. version:2 envelope is the current format; v1 (bare array) is read-only compat
-4. WorkspaceService.sanitizeName() lowercases and strips special chars — "My Workspace" → "my-workspace"
-5. Only persistable window types (PersistableAppType) should be saved — transient types must be excluded
-6. The workspace directory is created automatically by save() if missing
+1. RuntimeWorkspaceService is the canonical owner for workspace save/load semantics
+2. describeState() MUST return { appType } — workspace restore uses appType to select factory
+3. Window geometry at save time is frame.left/top/width/height (integers, pixels) — NOT blessed % values
+4. version:2 envelope is the current format; v1 (bare array) is read-only compat
+5. WorkspaceService.sanitizeName() lowercases and strips special chars — "My Workspace" → "my-workspace"
+6. Only persistable window types (PersistableAppType) should be saved — transient types must be excluded
+7. The workspace directory is created automatically by save() if missing
 
 ## Failure Modes
 

@@ -1161,3 +1161,22 @@ wibwob window.resize --id $WID --width 60 --height 14
 Unix sockets = primary for local CLI/agent (fast, no port conflicts, discovery via ls *.sock).
 HTTP ports = keep for remote access, server deployments, xterm.js, PartyKit bridges.
 CLI should try socket first, fall back to HTTP. Same pattern as Docker daemon.
+
+---
+
+## 2026-03-14: Live workspace tests need a strict restart order
+
+The workspace round-trip tests are live API tests, not pure unit tests. If they are
+started while `scripts/restart.sh` is still in-flight, they fail with a burst of
+`ConnectionRefused` noise that looks like a product regression but is just bad test
+sequencing.
+
+**Rule for agents:** after touching `src/` internals that require restart:
+
+1. `bun run typecheck`
+2. `bash scripts/restart.sh`
+3. wait for `/health`
+4. then run live workspace/parity tests
+
+Do not launch live API tests in parallel with restart. They race the shutdown window and
+produce misleading failures.

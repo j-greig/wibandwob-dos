@@ -65,8 +65,8 @@ POST /windows/resize              {"id":N,"width":W,"height":H}
 POST /windows/close               {"id":N}
 POST /windows/editor/write        {"id":N,"text":"replacement or insert text"}
 POST /windows/text/export         {"id":N,"name":"optional-name"}
-POST /workspace/save              {"name":"workspace-name"}
-POST /workspace/load              {"name":"workspace-name"}
+POST /workspace/save              {"name":"workspace-name"}   ← name optional; omitted means current active workspace name
+POST /workspace/load              {"name":"workspace-name"}   ← name optional; omitted means current active workspace name
 ```
 
 ### Overlay Control
@@ -97,6 +97,7 @@ curl -s -X POST http://127.0.0.1:8099/overlay/confirm
 `POST /commands/run` accepts `{"id":"..."}` only. The older `command` alias is retired.
 API command execution is non-interactive by default. If a command would normally open a picker or prompt from the menu, API callers must pass explicit args instead.
 Window geometry APIs now accept canonical fields only: `left/top/width/height`.
+Workspace save/load semantics are owned by `RuntimeWorkspaceService`, so TUI prompts and `/workspace/*` now follow the same current-name behavior.
 
 ## Window Openers
 

@@ -38,12 +38,14 @@ import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
 import type { RuntimeWindowService } from "../application/runtime-window-service.js";
+import type { RuntimeWorkspaceService } from "../application/runtime-workspace-service.js";
 import type { InstanceDescriptor } from "../domain/instance-descriptor.js";
 
 interface ControlApiDeps {
   commands: RuntimeCommandService;
   inspection: RuntimeInspectionService;
   windows: RuntimeWindowService;
+  workspace: RuntimeWorkspaceService;
 }
 
 type ControlApiIdentity = Pick<InstanceDescriptor, "instanceId" | "instanceLabel">;
@@ -739,14 +741,16 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
-      const name = String((body as any).name ?? "default");
-      const result = this.runApiCommand("workspace.save", { name });
-      return Response.json({ ...result, name });
+      const rawName = (body as any).name;
+      return Response.json(
+        this.deps.workspace.save(typeof rawName === "string" ? rawName : undefined),
+      );
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
-      const name = String((body as any).name ?? "default");
-      const result = this.runApiCommand("workspace.load_named", { name });
-      return Response.json({ ...result, name });
+      const rawName = (body as any).name;
+      return Response.json(
+        this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
+      );
     }
 
     return new Response("not found", { status: 404 });

@@ -2,26 +2,26 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { OverlayManager } from "../core/overlay-manager.js";
-import type { WorkspaceService } from "./workspace-service.js";
+import type {
+  RuntimeWorkspaceResult,
+  RuntimeWorkspaceService,
+} from "../application/runtime-workspace-service.js";
 
 export function promptForWorkspaceSave(params: {
   overlays: OverlayManager;
-  workspace: WorkspaceService;
-  onSave: () => void;
-  onAfterChange?: () => void;
+  workspace: Pick<RuntimeWorkspaceService, "currentName" | "save">;
+  onResult?: (result: RuntimeWorkspaceResult) => void;
 }): void {
   params.overlays.openValuePrompt("Save Workspace As", params.workspace.currentName, (value) => {
-    params.workspace.setCurrentWorkspaceName(value);
-    params.onSave();
-    params.onAfterChange?.();
+    params.onResult?.(params.workspace.save(value));
   });
 }
 
 export function promptForWorkspaceLoad(params: {
   overlays: OverlayManager;
-  workspace: WorkspaceService;
+  workspace: Pick<RuntimeWorkspaceService, "currentName" | "list" | "load">;
   workspaceDir: string;
-  onLoad: () => void;
+  onResult?: (result: RuntimeWorkspaceResult) => void;
 }): void {
   const names = params.workspace.list();
   if (names.length === 0) {
@@ -36,7 +36,6 @@ export function promptForWorkspaceLoad(params: {
   }));
   const initialIndex = Math.max(0, names.findIndex((name) => name === params.workspace.currentName));
   params.overlays.openBrowserPrompt("Load Workspace", items, initialIndex, (item) => {
-    params.workspace.setCurrentWorkspaceName(item.value);
-    params.onLoad();
+    params.onResult?.(params.workspace.load(item.value));
   });
 }

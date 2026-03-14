@@ -161,6 +161,11 @@ import {
   createRuntimeWindowService,
   type RuntimeWindowService,
 } from "../application/runtime-window-service.js";
+import {
+  createRuntimeWorkspaceService,
+  type RuntimeWorkspaceResult,
+  type RuntimeWorkspaceService,
+} from "../application/runtime-workspace-service.js";
 import type {
   RuntimeInspectionSnapshot,
   RuntimeOverlayInspection,
@@ -211,6 +216,7 @@ export class TsTuiMvpApp {
   private readonly runtimeCommands: RuntimeCommandService;
   private readonly runtimeInspection: RuntimeInspectionService;
   private readonly runtimeWindows: RuntimeWindowService;
+  private readonly runtimeWorkspace: RuntimeWorkspaceService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
@@ -388,12 +394,22 @@ export class TsTuiMvpApp {
       commands: this.runtimeCommands,
       windows: this.windowManager,
     });
+    this.runtimeWorkspace = createRuntimeWorkspaceService({
+      workspace: this.workspace,
+      snapshotWindows: () => this.snapshotWindows(),
+      getThemeName: () => themeName(),
+      clearWindows: () => this.clearWorkspaceWindows(),
+      restoreWindows: (snapshots) => this.restoreWorkspaceSnapshots(snapshots),
+      applyThemeByName: (name) => this.applyThemeByName(name),
+      persistState: () => this.persistState(),
+    });
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
         commands: this.runtimeCommands,
         inspection: this.runtimeInspection,
         windows: this.runtimeWindows,
+        workspace: this.runtimeWorkspace,
       },
       {
         instanceLabel: this.instanceLabel,
@@ -467,28 +483,9 @@ export class TsTuiMvpApp {
 
   /** Restore default workspace on boot. Empty desktop if none exists. */
   private restoreDefaultWorkspace(): void {
-    if (!this.workspace.exists()) return;
-    try {
-      const { windows: snapshots, theme: savedTheme } = this.workspace.load();
-      if (savedTheme) {
-        const variant = allVariants().find((v) => v.name === savedTheme);
-        if (variant) {
-          setThemeVariant(variant);
-          this.applyTheme();
-        }
-      }
-      if (snapshots.length === 0) return;
-      let focusedWindow: WindowRecord | undefined;
-      for (const snapshot of snapshots) {
-        const restored = restoreWindowSnapshot(
-          snapshot,
-          this.getRestoreActions(),
-        );
-        if (snapshot.focused) focusedWindow = restored;
-      }
-      focusedWindow?.focus();
-    } catch {
-      // Corrupt workspace — start with empty desktop
+    const restored = this.runtimeWorkspace.restoreDefault();
+    if (restored && !restored.ok) {
+      log.app(`default workspace restore skipped: ${restored.error}`);
     }
   }
 
@@ -498,11 +495,7 @@ export class TsTuiMvpApp {
 
   /** Save workspace, quit, then send Up arrow to terminal so last command is ready to re-run. */
   private devRestart(): void {
-    try {
-      this.workspace.save(this.snapshotWindows(), themeName());
-    } catch {
-      /* best effort */
-    }
+    this.runtimeWorkspace.autoSave();
     this.runtimeStats.destroy();
     this.shellChrome.destroy();
     this.screen.destroy();
@@ -1368,19 +1361,56 @@ export class TsTuiMvpApp {
       .map((window) => serializeWindowSnapshot(window, focusedId));
   }
 
+  private applyThemeByName(name: string): void {
+    const variant = allVariants().find((candidate) => candidate.name === name);
+    if (!variant) {
+      return;
+    }
+    setThemeVariant(variant);
+    this.applyTheme();
+  }
+
+  private clearWorkspaceWindows(): void {
+    for (const window of this.windowManager.getWindows()) {
+      if (window.kind !== "workspace") {
+        window.close();
+      }
+    }
+  }
+
+  private restoreWorkspaceSnapshots(snapshots: WindowSnapshot[]): void {
+    let focusedWindow: WindowRecord | undefined;
+    for (const snapshot of snapshots) {
+      const restored = restoreWindowSnapshot(
+        snapshot,
+        this.getRestoreActions(),
+      );
+      if (snapshot.focused) {
+        focusedWindow = restored;
+      }
+    }
+    focusedWindow?.focus();
+  }
+
+  private flashWorkspaceResult(action: "save" | "load", result: RuntimeWorkspaceResult): void {
+    if (!result.ok) {
+      this.overlays.flash(result.error);
+      return;
+    }
+    this.overlays.flash(
+      action === "save"
+        ? `Saved workspace to ${result.path}`
+        : `Loaded workspace from ${result.path}`,
+    );
+  }
+
   private saveWorkspace(): void {
-    this.workspace.save(this.snapshotWindows(), themeName());
-    this.persistState();
-    this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
+    this.flashWorkspaceResult("save", this.runtimeWorkspace.save());
   }
 
   /** Auto-save current layout to the active workspace (silent, no flash). */
   private autoSaveWorkspace(): void {
-    try {
-      this.workspace.save(this.snapshotWindows(), themeName());
-    } catch {
-      /* best-effort — don't block quit */
-    }
+    this.runtimeWorkspace.autoSave();
   }
 
   private getRestoreActions(): WorkspaceRestoreActions {
@@ -1417,31 +1447,28 @@ export class TsTuiMvpApp {
   }
 
   saveWorkspaceNamed(name: string): void {
-    this.workspace.setCurrentWorkspaceName(name);
-    this.saveWorkspace();
+    this.flashWorkspaceResult("save", this.runtimeWorkspace.save(name));
   }
 
   private promptForWorkspaceSave(): void {
     promptForWorkspaceSave({
       overlays: this.overlays,
-      workspace: this.workspace,
-      onSave: () => this.saveWorkspace(),
-      onAfterChange: () => this.syncLiveState(),
+      workspace: this.runtimeWorkspace,
+      onResult: (result) => this.flashWorkspaceResult("save", result),
     });
   }
 
   private promptForWorkspaceLoad(): void {
     promptForWorkspaceLoad({
       overlays: this.overlays,
-      workspace: this.workspace,
+      workspace: this.runtimeWorkspace,
       workspaceDir: WORKSPACES_DIR,
-      onLoad: () => this.loadWorkspace(),
+      onResult: (result) => this.flashWorkspaceResult("load", result),
     });
   }
 
   loadWorkspaceNamed(name: string): void {
-    this.workspace.setCurrentWorkspaceName(name);
-    this.loadWorkspace();
+    this.flashWorkspaceResult("load", this.runtimeWorkspace.load(name));
   }
 
   private resolveSmearSource(args?: Record<string, unknown>): {
@@ -1677,47 +1704,7 @@ export class TsTuiMvpApp {
 
   /** Restore a workspace: apply theme, tear down existing windows, replay snapshots, restore focus. */
   private loadWorkspace(): void {
-    if (!this.workspace.exists()) {
-      this.overlays.flash(`Workspace file not found: ${this.workspace.path}`);
-      return;
-    }
-    let snapshots: WindowSnapshot[] = [];
-    let savedTheme: string | undefined;
-    try {
-      const loaded = this.workspace.load();
-      snapshots = loaded.windows;
-      savedTheme = loaded.theme;
-    } catch (error) {
-      this.overlays.flash(
-        `Cannot parse workspace: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
-    if (savedTheme) {
-      const variant = allVariants().find((v) => v.name === savedTheme);
-      if (variant) {
-        setThemeVariant(variant);
-        this.applyTheme();
-      }
-    }
-    for (const window of this.windowManager.getWindows()) {
-      if (window.kind !== "workspace") {
-        window.close();
-      }
-    }
-    let focusedWindow: WindowRecord | undefined;
-    for (const snapshot of snapshots) {
-      const restored = restoreWindowSnapshot(
-        snapshot,
-        this.getRestoreActions(),
-      );
-      if (snapshot.focused) {
-        focusedWindow = restored;
-      }
-    }
-    focusedWindow?.focus();
-    this.persistState();
-    this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
+    this.flashWorkspaceResult("load", this.runtimeWorkspace.load());
   }
 
   /** Action bridge between the command catalog/registry and concrete controller behaviour. */
