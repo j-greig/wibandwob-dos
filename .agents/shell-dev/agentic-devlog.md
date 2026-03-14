@@ -2329,3 +2329,47 @@ ww-shader off
 ww-shader list
 ww-shader status
 ```
+
+### Host-side microapp registry (COAT tier system)
+
+**Problem:** Needed a way to classify microapps into visibility tiers (core/beta/internal/disabled)
+across all surfaces (menu, palette, API, CLI, agent). Initial instinct was to add a `status` field
+to `microapp.json` — but that's a COAT violation. Status is a **host decision**, not an author decision.
+The microapp declares capabilities; the host decides presentation.
+
+**Solution:** `src/core/microapp-registry.ts` — a host-side registry mapping microapp IDs to tiers.
+The loader reads the registry at load time and filters command placements by tier.
+
+**Tier visibility matrix:**
+
+| Tier | Menu | Palette | API | Agent | Loaded |
+|------|------|---------|-----|-------|--------|
+| core | ✅ | ✅ | ✅ | ✅ | ✅ |
+| beta | ❌ | ✅ | ✅ | ✅ | ✅ |
+| internal | ❌ | ❌ | filter | ❌ | ✅ |
+| disabled | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**Key design decisions:**
+- Unregistered microapps default to `beta` (safe — visible but not promoted)
+- API `/commands/list` includes `tier` field on every command, supports `?tier=core` filter
+- Workspace-level overrides via `setDisabledOverrides(ids[], tiers[])` — lets saved workspaces
+  disable specific apps or whole tiers without editing the registry
+- `bun run check-coat` validates every microapp ID is covered in the registry
+
+**COAT lesson:** When you catch yourself adding a field to `microapp.json` that describes
+how the host should treat the microapp (rather than what the microapp does), stop.
+That's host-owned semantics leaking into the adapter. Put it in the host.
+
+**Current classification:** 7 core, 19 beta, 6 internal, 0 disabled.
+
+### `bun run check-coat` enforcement script
+
+Six automated checks, all passing:
+1. **Import boundary** — microapps only import from `microapp-sdk` (not `src/core/` or `src/services/`)
+2. **Orphan actionKeys** — every catalog `actionKey` has a handler in `app-controller`
+3. **Manifest completeness** — required fields present, entry file exists
+4. **Command ID format** — all IDs follow `<domain>.<action>` convention
+5. **Dead shim detection** — `runDynamic()` calls in controller resolve to real microapp commands
+6. **Registry coverage** — every microapp ID appears in `microapp-registry.ts`
+
+Run as a gate: `bun run check-coat`. Exit 1 on any violation.
