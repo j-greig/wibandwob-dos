@@ -1,5 +1,8 @@
 import os from "node:os";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { parseAppFlags, printHelp } from "./core/cli.js";
 import { createRuntimeNode } from "./runtime/runtime-node.js";
 
@@ -39,10 +42,36 @@ process.title = [
 // Respects SCRATCH_DIR for dual-instance isolation.
 fs.mkdirSync(runtimeNode.scratchBase, { recursive: true });
 fs.writeFileSync(runtimeNode.pidPath, String(process.pid), "utf8");
+
+// ─── Ghostty shader lifecycle ────────────────────────────────
+// Activate configured shader on start, deactivate on exit.
+// Set WIBWOB_GHOSTTY_SHADER env var to a shader name (e.g. "wibwob-crt")
+// or leave unset to skip. Only runs from the canonical repo path.
+const ghosttyShaderScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "ghostty-shader.sh");
+const ghosttyShader = process.env.WIBWOB_GHOSTTY_SHADER;
+const isGhostty = (process.env.TERM_PROGRAM || "").toLowerCase().includes("ghostty");
+
+function activateGhosttyShader() {
+  if (!ghosttyShader || !isGhostty) return;
+  try {
+    if (!fs.existsSync(ghosttyShaderScript)) return;
+    spawnSync("bash", [ghosttyShaderScript, "on", ghosttyShader], { stdio: "ignore" });
+  } catch {}
+}
+function deactivateGhosttyShader() {
+  if (!ghosttyShader || !isGhostty) return;
+  try {
+    if (!fs.existsSync(ghosttyShaderScript)) return;
+    spawnSync("bash", [ghosttyShaderScript, "off"], { stdio: "ignore" });
+  } catch {}
+}
+
+activateGhosttyShader();
+
 const removePid = () => { try { fs.unlinkSync(runtimeNode.pidPath); } catch {} };
-process.once("exit", removePid);
-process.once("SIGTERM", () => { removePid(); process.exit(0); });
-process.once("SIGINT",  () => { removePid(); process.exit(0); });
+process.once("exit", () => { removePid(); deactivateGhosttyShader(); });
+process.once("SIGTERM", () => { removePid(); deactivateGhosttyShader(); process.exit(0); });
+process.once("SIGINT",  () => { removePid(); deactivateGhosttyShader(); process.exit(0); });
 
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 

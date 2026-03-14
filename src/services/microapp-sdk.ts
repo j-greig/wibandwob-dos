@@ -332,6 +332,7 @@ export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Contour / terrain engine
 export { renderContourFromHills } from "./contour-engine.js";
+export type { ContourMode, ContourPlayer } from "./contour-engine.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYNTAX HIGHLIGHTING — for code-editing microapps

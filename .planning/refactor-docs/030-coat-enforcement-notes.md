@@ -89,3 +89,12 @@ These could be PR review prompts, or a periodic "COAT audit" skill.
 - **Command parity note**: The old `figlet.open` command in the catalog had `requires: ["bin.figlet"]`.
   Microapp manifests don't have a `requires` field yet. The figlet-service itself handles
   the fallback gracefully, but this is a manifest gap worth noting.
+
+- **Loader `registerCommand` accepted boolean menu/palette but crashed**: Passing
+  `menu: true` caused `def.menu?.map is not a function` because `true?.map` is
+  `undefined` and calling `undefined(...)` throws. Fixed with `Array.isArray` guard.
+  Same issue existed for `palette: true`. This was documented in the devlog (2026-03-10)
+  as a known friction point but never fixed in the loader itself until now.
+
+- **Log location**: App logs go to `logs/tui-app/YYYY-MM-DD.log`, NOT `scratch/logs/app.log`.
+  The scratch log is stale/legacy. Agents should check the dated log.

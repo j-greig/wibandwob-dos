@@ -118,7 +118,7 @@ import {
   openScrambleSmolPopup,
 } from "../windows/scramble-window.js";
 import { ScrambleBrain } from "../services/scramble-brain.js";
-import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
+
 import { openPlasmaWindow as openPlasmaStudioWindow } from "../windows/plasma-window.js";
 import {
   extractMoodFromText,
@@ -1052,13 +1052,9 @@ export class TsTuiMvpApp {
   }
 
   private openContourWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("contour-studio", () => {
-      openContourStudioWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    const result = this.commands.runDynamic("microapp.wibwob.contour.open");
+    if (!result.ok) this.overlays.flash(result.error);
+    return undefined;
   }
 
   private openTerrainLabWindow(): WindowRecord | undefined {

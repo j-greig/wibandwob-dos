@@ -1975,6 +1975,69 @@ rate in ~20 WPM steps (documented in build-ident.sh header).
 - [ ] `wibwob batch` CLI subcommand (batch positioning still needs raw curl)
 - [ ] agg aspect ratio: currently portrait-ish, may need ffmpeg landscape post-scale
 
+## 2026-03-14 — The single smartest addition to the project right now
+
+**Prompt:** "What's the single smartest and most radically innovative and accretive
+and useful and compelling addition you could make to the project at this point?"
+
+**Answer: Agent-authored microapps at runtime.**
+
+The Wib&Wob agent (or any connected agent) should be able to scaffold, write,
+hot-load, and open a microapp during a live session. Not as a hack — as a
+first-class documented capability.
+
+"Build me a dashboard that shows my git commit frequency" → agent writes
+`microapps/git-dashboard/microapp.json` + `index.ts` → calls `microapps.reload`
+→ calls `microapp.wibwob.git-dashboard.open` → window appears on the desktop.
+
+**Why this is the smartest move right now:**
+
+1. **The infrastructure is 95% there.** COAT landed. The microapp SDK is stable.
+   The scaffold script works. `microapps.reload` discovers new microapps. The
+   boolean menu bug we just fixed was literally the last blocker. An agent can
+   already do this — it's just not documented or reliable enough to be a feature.
+
+2. **It completes the symbient vision.** The project's identity is "dual operating
+   system" — human and agent as peers. Right now the agent can *use* tools. With
+   this, the agent *makes* tools. The OS extends itself through conversation.
+
+3. **It's uniquely accretive.** Every tool the agent builds stays as a microapp.
+   Session 1: "build me a timer." Session 2: the timer is already there. The
+   platform accumulates capability through use, not through planned development.
+
+4. **It's the most compelling YouTube demo imaginable.** Watch the AI build its own
+   window on a terminal desktop. In real time. Using the same SDK a human would use.
+   No other terminal project can do this.
+
+5. **It forces the SDK to be honest.** If an agent can't build a working microapp
+   from the SDK docs alone, the SDK docs are wrong. This is the ultimate test of
+   COAT compliance — the agent is a thin adapter too.
+
+**What's actually needed to ship this:**
+
+- [ ] Make `microapps.reload` reliably pick up *new* microapps (not just code changes
+  to existing ones) — mostly works already, needs hardening
+- [ ] Document the agent-authored microapp loop in a skill or prompt
+- [ ] Add a `host.pickFromList()` SDK method so agent-built microapps can use pickers
+  without reimplementing blessed lists
+- [ ] Consider a `microapps/scratch/` or `microapps/agent-built/` convention for
+  ephemeral microapps that aren't committed to the repo
+- [ ] The Wib&Wob agent's tool set already includes `write`, `bash`, and
+  `tui_run_command` — it can already do this. The gap is a skill/prompt that
+  teaches it the pattern.
+
+**What makes this different from "agent writes code":**
+
+Most agent coding is: write file → run tests → ship. This is: write file →
+the thing appears on screen as a living interactive surface → the agent and
+human can both use it immediately → it persists across sessions. The feedback
+loop is visual, immediate, and shared. The agent isn't writing code *for* the
+human — it's extending a shared environment they both inhabit.
+
+**Risk:** agent-built microapps will be messy. That's fine. They live in a
+scratch directory. The good ones get promoted to `microapps/` and cleaned up.
+The bad ones get deleted. The platform accumulates the winners.
+
 ## 2026-03-14 — COAT migration: host → microapp migration pattern
 
 ### Context
