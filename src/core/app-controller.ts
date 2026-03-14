@@ -169,6 +169,7 @@ import {
 import type {
   RuntimeInspectionSnapshot,
   RuntimeOverlayInspection,
+  RuntimeUiBlockerInspection,
 } from "../domain/runtime-inspection.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
@@ -364,31 +365,36 @@ export class TsTuiMvpApp {
       syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
       screenshotText: () => (this.screen as any).screenshot() as string,
-      getSnapshot: (): RuntimeInspectionSnapshot => ({
-        state: this.getDesktopState(),
-        stats: this.runtimeStats.snapshot(),
-        ui: {
-          menu: {
-            open: this.menuUi.isAnyMenuOpen(),
-            label: this.menuUi.getOpenMenuLabel(),
+      getSnapshot: (): RuntimeInspectionSnapshot => {
+        const blockers = this.getRuntimeUiBlockers();
+        return {
+          ui: {
+            menu: {
+              open: this.menuUi.isAnyMenuOpen(),
+              label: this.menuUi.getOpenMenuLabel(),
+            },
+            overlay: this.getRuntimeOverlayInspection(),
+            blockers,
+            blocked: blockers.length > 0,
           },
-          overlay: this.getRuntimeOverlayInspection(),
-        },
-        scramble: {
-          status: this.scrambleBrain.status,
-          sleeping: this.scrambleBrain.sleeping,
-          model: this.scrambleBrain.modelName,
-          sessionId: this.scrambleBrain.sessionId,
-          messageCount: this.scrambleBrain.history.length,
-          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
-          logPath: this.scrambleBrain.logPath ?? null,
-        },
-        history: this.scrambleBrain.history.map((m) => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-        })),
-      }),
+          state: this.getDesktopState(),
+          stats: this.runtimeStats.snapshot(),
+          scramble: {
+            status: this.scrambleBrain.status,
+            sleeping: this.scrambleBrain.sleeping,
+            model: this.scrambleBrain.modelName,
+            sessionId: this.scrambleBrain.sessionId,
+            messageCount: this.scrambleBrain.history.length,
+            lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+            logPath: this.scrambleBrain.logPath ?? null,
+          },
+          history: this.scrambleBrain.history.map((m) => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+          })),
+        };
+      },
     });
     this.runtimeWindows = createRuntimeWindowService({
       commands: this.runtimeCommands,
@@ -694,6 +700,7 @@ export class TsTuiMvpApp {
     }
     return {
       type: info.type,
+      label: typeof info.label === "string" ? info.label : undefined,
       selectedIndex:
         typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
       count: typeof info.count === "number" ? info.count : undefined,
@@ -701,6 +708,93 @@ export class TsTuiMvpApp {
         typeof info.currentDirectory === "string"
           ? info.currentDirectory
           : undefined,
+    };
+  }
+
+  private getRuntimeUiBlockers(): RuntimeUiBlockerInspection[] {
+    const blockers: RuntimeUiBlockerInspection[] = [];
+
+    if (this.menuUi.isAnyMenuOpen()) {
+      blockers.push({
+        kind: "menu",
+        type: "menu",
+        label: this.menuUi.getOpenMenuLabel(),
+        escapeCommands: ["menu.close", "desktop.clear-all"],
+      });
+    }
+
+    const overlay = this.getRuntimeOverlayInspection();
+    if (overlay) {
+      blockers.push({
+        kind: "overlay",
+        type: overlay.type,
+        label: overlay.label,
+        selectedIndex: overlay.selectedIndex,
+        count: overlay.count,
+        currentDirectory: overlay.currentDirectory,
+        escapeCommands: ["overlay.cancel", "desktop.clear-all"],
+        continueCommands:
+          overlay.type === "browser" ||
+          overlay.type === "file-browser" ||
+          overlay.type === "centered-list" ||
+          overlay.type === "list"
+            ? ["overlay.select", "overlay.confirm"]
+            : ["overlay.confirm"],
+      });
+    }
+
+    const pickerApi = this.getBackroomsPickerApi();
+    const pickerInfo =
+      typeof pickerApi?.info === "function" ? pickerApi.info() : null;
+    if (pickerInfo && typeof pickerInfo === "object") {
+      const info = pickerInfo as Record<string, unknown>;
+      blockers.push({
+        kind: "picker-window",
+        type: "backrooms-primer-picker",
+        label:
+          typeof info.theme === "string"
+            ? `Backrooms Primer Picker: ${info.theme}`
+            : "Backrooms Primer Picker",
+        windowId: this.findWindowByAppType("backrooms-primer-picker")?.id,
+        selectedIndex:
+          typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
+        count:
+          typeof info.filteredCount === "number" ? info.filteredCount : undefined,
+        escapeCommands: ["backrooms.picker.cancel", "desktop.clear-all"],
+        continueCommands: ["backrooms.picker.select", "backrooms.picker.confirm"],
+      });
+    }
+
+    return blockers;
+  }
+
+  private openSharedOverlayPicker(
+    openPicker: () => void,
+    missingOverlayError: string,
+  ): { ok: true; opened: true; type?: string; label?: string } | { ok: false; error: string } {
+    if (this.overlays.hasActiveOverlay()) {
+      const active = this.overlays.getActiveOverlayInfo();
+      return {
+        error:
+          active && typeof active.type === "string"
+            ? `Another overlay is already active: ${active.type}`
+            : "Another overlay is already active",
+        ok: false,
+      };
+    }
+
+    openPicker();
+
+    const active = this.overlays.getActiveOverlayInfo();
+    if (!active || typeof active.type !== "string") {
+      return { ok: false, error: missingOverlayError };
+    }
+
+    return {
+      ok: true,
+      opened: true,
+      type: active.type,
+      label: typeof active.label === "string" ? active.label : undefined,
     };
   }
 
@@ -1184,6 +1278,44 @@ export class TsTuiMvpApp {
       repoRoot: REPO_ROOT,
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
     });
+  }
+
+  private openPrimerPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => this.promptForPrimer(),
+      "Primer picker did not open",
+    );
+  }
+
+  private openEditorPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => this.editor.openPicker(),
+      "Text file picker did not open",
+    );
+  }
+
+  private openMarkdownPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => {
+        this.openMarkdownViewerWindow(undefined);
+      },
+      "Markdown picker did not open",
+    );
   }
 
   // Editor open/save/keypress behavior delegated to EditorCoordinator
@@ -1712,6 +1844,7 @@ export class TsTuiMvpApp {
     return {
       browsePrimers: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
+      openPrimerPicker: () => this.openPrimerPicker(),
       openPrimerPrompt: (args) => {
         const filePath =
           typeof args?.filePath === "string" ? args.filePath : undefined;
@@ -1723,8 +1856,7 @@ export class TsTuiMvpApp {
                 "primer.open requires filePath when called through a non-interactive control surface",
             };
           }
-          this.promptForPrimer();
-          return;
+          return this.openPrimerPicker();
         }
         const window = this.openPrimerWindow(filePath);
         if (!window) {
@@ -1763,6 +1895,7 @@ export class TsTuiMvpApp {
       fxShear: (args) => this.runFxScript("shear", args),
       fxBreed: (args) => this.runFxScript("breed", args),
       fxFlip: (args) => this.runFxScript("flip", args),
+      openEditorPicker: () => this.openEditorPicker(),
       openTextFile: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -1793,7 +1926,7 @@ export class TsTuiMvpApp {
                 "editor.open requires filePath, title, or initial when called through a non-interactive control surface",
             };
           }
-          this.editor.openPicker();
+          return this.openEditorPicker();
         }
       },
       openEditor: () => this.editor.openWindow(),
@@ -1824,6 +1957,7 @@ export class TsTuiMvpApp {
           typeof args?.filePath === "string" ? args.filePath : undefined;
         this.openPlasmaFromPrimer(filePath);
       },
+      openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -1835,6 +1969,9 @@ export class TsTuiMvpApp {
             error:
               "markdown.open requires filePath when called through a non-interactive control surface",
           };
+        }
+        if (!filePath) {
+          return this.openMarkdownPicker();
         }
         this.openMarkdownViewerWindow(filePath, undefined);
       },

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 
 import {
   createRuntimeWorkspaceService,
@@ -12,7 +12,7 @@ import { WorkspaceService } from "../services/workspace-service.js";
 
 const tempDirs: string[] = [];
 
-afterEach(() => {
+afterAll(() => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -77,8 +77,8 @@ describe("runtime workspace service", () => {
     const loadResult = runtimeWorkspace.load("My Workspace");
     expect(loadResult.ok).toBe(true);
     expect(cleared).toBe(1);
-    expect(appliedThemes).toEqual(["wibwob-dark"]);
-    expect(restored).toEqual([makeSnapshots()]);
+    expect(JSON.stringify(appliedThemes)).toBe(JSON.stringify(["wibwob-dark"]));
+    expect(JSON.stringify(restored)).toBe(JSON.stringify([makeSnapshots()]));
     expect(persistCalls).toBe(2);
   });
 

@@ -8,14 +8,29 @@ export interface RuntimeMenuInspection {
 
 export interface RuntimeOverlayInspection {
   type: string;
+  label?: string;
   selectedIndex?: number;
   count?: number;
   currentDirectory?: string;
 }
 
+export interface RuntimeUiBlockerInspection {
+  kind: "menu" | "overlay" | "picker-window";
+  type: string;
+  label?: string;
+  windowId?: number;
+  selectedIndex?: number;
+  count?: number;
+  currentDirectory?: string;
+  escapeCommands: string[];
+  continueCommands?: string[];
+}
+
 export interface RuntimeUiInspection {
   menu: RuntimeMenuInspection;
   overlay: RuntimeOverlayInspection | null;
+  blocked: boolean;
+  blockers: RuntimeUiBlockerInspection[];
 }
 
 export interface RuntimeScrambleInspection {

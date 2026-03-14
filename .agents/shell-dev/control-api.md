@@ -74,7 +74,7 @@ POST /workspace/load              {"name":"workspace-name"}   ← name optional;
 Modal overlays (value prompts, list pickers, browser prompts) can be driven via API:
 
 ```
-GET  /overlay/info                returns {"active":true/false,"type":"value|browser|file-browser|...", "selectedIndex"?, "count"?}
+GET  /overlay/info                returns {"active":true/false,"type":"value|browser|file-browser|...", "label"?, "selectedIndex"?, "count"?}
 POST /overlay/confirm             confirm active overlay (OK/Enter). Returns ok:false if none active.
 POST /overlay/cancel              cancel active overlay (Cancel/Escape). Returns ok:false if none active.
 POST /overlay/select              {"index":N} select item index in active browser/list/file-browser overlay.
@@ -98,6 +98,7 @@ curl -s -X POST http://127.0.0.1:8099/overlay/confirm
 API command execution is non-interactive by default. If a command would normally open a picker or prompt from the menu, API callers must pass explicit args instead.
 Window geometry APIs now accept canonical fields only: `left/top/width/height`.
 Workspace save/load semantics are owned by `RuntimeWorkspaceService`, so TUI prompts and `/workspace/*` now follow the same current-name behavior.
+`GET /runtime/inspection` now includes `ui.blocked` and `ui.blockers[]` so agents can see whether menus, overlays, or picker windows are blocking the desktop and which escape/continue commands apply.
 
 ## Window Openers
 
@@ -145,10 +146,13 @@ theme.set                               {"name":"wibwob-dark|wibwob-dark-nord|wi
 desktop.clear-all                       {} or {"all":true}   ← cancels overlays, closes menus, and clears the desktop; `all:true` nukes every window
 text.smear                              {"filePath":"…","mode":"wipe|shear|glitch|stretch"}
 primer.open                             {"filePath":"/abs/path.txt"}   ← no-arg picker is menu/TUI only
+primer.picker.open                      {}   ← intentionally open the shared primer picker overlay
 primer.browse                           {}
 primer-gallery.open                     {}
 editor.open                             {"filePath":"/abs/path.txt"} or {"title":"Scratch","initial":"text"}   ← no-arg picker is menu/TUI only
+editor.picker.open                      {}   ← intentionally open the shared text-file picker overlay
 markdown.open                           {"filePath":"/abs/path.md"}   ← no-arg picker is menu/TUI only
+markdown.picker.open                    {}   ← intentionally open the shared markdown picker overlay
 backrooms.open                          {"theme":"…","mode":"…","model":"…","turns":N}
 backrooms.picker.info                   {}   ← inspect Backrooms primer picker state
 backrooms.picker.select                 {"index":N}

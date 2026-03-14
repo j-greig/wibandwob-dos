@@ -80,11 +80,14 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ### Slice 3: File/Open and Overlay State Hardening
 
-- `[ ]` Inventory all file-open and picker-style flows
-- `[ ]` Decide for each flow whether shared overlay control is enough, an explicit command seam is needed, or the flow should be removed
-- `[ ]` Ensure every blocking state has a canonical continue/select/cancel path or `desktop.clear-all`
-- `[ ]` Expose blocked-state info through runtime inspection where it matters
-- `[ ]` Prefer command ids over bespoke new HTTP endpoints
+- `[x]` Inventory the first-pass file-open and picker-style flows worth hardening: primer, editor text file, markdown, shared overlays, Backrooms custom picker
+- `[x]` Decide the first-pass disposition:
+  - shared overlay flows get explicit `*.picker.open` entrypoints plus `overlay.*`
+  - Backrooms keeps dedicated `backrooms.picker.*` commands for now
+  - broader module-local picker migration is deferred
+- `[x]` Ensure every first-pass blocking state has a canonical continue/select/cancel path or `desktop.clear-all`
+- `[x]` Expose blocked-state info through runtime inspection where it matters
+- `[x]` Prefer command ids over bespoke new HTTP endpoints
 
 ### Slice 4: Runtime Node and Instance-Scoped Paths
 

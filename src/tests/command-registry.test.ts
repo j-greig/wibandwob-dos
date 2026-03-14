@@ -159,6 +159,8 @@ describe("state service", () => {
     expect(typeof data.snapshot.state.app.instanceId).toBe("string");
     expect(typeof data.snapshot.ui.menu.open).toBe("boolean");
     expect(data.snapshot.ui.overlay === null || typeof data.snapshot.ui.overlay.type === "string").toBe(true);
+    expect(typeof data.snapshot.ui.blocked).toBe("boolean");
+    expect(Array.isArray(data.snapshot.ui.blockers)).toBe(true);
     expect(typeof data.snapshot.stats.render.fps).toBe("number");
   });
 

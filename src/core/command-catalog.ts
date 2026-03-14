@@ -23,6 +23,7 @@ export interface AppMenuActions {
   browsePrimers: () => void;
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
+  openPrimerPicker: () => unknown;
   listPrimers: () => unknown;
   smearTextSurface: (args?: Record<string, unknown>) => unknown;
   fxGlitch: (args?: Record<string, unknown>) => unknown;
@@ -30,6 +31,7 @@ export interface AppMenuActions {
   fxBreed: (args?: Record<string, unknown>) => unknown;
   fxFlip: (args?: Record<string, unknown>) => unknown;
   openTextFile: (args?: Record<string, unknown>) => void;
+  openEditorPicker: () => unknown;
   openEditor: () => void;
   saveFocusedEditor: () => void;
   saveAsFocusedEditor: () => void;
@@ -98,6 +100,7 @@ export interface AppMenuActions {
   openPlasmaWindow: (args?: Record<string, unknown>) => void;
   openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   openMarkdownViewer: (args?: Record<string, unknown>) => void;
+  openMarkdownPicker: () => unknown;
   toggleMarkdownFiglet: () => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
@@ -291,6 +294,17 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     returns: "json"
   },
   {
+    id: "primer.picker.open",
+    label: "Open Primer Picker",
+    description: "Open the shared primer file-browser overlay intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openPrimerPicker",
+    palettePlacement: { order: 21 },
+    api: true,
+    agent: true,
+    returns: "json",
+  },
+  {
     id: "text.smear",
     label: "Smear Surface",
     description: "Run scripts/smear.py on a file-backed text surface. Args: filePath (string, optional; defaults to focused file-backed primer/reader/editor), mode (wipe|shear|glitch|stretch, default wipe), width (number, optional), at/tile/skew/seed/intensity (mode-specific options), openAs (primer|reader, optional). Returns {ok, filePath, windowId, sourcePath, kind, mode}.",
@@ -379,6 +393,17 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     })
   },
   {
+    id: "editor.picker.open",
+    label: "Open Text File Picker",
+    description: "Open the shared text-file browser overlay intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openEditorPicker",
+    palettePlacement: { order: 31 },
+    api: true,
+    agent: true,
+    returns: "json",
+  },
+  {
     id: "markdown.open",
     label: "Open Markdown...",
     description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Menu use can open the markdown picker; API/agent callers should pass filePath.",
@@ -392,6 +417,17 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     params: z.object({
       filePath: z.string().optional().describe("Absolute path to a markdown file"),
     })
+  },
+  {
+    id: "markdown.picker.open",
+    label: "Open Markdown Picker",
+    description: "Open the shared markdown picker intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openMarkdownPicker",
+    palettePlacement: { order: 33 },
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "markdown.toggle_figlet",

@@ -143,6 +143,9 @@ Important command-pipeline rule:
   If `editor.open`, `markdown.open`, `primer.open`, `figlet.open`, etc. need
   picker/prompt input, menu/TUI callers may use the interactive flow but API/agent
   callers must pass explicit args or they should receive `{ ok:false, error: ... }`.
+  If the intent is to automate the shared picker itself, use the explicit picker-open
+  commands (`primer.picker.open`, `editor.picker.open`, `markdown.picker.open`) and
+  then drive the overlay with `overlay.select/confirm/cancel`.
 
 ## Invariants
 
@@ -154,6 +157,9 @@ Important command-pipeline rule:
 4. describeState() is called synchronously by StateService.buildState() — it must be fast.
 5. The state cache is NOT thread-safe — all mutations happen on the single Bun event loop.
 6. GET /health must return ok:true before any other endpoint is reliable.
+7. `GET /runtime/inspection` is the canonical blocker view. If `ui.blocked` is true,
+   the caller should inspect `ui.blockers[]` for the correct escape/continue commands
+   instead of guessing how to dismiss the UI.
 
 ## Failure Modes
 
@@ -163,6 +169,7 @@ Important command-pipeline rule:
 | Window missing from /state | registerWindow() not called or window closed | GET /state first; re-open if needed |
 | POST /commands/run returns {ok:false} | Wrong command id, missing required args | GET /commands/list first; check exact id and arg names |
 | POST /commands/run returns 404 for editor.open/markdown.open/primer.open with no args | Non-interactive control surface blocked picker-style UI | Pass filePath/title/initial args explicitly, or use menu/TUI flow |
+| UI gets stranded by a failing live test | Test opened a blocking surface but did not cleanup on assertion failure | Use `try/finally` and always send `desktop.clear-all` in live API tests |
 | tui_move_window has no effect | Used "x"/"y" instead of "left"/"top" | Field names are left, top, width, height |
 | Wrong window targeted | Cached/guessed window ID | Always GET /state for fresh IDs before targeting |
 | /health returns connection refused | App not running or wrong port | Check CONTROL_API_PORT; run curl /health; restart if needed |
@@ -264,5 +271,6 @@ When adding a control API endpoint:
 | 2026-03-12 | gotcha | control-api | Some interstitials are module-local windows, not shared overlays: `overlay.*` won’t drive them → expose module/window picker commands (`*.picker.info/select/confirm/cancel`) until migrated to OverlayManager | Backrooms and Zine picker automation |
 | 2026-03-14 | correction | command-pipeline | `/commands/run` now accepts canonical `id` only, and API/agent execution is non-interactive by default so picker-style commands fail cleanly instead of hijacking the desktop | Refactor slice: shared runtime verbs + inspection seam |
 | 2026-03-14 | invariant | runtime-inspection | `GET /runtime/inspection` is the inspectable runtime seam for state + menu/overlay UI + stats + Scramble state/history | Refactor slice: runtime inspection consolidation |
+| 2026-03-14 | correction | control-api | Shared picker surfaces now have explicit command entrypoints (`primer.picker.open`, `editor.picker.open`, `markdown.picker.open`) and runtime inspection exposes `ui.blocked` + `ui.blockers[]` with escape/continue commands | Refactor slice: blocking flow hardening |
 | 2026-03-14 | invariant | window-control | `/windows/*` and agent window tools should route through the shared runtime window service rather than talking to `WindowFacade` directly from each interface | Refactor slice: shared runtime window verbs |
 | 2026-03-14 | correction | control-api | `/windows/move`, `/windows/resize`, and `/windows/batch` now require canonical geometry fields only: `left/top/width/height`; short-form `x/y/w/h` aliases are retired | Refactor slice: runtime window verbs cleanup |

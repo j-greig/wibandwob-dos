@@ -33,8 +33,14 @@ async function closeWindow(id: number) {
   await post("/windows/close", { id });
 }
 
+async function clearDesktop() {
+  await post("/commands/run", { id: "desktop.clear-all", args: { all: true } });
+  await new Promise(r => setTimeout(r, 250));
+}
+
 describe("editor open failure paths", () => {
   test("nonexistent file → opens empty buffer with that path", async () => {
+    await clearDesktop();
     const fakePath = path.join(os.tmpdir(), `wibwob-test-nonexistent-${Date.now()}.txt`);
     // Ensure it really doesn't exist
     try { fs.unlinkSync(fakePath); } catch {}
@@ -57,6 +63,7 @@ describe("editor open failure paths", () => {
   });
 
   test("title + initial with no filePath → opens unsaved buffer", async () => {
+    await clearDesktop();
     const before = await getEditorWindows();
     await post("/commands/run", {
       id: "editor.open",
@@ -80,6 +87,7 @@ describe("editor open failure paths", () => {
   });
 
   test("existing readable file → opens with content", async () => {
+    await clearDesktop();
     const tmpFile = path.join(os.tmpdir(), `wibwob-test-readable-${Date.now()}.txt`);
     fs.writeFileSync(tmpFile, "test content here", "utf8");
 
@@ -103,6 +111,7 @@ describe("editor open failure paths", () => {
   });
 
   test("no args via API → fails cleanly and leaves no overlay behind", async () => {
+    await clearDesktop();
     const result = await post("/commands/run", { id: "editor.open" });
     expect(result.status).toBe(404);
     expect(result.data.ok).toBe(false);

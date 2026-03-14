@@ -1180,3 +1180,34 @@ sequencing.
 
 Do not launch live API tests in parallel with restart. They race the shutdown window and
 produce misleading failures.
+
+---
+
+## 2026-03-14: Blocking UI flows need explicit entrypoints and guaranteed cleanup
+
+Problem pattern:
+
+- a command like `markdown.open` or `editor.open` can be correctly non-interactive by default
+- but agents still sometimes need to automate the shared picker itself
+- if the live test fails before cleanup, the picker stays open in the shared tmux session
+
+What shipped:
+
+- explicit shared-picker commands:
+  - `primer.picker.open`
+  - `editor.picker.open`
+  - `markdown.picker.open`
+- richer runtime inspection:
+  - `ui.blocked`
+  - `ui.blockers[]`
+  - overlay `label`
+  - per-blocker `escapeCommands` and `continueCommands`
+- `scripts/blocking-flow-check.sh`
+  - text-first shell smoke for opening, inspecting, cancelling, and continuing blocking flows
+
+Rule for agents:
+
+1. if you want the picker UI itself, call the explicit picker command
+2. inspect `/runtime/inspection`
+3. drive the blocker with the listed commands
+4. in live tests, use `try/finally` and always send `desktop.clear-all`
