@@ -373,7 +373,7 @@ Current: 2,244 lines, 10+ responsibilities, 32 imports.
 |----------|-------|-----------------|
 | `app-controller.ts` (slimmed) | ~600 | Constructor (service graph), startup, shutdown, global keybindings, render loop. Pure composition root. |
 | `action-bridge.ts` | ~500 | `getAppMenuActions()` factory function. Maps command IDs → controller method calls. |
-| `window-openers.ts` | ~400 | All `open*Window` methods. Becomes a registry-pattern factory: `openWindow(kind, args)`. |
+| `window-openers.ts` | ~400 | All `open*Window` methods extracted as plain functions grouped by domain (text, browser, generative, agent). No registry abstraction in phase 1. |
 | `services/fx-service.ts` | ~200 | `runFxScript()`, `smearTextSurface()` — Python shell-outs. |
 | `services/clipboard-service.ts` | ~80 | `copyFocusedWindowText()`, `exportFocusedWindowText()`. |
 
@@ -426,7 +426,7 @@ Current: 2,395 lines, 17 responsibility groups, 80+ exports.
 | `audio-player-controller.ts` | **EXTRACT** | Extract `findAudioFiles`/`resolveAudioPath`/`refreshFiles` → `audio-library.ts`. |
 | `backrooms-service.ts` | **KEEP** | Acceptable complexity. |
 | `brave-search-service.ts` | **EXTRACT** | Extract `htmlToMarkdown` → `html-to-markdown.ts` (shared with chrome-browser-service). |
-| `canvas-document.ts` | **KEEP** | Replace `restoreWindowEntry` switch with registry pattern (aligns with snapshot-registry). |
+| `canvas-document.ts` | **KEEP** | Keep explicit `restoreWindowEntry` mapping for now (clear and debuggable). Revisit only if repeated extension pain appears. |
 | `capability-service.ts` | **KEEP** | Accept probes as config instead of importing services directly. |
 | `chrome-browser-service.ts` | **EXTRACT** | Extract `htmlToMarkdown` → shared `html-to-markdown.ts`. Extract Google search → `google-search.ts` if it grows. |
 | `content-measurement.ts` | **KEEP** | Clean. |
@@ -574,7 +574,7 @@ Current: 327 lines, 7 window types, most unrelated.
 | File | Purpose | Contents |
 |------|---------|----------|
 | `src/core/action-bridge.ts` | Map command IDs to controller actions | `createActionBridge(controller): AppMenuActions` — the 520-line `getAppMenuActions()` method extracted as a standalone factory. |
-| `src/core/window-openers.ts` | Registry-pattern window opener | `WindowOpenerRegistry` — replaces 20+ individual `open*Window` methods on app-controller. Each window type registers an opener function. Adding a new window type requires zero changes to app-controller. |
+| `src/core/window-openers.ts` | Extracted window opener module | Plain opener functions extracted from app-controller and grouped by concern (`openTextWindows`, `openBrowserWindows`, `openGenerativeWindows`, `openAgentWindows`). Keep simple first; consider registry only if a concrete runtime registration need appears. |
 | `src/core/window-interaction.ts` | Drag, resize, double-click handlers | Mouse interaction logic extracted from `window-manager.ts`. |
 | `src/core/pid-file.ts` | PID file lifecycle | `writePidFile(dir): () => void` — write PID, return cleanup function. |
 | `src/core/overlays/browser-prompt.ts` | Browser-style search+preview prompt | `openBrowserPrompt()` extracted from `overlay-manager.ts`. |
@@ -711,51 +711,88 @@ The command surface files are marked **E039 zone** — they will be rethought:
 |------|------------------|------------|
 | `command-catalog.ts` | E039 auto-discovers commands from this. Don't restructure the `APP_COMMANDS` array format until E039 stabilises the `ww` CLI. | Prep: split data from projection functions. No structural change. |
 | `command-registry.ts` | E039 `ww` CLI will read from registry. Don't change the `CommandRegistry` interface. | Prep: extract legacy aliases. No interface change. |
-| `control-api.ts` | E039 Phase 2 adds Unix socket alongside HTTP. Don't migrate to Hono yet — that's a separate epic. | Prep: clean up `handleRequest` routing but keep structure. Socket listener is additive. |
-| `cli/wibwob.ts` | E039 replaces this with `cli/ww.ts`. `wibwob.ts` may be kept as legacy or deleted. | Rename to `ww.ts` when E039 starts. Current `wibwob.ts` becomes the prototype. |
+| `control-api.ts` | E039 Phase 2 adds Unix socket alongside HTTP. Don't migrate to Hono yet — that's a separate epic. | Freeze response shapes and command discovery semantics before E039. Only additive changes allowed pre-E039. |
+| `cli/wibwob.ts` | E039 decides final CLI naming and packaging (`wibwob` vs `ww`). | Treat current file as prototype. Do not rename in E042 unless E039 explicitly requires it. |
+
+### Agent Operability Contracts (new foundation requirement)
+
+These are architecture-level contracts, not optional UX polish.
+
+1. Every shared overlay/picker must expose deterministic control operations:
+   - inspect current options/state
+   - select by index/value
+   - confirm
+   - cancel
+2. API-triggered commands must not strand agents in interstitial UI with no control path.
+3. Query/control commands that return state MUST support direct structured responses (no focus wrappers swallowing results).
+4. Any menu/palette-visible command with required args must have one of:
+   - no-arg fallback,
+   - picker flow,
+   - or be removed from menu surfaces.
+5. Every meaningful interactive surface must expose semantic inspectability (`describeState`, inspect command, or equivalent API-visible state).
+6. Module loader/runtime failures must be visible through logs/state (not only terminal noise).
+7. Restart-required vs reload-safe changes must be explicit in docs and command help.
 
 ---
 
 ## 5. Incremental Migration Strategy
 
-### Wave 1: Zero-Risk Extractions (no behavior change)
+### Wave 0: Correctness + Operability Contracts (do first)
 
-These are pure mechanical moves — extract code to new files, add re-exports from old paths. Run `bun run typecheck` after each.
+These changes reduce real agent friction before high-churn splits.
 
-1. **Extract `ui-parts.ts`** into 9 files + barrel re-export
-2. **Extract `overlay-manager.ts`** into 5 prompt files + coordinator
-3. **Extract `window-ansi-constants.ts`** from duplicated `A` objects
-4. **Create `html-to-markdown.ts`** — deduplicate from two services
-5. **Create `src/tests/helpers/api-client.ts`** — deduplicate test helpers
-6. **Fix `canvas-types.ts`** layer inversion
+1. **Fix `canvas-types.ts` layer inversion** (`core -> modules` must be zero).
+2. **Document and enforce command operability contracts**:
+   - `direct: true` for query/control command paths,
+   - no-arg fallback/picker requirement for menu-visible commands,
+   - no interstitial trap states without control hooks.
+3. **Add overlay control/introspection surface** (`inspect/select/confirm/cancel`) for shared pickers.
+4. **Add restart-vs-reload guidance** in docs/help for module and src changes.
+5. **Ensure module/runtime failures are observable** through logs/state (not only terminal output).
 
-**Verification:** `bun run typecheck`. No runtime behavior changes. Each extraction is one commit.
+Verification: `bun run typecheck` + a focused operability smoke (open prompt, inspect options, select/confirm/cancel via command/API).
 
-### Wave 2: God-Object Decomposition
+### Wave 1: Small, high-signal deduplications
 
-7. **Split `app-controller.ts`** → `action-bridge.ts`, `window-openers.ts`, `fx-service.ts`, `clipboard-service.ts`
-8. **Split `wibwob-agent-session.ts`** → 5 agent tool files + slimmed session
-9. **Split `browser-windows.ts`** → 4 window files
-10. **Split `generative-windows.ts`** → 4 window files + deprecate companion
-11. **Extract `music-player-window.ts`** internals → `audio-analyser.ts`, `music-viz-modes.ts`
+Low-risk changes that improve consistency and reduce copy-paste debt.
 
-**Verification:** `bun run typecheck` + smoke test (menus, windows open/close, agent chat, music player).
+6. Extract `html-to-markdown.ts` and deduplicate `brave-search-service.ts` + `chrome-browser-service.ts`.
+7. Extract shared ANSI constants (`window-ansi-constants.ts`).
+8. Extract shared test API helpers (`src/tests/helpers/api-client.ts`).
+9. Extract shared draft-input helper (`ui-draft-input.ts`) for agent/scramble windows.
 
-### Wave 3: Service Splits
+Verification: `bun run typecheck` + targeted test updates.
 
-12. **Split `pi-session-bridge.ts`** → client + server
-13. **Split `module-loader.ts`** → discovery + host factory
-14. **Extract `terrain-render-firstperson.ts`**
-15. **Extract `audio-library.ts`** from audio-player-controller
-16. **Extract `backrooms-primer-picker.ts`**
+### Wave 2: Focused god-object seams (lowest churn first)
 
-**Verification:** `bun run typecheck` + full smoke.
+10. Split `app-controller.ts` → `action-bridge.ts`, `window-openers.ts`, `fx-service.ts`, `clipboard-service.ts`.
+11. Split `wibwob-agent-session.ts` → agent tool files + slim session orchestrator.
+12. Split `music-player-window.ts` internals → `audio-analyser.ts`, `music-viz-modes.ts`.
 
-### Wave 4: E039 Prep (do when E039 starts)
+Verification: `bun run typecheck` + menu, command, and agent-window smoke.
 
-17. Rename `cli/wibwob.ts` → `cli/ww.ts`
-18. Add `src/cli/completions.ts`, `src/cli/parse-flags.ts`, `src/cli/api-types.ts`
-19. Add Unix socket listener to `control-api.ts` (E039 Phase 2)
+### Wave 3: High-churn UI file decompositions
+
+13. Split `browser-windows.ts` into `document-reader-window.ts`, `file-manager-window.ts`, `primer-browser-window.ts`, `primer-gallery-window.ts`.
+14. Split `generative-windows.ts` and deprecate companion file.
+15. Split `ui-parts.ts` into focused `ui-*` modules with `ui-parts.ts` as compatibility barrel.
+16. Split `overlay-manager.ts` into prompt modules, WITH the operability contracts from Wave 0.
+
+Verification: `bun run typecheck` + visual smoke (reader, file manager, prompts, generative windows).
+
+### Wave 4: File-manager stage 2 (avoid renaming a giant blob)
+
+17. Move file-manager integrations (git/search/OS shell-outs) into services.
+18. Keep `file-manager-window.ts` focused on rendering/input orchestration.
+19. Extract reusable viewport helpers to core if reused by other windows.
+
+Verification: same behavior, smaller file-manager core, cleaner test seams.
+
+### Wave 5: E039 execution (separate epic)
+
+20. E039 decides CLI naming/packaging and transport evolution.
+21. Add Unix socket listener to `control-api.ts` as additive transport.
+22. Keep command discovery/response contracts stable while evolving CLI.
 
 ---
 
@@ -763,12 +800,12 @@ These are pure mechanical moves — extract code to new files, add re-exports fr
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Largest file | `ui-parts.ts` (2,395 lines) | `file-manager-window.ts` (~1,400 lines) — still big but single-purpose |
+| Largest file | `ui-parts.ts` (2,395 lines) | ≤900 lines (no single-file mega surface) |
 | God objects | 4 (`app-controller`, `ui-parts`, `browser-windows`, `wibwob-agent-session`) | 0 |
-| `core → services/` imports | 37 | ~15 (all from composition root + barrel) |
-| `core → windows/` imports | 13 | 0 from core proper; ~13 from `window-openers.ts` (composition layer) |
+| `core → services/` imports | 37 | concentrated in composition layer only |
+| `core → windows/` imports | 13 | concentrated in composition layer only (`window-openers.ts`) |
 | `core → modules/` imports | 1 | 0 |
-| Files > 1,000 lines | 5 | 1 (`file-manager-window.ts`, candidate for future split) |
+| Files > 1,000 lines | 7 | 0 |
 | Files with 5+ responsibilities | 4 | 0 |
 | Duplicated `htmlToMarkdown` | 2 copies | 1 shared |
 | Duplicated ANSI constants | 2 copies | 1 shared |
@@ -786,6 +823,10 @@ Considered but rejected. The engines (`contour-engine`, `plasma-engine`, `terrai
 ### Why keep `window-manager.ts` in core/ instead of extracting to its own folder?
 
 The window system (`window-manager`, `window-facade`, `window-chrome`, `window-interaction`) is core infrastructure — it's the kernel of the desktop metaphor. It belongs in `core/` alongside `types.ts` and `render-scheduler.ts`. A `src/window-system/` folder would be architecturally correct but adds navigation cost for 4 tightly-coupled files.
+
+### Why not introduce a WindowOpenerRegistry now?
+
+Because we do not have evidence it solves a real current pain. The immediate problem is extraction from `app-controller.ts`, not dynamic runtime registration. A plain `window-openers.ts` module is easier to reason about, easier to debug, and lower risk for incremental migration. If E039 or future module runtime work creates a concrete need for registration/discovery, we can introduce a registry later with real requirements.
 
 ### Why not use discriminated unions for WindowRecord?
 

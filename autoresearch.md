@@ -34,10 +34,13 @@ The 4 god objects and their targets:
 1. **typecheck must pass** — `bun run typecheck` is the gate
 2. **Backward compatible imports** — original files must still exist as re-export barrels
 3. **No functional regressions** — the app must boot and work
-4. **E039 zone: do not restructure** — `command-catalog.ts`, `command-registry.ts`, `control-api.ts` are being rethought by E039. Trim dead weight only, no structural changes
-5. **Blessed `as any` casts are permanent** — `.scrollTo()`, `.selected`, `.iwidth`, `.setValue()`, `'100%' as any` — these are @types gaps, not bugs
-6. **One logical change per iteration** — extract one file or fix one concern per step
-7. **Re-exports from old paths** — any extracted file must have its exports re-exported from the original file
+4. **E039 zone: do not restructure** — `command-catalog.ts`, `command-registry.ts`, `control-api.ts` are being rethought by E039. Trim dead weight only, no structural/interface changes
+5. **CLI naming is E039-owned** — do not rename `cli/wibwob.ts` in E042 unless E039 explicitly requires it
+6. **Blessed `as any` casts are permanent** — `.scrollTo()`, `.selected`, `.iwidth`, `.setValue()`, `'100%' as any` — these are @types gaps, not bugs
+7. **No speculative abstractions** — extract plain modules first; only add registry/factory layers when there is concrete runtime need
+8. **One logical change per iteration** — extract one file or fix one concern per step
+9. **Re-exports from old paths** — any extracted file must have its exports re-exported from the original file
+10. **Operability is mandatory** — no interactive interstitial flow without inspect/select/confirm/cancel control path
 
 ## How to score
 
@@ -50,33 +53,45 @@ Read these for deep understanding of each folder:
 - `autoresearch/solid-foundations/services-report.md` — 44 files in src/services/
 - `autoresearch/solid-foundations/windows-report.md` — 17 files in src/windows/
 - `autoresearch/solid-foundations/cli-tests-app-report.md` — CLI, tests, app entry
+- `autoresearch/solid-foundations/codex-architecture-review.md` — external critical review with 5-whys + E039 context
 
 ## Suggested iteration order
 
-The scoring dimensions are weighted. Work on the highest-weighted dimensions first:
+This order was revised using Codex review (`codex-architecture-review.md`) to prioritise real agent friction before large file churn.
 
-### Wave 1: God object decomposition (30% weight, currently 0)
-1. Extract `ui-layout.ts` from `ui-parts.ts` (stack, row, grid, flex functions)
-2. Extract `ui-chrome.ts` from `ui-parts.ts` (header, status bar, rule)
-3. Extract `ui-tabs.ts` from `ui-parts.ts` (tabbed container)
-4. Extract `ui-scroll-viewport.ts`, `ui-sidebar.ts`, `ui-selectable-list.ts`
-5. Extract `file-manager-window.ts` from `browser-windows.ts`
-6. Extract `document-reader-window.ts` from `browser-windows.ts`
-7. Extract `window-openers.ts` from `app-controller.ts`
-8. Extract `action-bridge.ts` from `app-controller.ts`
-9. Extract agent tool files from `wibwob-agent-session.ts`
+### Wave 0: Correctness + operability first
+1. Fix `canvas-types.ts` module import inversion (core must not import modules).
+2. Add explicit overlay control contracts (`inspect/select/confirm/cancel`) for shared pickers.
+3. Ensure query/control commands return structured data on direct paths (`direct: true` semantics).
+4. Enforce menu command rule: required args must have no-arg fallback or picker flow.
+5. Document restart-required vs reload-safe paths where agents actually trip.
 
-### Wave 2: Layer discipline (25% weight, currently 20)
-10. Fix `canvas-types.ts` module import (define shape in core)
-11. Move `skeleton-renderer.ts` service import to constructor injection
-12. Fix `types.ts` importing `content-measurement.ts` from services
-13. Fix `ui-parts.ts` importing `animation-service.ts`
+### Wave 1: Small, high-signal dedup work
+6. Extract shared `html-to-markdown.ts` and remove duplicate implementations.
+7. Extract shared ANSI constants for windows.
+8. Extract shared test HTTP helpers (`src/tests/helpers/api-client.ts`).
+9. Extract shared draft-input helper used by agent/scramble flows.
 
-### Wave 3: Deduplication + type safety (15% combined weight)
-14. Extract shared `html-to-markdown.ts` service
-15. Create `ansi-palette.ts` shared constants
-16. Extract shared `ui-draft-input.ts`
-17. Fix non-blessed `as any` casts (control-api, markdown-service, etc.)
+### Wave 2: Focused god-object seams (lower risk)
+10. Split `app-controller.ts` into `action-bridge.ts`, `window-openers.ts`, `fx-service.ts`, `clipboard-service.ts`.
+11. Split `wibwob-agent-session.ts` into tool-focused files.
+12. Extract `music-player-window.ts` visualiser/analyser internals.
+
+### Wave 3: High-churn splits (after contracts are stable)
+13. Split `browser-windows.ts` into dedicated window files.
+14. Split `ui-parts.ts` into focused `ui-*` files while keeping `ui-parts.ts` as a compatibility barrel.
+15. Split `overlay-manager.ts` into prompt modules, preserving operability contracts.
+16. Split `generative-windows.ts` and deprecate companion patterns.
+
+### Wave 4: File-manager stage 2
+17. Move file-manager git/search/OS integration logic into services.
+18. Keep `file-manager-window.ts` focused on rendering and input orchestration.
+19. Extract reusable viewport helpers to core when shared.
+
+### Wave 5: E039 execution (separate epic)
+20. E039 owns CLI naming/packaging and transport evolution.
+21. Add Unix socket transport to `control-api.ts` as additive behavior.
+22. Keep command discovery and response contracts stable while E039 lands.
 
 ## What NOT to do
 
