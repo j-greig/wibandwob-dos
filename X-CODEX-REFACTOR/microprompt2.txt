@@ -1,0 +1,49 @@
+ARCHITECTURE PRINCIPLE — CONSTRAINED EXPRESSIVENESS
+
+Adjust the design bias toward a small, stable semantic core with emergent complexity through composition.
+
+Do not increase the public surface area of the runtime unnecessarily.
+
+Prefer:
+- fewer primitives
+- fewer command verbs
+- fewer SDK entry points
+- stronger defaults
+- clearer lifecycle boundaries
+
+When evaluating new functionality, ask:
+
+1. Can this be expressed using existing runtime primitives?
+2. Can this be composed from existing commands or events?
+3. Would adding this enlarge the conceptual surface of the platform?
+4. Would a microapp implement this instead of the host runtime?
+5. Does this improve clarity or only convenience?
+
+Prefer adding **compositional power** rather than **new primitives**.
+
+The host runtime should remain small and opinionated.
+Microapps should generate diversity through recombination.
+
+Avoid:
+- proliferating component types
+- parallel mechanisms for similar behaviours
+- special-case APIs for single features
+- UI-driven logic embedded in runtime semantics
+- leaking internal complexity into the SDK
+
+Aim for a system where:
+- the primitive set is easy to memorise
+- commands and state transitions are legible
+- microapps remain small and predictable
+- agents can reason about the system with minimal context
+
+Complexity should emerge from:
+- composition
+- sequencing of commands
+- state relationships
+- interactions between microapps
+- peer interfaces acting on the same runtime
+
+Desired outcome:
+
+A platform where a small set of stable primitives can support many creative microapps without expanding the architectural vocabulary.

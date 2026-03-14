@@ -1,0 +1,57 @@
+COURSE ADJUSTMENT — RUNTIME-CENTRIC REFACTOR
+
+Refine the refactor direction toward a runtime-centric architecture with multiple peer interfaces over a shared semantic layer.
+
+Do not frame the system as a simple one-way stack of frontend → backend → adapter.
+
+Instead, assume:
+- several peer interfaces may both observe and mutate shared runtime state
+- interfaces are not privileged; each is a client of the same runtime semantics
+- interface-specific behaviour should be translated into shared commands, events, and state transitions
+- UI callbacks, CLI actions, and API handlers should converge on the same runtime verbs where possible
+- rendering and presentation should be downstream of shared runtime state, not the primary source of truth
+
+Engoals:
+- multiple instances of wibwobdos can be running alongside each other, each controlled by a human and / or multiple agents by any or all of the TUI/CLI/API
+- the API/CLI control surfaces use different ports [or other method] to ensure the multiple instances be be indepntaly controlled
+- wibwobdos is stateful and its current view/setup/filesystem can be captured to a workspace JSON file
+
+Prioritise extraction of:
+1. semantic verbs
+2. shared runtime state
+3. command/event dispatch
+4. inspectable runtime objects
+5. interface adapters
+
+Re-read the codebase looking specifically for hidden equivalents of:
+- stateful content objects
+- viewports / windows / regions
+- semantic commands
+- context-sensitive behaviours / modes
+- extension seams
+
+Use this lens when identifying Godfiles:
+- where are direct widget mutations bypassing shared semantics?
+- where do multiple interfaces implement the same behaviour separately?
+- where is state implicit inside view code?
+- where are domain objects missing and replaced by ad hoc UI structures?
+- where is command dispatch embedded inside event handlers rather than exposed as a stable layer?
+
+Desired architectural outcome:
+- peer interfaces over a shared runtime
+- shared verbs and state transitions
+- inspectable runtime objects
+- additive extension model
+- rendering as a projection of runtime state
+
+Refactor toward a system where a built-in inspection tool could discover and operate on:
+- commands
+- windows / regions
+- microapps
+- events
+- runtime state
+without private hacks.
+
+Do not over-generalise.
+Do not introduce abstract frameworks prematurely.
+Prefer a small semantic core, explicit runtime objects, and stable interface boundaries.
