@@ -1030,7 +1030,16 @@ function openAsciicker(host: MicroappHost) {
     sprite: { ch: string; fg: number; bg: number }[];
     name: string;
     patrolRadius: number;
+    hp: number;
+    maxHp: number;
+    hostile: boolean;
+    attackCooldown: number;
   }
+
+  // Player stats
+  let playerHp = 100;
+  const playerMaxHp = 100;
+  let playerAttackCooldown = 0;
 
   const npcs: NPC[] = [];
   const npcSprites = [
@@ -1064,6 +1073,10 @@ function openAsciicker(host: MicroappHost) {
       dy: (hash2d(worldSeed, i, 44) - 0.5) * 0.3,
       sprite: spriteType.cells, name: spriteType.name,
       patrolRadius: 5 + Math.floor(hash2d(i * 7, worldSeed, 55) * 8),
+      hp: spriteType.name === "Guard" ? 50 : 30,
+      maxHp: spriteType.name === "Guard" ? 50 : 30,
+      hostile: i >= 8, // last 4 NPCs are hostile
+      attackCooldown: 0,
     });
   }
 
@@ -1217,7 +1230,26 @@ function openAsciicker(host: MicroappHost) {
       // Clamp to terrain
       npc.x = Math.max(2, Math.min(terrain.w - 3, npc.x));
       npc.y = Math.max(2, Math.min(terrain.h - 3, npc.y));
+
+      // Hostile NPC combat — chase and attack player
+      if (npc.hostile && npc.hp > 0) {
+        const dToPlayer = Math.sqrt((npc.x - playerX) ** 2 + (npc.y - playerY) ** 2);
+        if (dToPlayer < 12) {
+          // Chase player
+          npc.dx = (playerX - npc.x) * 0.04;
+          npc.dy = (playerY - npc.y) * 0.04;
+        }
+        if (dToPlayer < 2 && npc.attackCooldown <= 0) {
+          playerHp = Math.max(0, playerHp - 5);
+          npc.attackCooldown = 8;
+          showMessage(`${npc.name} attacks! HP: ${playerHp}/${playerMaxHp}`);
+        }
+        if (npc.attackCooldown > 0) npc.attackCooldown--;
+      }
     }
+
+    // Player attack cooldown
+    if (playerAttackCooldown > 0) playerAttackCooldown--;
 
     // Render 3D scene
     const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs, npcs);
@@ -1281,9 +1313,10 @@ function openAsciicker(host: MicroappHost) {
     const msgDisplay = messageTimer > 0 ? `  💬 ${messageText}` : "";
     const weatherIcons: Record<Weather, string> = { clear: "☀", rain: "🌧", fog: "🌫", storm: "⛈" };
     const invStr = `♦${inventory.gem} ○${inventory.coin} ♣${inventory.herb} ≡${inventory.scroll}`;
+    const hpBar = `♥${playerHp}/${playerMaxHp}`;
     status.setContent(
       ` ⊕${Math.floor(playerX)},${Math.floor(playerY)}  ▲${alt}m  ${biomeName}  ` +
-      `${weatherIcons[weather]}${dayPhases[phaseIdx]}  ${invStr}  ` +
+      `${weatherIcons[weather]}${dayPhases[phaseIdx]}  ${hpBar}  ${invStr}  ` +
       `WASD Q/E ±zoom Space:talk` +
       msgDisplay
     );
@@ -1301,25 +1334,41 @@ function openAsciicker(host: MicroappHost) {
     messageTimer = duration;
   }
 
-  // NPC interaction — find nearest NPC and show dialogue
+  // NPC interaction — talk to friendly, attack hostile
   function interactWithNPC() {
     let nearest: typeof npcs[0] | null = null;
     let nearestDist = Infinity;
     for (const npc of npcs) {
+      if (npc.hp <= 0) continue;
       const d = Math.sqrt((npc.x - playerX) ** 2 + (npc.y - playerY) ** 2);
       if (d < nearestDist && d < 5) { nearestDist = d; nearest = npc; }
     }
     if (nearest) {
-      const dialogues: Record<string, string[]> = {
-        "Villager": ["Fine day for fishing!", "Watch out for wolves.", "The mountain path is treacherous."],
-        "Guard": ["Move along, citizen.", "The roads are safe... mostly.", "Report any suspicious activity."],
-        "Merchant": ["Finest goods in the land!", "Everything must go!", "Special price, just for you!"],
-      };
-      const lines = dialogues[nearest.name] ?? ["..."];
-      const line = lines[Math.floor(hash2d(tick, nearest.homeX, nearest.homeY) * lines.length)];
-      showMessage(`${nearest.name}: "${line}"`);
+      if (nearest.hostile) {
+        // Attack!
+        if (playerAttackCooldown <= 0) {
+          const damage = 10 + Math.floor(hash2d(tick, playerX, playerY) * 10);
+          nearest.hp -= damage;
+          playerAttackCooldown = 6;
+          if (nearest.hp <= 0) {
+            showMessage(`${nearest.name} defeated! (+10 coins)`);
+            inventory.coin += 10;
+          } else {
+            showMessage(`Hit ${nearest.name} for ${damage}! (${nearest.hp}/${nearest.maxHp} HP)`);
+          }
+        }
+      } else {
+        const dialogues: Record<string, string[]> = {
+          "Villager": ["Fine day for fishing!", "Watch out for wolves.", "The mountain path is treacherous."],
+          "Guard": ["Move along, citizen.", "The roads are safe... mostly.", "Report any suspicious activity."],
+          "Merchant": ["Finest goods in the land!", "Everything must go!", "Special price, just for you!"],
+        };
+        const lines = dialogues[nearest.name] ?? ["..."];
+        const line = lines[Math.floor(hash2d(tick, nearest.homeX, nearest.homeY) * lines.length)];
+        showMessage(`${nearest.name}: "${line}"`);
+      }
     } else {
-      showMessage("No one nearby to talk to.");
+      showMessage("No one nearby.");
     }
   }
 
