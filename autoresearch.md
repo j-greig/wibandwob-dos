@@ -25,17 +25,19 @@ Checked programmatically by `autoresearch.sh`. Each feature either exists or doe
 | v4 Provenance | 8 | entry types, tags, actor metadata, collapsible groups, status bar |
 | v5 Composition | 8 | patchbay-ready state, ambient mode, summarize command, linked entries |
 
-### UI score (40 pts max)
+### UI + Agent Experience score (40 pts max)
 
-Self-scored from PNG screenshot against 5 axes, each 1–8, summed.
+Self-scored from PNG screenshot + API testing against 6 axes, summed.
 
 | Axis | Max | What it measures |
 |------|-----|-----------------|
-| LAYOUT | 8 | Use of space, balance, no dead zones, responsive, clear visual grouping |
-| READABILITY | 8 | Text legibility, contrast, clear hierarchy, easy to scan |
-| AESTHETIC | 8 | Colour harmony within theme, visual interest, deliberate appearance |
-| COHERENCE | 8 | Feels like one designed thing, consistent spacing/alignment/language |
-| CHARACTER | 8 | Personality, charm, WibWob-ness, crafted vs generic |
+| LAYOUT | 6 | Use of space, balance, no dead zones, responsive, clear visual grouping |
+| READABILITY | 6 | Text legibility, contrast, clear hierarchy, easy to scan |
+| AESTHETIC | 5 | Colour harmony within theme, visual interest, deliberate appearance |
+| COHERENCE | 5 | Feels like one designed thing, consistent spacing/alignment/language |
+| CHARACTER | 5 | Personality, charm, WibWob-ness, crafted vs generic |
+| USABILITY | 6 | Can a human actually use it? Keyboard flow, focus management, mouse scroll, input submission, filter cycling, clear affordances for what's interactive |
+| AGENT_XP | 7 | How useful is this to an agent? Commands discoverable via /commands/list, direct:true returning structured data, describeState rich enough to act on, import/export/summarize work programmatically, can an agent use this without seeing the TUI? |
 
 ## How to Run
 

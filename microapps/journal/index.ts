@@ -585,8 +585,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const agents = entries.filter(e => e.peer === "agent").length;
     const days = new Set(entries.map(e => dayKey(e.ts))).size;
     const filterHint = filterByPeer !== "all" ? `  FILTER:${filterByPeer}` : "";
+    const focusHint = focusedPanel === "log" ? "LOG" : "WRITE";
     statusBar.setContent(
-      `{${muted}-fg} ▸${humans} human  ▹${agents} agent  · ${entries.length} entries  ${days} day${days !== 1 ? "s" : ""}  │  j/k scroll  g/G jump  / filter${filterHint}{/${muted}-fg}`
+      `{${muted}-fg} [${focusHint}]  ▸${humans} ▹${agents} · ${entries.length}  ${days}d  │  Tab switch  j/k scroll  / filter  Esc clear${filterHint}{/${muted}-fg}`
     );
 
     host.screen.render();
@@ -612,7 +613,39 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   }
   // Skip "session resumed" noise — the session start is implicit from timestamps
 
-  win.setFocusTarget(inputBox);
+  // Focus management: Tab toggles between input and log
+  let focusedPanel: "input" | "log" = "input";
+
+  function focusInput() {
+    focusedPanel = "input";
+    win.setFocusTarget(inputBox);
+    inputBox.focus();
+    render(); // update focus indicator
+  }
+
+  function focusLog() {
+    focusedPanel = "log";
+    win.setFocusTarget(logBox);
+    logBox.focus();
+    render(); // update focus indicator
+  }
+
+  // Tab cycles focus
+  inputBox.key(["tab"], () => focusLog());
+  logBox.key(["tab"], () => focusInput());
+  logBox.key(["escape"], () => {
+    if (filterByPeer !== "all") {
+      filterByPeer = "all";
+      filterText = "";
+      render();
+    } else {
+      focusInput();
+    }
+  });
+  // i key in log returns to input (vim-like)
+  logBox.key(["i"], () => focusInput());
+
+  focusInput();
 
   // ── Lifecycle ─────────────────────────────────────────────────
   win.describeState(() => {

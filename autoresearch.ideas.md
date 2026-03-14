@@ -1,37 +1,29 @@
 # Autoresearch Ideas — Symbient Journal
 
-## UI Polish (now that features are 60/60)
-- Tags not visible enough — need brighter color or bracket styling like `[#tag]`
-- Agent entries could use a different bg tint (very subtle) to distinguish from human
-- Add / filter indicator to status bar (currently only shows when filtering)
-- Entry padding — add 1 line between entries for breathing room
-- Idle state: when journal is empty, show ASCII art or welcome message
-- The "session resumed" system entries are noise — consider suppressing or dimming them more
+## DONE ✓
+- Figlet header JRNL (slant/small responsive)
+- Muted timestamps, bright entry text
+- Peer-colored prefix: human=▸, agent=▹, system=·
+- Day dividers ━━━ 2026-03-14 ━━━
+- Status bar with entry count, peer breakdown, key hints
+- Kind icons: ◊ observation, ░ note, ★ discovery, ■ decision, ? question
+- Line numbers in muted gutter
+- Dynamic mood indicator (curious/exploring/decisive/productive)
+- Symbient/human-led/agent-led ratio in tagline
+- Import-devlog command (parses agentic-devlog.md → 578 entries)
+- Removed session-resumed noise
 
-## UI Character (TDR direction)
-- Geometric border characters instead of plain ━
-- Right-aligned timestamps instead of inline
-- Entry index numbers in muted left gutter (like line numbers)
-- Monospaced data table for stats in header area
-- ASCII art sidebar divider between stats and log areas
+## AGENT DEVLOG PIVOT (next priority)
+- Auto-detect file paths in entry text (src/, microapps/, .agents/) → render highlighted
+- On Enter when focused on a file reference → open via host.runGlobalCommand("editor.open")
+- Or open .md files via markdown.open
+- Section grouping from devlog headings (collapsible groups)
+- Agent attribution from import metadata
 
-## BIG PIVOT: JRNL → AGENT DEVLOG
-- Mine `.agents/shell-dev/agentic-devlog.md` as seed content
-- Each devlog section = journal entry with agent attribution (actor field)
-- Parse markdown headings → structured entries with kinds (observation, decision, discovery)
-- Auto-extract file references from devlog → linked files in repo
-- Show which agent wrote which devlog entry and why
-- Backlinks: entry references a file → clicking shows the file path
-- Import command: `journal.import-devlog` parses agentic-devlog.md into entries
-- This makes the Journal a real working tool, not a demo — COAT in action
-- File references in entries → clickable to open code editor or markdown viewer
-  via `host.runGlobalCommand("editor.open", { filePath })` or `markdown.open`
-- Auto-detect file paths in entry text (anything matching `src/` or `microapps/` etc)
-  and render as highlighted links
-
-## Future Features
-- Entry pinning — mark entries as important, always visible at top
-- Mood/sentiment tracking — simple emoji or keyword per entry
-- Auto-tagging — detect keywords and auto-apply tags
-- Journal templates — pre-filled entry starters for common patterns
-- Entry reactions — agent can react to human entries and vice versa
+## UI Push to 95+
+- Responsive breakpoint: narrow mode collapses metadata columns
+- Color-code entries by kind (not just icon — subtle bg tint)
+- Tags actually rendering in accent color (investigate blessed tag format)
+- Animated cursor/pulse on input line for liveliness
+- Empty state: ASCII art + "start writing" message instead of blank space
+- Add subtle separator dots between spaced entries
