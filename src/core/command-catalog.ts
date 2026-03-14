@@ -618,7 +618,7 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
   {
     id: "window.move",
     label: "Move Window",
-    description: "Move a window by id. Args: { id: number, x: number, y: number }",
+    description: "Move a window by id. Args: { id: number, left: number, top: number }",
     group: "focus",
     actionKey: "moveWindowById",
     api: true,
@@ -626,14 +626,14 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     returns: "void",
     params: z.object({
       id: z.number().describe("Window ID from GET /state"),
-      x: z.number().describe("Absolute X coordinate"),
-      y: z.number().describe("Absolute Y coordinate"),
+      left: z.number().describe("Absolute left coordinate"),
+      top: z.number().describe("Absolute top coordinate"),
     })
   },
   {
     id: "window.resize",
     label: "Resize Window",
-    description: "Resize a window by id. Args: { id: number, w: number, h: number }",
+    description: "Resize a window by id. Args: { id: number, width: number, height: number }",
     group: "focus",
     actionKey: "resizeWindowById",
     api: true,

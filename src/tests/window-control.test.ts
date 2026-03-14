@@ -133,4 +133,31 @@ describe("window control API", () => {
     expect(batch.data.ok).toBe(true);
     expect(JSON.stringify(batch.data.results)).toBe(JSON.stringify([true, true]));
   });
+
+  test("legacy short-form window geometry fields are rejected", async () => {
+    const move = await api("/windows/move", "POST", {
+      id: 999999,
+      x: 10,
+      y: 5,
+    });
+    expect(move.status).toBe(400);
+    expect(move.data.ok).toBe(false);
+    expect(move.data.error).toContain("left and top");
+
+    const resize = await api("/windows/resize", "POST", {
+      id: 999999,
+      w: 30,
+      h: 12,
+    });
+    expect(resize.status).toBe(400);
+    expect(resize.data.ok).toBe(false);
+    expect(resize.data.error).toContain("width and height");
+
+    const batch = await api("/windows/batch", "POST", {
+      ops: [{ id: 999999, x: 1, y: 2, w: 3, h: 4 }],
+    });
+    expect(batch.status).toBe(400);
+    expect(batch.data.ok).toBe(false);
+    expect(batch.data.error).toContain("canonical");
+  });
 });

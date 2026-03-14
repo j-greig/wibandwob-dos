@@ -562,21 +562,33 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       const b = body as any;
+      if (!Number.isFinite(Number(b.left)) || !Number.isFinite(Number(b.top))) {
+        return Response.json(
+          { ok: false, error: "left and top are required numbers" },
+          { status: 400 },
+        );
+      }
       return Response.json({
         ok: this.deps.windows.move(
           Number(b.id),
-          Number(b.left ?? b.x),
-          Number(b.top ?? b.y),
+          Number(b.left),
+          Number(b.top),
         ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
       const b = body as any;
+      if (!Number.isFinite(Number(b.width)) || !Number.isFinite(Number(b.height))) {
+        return Response.json(
+          { ok: false, error: "width and height are required numbers" },
+          { status: 400 },
+        );
+      }
       return Response.json({
         ok: this.deps.windows.resize(
           Number(b.id),
-          Number(b.width ?? b.w),
-          Number(b.height ?? b.h),
+          Number(b.width),
+          Number(b.height),
         ),
       });
     }
@@ -593,27 +605,49 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/windows/batch") {
-      // Body: { ops: Array<{ id, x?, y?, w?, h?, close? }> }
+      // Body: { ops: Array<{ id, left?, top?, width?, height?, close? }> }
       // Each op can move, resize, or close a window. All applied in order.
       const ops = (body as any).ops as Array<{
         id: number;
         left?: number; top?: number;
         width?: number; height?: number;
-        // Legacy aliases — accepted but canonical names preferred
-        x?: number; y?: number;
-        w?: number; h?: number;
         close?: boolean;
       }>;
       if (!Array.isArray(ops)) {
         return Response.json({ ok: false, error: "ops must be an array" }, { status: 400 });
       }
+      for (const [index, op] of ops.entries()) {
+        const hasMove = op.left !== undefined || op.top !== undefined;
+        const hasResize = op.width !== undefined || op.height !== undefined;
+        if (op.close) {
+          continue;
+        }
+        if (hasMove !== (op.left !== undefined && op.top !== undefined)) {
+          return Response.json(
+            { ok: false, error: `op ${index} requires canonical left and top fields` },
+            { status: 400 },
+          );
+        }
+        if (hasResize !== (op.width !== undefined && op.height !== undefined)) {
+          return Response.json(
+            { ok: false, error: `op ${index} requires canonical width and height fields` },
+            { status: 400 },
+          );
+        }
+        if (!hasMove && !hasResize) {
+          return Response.json(
+            { ok: false, error: `op ${index} must include canonical move/resize fields or close=true` },
+            { status: 400 },
+          );
+        }
+      }
       const results = this.deps.windows.batch(
         ops.map((op) => ({
           id: Number(op.id),
-          left: op.left ?? op.x,
-          top: op.top ?? op.y,
-          width: op.width ?? op.w,
-          height: op.height ?? op.h,
+          left: op.left,
+          top: op.top,
+          width: op.width,
+          height: op.height,
           close: op.close,
         })),
       );

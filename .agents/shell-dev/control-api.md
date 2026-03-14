@@ -96,11 +96,7 @@ curl -s -X POST http://127.0.0.1:8099/overlay/confirm
 
 `POST /commands/run` accepts `{"id":"..."}` only. The older `command` alias is retired.
 API command execution is non-interactive by default. If a command would normally open a picker or prompt from the menu, API callers must pass explicit args instead.
-
-Compatibility that still exists:
-- `window.move` accepts both `{x,y}` and `{left,top}`
-- `window.resize` accepts both `{w,h}` and `{width,height}`
-- `/windows/batch` still accepts `{x,y,w,h}` as fallback, but canonical docs should use `{left,top,width,height}`
+Window geometry APIs now accept canonical fields only: `left/top/width/height`.
 
 ## Window Openers
 

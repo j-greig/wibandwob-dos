@@ -1890,14 +1890,18 @@ export class TsTuiMvpApp {
       },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
       moveWindowById: (args) => {
-        const x = args?.x ?? args?.left;
-        const y = args?.y ?? args?.top;
-        this.windowManager.moveWindow(Number(args?.id), Number(x), Number(y));
+        this.windowManager.moveWindow(
+          Number(args?.id),
+          Number(args?.left),
+          Number(args?.top),
+        );
       },
       resizeWindowById: (args) => {
-        const w = args?.w ?? args?.width;
-        const h = args?.h ?? args?.height;
-        this.windowManager.resizeWindow(Number(args?.id), Number(w), Number(h));
+        this.windowManager.resizeWindow(
+          Number(args?.id),
+          Number(args?.width),
+          Number(args?.height),
+        );
       },
       clearDesktop: (args) => {
         const closeAll = args?.all === true;
