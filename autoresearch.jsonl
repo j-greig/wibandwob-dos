@@ -1,7 +1,0 @@
-{"type":"config","name":"E042 Solid Foundations — Core TypeScript Architecture Refinement","metricName":"typecheck_s","metricUnit":"s","bestDirection":"lower"}
-{"run":1,"commit":"bc53b73","metric":2.204,"metrics":{"max_file_lines":2395,"any_count":58,"sdk_gaps":0,"file_count":124},"status":"keep","description":"Baseline: typecheck 2.2s, max file 2395 lines (ui-parts.ts), 58 as-any in core, 124 TS files","timestamp":1773448312743,"segment":0}
-{"type":"config","name":"E042 Solid Foundations — Core TypeScript Architecture Refinement","metricName":"typecheck_s","metricUnit":"s","bestDirection":"lower"}
-{"run":1,"commit":"2b9184e","metric":2.237,"metrics":{"max_file_lines":2395,"any_count":58,"sdk_gaps":0,"file_count":124},"status":"keep","description":"Baseline: typecheck 2.24s, max file 2395 lines (ui-parts.ts), 58 as-any casts in core, 124 TS files","timestamp":1773448343777,"segment":0}
-{"type":"config","name":"E042 Solid Foundations — Core TypeScript Quality Debt Reduction","metricName":"quality_debt","metricUnit":"","bestDirection":"lower"}
-{"run":1,"commit":"aa910b6","metric":370.9,"metrics":{"max_file_lines":2395,"any_count":147,"god_files":20,"sdk_gaps":0,"file_count":124},"status":"keep","description":"Baseline: quality_debt 370.9 (max_file 2395, any_count 147, god_files 20, sdk_gaps 0)","timestamp":1773448439349,"segment":0}
-{"type":"config","name":"E042 Solid Foundations — Quality Debt Reduction","metricName":"quality_debt","metricUnit":"","bestDirection":"lower"}
