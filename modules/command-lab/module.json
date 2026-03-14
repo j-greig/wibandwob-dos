@@ -1,0 +1,24 @@
+{
+  "name": "command-lab",
+  "version": "0.1.0",
+  "description": "Proof microapp for shared runtime verbs and snapshot restore.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.command-lab",
+    "title": "Command Lab",
+    "description": "Run a curated set of shared runtime commands from one microapp.",
+    "persist": true,
+    "menu": [
+      {
+        "category": "applications",
+        "order": 168,
+        "label": "Command Lab"
+      }
+    ],
+    "palette": {
+      "order": 168,
+      "label": "Command Lab"
+    }
+  }
+}

@@ -37,6 +37,10 @@ cat > "$MODULE_DIR/module.json" <<EOF
   "description": "${ESC_TITLE} microapp",
   "type": "microapp",
   "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "module.json"],
+    "reopenCommand": "microapp.${ESC_APP_ID}.open"
+  },
   "microapp": {
     "id": "${ESC_APP_ID}",
     "title": "${ESC_TITLE}",
@@ -118,4 +122,6 @@ echo
 echo "Next:"
 echo "  1. Edit the scaffold"
 echo "  2. Run: bun run typecheck"
-echo "  3. Restart the app (bash scripts/restart.sh) or reload (modules.reload)"
+echo "  3. Stable reload: wibwob cmd modules.reload"
+echo "  4. Optional watch loop (experimental): bun run watch:microapp -- $MODULE_DIR --open"
+echo "  5. If you changed src/, use: bash scripts/restart.sh"

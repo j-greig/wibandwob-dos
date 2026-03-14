@@ -151,6 +151,22 @@ export class CommandRegistry {
     this.dynamicCommands.push(def);
   }
 
+  clearDynamicCommands(predicate?: (command: DynamicCommandDefinition) => boolean): number {
+    const before = this.dynamicCommands.length;
+    if (!predicate) {
+      this.dynamicCommands.length = 0;
+      return before;
+    }
+    let writeIndex = 0;
+    for (const command of this.dynamicCommands) {
+      if (!predicate(command)) {
+        this.dynamicCommands[writeIndex++] = command;
+      }
+    }
+    this.dynamicCommands.length = writeIndex;
+    return before - writeIndex;
+  }
+
   buildMenus(): MenuConfig[] {
     const menus = createMenuConfigs(this.actions);
     // Append dynamic commands to matching menu categories

@@ -4,6 +4,13 @@
   "description": "Proof microapp that inspects the live runtime through shared inspection APIs.",
   "type": "microapp",
   "entry": "index.ts",
+  "dev": {
+    "watch": [
+      "index.ts",
+      "module.json"
+    ],
+    "reopenCommand": "microapp.wibwob.runtime-inspector.open"
+  },
   "microapp": {
     "id": "wibwob.runtime-inspector",
     "title": "Runtime Inspector",

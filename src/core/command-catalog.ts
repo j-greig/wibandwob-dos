@@ -44,6 +44,7 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
+  reloadModules: () => unknown;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
@@ -541,6 +542,18 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     menuPlacements: [{ category: "file", order: 190, appTypes: ["wibwob-agent"] }],
     api: true,
     agent: true
+  },
+  {
+    id: "modules.reload",
+    label: "Reload Microapps",
+    description: "Reload dynamic microapp modules from disk without restarting the shell.",
+    group: "system",
+    actionKey: "reloadModules",
+    menuPlacements: [{ category: "view", order: 95 }],
+    palettePlacement: { order: 196 },
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "monster-cam.open",

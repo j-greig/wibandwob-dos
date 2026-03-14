@@ -22,7 +22,7 @@ import {
   SPIKE_ROOT,
 } from "./config.js";
 import { appFlags } from "./cli.js";
-import { loadModules } from "../services/module-loader.js";
+import { loadModules, reloadMicroapps } from "../services/module-loader.js";
 import type { MicroappHostDeps } from "../sdk/microapp-host.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry, type CommandSurface } from "./command-registry.js";
@@ -227,6 +227,7 @@ export class TsTuiMvpApp {
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
   private readonly runtimeNode: RuntimeNodeDescriptor;
+  private microappDeps?: MicroappHostDeps;
 
   constructor(opts?: {
     instanceLabel?: string;
@@ -462,23 +463,11 @@ export class TsTuiMvpApp {
   async run(): Promise<void> {
     // Load external modules (themes + microapps) before workspace restore
     // so that external themes and commands are available for restoration.
-    const microappDeps: MicroappHostDeps = {
-      screen: this.screen,
-      windowManager: this.windowManager,
-      commands: this.commands,
-      geometry: this.geometry.getGeometry(),
-      focusOrCreate: (appType, createFn, multiInstance) => {
-        this.focusOrCreate(appType, createFn, multiInstance);
-      },
-      worldChat: worldChatService,
-      overlays: this.overlays,
-      repoRoot: REPO_ROOT,
-    };
-    await loadModules(microappDeps);
+    this.microappDeps = this.buildMicroappDeps();
+    await loadModules(this.microappDeps);
 
     // Rebuild menus after microapps may have registered dynamic commands
-    this.menus.length = 0;
-    this.menus.push(...this.commands.buildMenus());
+    this.rebuildMenusFromCommands();
 
     this.renderChrome();
     this.runtimeStats.init();
@@ -491,6 +480,39 @@ export class TsTuiMvpApp {
     log.app(
       `started ${this.screen.width}x${this.screen.height} theme:${themeName()} instance:${this.getInstanceDisplayLabel()}`,
     );
+  }
+
+  private buildMicroappDeps(): MicroappHostDeps {
+    return {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      commands: this.commands,
+      geometry: this.geometry.getGeometry(),
+      focusOrCreate: (appType, createFn, multiInstance) => {
+        this.focusOrCreate(appType, createFn, multiInstance);
+      },
+      worldChat: worldChatService,
+      overlays: this.overlays,
+      repoRoot: REPO_ROOT,
+    };
+  }
+
+  private rebuildMenusFromCommands(): void {
+    this.menus.length = 0;
+    this.menus.push(...this.commands.buildMenus());
+  }
+
+  private async reloadModulesFromDisk(): Promise<{
+    reloaded: number;
+    clearedCommands: number;
+    clearedSnapshots: number;
+  }> {
+    this.microappDeps ??= this.buildMicroappDeps();
+    const result = await reloadMicroapps(this.microappDeps);
+    this.rebuildMenusFromCommands();
+    this.syncLiveState();
+    this.screen.render();
+    return result;
   }
 
   /** Restore default workspace on boot. Empty desktop if none exists. */
@@ -596,15 +618,10 @@ export class TsTuiMvpApp {
       this.windowManager.resizeFocusedWindow(0, 1),
     );
     this.screen.key(["escape"], () => this.closeMenu());
-    this.screen.key(["tab"], () => {
-      const focused = this.windowManager.getFocusedWindow();
-      if (focused?.kind === "editor") {
-        this.editor.insertText(focused, "  ");
-        return;
-      }
+    this.screen.key(["M-tab"], () => {
       this.windowManager.focusNextWindow(1);
     });
-    this.screen.key(["S-tab"], () => this.windowManager.focusNextWindow(-1));
+    this.screen.key(["M-S-tab"], () => this.windowManager.focusNextWindow(-1));
     this.screen.key(["C-s"], () => this.editor.saveFocused());
     this.screen.on("keypress", (ch, key) => {
       this.editor.handleFocusedKeypress(ch, key);
@@ -2005,6 +2022,19 @@ export class TsTuiMvpApp {
             const message = error instanceof Error ? error.message : String(error);
             this.overlays.flash(`Agent reload failed: ${message}`);
           });
+      },
+      reloadModules: () => {
+        void this.reloadModulesFromDisk()
+          .then((result) => {
+            this.overlays.flash(
+              `Reloaded microapps: ${result.reloaded} cmds · cleared ${result.clearedCommands} cmds/${result.clearedSnapshots} snaps`,
+            );
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.overlays.flash(`Microapp reload failed: ${message}`);
+          });
+        return { ok: true, reloading: true };
       },
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),

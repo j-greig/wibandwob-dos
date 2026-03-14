@@ -339,6 +339,20 @@ export function registerDynamicSnapshot(appType: string, handler: SnapshotHandle
   dynamicHandlers.set(appType, handler);
 }
 
+export function clearDynamicSnapshots(predicate?: (appType: string) => boolean): number {
+  const before = dynamicHandlers.size;
+  if (!predicate) {
+    dynamicHandlers.clear();
+    return before;
+  }
+  for (const appType of [...dynamicHandlers.keys()]) {
+    if (predicate(appType)) {
+      dynamicHandlers.delete(appType);
+    }
+  }
+  return before - dynamicHandlers.size;
+}
+
 // ---------------------------------------------------------------------------
 // Public API — used by workspace-snapshots.ts
 // ---------------------------------------------------------------------------

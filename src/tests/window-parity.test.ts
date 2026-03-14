@@ -33,6 +33,17 @@ async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function closeByAppType(appType: string) {
+  const state = await get("/state");
+  const matching = state.windows.filter((window: any) => window.details?.appType === appType);
+  for (const window of matching) {
+    await post("/windows/close", { id: window.id });
+  }
+  if (matching.length > 0) {
+    await sleep(250);
+  }
+}
+
 /** Open a window via command, return its state entry. */
 async function openAndFind(
   commandId: string,
@@ -102,6 +113,26 @@ describe("window parity audit", () => {
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("state-inspector");
+  });
+
+  test("runtime-inspector microapp: reports appType and summary", async () => {
+    await closeByAppType("wibwob.runtime-inspector");
+    const win = await openAndFind("microapp.wibwob.runtime-inspector.open", "wibwob.runtime-inspector");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.runtime-inspector");
+    expect(win.details.summary).toContain("Runtime Inspector");
+    expect(win.details.activeTab).toBeDefined();
+  });
+
+  test("command-lab microapp: reports appType and summary", async () => {
+    await closeByAppType("wibwob.command-lab");
+    const win = await openAndFind("microapp.wibwob.command-lab.open", "wibwob.command-lab");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.command-lab");
+    expect(win.details.summary).toContain("Command Lab");
+    expect(typeof win.details.selectedCommandId).toBe("string");
   });
 
   test("workspace-manager: reports appType and summary", async () => {

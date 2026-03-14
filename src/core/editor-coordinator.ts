@@ -175,7 +175,7 @@ export class EditorCoordinator {
     if (this.deps.isMenuOpen() || this.deps.screen.focused !== window.editor.widget) return;
 
     if (key.ctrl && key.name === "s") { this.save(window); return; }
-    if (key.full === "S-tab") { this.deps.windowManager.focusNextWindow(-1); return; }
+    if (key.name === "tab" && !key.meta && !key.ctrl) { this.insertText(window, "  "); return; }
     if (key.name === "backspace") { this.deleteBackward(window); return; }
     if (key.name === "delete") { this.deleteForward(window); return; }
     if (key.name === "left") { moveEditorCursorState(window.editor, -1); this.render(window); return; }

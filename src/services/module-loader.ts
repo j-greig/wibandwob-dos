@@ -16,10 +16,12 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { APP_ROOT } from "../core/config.js";
 import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
-import { registerDynamicSnapshot } from "../core/snapshot-registry.js";
+import { log } from "./app-logger.js";
+import { clearDynamicSnapshots, registerDynamicSnapshot } from "../core/snapshot-registry.js";
 import type { SnapshotHandler } from "../core/snapshot-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
 import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "../core/types.js";
@@ -64,7 +66,14 @@ interface ModuleManifest {
   type: "content" | "prompt" | "theme" | "microapp" | "data";
   entry?: string;
   provides?: Record<string, string>;
+  dev?: ModuleDevConfig;
   microapp?: MicroappManifestConfig;
+}
+
+interface ModuleDevConfig {
+  watch?: string[];
+  reopenCommand?: string;
+  reopenArgs?: Record<string, unknown>;
 }
 
 /** Microapp-specific manifest fields. */
@@ -230,8 +239,7 @@ function createMicroappHost(
 
     pickFile(label, startDir, onSelect, options) {
       if (!deps.overlays) {
-        // eslint-disable-next-line no-console
-        console.error(`[${moduleId}] pickFile unavailable — overlays not provided`);
+        log.err(`[${moduleId}] pickFile unavailable — overlays not provided`);
         return;
       }
       deps.overlays.openFileBrowserPrompt(label, startDir, onSelect, options);
@@ -239,8 +247,7 @@ function createMicroappHost(
 
     flash(message) {
       if (!deps.overlays) {
-        // eslint-disable-next-line no-console
-        console.error(`[${moduleId}] flash unavailable — overlays not provided`);
+        log.err(`[${moduleId}] flash unavailable — overlays not provided`);
         return;
       }
       deps.overlays.flash(message);
@@ -248,8 +255,7 @@ function createMicroappHost(
 
     promptValue(label, defaultValue, onSubmit) {
       if (!deps.overlays) {
-        // eslint-disable-next-line no-console
-        console.error(`[${moduleId}] promptValue unavailable — overlays not provided`);
+        log.err(`[${moduleId}] promptValue unavailable — overlays not provided`);
         return;
       }
       deps.overlays.openValuePrompt(label, defaultValue, onSubmit);
@@ -293,13 +299,13 @@ function discoverModules(): DiscoveredModule[] {
         const manifest = JSON.parse(raw) as ModuleManifest;
 
         if (!manifest.name || !manifest.type) {
-          console.warn(`[module-loader] Invalid manifest in ${root}/${name} — missing name or type, skipping`);
+          log.err(`[module-loader] Invalid manifest in ${root}/${name} — missing name or type, skipping`);
           continue;
         }
 
         found.push({ dir: path.join(rootPath, name), manifest });
       } catch (err) {
-        console.warn(`[module-loader] Failed to parse ${manifestPath}: ${err}`);
+        log.err(`[module-loader] Failed to parse ${manifestPath}: ${err}`);
       }
     }
   }
@@ -316,12 +322,12 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
   const entryPath = path.join(mod.dir, entry);
 
   if (!fs.existsSync(entryPath)) {
-    console.warn(`[module-loader] Theme module ${mod.manifest.name} missing entry ${entry}`);
+    log.err(`[module-loader] Theme module ${mod.manifest.name} missing entry ${entry}`);
     return;
   }
 
   try {
-    const imported = await import(entryPath);
+    const imported = await import(pathToFileURL(entryPath).href);
 
     let variant: ThemeVariant | undefined;
 
@@ -338,14 +344,14 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
     }
 
     if (!variant) {
-      console.warn(`[module-loader] Theme module ${mod.manifest.name} does not export a ThemeVariant`);
+      log.err(`[module-loader] Theme module ${mod.manifest.name} does not export a ThemeVariant`);
       return;
     }
 
     registerExternalTheme(variant);
-    console.log(`[module-loader] Loaded theme: ${variant.name} (from ${mod.manifest.name})`);
+    log.app(`[module-loader] Loaded theme: ${variant.name} (from ${mod.manifest.name})`);
   } catch (err) {
-    console.warn(`[module-loader] Failed to load theme ${mod.manifest.name}: ${err}`);
+    log.err(`[module-loader] Failed to load theme ${mod.manifest.name}: ${err}`);
   }
 }
 
@@ -356,7 +362,7 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
 async function loadMicroappModule(mod: DiscoveredModule, deps: MicroappHostDeps): Promise<void> {
   const config = mod.manifest.microapp;
   if (!config?.id || !config?.title) {
-    console.warn(`[module-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
+    log.err(`[module-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
     return;
   }
 
@@ -364,24 +370,24 @@ async function loadMicroappModule(mod: DiscoveredModule, deps: MicroappHostDeps)
   const entryPath = path.join(mod.dir, entry);
 
   if (!fs.existsSync(entryPath)) {
-    console.warn(`[module-loader] Microapp ${mod.manifest.name} missing entry ${entry}`);
+    log.err(`[module-loader] Microapp ${mod.manifest.name} missing entry ${entry}`);
     return;
   }
 
   try {
-    const imported = await import(entryPath);
+    const imported = await import(`${pathToFileURL(entryPath).href}?reload=${Date.now()}`);
     const setup = imported.default;
 
     if (typeof setup !== "function") {
-      console.warn(`[module-loader] Microapp ${mod.manifest.name} does not default-export a setup function`);
+      log.err(`[module-loader] Microapp ${mod.manifest.name} does not default-export a setup function`);
       return;
     }
 
     const host = createMicroappHost(config, deps);
     setup(host);
-    console.log(`[module-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
+    log.app(`[module-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
   } catch (err) {
-    console.warn(`[module-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
+    log.err(`[module-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
   }
 }
 
@@ -426,6 +432,14 @@ export async function loadMicroapps(deps: MicroappHostDeps): Promise<void> {
       await loadMicroappModule(mod, deps);
     }
   }
+}
+
+export async function reloadMicroapps(deps: MicroappHostDeps): Promise<{ reloaded: number; clearedCommands: number; clearedSnapshots: number }> {
+  const clearedCommands = deps.commands.clearDynamicCommands((command) => command.id.startsWith("microapp."));
+  const clearedSnapshots = clearDynamicSnapshots();
+  await loadMicroapps(deps);
+  const reloaded = deps.commands.list().filter((command) => command.id.startsWith("microapp.")).length;
+  return { reloaded, clearedCommands, clearedSnapshots };
 }
 
 /**
