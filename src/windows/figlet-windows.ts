@@ -9,7 +9,14 @@ import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle } from "../core/ui-parts.js";
-import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
+import {
+  getDefaultFigletFont,
+  getFigletCatalogue,
+  getFigletFontChoices,
+  getFigletWindowContentSize,
+  measureFiglet,
+  renderFiglet,
+} from "../services/figlet-service.js";
 
 export function promptForFigletText(
   overlays: OverlayManager,
@@ -207,13 +214,7 @@ export function openFigletWindow(params: {
 
   const measured = measureFiglet(currentText, currentFont, 0);
   lastMeasurement = measured;
-  const mh = measured.measurement.lineCount;
-  const mw = measured.measurement.columnWidth;
-  const oneRowHeight = measured.fontHeight > 0 && mh > measured.fontHeight ? measured.fontHeight : mh;
-  params.applyMeasuredWindowSize(frame, "figlet", {
-    width: Math.max(mw, 32),
-    height: Math.max(oneRowHeight, 5)
-  });
+  params.applyMeasuredWindowSize(frame, "figlet", getFigletWindowContentSize(measured));
 }
 
 export function openBrowserReaderWindow(params: {

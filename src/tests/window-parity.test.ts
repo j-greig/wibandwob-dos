@@ -74,6 +74,19 @@ describe("window parity audit", () => {
     expect(win.details.appType).toBe("figlet-banner");
     expect(win.details.summary).toContain("figlet");
     expect(win.details.font).toBeDefined();
+    expect(win.height).toBeGreaterThanOrEqual((win.details.contentHeight ?? 0) + 5);
+    expect(win.width).toBeGreaterThanOrEqual((win.details.contentWidth ?? 0) + 4);
+  });
+
+  test("figlet-banner fits tall rendered glyphs", async () => {
+    const win = await openAndFind("figlet.open", "figlet-banner", {
+      text: "RUNTIME parity-1773492175",
+      font: "doom",
+    });
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.lineCount).toBeGreaterThanOrEqual(8);
+    expect(win.height).toBeGreaterThanOrEqual(win.details.contentHeight + 5);
   });
 
   test("pattern-animation: reports appType and summary", async () => {

@@ -1372,3 +1372,54 @@ Important correction:
 - Bun auto-loads `.env`, so local live tests can accidentally pick hosted `WIBWOB_API`
 - for local runtime tests, only use `API_URL`, `WW_API`, or a literal local fallback
 - reserve `WIBWOB_API_BASE_URL` for in-process runtime clients that intentionally follow the local app
+
+---
+
+## 2026-03-14: Always separate content measurement from chrome math
+
+Problem pattern:
+
+- visual sizing bugs keep recurring when code mixes content dimensions with
+  borders, title bars, toolbars, scrollbars, or positioning offsets
+- figlet windows are a common failure case because rendered text may look
+  "measured" while the actual frame still clips after chrome is applied
+
+Rule for agents:
+
+1. measure content first and keep that measurement chrome-free
+2. apply border/title/toolbar/scrollbar width and height in the window-chrome path
+3. when positioning child widgets inside a frame, account for chrome offsets explicitly
+4. if a window resizes based on content, verify the post-resize rendered state, not only the pre-resize measurement
+
+Heuristic:
+
+- if you are adding `+1`, `+2`, or ad hoc padding near a widget layout call, ask whether it really belongs in `window-chrome.ts`
+- if the content re-wraps after resize, the first-fit measurement was not the final truth
+
+---
+
+## 2026-03-14: Figlet sizing needed two fixes: real content height and proof-layout discipline
+
+Problem pattern:
+
+- figlet banners were being clipped in two different places
+- the opener was collapsing height from a one-row heuristic
+- the runtime parity harness then reintroduced clipping by forcing the banner back to `92x12`
+
+What shipped:
+
+- `src/services/figlet-service.ts`
+  - `getFigletWindowContentSize()` now sizes from actual rendered content plus catalogue height
+- `src/windows/figlet-windows.ts`
+  - figlet windows use that content-truth sizing instead of the old single-row heuristic
+- `src/core/window-chrome.ts`
+  - figlet toolbar chrome width was widened so the resized window does not re-wrap and inflate height again
+- `scripts/runtime-parity-check.sh`
+  - derives banner height from the opened figlet window instead of hard-coding 12 rows
+  - resizes before moving in batch ops so window-manager clamping uses final geometry
+
+Rule for agents:
+
+1. if a proof harness forces a window to a fixed size, it can mask or recreate the very bug you just fixed
+2. for figlet-like rendered content, open first, inspect real state, then arrange
+3. when a window needs both resize and move in one batch, do resize first if top/left clamping depends on final dimensions

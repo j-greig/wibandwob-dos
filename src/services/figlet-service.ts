@@ -157,6 +157,11 @@ export interface FigletMeasurement {
   fontHeight: number;
 }
 
+export interface FigletWindowContentSize {
+  width: number;
+  height: number;
+}
+
 // ── Width-aware rendering + responsive font cascade ──────────────────────────
 
 const tryFigletCache = new Map<string, string | null>();
@@ -237,5 +242,14 @@ export function measureFiglet(text: string, font = FALLBACK_FONT, width = 0): Fi
     lines,
     measurement,
     fontHeight: getFigletFontHeight(font)
+  };
+}
+
+export function getFigletWindowContentSize(measured: FigletMeasurement): FigletWindowContentSize {
+  const measuredHeight = measured.measurement.lineCount;
+  const catalogueHeight = measured.fontHeight;
+  return {
+    width: Math.max(measured.measurement.columnWidth, 32),
+    height: Math.max(measuredHeight, catalogueHeight, 5),
   };
 }

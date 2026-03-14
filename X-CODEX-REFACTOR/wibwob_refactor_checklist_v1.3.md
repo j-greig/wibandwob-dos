@@ -302,4 +302,4 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[-]` Stable-state automation should default to existing API-driven text capture for whole-TUI artifacts
 - `[-]` PNG capture remains useful as secondary visual evidence when text/API capture is not sufficient
 - `[-]` Add a host-vs-microapp agent runtime efficiency check: compare running a Pi agent or Claude Code agent in normal Ghostty versus inside the WibWob terminal microapp, using concrete metrics such as per-process RSS/PSS, idle memory, active-task peak memory, CPU while streaming, startup latency, and end-to-end command/response latency
-- `[-]` Follow on the remaining figlet window sizing defect: size figlet banners from central font metadata plus rendered content measurement so tall glyphs do not clip — parked in `.planning/refactor-docs/024-figlet-window-sizing-follow-on.md`
+- `[x]` Figlet banner sizing now uses rendered content plus corrected chrome math, and the runtime parity harness no longer forces a clipped 12-row banner box

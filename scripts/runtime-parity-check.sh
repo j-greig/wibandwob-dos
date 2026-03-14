@@ -117,12 +117,17 @@ PY
 
 build_layout() {
   local state_json="$1"
-  python3 - "$state_json" <<'PY'
+  local figlet_id="$2"
+  python3 - "$state_json" "$figlet_id" <<'PY'
 import json, sys
 state = json.loads(sys.argv[1])
+figlet_id = int(sys.argv[2])
 screen = state.get("screen", {})
 screen_w = int(screen.get("width") or 180)
 screen_h = int(screen.get("height") or 48)
+windows = {int(w["id"]): w for w in state.get("windows", [])}
+figlet = windows.get(figlet_id, {})
+figlet_details = figlet.get("details", {})
 
 left_margin = 4
 right_margin = 4
@@ -132,7 +137,10 @@ top_margin = 3
 right_width = max(58, min(76, screen_w // 2 - 12))
 left_width = max(72, screen_w - left_margin - right_margin - gutter - right_width)
 figlet_top = top_margin
-figlet_height = min(12, max(10, screen_h // 4))
+figlet_content_height = int(figlet_details.get("contentHeight") or 0)
+figlet_open_height = int(figlet.get("height") or 0)
+figlet_height = max(12, figlet_content_height + 5, figlet_open_height)
+figlet_height = min(figlet_height, max(12, screen_h // 2))
 editor_top = figlet_top + figlet_height + 2
 editor_height = max(14, min(18, screen_h - editor_top - 6))
 inspector_top = 6
@@ -204,11 +212,11 @@ print(json.dumps({"text": sys.argv[1]}))
 PY
 )"
 STATE_BEFORE="$(api_get /state)"
-LAYOUT_JSON="$(build_layout "$STATE_BEFORE")"
 open_and_capture_id "/view/figlet/open-default" "$FIGLET_BODY" "$STATE_BEFORE"
 FIGLET_ID="$OPENED_WINDOW_ID"
 STATE_AFTER="$OPENED_STATE"
 STATE_BEFORE="$STATE_AFTER"
+LAYOUT_JSON="$(build_layout "$STATE_BEFORE" "$FIGLET_ID")"
 
 EDITOR_BODY="$(python3 - "$EDITOR_TITLE" "$EDITOR_INITIAL" <<'PY'
 import json, sys
@@ -230,9 +238,12 @@ layout = json.loads(sys.argv[1])
 figlet_id, editor_id, inspector_id = map(int, sys.argv[2:5])
 print(json.dumps({
     "ops": [
-        {"id": figlet_id, **layout["figlet"]},
-        {"id": editor_id, **layout["editor"]},
-        {"id": inspector_id, **layout["inspector"]},
+        {"id": figlet_id, "width": layout["figlet"]["width"], "height": layout["figlet"]["height"]},
+        {"id": figlet_id, "left": layout["figlet"]["left"], "top": layout["figlet"]["top"]},
+        {"id": editor_id, "width": layout["editor"]["width"], "height": layout["editor"]["height"]},
+        {"id": editor_id, "left": layout["editor"]["left"], "top": layout["editor"]["top"]},
+        {"id": inspector_id, "width": layout["inspector"]["width"], "height": layout["inspector"]["height"]},
+        {"id": inspector_id, "left": layout["inspector"]["left"], "top": layout["inspector"]["top"]},
     ]
 }))
 PY

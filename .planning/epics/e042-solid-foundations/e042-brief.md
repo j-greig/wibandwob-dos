@@ -69,6 +69,8 @@ The thin runtime-centric slice on `epic/refactor-13` landed these architectural 
 - SDK ownership anchors under `src/sdk/` with stable `src/services/microapp-sdk.ts` facade
 - CLI inspection + canonical CLI parity harness
 - Runtime Inspector proof microapp consuming `/runtime/inspection` and `/commands/list`
+- figlet banners sized from rendered content plus explicit chrome math, with the
+  runtime parity harness respecting measured banner height instead of forcing a clipped box
 
 Explicitly parked follow-ons from this slice:
 
@@ -76,8 +78,8 @@ Explicitly parked follow-ons from this slice:
   - `.planning/refactor-docs/022-peer-provenance-follow-on.md`
 - host-vs-terminal-microapp agent efficiency benchmark
   - `.planning/refactor-docs/023-agent-runtime-efficiency-benchmark-follow-on.md`
-- figlet window sizing should fit real rendered glyph height
-  - `.planning/refactor-docs/024-figlet-window-sizing-follow-on.md`
+- agent-friendly microapp proof/build loop and optional hot reload
+  - `.planning/refactor-docs/025-agent-friendly-microapp-dev-follow-on.md`
 
 This means E042 now has a proven runtime/application/SDK direction to build on,
 even though the broader god-file decomposition and deeper type-system work remain open.
