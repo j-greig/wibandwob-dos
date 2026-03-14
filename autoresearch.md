@@ -1,65 +1,87 @@
-# Autoresearch — Solid Foundations
+# E042 Solid Foundations — Autoresearch Brief
 
-## Objective
-Refactor the WibWob-DOS core TypeScript codebase (`src/`) for better organisation,
-stronger types, faster boot, complete SDK, and single-responsibility functions.
-Every change must pass `bun run typecheck` with no functional regressions.
+## What are we optimising?
 
-## Primary Metric
-**typecheck_s** — wall-clock seconds for `bun run typecheck` (lower is better).
-This is a proxy for codebase health: smaller files with cleaner imports resolve
-faster. Measured via `time bun run typecheck`.
+The structural architecture of WibWob-DOS's `src/` TypeScript codebase, measured by
+how closely the actual file structure matches a defined target architecture.
 
-## Secondary Metrics (tracked, not driving keep/discard)
-- `max_file_lines` — line count of the largest .ts file in src/
-- `any_count` — occurrences of `as any` in src/core/
-- `sdk_gaps` — modules with direct src/core/ or src/services/ imports
-  (bypassing microapp-sdk.ts)
-- `file_count` — number of .ts files in src/ (expected to increase as god files split)
+**Primary metric:** `architecture_score` (0-100, higher is better)
+**Baseline:** 14.2
 
-## Measurement Commands
-```bash
-# Primary metric
-time bun run typecheck 2>&1
+## Scoring dimensions
 
-# Secondary metrics
-wc -l src/core/*.ts src/services/*.ts src/windows/*.ts | sort -rn | head -1  # max_file_lines
-grep -rn "as any" src/core/ | wc -l                                          # any_count
-grep -rn "from.*\.\./\.\./src/" modules/ | grep -v microapp-sdk | wc -l      # sdk_gaps
-find src -name "*.ts" | wc -l                                                 # file_count
-```
+| Dimension | Weight | Baseline | What it measures |
+|-----------|--------|----------|-----------------|
+| God object decomposition | 30% | 0 | How much the 4 god objects have been split toward targets |
+| Layer discipline | 25% | 20 | Cross-layer import violations (core→services, core→windows) |
+| File health | 20% | 18 | Files over 1000/500 line thresholds |
+| Target file existence | 10% | 0 | Whether planned extraction files exist |
+| Deduplication | 10% | 50 | Known code duplications resolved |
+| Type safety | 5% | 12.5 | `as any` casts beyond blessed framework gaps |
 
-## Priority Order
-1. God file decomposition (biggest structural wins)
-2. SDK completeness (biggest agent-experience wins)
-3. Type hardening (biggest correctness wins)
-4. Boot performance (lazy loading)
-5. Design system components (fills gaps)
-6. Function decomposition (ongoing discipline)
+## Target architecture
 
-## Files in Scope
-All files under `src/core/`, `src/services/`, `src/windows/`.
-Module files (`modules/*/index.ts`) touched only to fix import paths.
+Full target: `autoresearch/solid-foundations/target-architecture.md`
 
-## God Files (targets for splitting)
-| File | Lines | Split target |
-|------|-------|-------------|
-| `src/core/ui-parts.ts` | 2395 | src/core/ui/ directory |
-| `src/core/app-controller.ts` | 2244 | Extract window openers, theme, workspace, keybindings |
-| `src/core/command-catalog.ts` | 1307 | Could split by domain |
-| `src/core/overlay-manager.ts` | 937 | Extract each overlay type |
-| `src/core/ui-parts-forms.ts` | 881 | Could merge with ui/ directory |
-| `src/windows/browser-windows.ts` | 2082 | Split file manager / doc reader / md viewer |
-| `src/windows/music-player-window.ts` | 1224 | Extract viz modes, audio analysis |
-| `src/services/wibwob-agent-session.ts` | 1063 | Extract tool handlers |
-| `src/services/chrome-browser-service.ts` | 1029 | Extract extractors |
-| `src/services/control-api.ts` | 795 | Extract route handlers |
+The 4 god objects and their targets:
+- `app-controller.ts` (2244 → ~600 lines): Extract `action-bridge.ts`, `window-openers.ts`
+- `ui-parts.ts` (2395 → ~200 lines): Extract to 9 focused ui-*.ts files
+- `browser-windows.ts` (2082 → split into 4): `file-manager-window.ts`, `document-reader-window.ts`, etc.
+- `wibwob-agent-session.ts` (1063 → ~400 lines): Extract tool files to `services/agent/`
 
-## What Has Been Tried
-(Updated after each keep)
+## Rules
 
-## Constraints
-- Must pass `bun run typecheck`
-- No functional regressions
-- Backward compatible imports (re-export from old paths)
-- One logical change per commit
+1. **typecheck must pass** — `bun run typecheck` is the gate
+2. **Backward compatible imports** — original files must still exist as re-export barrels
+3. **No functional regressions** — the app must boot and work
+4. **E039 zone: do not restructure** — `command-catalog.ts`, `command-registry.ts`, `control-api.ts` are being rethought by E039. Trim dead weight only, no structural changes
+5. **Blessed `as any` casts are permanent** — `.scrollTo()`, `.selected`, `.iwidth`, `.setValue()`, `'100%' as any` — these are @types gaps, not bugs
+6. **One logical change per iteration** — extract one file or fix one concern per step
+7. **Re-exports from old paths** — any extracted file must have its exports re-exported from the original file
+
+## How to score
+
+Run `bash autoresearch.sh` — it outputs all metrics and the composite `architecture_score`.
+
+## Analysis reports
+
+Read these for deep understanding of each folder:
+- `autoresearch/solid-foundations/core-report.md` — 37 files in src/core/
+- `autoresearch/solid-foundations/services-report.md` — 44 files in src/services/
+- `autoresearch/solid-foundations/windows-report.md` — 17 files in src/windows/
+- `autoresearch/solid-foundations/cli-tests-app-report.md` — CLI, tests, app entry
+
+## Suggested iteration order
+
+The scoring dimensions are weighted. Work on the highest-weighted dimensions first:
+
+### Wave 1: God object decomposition (30% weight, currently 0)
+1. Extract `ui-layout.ts` from `ui-parts.ts` (stack, row, grid, flex functions)
+2. Extract `ui-chrome.ts` from `ui-parts.ts` (header, status bar, rule)
+3. Extract `ui-tabs.ts` from `ui-parts.ts` (tabbed container)
+4. Extract `ui-scroll-viewport.ts`, `ui-sidebar.ts`, `ui-selectable-list.ts`
+5. Extract `file-manager-window.ts` from `browser-windows.ts`
+6. Extract `document-reader-window.ts` from `browser-windows.ts`
+7. Extract `window-openers.ts` from `app-controller.ts`
+8. Extract `action-bridge.ts` from `app-controller.ts`
+9. Extract agent tool files from `wibwob-agent-session.ts`
+
+### Wave 2: Layer discipline (25% weight, currently 20)
+10. Fix `canvas-types.ts` module import (define shape in core)
+11. Move `skeleton-renderer.ts` service import to constructor injection
+12. Fix `types.ts` importing `content-measurement.ts` from services
+13. Fix `ui-parts.ts` importing `animation-service.ts`
+
+### Wave 3: Deduplication + type safety (15% combined weight)
+14. Extract shared `html-to-markdown.ts` service
+15. Create `ansi-palette.ts` shared constants
+16. Extract shared `ui-draft-input.ts`
+17. Fix non-blessed `as any` casts (control-api, markdown-service, etc.)
+
+## What NOT to do
+
+- Don't rename files just to match target names if the content hasn't changed
+- Don't create empty stub files to boost `target_files_exist` score
+- Don't move code between files without understanding what it does
+- Don't touch command system files beyond trimming (E039 zone)
+- Don't break existing imports — always add re-exports
