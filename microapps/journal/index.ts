@@ -115,7 +115,7 @@ function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
   const indent = " ".repeat(prefixLen);
 
   const tagStr = e.tags && e.tags.length > 0
-    ? `  {${accent}-fg}${e.tags.map(tg => `#${tg}`).join(" ")}{/${accent}-fg}`
+    ? `  {${accent}-fg}[${e.tags.map(tg => `#${tg}`).join(" ")}]{/${accent}-fg}`
     : "";
   const refStr = e.referenceId !== undefined
     ? `  {${muted}-fg}→ #${e.referenceId}{/${muted}-fg}`
@@ -430,6 +430,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     }
 
     let lastDay = "";
+    let entryIdx = 0;
     for (const e of visible) {
       const day = dayKey(e.ts);
       if (day !== lastDay) {
@@ -438,7 +439,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         lines.push("");
         lastDay = day;
       }
-      lines.push(...formatEntryLines(e, th, logW));
+      const entryLines = formatEntryLines(e, th, logW);
+      // Add muted line number gutter to first line
+      const num = String(entryIdx).padStart(3);
+      if (entryLines.length > 0) {
+        entryLines[0] = `{${muted}-fg}${num}{/${muted}-fg}` + entryLines[0]!.slice(2); // replace leading 2 spaces
+      }
+      lines.push(...entryLines);
+      entryIdx++;
     }
     if (lines.length === 0) {
       lines.push(`  {${muted}-fg}no entries yet. type below.{/${muted}-fg}`);

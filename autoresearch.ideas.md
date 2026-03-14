@@ -1,13 +1,21 @@
 # Autoresearch Ideas — Symbient Journal
 
-## UI Improvements
-- Figlet header "JOURNAL" at top for character
-- Muted timestamps, bright entry text for readability
-- Peer-colored prefix: human=theme accent, agent=muted, system=dim
-- ASCII art divider between days (─── or ═══)
-- Status bar at bottom with entry count and session info
+## UI Polish (now that features are 60/60)
+- Tags not visible enough — need brighter color or bracket styling like `[#tag]`
+- Agent entries could use a different bg tint (very subtle) to distinguish from human
+- Add / filter indicator to status bar (currently only shows when filtering)
+- Entry padding — add 1 line between entries for breathing room
+- Idle state: when journal is empty, show ASCII art or welcome message
+- The "session resumed" system entries are noise — consider suppressing or dimming them more
 
-## Feature Ideas
+## UI Character (TDR direction)
+- Geometric border characters instead of plain ━
+- Right-aligned timestamps instead of inline
+- Entry index numbers in muted left gutter (like line numbers)
+- Monospaced data table for stats in header area
+- ASCII art sidebar divider between stats and log areas
+
+## Future Features
 - Entry pinning — mark entries as important, always visible at top
 - Mood/sentiment tracking — simple emoji or keyword per entry
 - Auto-tagging — detect keywords and auto-apply tags
