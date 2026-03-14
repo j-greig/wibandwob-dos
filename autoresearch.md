@@ -1,102 +1,137 @@
-# E042 Solid Foundations — Autoresearch Brief
+# Symbient Journal — Autoresearch Brief
 
-## What are we optimising?
+## Objective
 
-The structural architecture of WibWob-DOS's `src/` TypeScript codebase, measured by
-how closely the actual file structure matches a defined target architecture.
+Build out the Symbient Journal microapp from barebones MVP through a 5-version
+feature plan, while maintaining high TUI visual quality throughout.
 
-**Primary metric:** `architecture_score` (0-100, higher is better)
-**Baseline:** 14.2
+The primary metric combines **feature completeness** and **UI quality** into
+a single `journal_score` (0–100, higher is better).
 
-## Scoring dimensions
+## Primary Metric
 
-| Dimension | Weight | Baseline | What it measures |
-|-----------|--------|----------|-----------------|
-| God object decomposition | 30% | 0 | How much the 4 god objects have been split toward targets |
-| Layer discipline | 25% | 20 | Cross-layer import violations (core→services, core→windows) |
-| File health | 20% | 18 | Files over 1000/500 line thresholds |
-| Target file existence | 10% | 0 | Whether planned extraction files exist |
-| Deduplication | 10% | 50 | Known code duplications resolved |
-| Type safety | 5% | 12.5 | `as any` casts beyond blessed framework gaps |
+`journal_score = feature_score (0–60) + ui_score (0–40)`
 
-## Target architecture
+### Feature score (60 pts max)
 
-Full target: `autoresearch/solid-foundations/target-architecture.md`
+Checked programmatically by `autoresearch.sh`. Each feature either exists or doesn't.
 
-The 4 god objects and their targets:
-- `app-controller.ts` (2244 → ~600 lines): Extract `action-bridge.ts`, `window-openers.ts`
-- `ui-parts.ts` (2395 → ~200 lines): Extract to 9 focused ui-*.ts files
-- `browser-windows.ts` (2082 → split into 4): `file-manager-window.ts`, `document-reader-window.ts`, etc.
-- `wibwob-agent-session.ts` (1063 → ~400 lines): Extract tool files to `services/agent/`
+| Version | Points | Features |
+|---------|--------|----------|
+| MVP (baseline) | 10 | manifest, entry point, .jsonl persist, input line, lifecycle hooks, system entries |
+| v1 Agent parity | 12 | journal.append command, peer distinction, auto-scroll, structured describeState |
+| v2 Rich rendering | 12 | day dividers, keyboard nav, search/filter, relative timestamps, word-wrap |
+| v3 Persistence | 10 | workspace persist, registerSnapshot, multiple journals, markdown export |
+| v4 Provenance | 8 | entry types, tags, actor metadata, collapsible groups, status bar |
+| v5 Composition | 8 | patchbay-ready state, ambient mode, summarize command, linked entries |
+
+### UI score (40 pts max)
+
+Self-scored from PNG screenshot against 5 axes, each 1–8, summed.
+
+| Axis | Max | What it measures |
+|------|-----|-----------------|
+| LAYOUT | 8 | Use of space, balance, no dead zones, responsive, clear visual grouping |
+| READABILITY | 8 | Text legibility, contrast, clear hierarchy, easy to scan |
+| AESTHETIC | 8 | Colour harmony within theme, visual interest, deliberate appearance |
+| COHERENCE | 8 | Feels like one designed thing, consistent spacing/alignment/language |
+| CHARACTER | 8 | Personality, charm, WibWob-ness, crafted vs generic |
+
+## How to Run
+
+```bash
+bash autoresearch.sh
+```
+
+1. Reloads microapps (no restart needed for microapp-only changes)
+2. Opens the Journal window
+3. Runs programmatic feature checks → `feature_score`
+4. Captures PNG screenshot → agent scores UI axes
+5. Agent computes `journal_score = feature_score + ui_score`
+
+## Scoring Discipline
+
+- Score UI against the rubric, not against expectations of what changed
+- A UI axis score of 4 = competent default. Below 3 = actively bad. Above 6 = genuinely good.
+- 8 means you cannot imagine how to improve that axis.
+- If the window failed to render, score 0 on all UI axes.
+- Feature checks are binary — the feature works or it doesn't. No partial credit.
+
+## Files in Scope
+
+- `microapps/journal/microapp.json` — manifest
+- `microapps/journal/index.ts` — entry point (may split into multiple files)
+
+## Off Limits
+
+- `src/` — shell internals
+- Other `microapps/` directories
+- Theme files, SDK source, scripts
+
+## Constraints
+
+- `bun run typecheck` must pass (no new journal errors)
+- Module must load after `microapps.reload`
+- No new npm dependencies
+- All imports from `../../src/services/microapp-sdk.js`
+- Use `host.theme()` tokens, never hardcode colours
+- Existing `scratch/journal.jsonl` entries must still load after changes
 
 ## Rules
 
-1. **typecheck must pass** — `bun run typecheck` is the gate
-2. **Backward compatible imports** — original files must still exist as re-export barrels
-3. **No functional regressions** — the app must boot and work
-4. **E039 zone: do not restructure** — `command-catalog.ts`, `command-registry.ts`, `control-api.ts` are being rethought by E039. Trim dead weight only, no structural/interface changes
-5. **CLI naming is E039-owned** — do not rename `cli/wibwob.ts` in E042 unless E039 explicitly requires it
-6. **Blessed `as any` casts are permanent** — `.scrollTo()`, `.selected`, `.iwidth`, `.setValue()`, `'100%' as any` — these are @types gaps, not bugs
-7. **No speculative abstractions** — extract plain modules first; only add registry/factory layers when there is concrete runtime need
-8. **One logical change per iteration** — extract one file or fix one concern per step
-9. **Re-exports from old paths** — any extracted file must have its exports re-exported from the original file
-10. **Operability is mandatory** — no interactive interstitial flow without inspect/select/confirm/cancel control path
+1. One feature per iteration — small slices, each scored
+2. Don't skip versions — each builds on the previous
+3. Features must actually work, not just exist as dead code
+4. Backward compatible — old .jsonl entries always load
+5. SDK-only imports
+6. All lifecycle hooks required
 
-## How to score
+## Iteration Order
 
-Run `bash autoresearch.sh` — it outputs all metrics and the composite `architecture_score`.
+### v1 — Agent parity
+1. `journal.append` direct command
+2. Peer visual distinction (color/prefix)
+3. Auto-scroll + structured describeState
 
-## Analysis reports
+### v2 — Rich rendering
+4. Day dividers between entries
+5. Keyboard nav j/k/g/G
+6. Search/filter by peer or text
+7. Relative timestamps + word-wrap
 
-Read these for deep understanding of each folder:
-- `autoresearch/solid-foundations/core-report.md` — 37 files in src/core/
-- `autoresearch/solid-foundations/services-report.md` — 44 files in src/services/
-- `autoresearch/solid-foundations/windows-report.md` — 17 files in src/windows/
-- `autoresearch/solid-foundations/cli-tests-app-report.md` — CLI, tests, app entry
-- `autoresearch/solid-foundations/codex-architecture-review.md` — external critical review with 5-whys + E039 context
+### v3 — Persistence
+8. persist:true + registerSnapshot
+9. Multiple journal support
+10. Markdown export command
 
-## Suggested iteration order
+### v4 — Provenance
+11. Entry types (observation/decision/discovery/question/note)
+12. Tags + actor metadata
+13. Collapsible groups + status bar
 
-This order was revised using Codex review (`codex-architecture-review.md`) to prioritise real agent friction before large file churn.
+### v5 — Composition
+14. Patchbay-ready describeState
+15. Ambient mode (compact window)
+16. Summarize command
+17. Linked entries
 
-### Wave 0: Correctness + operability first
-1. Fix `canvas-types.ts` module import inversion (core must not import modules).
-2. Add explicit overlay control contracts (`inspect/select/confirm/cancel`) for shared pickers.
-3. Ensure query/control commands return structured data on direct paths (`direct: true` semantics).
-4. Enforce menu command rule: required args must have no-arg fallback or picker flow.
-5. Document restart-required vs reload-safe paths where agents actually trip.
+## Terminal Design Principles
 
-### Wave 1: Small, high-signal dedup work
-6. Extract shared `html-to-markdown.ts` and remove duplicate implementations.
-7. Extract shared ANSI constants for windows.
-8. Extract shared test HTTP helpers (`src/tests/helpers/api-client.ts`).
-9. Extract shared draft-input helper used by agent/scramble flows.
+- TYPOGRAPHY: figlet for headers where appropriate, consistent alignment
+- COLOUR: theme tokens only, accent for emphasis, muted for secondary
+- COMPOSITION: createStack/createRow for layout, responsive via pickBreakpoint
+- RHYTHM: consistent gaps, deliberate whitespace, visual breathing room
+- DENSITY: terminal cells are precious — use wisely, no wasted space
 
-### Wave 2: Focused god-object seams (lower risk)
-10. Split `app-controller.ts` into `action-bridge.ts`, `window-openers.ts`, `fx-service.ts`, `clipboard-service.ts`.
-11. Split `wibwob-agent-session.ts` into tool-focused files.
-12. Extract `music-player-window.ts` visualiser/analyser internals.
+## SDK Components Available
 
-### Wave 3: High-churn splits (after contracts are stable)
-13. Split `browser-windows.ts` into dedicated window files.
-14. Split `ui-parts.ts` into focused `ui-*` files while keeping `ui-parts.ts` as a compatibility barrel.
-15. Split `overlay-manager.ts` into prompt modules, preserving operability contracts.
-16. Split `generative-windows.ts` and deprecate companion patterns.
-
-### Wave 4: File-manager stage 2
-17. Move file-manager git/search/OS integration logic into services.
-18. Keep `file-manager-window.ts` focused on rendering and input orchestration.
-19. Extract reusable viewport helpers to core when shared.
-
-### Wave 5: E039 execution (separate epic)
-20. E039 owns CLI naming/packaging and transport evolution.
-21. Add Unix socket transport to `control-api.ts` as additive behavior.
-22. Keep command discovery and response contracts stable while E039 lands.
-
-## What NOT to do
-
-- Don't rename files just to match target names if the content hasn't changed
-- Don't create empty stub files to boost `target_files_exist` score
-- Don't move code between files without understanding what it does
-- Don't touch command system files beyond trimming (E039 zone)
-- Don't break existing imports — always add re-exports
+| Family | Components |
+|--------|-----------|
+| Layout | createStack, createRow, createGrid, createNodePart, pickBreakpoint, createScrollViewport |
+| Chrome | createHeaderBar, createStatusBar, createButtonBar, createBorderedPanel, createRule |
+| Content | createTextBlock, createFigletDisplay, createMessageHistory, createContentStack |
+| Navigation | createTabs, createSelectableList, createInlineSearch |
+| Forms | createInputLine, createButton, createCheckbox, createRadioGroup, createSelect |
+| Data | createKeyValuePanel, createLogView, createDataTable |
+| Feedback | createProgressBar, createSpinner |
+| Animation | createAnimationClock, tween, EASINGS |

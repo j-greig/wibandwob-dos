@@ -1,139 +1,119 @@
-#!/usr/bin/env bash
-# E042 Solid Foundations — Architecture fitness scorer
-# Uses a subagent to compare actual codebase against target architecture
-# Outputs: architecture_score (0-100, higher is better)
-set -uo pipefail
+#!/bin/bash
+set -euo pipefail
 
-REPO="$(cd "$(dirname "$0")" && pwd)"
-TARGET="$REPO/autoresearch/solid-foundations/target-architecture.md"
+SCREENSHOT_PATH="scratch/autoresearch-screenshot.png"
+DISPLAY_NUM="${DISPLAY_NUM:-2}"
+API="http://127.0.0.1:8099"
+SCORE=0
 
-# Quick deterministic pre-checks (fast, no LLM needed)
-# These feed the scorer but also give us hard numbers
+# ── 1. Reload microapps ─────────────────────────────────────────────
+curl -sf -X POST "$API/commands/run" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"microapps.reload"}' > /dev/null 2>&1 || true
+sleep 1
 
-# God object line counts
-ac_lines=$(wc -l < "$REPO/src/core/app-controller.ts" 2>/dev/null || echo 9999)
-ui_lines=$(wc -l < "$REPO/src/core/ui-parts.ts" 2>/dev/null || echo 9999)
-bw_lines=$(wc -l < "$REPO/src/windows/browser-windows.ts" 2>/dev/null || echo 9999)
-was_lines=$(wc -l < "$REPO/src/services/wibwob-agent-session.ts" 2>/dev/null || echo 9999)
+# ── 2. Open Journal window ──────────────────────────────────────────
+curl -sf -X POST "$API/commands/run" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"microapp.wibwob.journal.open"}' > /dev/null 2>&1 || true
+sleep 2
 
-# Files over thresholds
-over_1000=$(find "$REPO/src" -name '*.ts' -not -path '*/types/*' -not -path '*/tests/*' | xargs wc -l 2>/dev/null | awk '$1 > 1000 && !/total/' | wc -l | tr -d ' ')
-over_500=$(find "$REPO/src" -name '*.ts' -not -path '*/types/*' -not -path '*/tests/*' | xargs wc -l 2>/dev/null | awk '$1 > 500 && !/total/' | wc -l | tr -d ' ')
+# ── 3. Grab state ───────────────────────────────────────────────────
+STATE=$(curl -sf "$API/state" 2>/dev/null || echo "{}")
+JOURNAL_STATE=$(echo "$STATE" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for w in data.get('windows', []):
+    if w.get('appType') == 'wibwob.journal':
+        print(json.dumps(w))
+        break
+" 2>/dev/null || echo "{}")
 
-# as any count
-any_count=$(grep -r "as any" "$REPO/src" --include='*.ts' -l 2>/dev/null | xargs grep -c "as any" 2>/dev/null | awk -F: '{s+=$2} END {print s}')
+# ── Helper: check function ──────────────────────────────────────────
+check() {
+  local name="$1" points="$2" result="$3"
+  if [ "$result" = "1" ]; then
+    SCORE=$((SCORE + points))
+    echo "  ✓ $name (+$points)"
+  else
+    echo "  ✗ $name (0/$points)"
+  fi
+}
 
-# Layer violations (core importing from services/windows, excluding app-controller)
-core_svc_violations=$(grep -r "from ['\"]\.\.\/services\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | grep -v app-controller | wc -l | tr -d ' ')
-core_win_violations=$(grep -r "from ['\"]\.\.\/windows\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | grep -v app-controller | wc -l | tr -d ' ')
-core_mod_violations=$(grep -r "from ['\"]\.\.\/\.\.\/modules\/" "$REPO/src/core" --include='*.ts' -l 2>/dev/null | wc -l | tr -d ' ')
+SOURCE="microapps/journal/index.ts"
+MANIFEST="microapps/journal/microapp.json"
 
-# Target files that exist (check key extractions from target architecture)
-target_files_exist=0
-for f in \
-  src/core/action-bridge.ts \
-  src/core/window-openers.ts \
-  src/core/ui-layout.ts \
-  src/core/ui-chrome.ts \
-  src/core/ui-tabs.ts \
-  src/core/ui-scroll-viewport.ts \
-  src/core/ui-sidebar.ts \
-  src/core/ui-selectable-list.ts \
-  src/core/ui-draft-input.ts \
-  src/core/overlays/browser-prompt.ts \
-  src/core/overlays/file-browser-prompt.ts \
-  src/core/overlays/list-picker.ts \
-  src/windows/file-manager-window.ts \
-  src/windows/document-reader-window.ts \
-  src/services/agent/tool-registry.ts \
-  src/services/html-to-markdown.ts \
-  src/core/ansi-palette.ts \
-  src/tests/helpers.ts; do
-  [ -f "$REPO/$f" ] && target_files_exist=$((target_files_exist + 1))
-done
-total_target_files=18
+echo "=== MVP (10 pts) ==="
+check "manifest exists" 2 "$([ -f "$MANIFEST" ] && echo 1 || echo 0)"
+check "entry point exists" 1 "$([ -f "$SOURCE" ] && echo 1 || echo 0)"
+check "jsonl persistence" 2 "$(grep -q 'journal.jsonl' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "input line" 2 "$(grep -q 'textbox\|inputLine\|createInputLine' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "lifecycle hooks" 2 "$(grep -q 'describeState' "$SOURCE" 2>/dev/null && grep -q 'captureText' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "system entries" 1 "$(grep -q '"system"' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-# Deduplication check
-html_to_md_copies=$(grep -rl "htmlToMarkdown\|html_to_markdown\|htmltomarkdown" "$REPO/src/services" --include='*.ts' 2>/dev/null | wc -l | tr -d ' ')
+echo ""
+echo "=== v1 — Agent Parity (12 pts) ==="
+check "journal.append command" 4 "$(grep -q 'journal.*append\|id:.*append' "$SOURCE" 2>/dev/null && grep -q 'direct.*true\|direct:true' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "peer visual distinction" 3 "$(grep -qE '\[H\]|\[A\]|\[S\]|peer.*fg|peer.*color|peerColor' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "auto-scroll" 2 "$(grep -qE 'setScrollPerc|scrollTo|scrollBottom' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "structured describeState" 3 "$(grep -q 'entryCount\|lastEntry' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-# Output all metrics
-echo "god_ac_lines=$ac_lines"
-echo "god_ui_lines=$ui_lines"  
-echo "god_bw_lines=$bw_lines"
-echo "god_was_lines=$was_lines"
-echo "over_1000=$over_1000"
-echo "over_500=$over_500"
-echo "any_count=$any_count"
-echo "core_svc_violations=$core_svc_violations"
-echo "core_win_violations=$core_win_violations"
-echo "core_mod_violations=$core_mod_violations"
-echo "target_files_exist=$target_files_exist"
-echo "total_target_files=$total_target_files"
-echo "html_to_md_copies=$html_to_md_copies"
+echo ""
+echo "=== v2 — Rich Rendering (12 pts) ==="
+check "day dividers" 2 "$(grep -qE 'divider|day.*sep|───|━━━|date.*header' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "keyboard navigation" 3 "$(grep -qE "key.*\[.*'j'|key.*\[.*'k'|'g'.*'G'" "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "search/filter" 3 "$(grep -qE 'filterEntries|searchMode|createInlineSearch|filterByPeer' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "relative timestamps" 2 "$(grep -qE 'ago|relative.*time|timeAgo|formatRelative' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "word-wrap" 2 "$(grep -qE 'wrap|wordWrap|wrapText' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-# Compute composite score (deterministic, fast)
-# God objects: target is ac=600, ui=200, bw=0(split), was=400
-# Score = how close to target, 0-100 per object, averaged
-god_score=$(python3 -c "
-import math
-def shrink_score(current, original, target):
-    if current <= target: return 100
-    progress = (original - current) / (original - target) * 100
-    return max(0, min(100, progress))
+echo ""
+echo "=== v3 — Persistence (10 pts) ==="
+check "persist in manifest" 2 "$(grep -q '"persist".*true' "$MANIFEST" 2>/dev/null && echo 1 || echo 0)"
+check "registerSnapshot" 3 "$(grep -q 'registerSnapshot' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "multiple journals" 3 "$(grep -qE 'switchJournal|journalName|pickFile.*journal|multiple.*journal' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "markdown export" 2 "$(grep -qE 'export.*markdown\|export.*md\|toMarkdown\|exportMarkdown' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-ac = shrink_score($ac_lines, 2244, 600)
-ui = shrink_score($ui_lines, 2395, 200)
-bw = shrink_score($bw_lines, 2082, 0)
-was = shrink_score($was_lines, 1063, 400)
-print(f'{(ac + ui + bw + was) / 4:.1f}')
-")
+echo ""
+echo "=== v4 — Provenance (8 pts) ==="
+check "entry types" 2 "$(grep -qE 'observation|decision|discovery|question.*note|entryType|kind.*observation' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "tags" 2 "$(grep -qE 'tags.*\[|addTag|tag.*label|entry.*tags' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "actor metadata" 2 "$(grep -qE 'actor.*:|actor.*metadata|peer.*actor' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "status bar" 2 "$(grep -qE 'createStatusBar|statusBar|stats.*bar' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-# Layer discipline: start at baseline for current state (~10 violations)
-# Each violation removed is worth points, scaled so 0 violations = 100
-layer_violations=$((core_svc_violations + core_win_violations + core_mod_violations))
-layer_score=$(python3 -c "print(max(0, min(100, 100 - $layer_violations * 8)))")
+echo ""
+echo "=== v5 — Composition (8 pts) ==="
+check "patchbay-ready state" 2 "$(grep -qE 'peerBreakdown|mood|stats.*describe' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "ambient mode" 2 "$(grep -qE 'ambient|compact.*mode|sticky.*window' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "summarize command" 2 "$(grep -qE 'summarize|summarise|journal.*summary' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "linked entries" 2 "$(grep -qE 'linkedEntry|backlink|entry.*ref|referenceId' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
-# File health: penalise files over 1000 heavily, 500-999 moderately
-# over_500 includes over_1000, so subtract to avoid double-counting
-mid_files=$((over_500 - over_1000))
-file_health=$(python3 -c "print(max(0, 100 - $over_1000 * 8 - $mid_files * 2))")
+echo ""
+echo "========================================="
+echo "feature_score: $SCORE / 60"
+echo "========================================="
 
-# Target file existence: simple percentage
-target_score=$(python3 -c "print(round($target_files_exist / $total_target_files * 100, 1))")
+# ── 4. Capture screenshot ────────────────────────────────────────────
+# Ensure fixed tmux geometry for comparable screenshots
+tmux resize-window -t wibwob -x 211 -y 56 2>/dev/null || true
+sleep 1
 
-# Dedup: target is 1 copy of htmlToMarkdown (or 0 if extracted to shared file)
-dedup_score=$(python3 -c "print(100 if $html_to_md_copies <= 1 else max(0, 100 - ($html_to_md_copies - 1) * 50))")
+mkdir -p "$(dirname "$SCREENSHOT_PATH")"
+./scripts/capture-tui-png.sh --display "$DISPLAY_NUM" --out "$SCREENSHOT_PATH" 2>/dev/null || {
+  echo "WARNING: screenshot capture failed — score UI from text screenshot"
+  ./scripts/screenshot-window.sh "Journal" 2>/dev/null || true
+}
 
-# Type safety: target <20 non-blessed casts, but we count all for simplicity
-# ~40 are blessed gaps (permanent), so effective floor is ~40
-type_score=$(python3 -c "
-count = $any_count
-blessed_floor = 40  # permanent blessed type gaps
-effective = max(0, count - blessed_floor)
-# 0 effective = 100, 115 effective (current) ≈ 10
-if effective <= 0: score = 100
-elif effective <= 20: score = 90 - effective * 1
-else: score = max(5, 70 - effective * 0.5)
-print(f'{score:.1f}')
-")
+# Archive
+SHOTS_DIR="scratch/autoresearch-shots"
+mkdir -p "$SHOTS_DIR"
+NEXT_NUM=$(printf "%03d" "$(( $(ls "$SHOTS_DIR"/*.png 2>/dev/null | wc -l) + 1 ))")
+STAMP=$(date +%H%M%S)
+ARCHIVE_PATH="$SHOTS_DIR/${NEXT_NUM}-${STAMP}.png"
+cp "$SCREENSHOT_PATH" "$ARCHIVE_PATH" 2>/dev/null || true
 
-# Weighted total
-total=$(python3 -c "
-god = $god_score * 0.30
-layer = $layer_score * 0.25
-health = $file_health * 0.20
-target = $target_score * 0.10
-dedup = $dedup_score * 0.10
-types = $type_score * 0.05
-total = god + layer + health + target + dedup + types
-print(f'{total:.1f}')
-")
-
-echo "---"
-echo "god_score=$god_score"
-echo "layer_score=$layer_score"
-echo "file_health=$file_health"
-echo "target_score=$target_score"
-echo "dedup_score=$dedup_score"  
-echo "type_score=$type_score"
-echo "architecture_score=$total"
+echo ""
+echo "Screenshot: $SCREENSHOT_PATH"
+echo "Archived: $ARCHIVE_PATH"
+echo ""
+echo "Agent: Read the screenshot, score 5 UI axes (each 1-8),"
+echo "then journal_score = feature_score + sum(UI axes)."
