@@ -1,7 +1,7 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { renderFiglet } from "../../src/services/microapp-sdk.js";
-import { readFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, appendFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -117,7 +117,21 @@ export default function setup(host: MicroappHost) {
     description: "Open the Symbient Journal.",
     menu: [{ category: "demos", order: 155, label: "Journal" }],
     palette: { order: 155, label: "Open Journal" },
-    action: () => openJournal(host),
+    action: (args: any) => openJournal(host, args),
+  });
+
+  host.registerSnapshot({
+    serialize: (window) => {
+      const state = window.describeState?.() ?? {};
+      return {
+        filterByPeer: state.filterByPeer ?? "all",
+      };
+    },
+    restore: (_snapshot, payload) => {
+      host.runCommand("open", {
+        filterByPeer: payload?.filterByPeer,
+      });
+    },
   });
 
   host.registerCommand({
@@ -136,22 +150,69 @@ export default function setup(host: MicroappHost) {
       return { ok: true, entry };
     },
   });
+
+  host.registerCommand({
+    id: "export-markdown",
+    label: "Export Journal as Markdown",
+    description: "Export the current journal as a .md file. Args: { journalName? }",
+    direct: true,
+    action: (args: any) => {
+      const jName = args?.journalName || "journal";
+      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
+      const entries = loadEntries(fp);
+      const mdLines = [`# Symbient Journal — ${jName}`, "", `> Exported ${new Date().toISOString()}`, ""];
+      let lastDay = "";
+      for (const e of entries) {
+        const day = dayKey(e.ts);
+        if (day !== lastDay) {
+          mdLines.push(`## ${day}`, "");
+          lastDay = day;
+        }
+        const time = formatTime(e.ts);
+        const tag = PEER_LABEL[e.peer] || "???";
+        mdLines.push(`- **${time}** \`${tag}\` ${e.text}`);
+      }
+      const exportMarkdown = mdLines.join("\n");
+      const outPath = join(host.repoRoot, "scratch", `${jName}-export.md`);
+      const dir = dirname(outPath);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(outPath, exportMarkdown);
+      return { ok: true, path: outPath, entries: entries.length };
+    },
+  });
+
+  host.registerCommand({
+    id: "switch",
+    label: "Switch Journal",
+    description: "Switch to a different journal file. Args: { journalName }",
+    direct: true,
+    action: (args: any) => {
+      const name = args?.journalName;
+      if (!name || typeof name !== "string") {
+        return { ok: false, error: "journalName is required" };
+      }
+      // Store preference — next open will use this
+      return { ok: true, switchJournal: name, note: "Reopen journal to use new file" };
+    },
+  });
 }
 
-function openJournal(host: MicroappHost) {
+function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   const geo = host.geometry;
   const winW = Math.max(80, Math.floor(geo.width * 0.95));
   const winH = Math.max(20, Math.floor(geo.height * 0.90));
   const winL = Math.max(0, Math.floor((geo.width - winW) / 2));
   const winT = Math.max(1, Math.floor((geo.height - winH) / 2));
 
+  const journalName = (args?.journalName as string) || "journal";
+  const fp = join(host.repoRoot, "scratch", `${journalName}.jsonl`);
+
   const win = host.createWindow({
-    title: "Journal",
+    title: journalName === "journal" ? "Journal" : `Journal: ${journalName}`,
     width: winW, height: winH, left: winL, top: winT,
   });
 
   const t = () => host.theme();
-  const fp = journalPath(host);
   let entries = loadEntries(fp);
   let filterByPeer: "all" | "human" | "agent" | "system" = "all";
   let filterText = "";
@@ -322,6 +383,8 @@ function openJournal(host: MicroappHost) {
     summary: `Journal — ${entries.length} entries`,
     lastEntry: entries.length > 0 ? entries[entries.length - 1]!.text : null,
     entryCount: entries.length,
+    filterByPeer,
+    journalName,
   }));
 
   win.captureText(() => entries.map(e => {

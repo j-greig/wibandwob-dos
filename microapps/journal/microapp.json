@@ -13,7 +13,7 @@
     "title": "Journal",
     "description": "Journal microapp scaffold.",
     "multiInstance": false,
-    "persist": false,
+    "persist": true,
     "menu": [
       { "category": "demos", "order": 155, "label": "Journal" }
     ],

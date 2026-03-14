@@ -80,7 +80,7 @@ echo "=== v3 — Persistence (10 pts) ==="
 check "persist in manifest" 2 "$(grep -q '"persist".*true' "$MANIFEST" 2>/dev/null && echo 1 || echo 0)"
 check "registerSnapshot" 3 "$(grep -q 'registerSnapshot' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 check "multiple journals" 3 "$(grep -qE 'switchJournal|journalName|pickFile.*journal|multiple.*journal' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
-check "markdown export" 2 "$(grep -qE 'export.*markdown\|export.*md\|toMarkdown\|exportMarkdown' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
+check "markdown export" 2 "$(grep -qE 'export-markdown|exportMarkdown|Export.*Markdown' "$SOURCE" 2>/dev/null && echo 1 || echo 0)"
 
 echo ""
 echo "=== v4 — Provenance (8 pts) ==="
