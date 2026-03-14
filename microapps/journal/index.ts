@@ -518,8 +518,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   });
 
   // ── Keyboard nav ──────────────────────────────────────────────
-  logBox.key(["j"], () => { logBox.scroll(1); host.screen.render(); });
-  logBox.key(["k"], () => { logBox.scroll(-1); host.screen.render(); });
+  logBox.key(["j", "down"], () => { logBox.scroll(1); host.screen.render(); });
+  logBox.key(["k", "up"], () => { logBox.scroll(-1); host.screen.render(); });
   logBox.key(["g"], () => { (logBox as any).scrollTo(0); host.screen.render(); });
   logBox.key(["S-g"], () => { logBox.setScrollPerc(100); host.screen.render(); });
 
@@ -611,8 +611,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const days = new Set(entries.map(e => dayKey(e.ts))).size;
     const filterHint = filterByPeer !== "all" ? `  FILTER:${filterByPeer}` : "";
     const focusHint = focusedPanel === "log" ? "LOG" : "WRITE";
+    const keyHints = focusedPanel === "log"
+      ? "j/k↕ scroll  g/G jump  / filter  Esc clear  i write  Tab switch"
+      : "Enter submit  Tab→log";
     statusBar.setContent(
-      `{${muted}-fg} [${focusHint}]  ▸${humans} ▹${agents} · ${entries.length}  ${days}d  │  Tab switch  j/k scroll  / filter  Esc clear${filterHint}{/${muted}-fg}`
+      `{${muted}-fg} [${focusHint}]  ▸${humans} ▹${agents} · ${entries.length}  ${days}d  │  ${keyHints}${filterHint}{/${muted}-fg}`
     );
 
     // Update input prompt based on focus
@@ -688,25 +691,40 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
   // ── Lifecycle ─────────────────────────────────────────────────
   win.describeState(() => {
-    const humans = entries.filter(e => e.peer === "human").length;
-    const agents = entries.filter(e => e.peer === "agent").length;
-    const systems = entries.filter(e => e.peer === "system").length;
-    const last = entries.length > 0 ? entries[entries.length - 1]! : null;
+    const all = loadEntries(fp);
+    const humans = all.filter(e => e.peer === "human").length;
+    const agents = all.filter(e => e.peer === "agent").length;
+    const systems = all.filter(e => e.peer === "system").length;
+    const last = all.length > 0 ? all[all.length - 1]! : null;
     const peerBreakdown = { human: humans, agent: agents, system: systems };
-    // mood heuristic: ratio of questions to decisions
-    const questions = entries.filter(e => e.kind === "question").length;
-    const decisions = entries.filter(e => e.kind === "decision").length;
+    const questions = all.filter(e => e.kind === "question").length;
+    const decisions = all.filter(e => e.kind === "decision").length;
     const mood = questions > decisions ? "curious" : decisions > 0 ? "decisive" : "observing";
-    const stats = { entryCount: entries.length, peerBreakdown, mood };
+    const kinds: Record<string, number> = {};
+    for (const e of all) { const k = e.kind || "note"; kinds[k] = (kinds[k] || 0) + 1; }
+    const allTags = [...new Set(all.flatMap(e => e.tags || []))];
+    // Last 5 entries for agent visibility
+    const recentEntries = all.slice(-5).map(e => ({
+      peer: e.peer, text: e.text, kind: e.kind || "note",
+      ts: e.ts, tags: e.tags,
+    }));
     return {
-      summary: `Journal — ${entries.length} entries`,
-      lastEntry: last?.text ?? null,
-      entryCount: entries.length,
-      filterByPeer,
+      summary: `Journal "${journalName}" — ${all.length} entries, mood: ${mood}`,
       journalName,
+      focusMode: focusedPanel,
+      filter: filterByPeer,
+      entryCount: all.length,
       peerBreakdown,
       mood,
-      stats,
+      kinds,
+      tags: allTags,
+      lastEntry: last ? { peer: last.peer, text: last.text, kind: last.kind } : null,
+      recentEntries,
+      availableCommands: [
+        "journal.open", "journal.append", "journal.query",
+        "journal.summarize", "journal.export-markdown",
+        "journal.switch", "journal.import-devlog", "journal.ambient",
+      ],
     };
   });
 
