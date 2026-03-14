@@ -24,6 +24,10 @@
 - Backlinks: entry references a file → clicking shows the file path
 - Import command: `journal.import-devlog` parses agentic-devlog.md into entries
 - This makes the Journal a real working tool, not a demo — COAT in action
+- File references in entries → clickable to open code editor or markdown viewer
+  via `host.runGlobalCommand("editor.open", { filePath })` or `markdown.open`
+- Auto-detect file paths in entry text (anything matching `src/` or `microapps/` etc)
+  and render as highlighted links
 
 ## Future Features
 - Entry pinning — mark entries as important, always visible at top

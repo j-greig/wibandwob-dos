@@ -253,6 +253,114 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
+    id: "import-devlog",
+    label: "Import Agentic Devlog",
+    description: "Parse .agents/shell-dev/agentic-devlog.md into journal entries. Args: { filePath?, journalName? }",
+    direct: true,
+    action: (args: any) => {
+      const filePath = args?.filePath || join(host.repoRoot, ".agents", "shell-dev", "agentic-devlog.md");
+      const jName = args?.journalName || "agent-devlog";
+      const outPath = join(host.repoRoot, "scratch", `${jName}.jsonl`);
+
+      if (!existsSync(filePath)) return { ok: false, error: `File not found: ${filePath}` };
+      const md = readFileSync(filePath, "utf-8");
+      const lines = md.split("\n");
+
+      const entries: JournalEntry[] = [];
+      let currentDate = "";
+      let currentSection = "";
+      let currentKind: EntryKind = "note";
+      let buffer: string[] = [];
+
+      function flushBuffer() {
+        const text = buffer.join(" ").trim();
+        if (text && text.length > 3) {
+          // Extract file references
+          const fileRefs = text.match(/(?:src\/|microapps\/|\.agents\/|\.planning\/)[^\s,)]+/g) || [];
+          const tags: string[] = [];
+          if (currentSection) tags.push(currentSection.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 30));
+          if (fileRefs.length > 0) tags.push("has-files");
+
+          entries.push({
+            peer: "agent",
+            text,
+            ts: currentDate ? new Date(currentDate + "T12:00:00Z").toISOString() : new Date().toISOString(),
+            kind: currentKind,
+            tags: tags.length > 0 ? tags : undefined,
+            actor: "devlog-import",
+          });
+        }
+        buffer = [];
+      }
+
+      let inFrontmatter = false;
+      for (const line of lines) {
+        // Skip YAML frontmatter
+        if (line.trim() === "---") { inFrontmatter = !inFrontmatter; continue; }
+        if (inFrontmatter) continue;
+
+        // Date headers: ## 2026-03-13: Title  or  ## 2026-03-09 — Title
+        const dateMatch = line.match(/^## (\d{4}-\d{2}-\d{2})[:\s—–-]+\s*(.*)/);
+        if (dateMatch) {
+          flushBuffer();
+          currentDate = dateMatch[1]!;
+          currentSection = dateMatch[2]!.trim();
+          currentKind = "observation";
+          continue;
+        }
+
+        // Sub-headers: ### What worked / What failed / Lesson
+        const subMatch = line.match(/^### (.*)/);
+        if (subMatch) {
+          flushBuffer();
+          const sub = subMatch[1]!.toLowerCase();
+          if (sub.includes("decision") || sub.includes("what worked")) currentKind = "decision";
+          else if (sub.includes("lesson") || sub.includes("rule")) currentKind = "discovery";
+          else if (sub.includes("question") || sub.includes("open")) currentKind = "question";
+          else if (sub.includes("fail") || sub.includes("pain") || sub.includes("friction")) currentKind = "observation";
+          else currentKind = "note";
+          currentSection = subMatch[1]!.trim();
+          continue;
+        }
+
+        // Skip frontmatter, empty lines between sections
+        if (line.startsWith("---") || line.startsWith("# ") || line.startsWith("```")) {
+          if (buffer.length > 0) flushBuffer();
+          continue;
+        }
+
+        // Content lines
+        const trimmed = line.trim();
+        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          flushBuffer();
+          buffer.push(trimmed.slice(2));
+        } else if (trimmed) {
+          buffer.push(trimmed);
+        } else if (buffer.length > 0) {
+          flushBuffer();
+        }
+      }
+      flushBuffer();
+
+      // Write entries
+      const dir = dirname(outPath);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const content = entries.map(e => JSON.stringify(e)).join("\n") + "\n";
+      writeFileSync(outPath, content);
+
+      return {
+        ok: true,
+        journalName: jName,
+        path: outPath,
+        entriesImported: entries.length,
+        dateRange: entries.length > 0
+          ? { from: entries[0]!.ts.slice(0, 10), to: entries[entries.length - 1]!.ts.slice(0, 10) }
+          : null,
+      };
+    },
+  });
+
+  host.registerCommand({
     id: "ambient",
     label: "Journal Ambient",
     description: "Open a compact ambient view showing the last 3 entries.",
