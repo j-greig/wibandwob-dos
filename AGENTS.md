@@ -192,6 +192,9 @@ bash scripts/start-alt-instance.sh
 | `package.json`, `tsconfig.json` | RESTART required |
 
 Rule of thumb: if it lives in `microapps/`, reload. If it lives in `src/`, restart.
+For agent/dev watch loops, prefer `bun run watch:microapp -- microapps/<name> --open`.
+That watcher now defaults to a safe restart+reopen cycle. `--strategy reload`
+is still available as the experimental in-process path.
 
 ## Subsystem Specs
 

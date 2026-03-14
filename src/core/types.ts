@@ -201,6 +201,7 @@ export interface DesktopState {
     controlApiPort?: number;
     controlApiHost?: string;
     controlApiBaseUrl?: string;
+    microappReloadEpoch?: number;
     theme?: string;
     capabilities?: Record<string, { ok: boolean; reason?: string; source?: string; checkedAt?: string }>;
   };

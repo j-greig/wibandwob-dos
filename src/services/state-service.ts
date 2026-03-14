@@ -11,6 +11,7 @@ interface StateServiceOptions {
   appMode: string;
   cwd: string;
   runtimeNode: RuntimeNodeDescriptor;
+  getMicroappReloadEpoch?: () => number;
   getControlApiStatus?: () => {
     enabled: boolean;
     port?: number;
@@ -114,6 +115,7 @@ export class StateService {
         controlApiPort: controlApi?.port,
         controlApiHost: controlApi?.host ?? this.options.runtimeNode.host,
         controlApiBaseUrl: controlApi?.baseUrl,
+        microappReloadEpoch: this.options.getMicroappReloadEpoch?.(),
         theme: themeName(),
         capabilities: capabilityService.snapshot()
       },

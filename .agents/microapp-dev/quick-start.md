@@ -75,9 +75,14 @@ Optional, experimental loop:
 bun run watch:microapp -- microapps/my-app --open
 ```
 
-This builds on the stable `microapps.reload` path but best-effort reopens the
-microapp window. Use it as development scaffolding, not as a guaranteed live
-state-preserving hot-reload system.
+This now defaults to the safe path: restart the host, wait for `/health`, then
+reopen the microapp. If you want to try the in-process path anyway, use:
+
+```bash
+bun run watch:microapp -- microapps/my-app --open --strategy reload
+```
+
+Treat `--strategy reload` as experimental. The reliable default is restart+reopen.
 
 ## Next steps
 

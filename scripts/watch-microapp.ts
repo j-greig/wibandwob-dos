@@ -29,10 +29,17 @@ interface RuntimeWindowState {
   };
 }
 
+interface RuntimeStateEnvelope {
+  app?: {
+    microappReloadEpoch?: number;
+  };
+  windows?: RuntimeWindowState[];
+}
+
 const DEFAULT_WATCH = ["index.ts", "microapp.json"];
 
 function usage(): never {
-  console.error("Usage: bun run scripts/watch-microapp.ts <microapp-dir> [--open] [--debounce <ms>] [--api <url>]");
+  console.error("Usage: bun run scripts/watch-microapp.ts <microapp-dir> [--open] [--debounce <ms>] [--api <url>] [--strategy restart|reload]");
   process.exit(1);
 }
 
@@ -67,6 +74,7 @@ function parseArgs(argv: string[]) {
   const microappDir = path.resolve(args.shift()!);
   let debounceMs = 250;
   let open = false;
+  let strategy: "restart" | "reload" = "restart";
   let apiBase = process.env.MICROAPP_WATCH_API ?? "http://127.0.0.1:8099";
   while (args.length > 0) {
     const arg = args.shift()!;
@@ -86,9 +94,15 @@ function parseArgs(argv: string[]) {
       if (!apiBase) usage();
       continue;
     }
+    if (arg === "--strategy") {
+      const value = args.shift();
+      if (value !== "restart" && value !== "reload") usage();
+      strategy = value;
+      continue;
+    }
     usage();
   }
-  return { microappDir, debounceMs, open, apiBase };
+  return { microappDir, debounceMs, open, apiBase, strategy };
 }
 
 function loadManifest(microappDir: string): MicroappManifest {
@@ -122,9 +136,38 @@ async function waitForCommand(apiBase: string, commandId: string, attempts = 20)
   throw new Error(`Timed out waiting for command ${commandId}`);
 }
 
+async function getMicroappReloadEpoch(apiBase: string): Promise<number> {
+  const state = await api(apiBase, "/state") as RuntimeStateEnvelope;
+  const epoch = Number(state.app?.microappReloadEpoch ?? 0);
+  return Number.isFinite(epoch) ? epoch : 0;
+}
+
+async function waitForReloadEpoch(apiBase: string, previousEpoch: number, attempts = 40): Promise<number> {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const epoch = await getMicroappReloadEpoch(apiBase);
+    if (epoch > previousEpoch) {
+      return epoch;
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting for microapp reload epoch to advance past ${previousEpoch}`);
+}
+
+async function restartRuntime(): Promise<void> {
+  const proc = Bun.spawn(["bash", "scripts/restart.sh"], {
+    cwd: process.cwd(),
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`restart.sh exited with code ${exitCode}`);
+  }
+}
+
 async function listMicroappWindows(apiBase: string, appType: string): Promise<RuntimeWindowState[]> {
-  const state = await api(apiBase, "/state") as { windows: RuntimeWindowState[] };
-  return state.windows.filter((window) => window.details?.appType === appType);
+  const state = await api(apiBase, "/state") as RuntimeStateEnvelope;
+  return (state.windows ?? []).filter((window) => window.details?.appType === appType);
 }
 
 async function waitForClosedWindows(apiBase: string, ids: number[], appType: string, attempts = 20): Promise<void> {
@@ -178,7 +221,12 @@ async function reopenMicroappWindows(
   }
 }
 
-async function reloadMicroapp(microappDir: string, apiBase: string, openOnBoot: boolean): Promise<void> {
+async function reloadMicroapp(
+  microappDir: string,
+  apiBase: string,
+  openOnBoot: boolean,
+  strategy: "restart" | "reload",
+): Promise<void> {
   const manifest = loadManifest(microappDir);
   const appType = manifest.microapp?.id;
   if (!appType) {
@@ -188,13 +236,21 @@ async function reloadMicroapp(microappDir: string, apiBase: string, openOnBoot: 
   const reopenArgs = manifest.dev?.reopenArgs ?? {};
   const priorWindows = await listMicroappWindows(apiBase, appType);
 
-  for (const window of priorWindows) {
-    await closeWindow(apiBase, window.id);
+  let result: unknown;
+  if (strategy === "reload") {
+    const previousEpoch = await getMicroappReloadEpoch(apiBase);
+    for (const window of priorWindows) {
+      await closeWindow(apiBase, window.id);
+    }
+    await waitForClosedWindows(apiBase, priorWindows.map((window) => window.id), appType);
+    result = await api(apiBase, "/commands/run", "POST", { id: "microapps.reload" });
+    await waitForReloadEpoch(apiBase, previousEpoch);
+    await waitForCommand(apiBase, reopenCommand);
+  } else {
+    await restartRuntime();
+    result = { ok: true, restarted: true };
+    await waitForCommand(apiBase, reopenCommand, 60);
   }
-  await waitForClosedWindows(apiBase, priorWindows.map((window) => window.id), appType);
-
-  const result = await api(apiBase, "/commands/run", "POST", { id: "microapps.reload" });
-  await waitForCommand(apiBase, reopenCommand);
 
   if (openOnBoot && priorWindows.length === 0) {
     await api(apiBase, "/commands/run", "POST", { id: reopenCommand, args: reopenArgs });
@@ -203,11 +259,11 @@ async function reloadMicroapp(microappDir: string, apiBase: string, openOnBoot: 
   }
 
   const stamp = new Date().toLocaleTimeString();
-  console.log(`[watch-microapp] ${stamp} ${manifest.name ?? appType} reloaded`, JSON.stringify(result));
+  console.log(`[watch-microapp] ${stamp} ${manifest.name ?? appType} ${strategy} complete`, JSON.stringify(result));
 }
 
 async function main() {
-  const { microappDir, debounceMs, open, apiBase } = parseArgs(process.argv.slice(2));
+  const { microappDir, debounceMs, open, apiBase, strategy } = parseArgs(process.argv.slice(2));
   const manifest = loadManifest(microappDir);
   const watchEntries = manifest.dev?.watch?.length ? manifest.dev.watch : DEFAULT_WATCH;
   const parentDirs = uniqueParentDirs(microappDir, watchEntries);
@@ -221,7 +277,7 @@ async function main() {
       return;
     }
     reloadInFlight = true;
-    void reloadMicroapp(microappDir, apiBase, open)
+    void reloadMicroapp(microappDir, apiBase, open, strategy)
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`[watch-microapp] reload failed: ${message}`);
@@ -250,9 +306,10 @@ async function main() {
   console.log(`[watch-microapp] watching ${microappDir}`);
   console.log(`[watch-microapp] files: ${watchEntries.join(", ")}`);
   console.log(`[watch-microapp] api: ${apiBase}`);
+  console.log(`[watch-microapp] strategy: ${strategy}`);
 
   if (open) {
-    await reloadMicroapp(microappDir, apiBase, true);
+    await reloadMicroapp(microappDir, apiBase, true, strategy);
   }
 }
 

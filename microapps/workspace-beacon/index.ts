@@ -112,6 +112,12 @@ export default function setup(host: MicroappHost) {
 
 function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
   let state = sanitizeState(args?._restore);
+  const themedStyles = () => ({
+    root: host.theme().body,
+    header: host.theme().body,
+    body: host.theme().body,
+    footer: host.theme().body,
+  });
   const win = host.createWindow({
     title: "Workspace Beacon",
     width: 72,
@@ -126,7 +132,7 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
     left: 0,
     right: 0,
     bottom: 0,
-    style: host.theme().body,
+    style: themedStyles().root,
   });
 
   const header = blessed.box({
@@ -136,7 +142,7 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
     right: 0,
     height: 4,
     tags: true,
-    style: host.theme().body,
+    style: themedStyles().header,
   });
 
   const body = blessed.box({
@@ -144,9 +150,9 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
     top: 4,
     left: 0,
     right: 0,
-    bottom: 2,
+    bottom: 3,
     tags: true,
-    style: host.theme().body,
+    style: themedStyles().body,
   });
 
   const footer = blessed.box({
@@ -154,17 +160,17 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
     left: 0,
     right: 0,
     bottom: 0,
-    height: 2,
+    height: 3,
     tags: true,
-    style: host.theme().body,
+    style: themedStyles().footer,
   });
 
   function render() {
     header.setContent([
-      "{bold}Workspace Beacon{/bold}",
+      "{bold}Workspace Beacon · RESTART RELOAD OK{/bold}",
       `stage  ${state.stage}    pinned  ${state.pinned ? "yes" : "no"}`,
       `updated ${state.updatedAt}`,
-      "",
+      "watch:microapp reopened this window",
     ].join("\n"));
     body.setContent([
       "{underline}Current note{/underline}",
@@ -173,8 +179,14 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
       "",
       "{underline}Why it exists{/underline}",
       "A workspace restore should bring back human/agent intent, not just window geometry.",
+      "",
+      "{underline}Visible reload token{/underline}",
+      "workspace-beacon-ui-proof-v4",
     ].join("\n"));
-    footer.setContent("e edit note · s cycle stage · p toggle pin · q close");
+    footer.setContent([
+      "[ Edit Note ]  [ Cycle Stage ]  [ Toggle Pin ]  [ Restart OK ]",
+      "e edit note · s cycle stage · p toggle pin · q close",
+    ].join("\n"));
     host.screen.render();
   }
 
@@ -216,18 +228,24 @@ function openWorkspaceBeacon(host: MicroappHost, args?: RestoreArgs) {
     updatedAt: state.updatedAt,
   }));
   win.captureText(() => [
-    "Workspace Beacon",
+    "Workspace Beacon · RESTART RELOAD OK",
     `stage: ${state.stage}`,
     `pinned: ${state.pinned ? "yes" : "no"}`,
     `updated: ${state.updatedAt}`,
     "",
     state.note,
+    "",
+    "Visible reload token:",
+    "workspace-beacon-ui-proof-v4",
+    "",
+    "[ Edit Note ] [ Cycle Stage ] [ Toggle Pin ] [ Restart OK ]",
   ].join("\n"));
   win.onRestyle(() => {
-    root.style = host.theme().body;
-    header.style = host.theme().body;
-    body.style = host.theme().body;
-    footer.style = host.theme().body;
+    const styles = themedStyles();
+    root.style = styles.root;
+    header.style = styles.header;
+    body.style = styles.body;
+    footer.style = styles.footer;
     render();
   });
   win.onCleanup(() => {

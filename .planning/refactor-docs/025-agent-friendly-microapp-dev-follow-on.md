@@ -46,6 +46,7 @@ The next quality bar for microapp development is agent ergonomics:
   - `microapps/workspace-beacon/`
   - `microapps/layout-probe/`
 - stable scaffold path: `bash scripts/scaffold-microapp.sh microapps/<name> ...`
+- safe watcher default: `watch:microapp` now uses restart+reopen unless `--strategy reload` is requested
 - canonical authoring docs under `.agents/microapp-dev/`
 
 These proofs now cover:
@@ -90,6 +91,7 @@ Use this loop by default for authoring work inside `microapps/*`:
 Optional best-effort watcher:
 
 - `bun run watch:microapp -- microapps/<name> --open`
+- experimental in-process path: `bun run watch:microapp -- microapps/<name> --open --strategy reload`
 
 ## Why Hot Reload Is Still Parked
 
@@ -108,9 +110,9 @@ as a post-refactor follow-on.
 
 Safe enough now:
 
+- safe restart → reopen loops for microapp authoring
 - reloading command metadata
-- reopening stateless/simple microapps after `microapps.reload`
-- best-effort close → reload → reopen with geometry restoration
+- best-effort close → reload → reopen with geometry restoration only when explicitly opting into `--strategy reload`
 
 Not yet safe as a contract:
 

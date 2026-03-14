@@ -227,6 +227,7 @@ export class TsTuiMvpApp {
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
   private readonly runtimeNode: RuntimeNodeDescriptor;
+  private microappReloadEpoch = 0;
   private microappDeps?: MicroappHostDeps;
 
   constructor(opts?: {
@@ -437,6 +438,7 @@ export class TsTuiMvpApp {
         appMode: "terminal-native",
         cwd: REPO_ROOT,
         runtimeNode: this.runtimeNode,
+        getMicroappReloadEpoch: () => this.microappReloadEpoch,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -508,11 +510,15 @@ export class TsTuiMvpApp {
     clearedSnapshots: number;
   }> {
     this.microappDeps ??= this.buildMicroappDeps();
-    const result = await reloadMicroapps(this.microappDeps);
-    this.rebuildMenusFromCommands();
-    this.syncLiveState();
-    this.screen.render();
-    return result;
+    try {
+      const result = await reloadMicroapps(this.microappDeps);
+      this.rebuildMenusFromCommands();
+      return result;
+    } finally {
+      this.microappReloadEpoch += 1;
+      this.syncLiveState();
+      this.screen.render();
+    }
   }
 
   /** Restore default workspace on boot. Empty desktop if none exists. */

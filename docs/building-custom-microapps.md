@@ -224,7 +224,20 @@ For edit-save-reload during development, there is also an experimental watcher:
 bun run watch:microapp -- microapps/my-app --open
 ```
 
-What it tries to do:
+Default behavior now:
+
+- restart the host cleanly via `scripts/restart.sh`
+- wait for `/health`
+- reopen the watched microapp
+- restore the reopened window geometry when possible
+
+Experimental alternate path:
+
+```bash
+bun run watch:microapp -- microapps/my-app --open --strategy reload
+```
+
+What the experimental reload path tries to do:
 
 - watches `dev.watch` entries from `microapp.json` or defaults to `index.ts,microapp.json`
 - runs `microapps.reload`
@@ -233,8 +246,9 @@ What it tries to do:
 
 Current status:
 
-- `microapps.reload` itself is stable and is the canonical microapp-only reload path
-- hot-swapping an already-open microapp window is still best-effort
+- `microapps.reload` itself is stable for command/catalog refresh and non-watcher control
+- watch-mode code reload now defaults to restart+reopen because that is the reliable path
+- hot-swapping an already-open microapp window through `--strategy reload` is still best-effort
 - reliable full window-state handoff is a later abstraction task, not part of
   the stable refactor contract
 
