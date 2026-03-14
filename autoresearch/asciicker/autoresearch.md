@@ -1,228 +1,226 @@
-# Autoresearch — Asciicker Port
+# Autoresearch — Asciicker Port v2 (Triangle Rasterizer)
 
 ## Objective
-Port the asciicker 3D ASCII game engine (github.com/msokalski/asciicker, MIT)
-to TypeScript as a WibWob-DOS module. Not a reimagination — a faithful port of
-the original's rendering pipeline, map data, sprites, meshes, and gameplay.
+Rewrite the asciicker renderer from scratch as a proper software rasterizer,
+matching the original C++ engine's architecture. The v1 tile renderer is
+retired — it cannot produce gap-free terrain or correct 3D depth.
 
-## Reference Materials
-- **C++ source**: `/tmp/asciicker/` — 136K lines (cloned from github, MIT)
-- **Gameplay GIF**: `asciicker-gameplay-animted.gif` (repo root)
-  — 26s at 16.67fps, 391 frames, 800x600. Actual gameplay recording.
-- **Extracted frames**: `autoresearch/asciicker/reference-frames/`
-  — 15 PNGs evenly spaced through the GIF (~1.7s apart). Study these for
-  water reflections, 3D camera rotation, mesh rendering, sprite animation,
-  lighting, cliff faces, and the fg+bg dithering technique in action.
+See `ENGINE_ANALYSIS.md` for the full C++ reverse-engineering report.
 
-## Reference Codebase
+## What v1 got wrong
+- One projected point per terrain cell, stamped as a 2-wide block → gaps everywhere
+- No triangle rasterization → no sub-cell coverage, no depth interpolation
+- No post-pass → no auto_mat dithering, no cliff illusion, no 2x2 downsampling
+- Movement directions felt wrong because projection didn't match camera yaw properly
+- Minimap was inverted
 
-### Original architecture (what we're porting)
-| System | C++ files | Lines | What it does |
-|--------|-----------|-------|-------------|
-| Terrain | terrain.cpp/h | 2954 | Heightmap patches, load/save .a3d format |
-| World | world.cpp/h | 5316 | BSP tree, mesh instances, sprite instances, items |
-| Render | render.cpp/h | 4359 | CPU rasterizer: 3D→AnsiCell buffer with depth, materials, lighting |
-| Sprite | sprite.cpp/h | 1660 | Load .xp (REXPaint gzip), multi-frame animation atlas |
-| Physics | physics.cpp/h | 1695 | Collision, gravity, movement |
-| Game | game.cpp/h | 10588 | Player, NPCs, combat, inventory, AI |
+## Architecture (from ENGINE_ANALYSIS.md)
 
-### Key data formats
-- **Map** `.a3d`: header "AS3D", terrain patches + world instances (binary)
-- **Meshes** `.akm`: PLY ascii — vertices with RGBA colour + triangle faces
-- **Sprites** `.xp`: gzip REXPaint — layers of (glyph:i32, fg:RGB, bg:RGB) cells, column-major
-- **Palette** `palette.gz`: gzip — 256 RGB triplets for the ANSI colour mapping
+The original is a 3-stage pipeline:
 
-### Core rendering concept
-Each screen cell = `AnsiCell { fg: u8, bg: u8, glyph: u8, spare: u8 }`.
-The renderer writes to a flat `AnsiCell[w*h]` buffer using a depth test per cell.
-Terrain patches are rasterized as triangle pairs. Meshes rasterized face-by-face.
-Sprites blitted with transparency. Then the buffer is printed as ANSI escape codes.
+```
+World data → Sample buffer (2x resolution) → Post-pass → Terminal cells
+```
 
-The visual richness comes from BOTH fg AND bg colour per cell — the two colours
-create a dithering effect that doubles effective colour resolution.
+1. **Projection**: isometric with 30° elevation, yaw-rotatable
+2. **Triangle rasterizer**: barycentric fill with depth test, shared by terrain + meshes
+3. **Post-pass**: 2x2 sample blocks → one terminal cell via auto_mat dithering
+
+### Key constants
+- HEIGHT_SCALE = 16 (z units per visual cell of height)
+- HEIGHT_CELLS = 4 (height vertices per patch side = 5)
+- VISUAL_CELLS = 8 (material cells per patch side)
+- ds = 2 * zoom / VISUAL_CELLS (screen samples per world visual cell)
+- sin30 = 0.5, cos30 = 0.866
+
+### Projection formulas (TypeScript)
+```ts
+sx = cosYaw * ds * X + sinYaw * ds * Y + cx
+sy = -sinYaw * sin30 * ds * X + cosYaw * sin30 * ds * Y + (cos30/HEIGHT_SCALE * ds * HEIGHT_CELLS) * Z + cy
+```
+where X = x * HEIGHT_CELLS, Y = y * HEIGHT_CELLS (premultiplied coords).
 
 ## Module Structure
-This port uses multiple files under `modules/asciicker/`:
+Split early per god-file-prevention rule. Each file < 300 lines.
 
-| File | Responsibility |
-|------|---------------|
-| `index.ts` | Module entry, window setup, game loop, input |
-| `render.ts` | 3D→AnsiCell rasterizer, projection, depth buffer |
-| `terrain.ts` | Heightmap patches, terrain generation or .a3d loading |
-| `world.ts` | World objects: mesh instances, sprite instances |
-| `sprite.ts` | .xp parser, sprite blitting, animation |
-| `mesh.ts` | .akm PLY parser, mesh face rasterization |
-| `material.ts` | Material/palette system, glyph selection, lighting |
-| `physics.ts` | Collision, movement, gravity |
-| `cp437.ts` | CP437→Unicode glyph mapping table (256 entries) |
+```
+modules/asciicker/
+  index.ts          — module setup, window, game loop, input, HUD
+  projection.ts     — buildProjection(), projectVertex()
+  rasterize.ts      — rasterizeTriangle() with barycentric coords + depth test
+  sample-buffer.ts  — Sample type, buffer create/clear
+  terrain.ts        — procedural terrain gen (height[5][5] + visual[8][8] + diag)
+  terrain-render.ts — project patch vertices, split quads to triangles, rasterize
+  postpass.ts       — 2x2 downsample, auto_mat LUT, cliff glyphs, water tint
+  materials.ts      — auto_mat table generation, material shade lookup
+  ansi.ts           — convert terminal cell buffer to ANSI escape string
+  world-objects.ts  — trees/bushes/rocks as procedural mesh-like objects
+  npcs.ts           — NPC state, patrol AI, combat
+  formats/
+    a3d.ts          — .a3d terrain loader (Phase 3)
+    xp.ts           — .xp sprite loader (Phase 3)
+    akm.ts          — .akm PLY mesh loader (Phase 3)
+```
 
 ## Phase Plan
 
-### Phase 1: Faithful render pipeline (RENDER axis)
-Goal: match the original's projection, depth buffer, and per-cell output.
+### Phase 1: Triangle-based terrain (the visual breakthrough)
+This is the minimum viable renderer — gap-free terrain with depth.
 
-**Story 1.1: AnsiCell buffer + ANSI output**
-- AnsiCell type: { fg, bg, glyph, depth }
-- Buffer clear, write with depth test
-- Convert buffer to ANSI escape string with fg+bg per cell
-- AC: buffer renders correctly in blessed window with per-cell colour
+**Story 1.1: Projection module**
+- Port exact projection matrix from render.cpp:2785-2815
+- buildProjection(zoom, yawDeg, camera, dw, dh) → projection object
+- projectVertex(proj, x, y, z) → { sx, sy }
+- AC: projecting (0,0,0) lands at screen centre, yaw rotates correctly
 
-**Story 1.2: Isometric projection matching original**
-- Port the exact transform matrix from render.cpp lines 2780-2830
-- 30° pitch, yaw-rotatable, architectural perspective
-- Zoom control, screen centering
-- AC: projection matches original's visual angle and proportions
+**Story 1.2: Sample buffer + triangle rasterizer**
+- Sample { height, visual, diffuse, flags } as typed array (SoA or AoS)
+- rasterizeTriangle(buffer, w, h, tri, blend) with barycentric coords
+- Depth test: larger height wins (matching original)
+- Edge pairing rule to prevent double-fill
+- AC: rasterizing a single triangle fills correct pixels, no gaps at shared edges
 
-**Story 1.3: Terrain patch rasterization**
-- Port terrain patch structure (HEIGHT_CELLS=4, VISUAL_CELLS=8)
-- Rasterize patch quads as triangle pairs (Bresenham fill)
-- Height offset creates depth — higher cells occupy higher screen rows
-- AC: flat terrain renders as filled grid, height variations show depth
+**Story 1.3: Terrain patch generation**
+- Procedural terrain: height[5][5] vertices + visual[8][8] material cells + diag bits
+- Each height quad → 2 triangles (diag bit selects / or \ split)
+- Project all 5x5 vertices through projection, rasterize all triangles
+- AC: terrain fills screen with zero gaps, height creates visible depth
 
-**Story 1.4: Surface normal lighting**
-- Compute normals from height differences
-- Directional light dot product → diffuse value
-- Map diffuse to material shade levels
-- AC: terrain shows light/shadow based on height slope
+**Story 1.4: Simple post-pass (no auto_mat yet)**
+- Read sample buffer, convert each sample to one terminal cell
+- Use visual index → biome colour mapping (simplified materials)
+- Compute diffuse from height gradients
+- AC: coloured terrain visible, no blue-sky bleedthrough
 
-### Phase 2: Materials + visual richness (BEAUTY axis)
-Goal: match the original's fg+bg dithering and glyph variety.
+### Phase 2: Visual richness (auto_mat + cliff illusion)
+This is what makes it LOOK like asciicker.
 
-**Story 2.1: Material system port**
-- Port Material struct: shade[4][16] = 4 light levels × 16 sub-materials
-- Each shade entry = { fg, bg, glyph }
-- Material assigned per terrain visual cell
-- AC: terrain cells show varied fg+bg+glyph combinations
+**Story 2.1: auto_mat LUT generation**
+- Port create_auto_mat() — maps RGB15 → (bg, fg, glyph) triple
+- Glyph ramp: " ..::%"  with fg/bg swap at midpoint = 12 effective levels
+- Precompute 32*32*32*3 lookup table at module load
+- AC: arbitrary RGB colour maps to visually correct terminal cell
 
-**Story 2.2: CP437 glyph table**
-- Full 256-entry CP437→Unicode mapping (from game_app.cpp)
-- Glyph index stored in AnsiCell, converted at output time
-- AC: all 256 CP437 characters render correctly as Unicode
+**Story 2.2: 2x2 downsample post-pass**
+- Render to 2x resolution sample buffer
+- Each 2x2 block → average RGB → auto_mat lookup → one terminal cell
+- This is the core of the doubled colour resolution
+- AC: terrain shows smooth colour gradients, not blocky biome boundaries
 
-**Story 2.3: Palette port**
-- Load palette.gz: 256 RGB→ANSI colour entries
-- Or port the auto_mat table from render.cpp (RGB→closest fg+bg+glyph)
-- AC: colours match the original's look
+**Story 2.3: Cliff/elevation illusion**
+- Visual cell bit 0x8000 = elevated
+- Post-pass reads elevation patterns across neighbours
+- Selects material shade row (lower/high/raise/low)
+- Silhouette glyphs ─ and _ for ledges
+- AC: height drops show visible cliff edges, not just colour changes
 
-### Phase 3: World data (WORLD axis)
-Goal: load and render the actual game map, not procedural terrain.
+**Story 2.4: Surface normal lighting**
+- Compute dzdx, dzdy from height grid
+- Directional light dot product → diffuse 0-255
+- diffuse/17 → shade bucket 0-15 → material lookup
+- AC: terrain shows light/shadow based on slope direction
+
+### Phase 3: Real data (faithful port)
+Load the actual game map and assets instead of procedural terrain.
 
 **Story 3.1: .a3d terrain loader**
-- Parse the binary format: header, patch index, height/visual maps
-- Reconstruct the original game terrain
-- AC: game_map_y8.a3d loads and renders recognisable terrain
+- Parse binary: AS3D header + FilePatch records
+- Each patch: x, y, visual[8][8], height[5][5], diag
+- visual bit 0x8000 = elevation flag, lower 7 bits = material
+- AC: game_map_y8.a3d loads, patch count matches original
 
-**Story 3.2: .akm mesh loader**
-- Parse PLY ascii: vertices (xyz + RGBA), triangle faces
-- Store as renderable face list
-- AC: tree-1.akm loads and has correct vertex count
+**Story 3.2: .xp sprite loader**
+- Gunzip + parse: version, layers, width, height
+- COLUMN-MAJOR cell order (cell = x * height + y)
+- Layer 0 = colour key, layer 1 = height, layer 2 = image
+- XPCell: u32 glyph + RGB fg + RGB bg = 10 bytes
+- AC: player-nude.xp loads with correct dimensions and colours
 
-**Story 3.3: Mesh face rasterization**
+**Story 3.3: .akm mesh loader**
+- ASCII PLY parser: vertices (xyz + rgba), triangle faces
+- Fan-triangulate quads
+- AC: tree-1.akm loads with correct vertex/face count
+
+**Story 3.4: Sprite rendering**
+- Position sprite in 3D, project to sample buffer
+- Blit with transparency (colour key from layer 0)
+- Reflection mode: mirror Z around water level
+- AC: player sprite visible on terrain, correctly occluded by height
+
+**Story 3.5: Mesh rendering**
 - Transform mesh vertices through camera matrix
-- Rasterize coloured triangles to AnsiCell buffer
-- Depth test per cell
-- AC: a tree mesh renders as a multi-cell 3D object on terrain
+- Rasterize coloured triangles through same rasterizer as terrain
+- AC: tree mesh renders as 3D object, depth-correct with terrain
 
-**Story 3.4: .xp sprite loader**
-- Parse gzip REXPaint: layers of column-major cells
-- Extract animation frames from atlas layout
-- AC: player-nude.xp loads all frames, character.xp loads preview
+### Phase 4: Water + effects
+**Story 4.1: Water plane + reflections**
+- Global water height, quantised to sample increments
+- Reflection pass: negate Z projection, re-render terrain
+- Merge normal + reflected in post-pass
+- AC: water areas show reflected terrain/objects
 
-**Story 3.5: World instance placement**
-- Load instance data from .a3d (position, yaw, mesh/sprite ref)
-- Place trees, bushes, rocks, houses at their map positions
-- AC: world objects appear at correct positions matching original
+**Story 4.2: Water surface animation**
+- Post-pass detects submerged cells
+- Animated noise perturbation on colour
+- AC: water surface ripples
 
-### Phase 4: Player + controls (CONTROLS axis)
-Goal: walk through the world like the original game.
+### Phase 5: Gameplay (re-add from v1)
+Re-integrate the gameplay features from v1 that worked well.
 
-**Story 4.1: Player movement**
-- WASD screen-relative movement
-- Height-following (player walks on terrain surface)
-- Collision with world objects
-- AC: player walks smoothly, can't walk through trees
+**Story 5.1: Player movement + camera**
+- WASD screen-relative movement with correct yaw mapping
+- Smooth camera follow with lerp
+- Q/E rotation, +/- zoom
+- Height-following on terrain surface
 
-**Story 4.2: Camera system**
-- Smooth follow with Z-tracking
-- Q/E yaw rotation (free angle, not just 90° steps)
-- +/- zoom
-- AC: camera tracks player smoothly, rotation feels natural
+**Story 5.2: NPCs + combat**
+- Patrol AI, hostile/friendly NPCs
+- Space to interact/attack
+- HP system, damage, defeat rewards
 
-**Story 4.3: Sprite animation**
-- Walking animation: cycle frames based on movement direction
-- Idle animation when standing still
-- Direction-dependent sprite selection (8 angles)
-- AC: player sprite animates when walking, faces movement direction
+**Story 5.3: Weather + items + inventory**
+- Weather cycling with visual overlays
+- Item pickups, inventory tracking
+- Day/night cycle
 
-### Phase 5: Water + effects (BEAUTY axis continued)
-Goal: animated water, reflections, weather.
+### Phase 6: Polish
+**Story 6.1: registerSnapshot persistence**
+- Save/restore player position, seed, inventory
 
-**Story 5.1: Water surface**
-- Flat water plane at configurable level
-- Animated glyph cycling (ripple effect)
-- Distinct blue palette for water cells
-- AC: water areas ripple and look like the original
-
-**Story 5.2: Water reflections**
-- Terrain/objects above water reflect below water line
-- Reflection uses inverted y-coordinate + dimmed colours
-- AC: trees near water show visible reflections
-
-**Story 5.3: Day/night cycle**
-- Light direction rotates over time
-- Palette shifts: warm dawn → bright day → orange dusk → blue night
-- AC: world lighting changes gradually over play time
-
-### Phase 6: NPCs + gameplay (SURPRISE axis)
-Goal: the world has life, not just scenery.
-
-**Story 6.1: NPC spawning**
-- Place NPC sprites at world positions
-- Simple patrol AI (random walk within radius)
-- AC: NPCs visible and moving in the world
-
-**Story 6.2: Combat basics**
-- Attack animation when clicking/pressing space
-- NPC health, player health, damage
-- AC: player can fight NPCs, health bars visible
+**Story 6.2: Help overlay + minimap**
+- H key shows controls
+- Minimap using actual terrain data
 
 ## Scoring
-5 axes (each 1-10, averaged):
-- **RENDER** — 3D rendering fidelity (projection, depth, occlusion, lighting)
-- **WORLD** — terrain, objects, map fidelity to original
+Same 5 axes (each 1-10, averaged):
+- **RENDER** — 3D rendering fidelity (triangles, depth, no gaps, lighting)
+- **WORLD** — terrain, objects, map fidelity
 - **CONTROLS** — movement, camera, responsiveness
-- **BEAUTY** — visual richness (fg+bg dithering, glyph variety, palette)
-- **CRAFT** — code quality, architecture, performance, lifecycle
+- **BEAUTY** — visual richness (auto_mat dithering, cliff illusion, water)
+- **CRAFT** — code quality, multi-file architecture, lifecycle
 
-Current: RENDER:8.7 WORLD:8.2 CONTROLS:8.1 BEAUTY:8.1 CRAFT:8.9 = **8.4**
+Current baseline: 9.3 (v1 tile renderer)
+Target: genuine improvement through correct architecture, not feature stuffing
 
 ## Constraints
-- Files: `modules/asciicker/*.ts` (multiple files allowed)
+- Files: `modules/asciicker/*.ts` (multi-file, each < 300 lines)
 - Must pass `bun run typecheck`
 - Keep fps ≤ 8 (125ms+ interval)
 - Import only from blessed and `../../src/services/microapp-sdk.js`
-- Reference data files copied to `modules/asciicker/data/`
+- Reference data files in `modules/asciicker/data/`
 - All lifecycle hooks maintained in index.ts
 
-## Testing Notes
-- **Always maximize the window before scoring/screenshots.** The renderer
-  fills available space — a small window makes everything look cramped and
-  loses detail. Maximize via API before capture:
-  `curl -s -X POST http://127.0.0.1:8099/windows/maximize -H 'Content-Type: application/json' -d '{"id":ID}'`
-- Current MVP screenshot: `autoresearch/asciicker/shots/mvp-current.png`
+## Key Risk (from ENGINE_ANALYSIS.md)
+> The largest hidden risk is not projection. It is the post-pass. That is
+> where terrain materials, elevation, dithering, water tint, and final
+> glyph selection happen.
 
-## Reload Pattern
-```bash
-# Close + reopen (module code re-evaluated on window creation)
-curl -s http://127.0.0.1:8099/state | python3 -c "
-import sys,json; d=json.load(sys.stdin)
-for w in d.get('windows',[]):
-    if w.get('appType')=='wibwob.asciicker': print(w['id'])
-" | while read id; do
-  curl -s -X POST http://127.0.0.1:8099/windows/close \
-    -H 'Content-Type: application/json' -d "{\"id\":$id}"
-done
-curl -s -X POST http://127.0.0.1:8099/commands/run \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.asciicker.open"}'
-```
+The post-pass is where the visual magic lives. Get it right and the port
+looks like asciicker. Get it wrong and it looks like a tile renderer
+with fancier projection math.
+
+## Reference
+- `ENGINE_ANALYSIS.md` — full C++ reverse-engineering (962 lines)
+- `/tmp/asciicker/` — original C++ source (MIT licence)
+- `reference-frames/` — 15 PNGs from original gameplay
+- `autoresearch.ideas.md` — v1 ideas (some still relevant for Phase 5-6)
