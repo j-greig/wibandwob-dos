@@ -82,6 +82,52 @@ One control/API path for every user-visible surface.
 
 Full invariants and anti-patterns: `.agents/shell-dev/invariants.md`
 
+## COAT — Command Once, Adapt Thin (shared semantic runtime)
+
+The runtime is a **shared semantic core** with four explicit seams:
+
+- **command** — one catalog, one dispatch path, one discovery surface
+- **inspection** — one snapshot shape, one access path
+- **window** — one facade, one lifecycle
+- **workspace** — one save/restore path
+
+TUI, CLI, API, agent, and microapps are **thin adapters** over these seams.
+They discover at runtime, invoke through the same dispatch, and read results
+through the same inspection surface. No adapter owns semantics. No adapter
+invents its own command/control path.
+
+```
+                    ┌─────────┐
+                    │ Command  │  ← single source of truth
+                    │ Catalog  │    (id, params, visibility flags)
+                    └────┬────┘
+                         │
+                 ┌───────┴───────┐
+                 │  Shared Seams │  ← semantic core
+                 │  cmd · inspect │    window · workspace
+                 └───────┬───────┘
+                         │
+          ┌──────┬───────┼───────┬──────┐
+          │      │       │       │      │
+        ┌─┴─┐ ┌─┴─┐  ┌──┴──┐ ┌─┴─┐  ┌─┴──┐
+        │TUI│ │API│  │ CLI │ │Agent│ │Micro│
+        │   │ │   │  │     │ │    │  │apps │
+        └───┘ └───┘  └─────┘ └────┘  └────┘
+         thin adapters — discover, invoke, render
+```
+
+**The COAT test:** "Would this work if I deleted the TUI and only had the API?"
+If no — the semantics are in the wrong place. Pull them into the shared seam.
+The adapter just wires input and renders output.
+
+**For microapps:** commands register via `microapp.json` manifest. The loader
+auto-prefixes them (`microapp.<id>.<command>`). They appear in menu, palette,
+API, and agent surfaces automatically — same discovery, same dispatch, same
+parity. No hand-wiring.
+
+**Say "COAT" to invoke this principle.** It means: four shared seams, thin
+adapters, runtime discovery, no interface-owned semantics.
+
 ## Key Files
 
 Quick index — full descriptions live in `.agents/shell-dev/architecture.md`.

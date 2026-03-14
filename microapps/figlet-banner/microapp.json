@@ -1,0 +1,24 @@
+{
+  "name": "figlet-banner",
+  "version": "0.1.0",
+  "description": "FIGlet text banner with interactive font picker and live editing.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.figlet.open"
+  },
+  "microapp": {
+    "id": "wibwob.figlet",
+    "title": "Figlet Banner",
+    "description": "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 70, "label": "Figlet Banner" }
+    ],
+    "palette": { "order": 50, "label": "Figlet Banner" },
+    "agent": true,
+    "api": true
+  }
+}

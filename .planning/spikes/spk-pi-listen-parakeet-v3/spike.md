@@ -1,6 +1,6 @@
 ---
 title: "Spike: Local Parakeet V3 STT for pi-listen"
-status: not-started
+status: in-progress
 created: 2026-03-14
 ---
 
@@ -158,41 +158,74 @@ doesn't couple to Handy being installed/running.
 Path B is only worth it if we need zero external dependencies AND streaming,
 and we're willing to invest significant time in TDT decoder implementation.
 
+## What was built (skipped Phase 1, went direct to Phase 2)
+
+Skipped the Handy-as-backend approach entirely. Instead built a direct
+sherpa-onnx-node integration using the OfflineRecognizer API.
+
+### Proof of concept results
+
+- sherpa-onnx-node v1.12.29 works in Bun (native addon, no issues)
+- Parakeet V3 int8 model: 2.2s load time, 190ms to decode 3.8s of audio
+- RTF 0.049 (20x faster than real-time on Apple Silicon)
+
+### Files created/modified
+
+- `~/.pi/agent/extensions/voice.ts` — modded pi-listen with local backend
+- `~/.pi/agent/extensions/voice/sherpa.ts` — sherpa-onnx backend module
+- `~/.pi/agent/extensions/voice/config.ts` — added backend/localModelPath fields
+- `~/.pi/agent/extensions/voice/deepgram.ts` — unchanged (still available)
+- `~/.pi/agent/extensions/voice/onboarding.ts` — unchanged
+- `~/.pi/agent/extensions/node_modules/` — sherpa-onnx-node installed here
+- `~/Library/Application Support/sherpa-onnx/parakeet-tdt-0.6b-v3-int8/` — model files
+- `scratch/pi-listen-modded/` — backup of modded extension in repo
+- `scratch/pi-listen-original/` — backup of original pi-listen source
+
+### Architecture
+
+- Config default backend changed from `"deepgram"` to `"local"`
+- When backend is `"local"`:
+  - Audio captured via sox/ffmpeg (same as Deepgram path)
+  - PCM chunks accumulated in memory during recording
+  - On stop: concatenate chunks, convert s16le to float32, run OfflineRecognizer
+  - Model cached after first load (~2.2s), subsequent decodes are instant
+  - No API key needed, fully offline
+  - No streaming interim transcripts (batch decode on release)
+  - "transcribing..." widget shown during decode
+- When backend is `"deepgram"`: original behavior unchanged
+- `/voice backend local` / `/voice backend deepgram` to switch
+- `/voice info` and `/voice-settings` show backend-specific info
+- Session start auto-activates if model found (no onboarding wizard)
+
 ## Checklist
 
-### Phase 1: Handy backend proof-of-concept
+### Phase 1: Handy backend proof-of-concept — SKIPPED
 
-- [ ] Test Handy CLI control: verify `handy --toggle-transcription` starts/stops
-      recording when Handy is already running
-- [ ] Test Handy paste suppression: find settings combo that prevents Handy from
-      typing into the active window (just transcribe + store in DB)
-- [ ] Test DB polling: read newest entry from history.db after transcription
-- [ ] Fork pi-listen extension locally (copy to ~/.pi/agent/extensions/ or
-      project .pi/extensions/)
-- [ ] Add `backend` config option: `"deepgram"` (default) or `"handy"`
-- [ ] Implement Handy backend in voice extension:
-  - [ ] On recording start: spawn `handy --toggle-transcription`
-  - [ ] On recording stop: spawn `handy --toggle-transcription` (or --cancel)
-  - [ ] Poll history.db for new entry (timeout after 10s)
-  - [ ] Extract text, put in editor
-- [ ] Skip Deepgram onboarding when backend is `"handy"`
-- [ ] Test end-to-end: hold SPACE, speak, release, text appears
-- [ ] Handle edge cases: Handy not running, model not loaded, empty transcription
+Went directly to sherpa-onnx-node integration (better architecture).
 
 ### Phase 2: sherpa-onnx bridge (production quality)
 
-- [ ] Install sherpa-onnx (`brew install sherpa-onnx` or build from source)
-- [ ] Test CLI: pipe audio to sherpa-onnx with Handy's model files
-- [ ] Add `"sherpa"` backend option
-- [ ] Implement streaming: sherpa-onnx server mode or incremental CLI
-- [ ] Wire streaming to pi-listen's existing live transcript widget
-- [ ] Benchmark latency vs Deepgram
-- [ ] Update /voice-setup to offer backend choice (Deepgram / Local Parakeet)
+- [x] Install sherpa-onnx-node (npm, works in Bun)
+- [x] Test: decode test WAV with Parakeet V3 model (190ms for 3.8s audio)
+- [x] Download sherpa-onnx-compatible Parakeet V3 int8 model (464MB)
+- [x] Install model to ~/Library/Application Support/sherpa-onnx/
+- [x] Add `"local"` backend option to config
+- [x] Implement sherpa.ts backend module (startLocalSession/stopLocalSession)
+- [x] Wire into voice.ts (startLocalRecording, stopVoiceRecording branches)
+- [x] Auto-activate on session start when model is available
+- [x] `/voice backend` command to switch backends
+- [x] Updated /voice info, /voice-settings, /voice test for local backend
+- [x] Escape cancellation handles local sessions
+- [x] Cleanup on session shutdown handles local sessions
+- [x] Uninstalled original pi-listen package, removed from settings
+- [ ] Test end-to-end: hold SPACE, speak, release, text appears in pi editor
+- [ ] Benchmark latency in real usage (model load + decode)
 
 ### Phase 3: polish
 
-- [ ] Model auto-discovery: find Handy's model dir automatically
+- [x] Model auto-discovery from known paths
+- [x] Config: localModelPath override for custom installs
 - [ ] Fallback chain: try local first, fall back to Deepgram if model not found
-- [ ] Config: model path override for non-Handy installs
 - [ ] Language support: Parakeet V3 supports 25 European languages
 - [ ] Docs: update README with local STT setup instructions
+- [ ] Consider OnlineRecognizer for streaming interim transcripts

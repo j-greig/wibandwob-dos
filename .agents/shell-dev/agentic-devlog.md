@@ -1801,3 +1801,176 @@ Instead of knowing the python path. Could also smear the live screenshot directl
 - `wibwob record start` / `wibwob record stop` — wraps asciinema
 - `wibwob record export --audio cues.tsv` — renders cast+audio→mp4
 - Could auto-start recording when a creative pipe script runs
+
+---
+
+## 2026-03-14: Recording pipeline — tmux→cast→GIF→MP4 with synced audio
+
+### What got built
+
+End-to-end recording pipeline in `scripts/wibwob-record.sh`:
+- `wibwob-record run <script>` — captures the tmux pane at 10fps as asciicast v2
+- `wibwob-record export <file.cast> --audio <mp3>` — renders cast→GIF via agg, composites with audio→MP4
+- `wibwob-record mix <cues.tsv> <output.mp3>` — renders SFX cue file to single mixed audio track
+- Auto-mixes audio at end of recording if `cues.tsv` found in latest capture dir
+- Uploaded to asciinema: https://asciinema.org/a/6zXq5wir4dJdWVBn
+
+### Capture source: `/screenshot/ansi` API, NOT tmux capture-pane
+
+**Biggest lesson of this session.** tmux `capture-pane -e` includes blessed's raw
+VT100 ACS (Alternate Character Set) bytes — `\x0e`/`\x0f` shift-in/shift-out with
+ASCII letters as box-drawing (`a`=fill, `q`=horizontal, `x`=vertical, `l`=top-left).
+agg doesn't understand ACS, so it renders literal letters instead of box-drawing chars.
+
+Built `scripts/acs-translate.py` to post-process these, but it had edge cases:
+- `a` should map to space (blessed uses ACS `a` as background fill), not `░`
+- ACS bytes inside ANSI escape sequences (e.g. `m` in `\e[36m`) got translated
+- Column alignment broke because multi-byte UTF-8 chars changed byte counts
+
+**Fix:** switched to `GET /screenshot/ansi` API endpoint. Blessed resolves ACS
+internally before returning, so the output has proper Unicode box-drawing. Clean,
+no post-processing needed. This is the correct capture source for any recording.
+
+### Cast frame format: cursor positioning required
+
+asciicast v2 frames are `[timestamp, "o", "terminal_data"]`. The terminal data must
+include cursor positioning — bare `\n` causes staircase rendering in agg (each line
+starts where the previous one ended). Fix: prefix each frame with `\x1b[2J\x1b[H`
+(clear + home) and each line with `\x1b[{row};1H` (move cursor to row start).
+
+### agg render settings
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `--font-size` | 32 | 2x retina quality |
+| `--line-height` | 1.1 | Best cell proportion match |
+| `--theme` | github-dark | Closest to wibwob-dark-nord |
+
+agg cell proportions are inherently taller than wide (~0.76:1 ratio) regardless of
+font size. Real Ghostty cells are wider than tall on landscape monitors. The rendered
+output is slightly portrait-ish. User accepted this as "decent" — for exact landscape
+matching, ffmpeg post-scale would be needed:
+```bash
+ffmpeg -i input.gif -vf "scale=iw*2:ih,scale=1920:-2" output.mp4
+```
+
+### Voice lines in audio mix
+
+macOS `say` voices are now pre-rendered as WAVs at script start (`say -v Voice "text" -o file.aiff`
+→ ffmpeg convert to WAV). Then played via `sfx()` function so they get logged in `cues.tsv`
+and mixed into the soundtrack. 10 voice lines across 8 phases, 96 total cues.
+
+Previously `say` was fire-and-forget in the background — worked for live playback but
+was invisible to the audio mix pipeline.
+
+### Audio-video sync: unsolved pain point
+
+**The core problem: two independent timelines drift apart.**
+
+- **Timeline A**: cast frame timestamps (from the capture loop's wall clock polling at 10fps)
+- **Timeline B**: cue timestamps in cues.tsv (from the script's `epoch_ms()` calls)
+
+Even with a shared start time (`WIBWOB_RECORD_START_MS` exported from the recording
+script to the sfx script), the rendered MP4 has audible sync drift that grows over
+time. By 40s, sounds are ~10s early relative to the visuals.
+
+**Investigation findings:**
+- Cast frame timestamps match GIF frame delays (centisecond precision is fine)
+- GIF frame timestamps survive into the MP4 faithfully
+- `cues.tsv` timestamps and cast timestamps are close in the raw data (~0.2s offset)
+- The `mix-sfx-track.py` mixer places cues at correct sample positions
+- Yet the MP4 playback is noticeably off
+
+**Root cause hypothesis:** GIF timing is encoded as frame delays (centiseconds).
+When ffmpeg encodes GIF→h264, the variable frame rate gets reinterpreted. Frames with
+long gaps (e.g. 3s of no change → one frame at t=7.3, next at t=10.5) may get
+compressed or interpolated differently than expected. The audio track plays at real-time
+44.1kHz while the video frame timing is approximate.
+
+**Proposed fix: single-timeline architecture.**
+The script IS the timeline. Instead of two independent clocks:
+
+1. **Option A (best):** Script emits a unified event log with timestamps for both
+   visual snapshots and audio cues. One renderer reads this log and places video
+   frames and audio at the exact same timestamps. No drift possible.
+
+2. **Option B:** Skip GIF entirely. Render each cast frame as an individual PNG
+   via agg (single-frame casts). Use ffmpeg's concat demuxer with exact per-frame
+   durations from the cast timestamps. This avoids GIF's centisecond precision
+   limitation and gives frame-accurate video.
+
+3. **Option C (quick fix):** ffmpeg `-itsoffset` to manually shift the audio track.
+   Fragile but fast for one-off exports.
+
+**Not yet implemented.** The current pipeline produces watchable but imperfect MP4s.
+The audio sync issue is the main remaining quality gap.
+
+### Other fixes applied
+
+- **Video too long**: was 92s due to GIF looping (`-ignore_loop 0`). Fixed: use
+  `-t <cast_duration>` to trim to the actual cast span instead of letting the GIF loop.
+- **`~/.wibwob` dotfile**: shared env for creative pipe scripts. Sources paths, sets
+  aliases (`wibwob`, `smear`, `sfx`, `ww-clear`, `ww-theme`, `ww-batch`).
+- **E043 Session Capture & Playback epic**: planned at
+  `.planning/epics/e043-session-capture/e043-brief.md` — RecordingService with chrome
+  indicator, cue logging, export pipeline. 4 features, 9 stories. Not started.
+
+### `RECORDING.md` created
+
+Root-level `RECORDING.md` documents the full pipeline: quick start, final settings,
+architecture diagram, how-we-got-here narrative, and file index. This is the canonical
+reference for anyone wanting to record and export WibWob-DOS sessions.
+
+### Outstanding
+
+- [ ] Fix audio-video sync (single-timeline architecture — see `.scpt.md` pattern below)
+
+### Existing prior art: `.scpt.md` voiceover timeline format
+
+The `wibandwob-heartbeat` repo already has a proven single-timeline format at
+`~/Repos/wibandwob-heartbeat/`. The `.scpt.md` format defines:
+
+```markdown
+@config
+rate = 180
+pause = 0.2
+scene_gap = 0.3
+dividers = off
+wib = Samantha
+wob = Daniel
+
+@content
+[frame: phase-01-menagerie]
+wob: The menagerie.
+---
+[frame: phase-02-corruption]
+wib: Corruption.
+---
+```
+
+`build-ident.sh` processes this into:
+1. **MP3** — all voiced lines rendered via macOS `say`, concatenated with exact timing
+2. **`.timecodes`** — timestamps for each `[frame:]` marker, synced to the audio
+
+`compile-narrated-reel.py` then composites PNG frames at those exact timecodes.
+
+**This solves our audio-video sync problem.** Instead of two independent clocks
+(cast capture polling vs sfx cue logging), we'd write a `.scpt.md` for the creature
+word bomb, render the audio track first, then replay the visual script timed to the
+audio's timecodes. One timeline drives everything.
+
+Key files in heartbeat repo:
+- `scripts/build-ident.sh` — `.scpt.md` → MP3 + timecodes pipeline
+- `scripts/compile-narrated-reel.py` — frames + audio → MP4 with per-frame timing
+- `scripts/text-to-voiceover.py` — prose text → AppleScript voiceover
+- `output/*/voiceover.scpt.md` — ~30 example scripts with frame markers
+- `WIB-WOB-VIDEO-MAKER.md` — full pipeline docs
+
+Config features: `rate`, `pause`, `pad_to`, `scene_gap`, inline `[R:180]`/`[FAST]`/
+`[SLOW]`/`[V:VoiceName]`/`[pad:3.5]` modifiers per line. macOS `say` quantises
+rate in ~20 WPM steps (documented in build-ident.sh header).
+- [ ] Portrait mode recording (50×45 terminal, 9:16 for mobile)
+- [ ] `figlet.open` should return window ID (still forces `/state` query after open)
+- [ ] `figlet.open` should accept `--x`/`--y` position args
+- [ ] `wibwob batch` CLI subcommand (batch positioning still needs raw curl)
+- [ ] agg aspect ratio: currently portrait-ish, may need ffmpeg landscape post-scale

@@ -2080,3 +2080,21 @@ export function openFileManagerWindow(params: {
   renderSearchBox();
   frame.focus();
 }
+
+
+/**
+ * Simple browser reader — reads a local file and opens it as a text viewer.
+ * Relocated from figlet-windows.ts during host→microapp migration.
+ */
+export function openBrowserReaderWindow(params: {
+  filePath: string;
+  onOpenTextViewer: (title: string, content: string, kind: "reader", filePath?: string) => void;
+  onError: (message: string) => void;
+}): void {
+  try {
+    const content = fs.readFileSync(params.filePath, "utf8");
+    params.onOpenTextViewer(`Browser: ${path.basename(params.filePath)}`, `Location: ${params.filePath}\n\n${content}`, "reader", params.filePath);
+  } catch (error) {
+    params.onError(`Cannot open browser reader: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

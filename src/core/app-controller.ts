@@ -77,13 +77,7 @@ import {
 } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
-import {
-  getDefaultFigletFont,
-  getFigletCatalogue,
-  getFigletFontChoices,
-  measureFiglet,
-  renderFiglet,
-} from "../services/figlet-service.js";
+
 import {
   openPrimerFile,
   promptForPrimerFile,
@@ -110,13 +104,8 @@ import {
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow,
-} from "../windows/browser-windows.js";
-import {
   openBrowserReaderWindow as openBrowserReaderContentWindow,
-  openFigletFontPicker as openFigletFontPickerWindow,
-  openFigletWindow as openFigletBannerWindow,
-  promptForFigletText as promptForFigletBannerText,
-} from "../windows/figlet-windows.js";
+} from "../windows/browser-windows.js";
 import {
   openCommandPaletteWindow as openPaletteWindow,
   openArtWindow as openGenerativeArtWindow,
@@ -1053,50 +1042,6 @@ export class TsTuiMvpApp {
     );
   }
 
-  private promptForFigletText(): void {
-    promptForFigletBannerText(this.overlays, (text, font) =>
-      this.openFigletFontPicker(text, font),
-    );
-  }
-
-  private openFigletFontPicker(
-    text: string,
-    currentFont: string,
-    onSelect?: (font: string) => void,
-  ): void {
-    openFigletFontPickerWindow({
-      overlays: this.overlays,
-      text,
-      currentFont,
-      onSelect,
-      onOpenWindow: (nextText, font) => this.openFigletWindow(nextText, font),
-    });
-  }
-
-  private openFigletWindow(
-    text: string,
-    initialFont = getDefaultFigletFont(),
-  ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "figlet-banner",
-      () => {
-        openFigletBannerWindow({
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          applyMeasuredWindowSize: (frame, kind, content) =>
-            this.applyMeasuredWindowSize(frame, kind, content),
-          text,
-          initialFont,
-          onOpenFontPicker: (nextText, currentFont, onSelect) =>
-            this.openFigletFontPicker(nextText, currentFont, onSelect),
-          onSyncState: () => this.syncLiveState(),
-        });
-      },
-      true,
-    );
-  }
-
   private openPatternWindow(): WindowRecord | undefined {
     return this.focusOrCreate("pattern-animation", () => {
       openPatternAnimationWindow({
@@ -1581,7 +1526,10 @@ export class TsTuiMvpApp {
         this.editor.openWindow(filePath, title, initial, restore),
       openBrowserReaderWindow: (filePath) =>
         this.openBrowserReaderWindow(filePath),
-      openFigletWindow: (text, font) => this.openFigletWindow(text, font),
+      openFigletWindow: (text, font) => {
+        this.commands.runDynamic("microapp.wibwob.figlet.open", { text, font });
+        return undefined; // microapp creates its own window
+      },
       openPatternWindow: () => this.openPatternWindow(),
       openPrimerGalleryWindow: (restore) =>
         this.openPrimerGalleryWindow(restore),
@@ -2185,33 +2133,11 @@ export class TsTuiMvpApp {
         this.openChromeBrowserWindow(url);
       },
       openFigletBanner: (args) => {
-        const text = args?.text as string | undefined;
-        if (text) {
-          const font = (args?.font as string) || getDefaultFigletFont();
-          this.openFigletWindow(text, font);
-        } else {
-          if (this.isNonInteractiveCommand(args)) {
-            return {
-              ok: false,
-              error:
-                "figlet.open requires text when called through a non-interactive control surface",
-            };
-          }
-          this.promptForFigletText();
-        }
+        const result = this.commands.runDynamic("microapp.wibwob.figlet.open", args);
+        if (!result.ok) this.overlays.flash(result.error);
       },
       listFigletFonts: () => {
-        const catalogue = getFigletCatalogue();
-        return {
-          defaultFont: getDefaultFigletFont(),
-          favourites: catalogue.favourites,
-          count: catalogue.allFontsSorted.length,
-          fonts: catalogue.allFontsSorted.map((font) => ({
-            name: font,
-            favourite: catalogue.favourites.includes(font),
-            meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
-          })),
-        };
+        return this.commands.runDynamic("microapp.wibwob.figlet.fonts");
       },
       openMusicPlayer: (args) => {
         const filePath =
