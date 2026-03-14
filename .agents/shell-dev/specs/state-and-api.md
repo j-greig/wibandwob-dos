@@ -82,6 +82,8 @@ Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
 
   GET  /health          → { ok: true, port, instanceId, instanceLabel? }
   GET  /state           → DesktopState (full live snapshot)
+  GET  /runtime/inspection → { ok: true, snapshot } where snapshot includes
+                             state, stats, ui.menu, ui.overlay, scramble, history
   GET  /commands/list   → CommandListItem[] (optional ?surface=menu|palette|api|agent)
   POST /commands/run    → { ok, result?, error? }
                           body: { id: string, args?: object }
@@ -136,6 +138,12 @@ Available inside the Wib&Wob agent session. Source: src/services/agent-tools.ts.
 Pattern for agents: tui_get_state → read window IDs → tui_menu_command or tui_move_window.
 Never guess window IDs. Never call tui_list_commands with assumed command names.
 
+Important command-pipeline rule:
+  API and agent command execution are non-interactive by default.
+  If `editor.open`, `markdown.open`, `primer.open`, `figlet.open`, etc. need
+  picker/prompt input, menu/TUI callers may use the interactive flow but API/agent
+  callers must pass explicit args or they should receive `{ ok:false, error: ... }`.
+
 ## Invariants
 
 1. GET /state IDs are session-local. Always re-fetch after any window open/close.
@@ -154,6 +162,7 @@ Never guess window IDs. Never call tui_list_commands with assumed command names.
 | GET /state shows stale window data | sync() not called after mutation | Call stateService.sync() or wire onStateChanged callback |
 | Window missing from /state | registerWindow() not called or window closed | GET /state first; re-open if needed |
 | POST /commands/run returns {ok:false} | Wrong command id, missing required args | GET /commands/list first; check exact id and arg names |
+| POST /commands/run returns 404 for editor.open/markdown.open/primer.open with no args | Non-interactive control surface blocked picker-style UI | Pass filePath/title/initial args explicitly, or use menu/TUI flow |
 | tui_move_window has no effect | Used "x"/"y" instead of "left"/"top" | Field names are left, top, width, height |
 | Wrong window targeted | Cached/guessed window ID | Always GET /state for fresh IDs before targeting |
 | /health returns connection refused | App not running or wrong port | Check CONTROL_API_PORT; run curl /health; restart if needed |
@@ -171,7 +180,10 @@ DO: call POST /windows/batch for multi-window layout changes
 DON'T: chain individual move calls — batch is atomic and cheaper
 
 DO: check command id with GET /commands/list before POST /commands/run
-DON'T: assume command ids — they change; catalog is source of truth
+DON’T: assume command ids — they change; catalog is source of truth
+
+DO: treat `/commands/run` as canonical and pass `id`
+DON’T: send the old `command` body field — it is retired
 
 DO: call stateService.sync() after window mutations in app-controller
 DON'T: rely on state auto-updating — it is cache-based
@@ -250,3 +262,5 @@ When adding a control API endpoint:
 | 2026-03-11 | invariant | control-api | GET /runtime/stats endpoint added for structured telemetry | E033 S08 |
 | 2026-03-12 | correction | control-api | Interactive list/file-browser overlays were not fully automatable with confirm/cancel only: no index control → added `overlay.select` endpoint/command and selectedIndex/count in `overlay.info` | Applications API sweep (primer/plasma interactive blockers) |
 | 2026-03-12 | gotcha | control-api | Some interstitials are module-local windows, not shared overlays: `overlay.*` won’t drive them → expose module/window picker commands (`*.picker.info/select/confirm/cancel`) until migrated to OverlayManager | Backrooms and Zine picker automation |
+| 2026-03-14 | correction | command-pipeline | `/commands/run` now accepts canonical `id` only, and API/agent execution is non-interactive by default so picker-style commands fail cleanly instead of hijacking the desktop | Refactor slice: shared runtime verbs + inspection seam |
+| 2026-03-14 | invariant | runtime-inspection | `GET /runtime/inspection` is the inspectable runtime seam for state + menu/overlay UI + stats + Scramble state/history | Refactor slice: runtime inspection consolidation |

@@ -103,7 +103,7 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 - `[x]` Define the initial `src/domain/` shape without over-expanding it
 - `[ ]` Extract side-effect-free window model logic from UI/render owners
-- `[ ]` Extract command definitions and schemas that are currently mixed with dispatch or UI concerns
+- `[~]` Extract command definitions and schemas that are currently mixed with dispatch or UI concerns
 - `[ ]` Extract workspace snapshot schema / transforms into pure logic
 - `[x]` Define an explicit instance descriptor model
 - `[ ]` Add focused tests for each extracted pure unit
@@ -112,10 +112,10 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 - `[ ]` Window model
 - `[ ]` Layout rules
-- `[ ]` Command definition / argument schema
+- `[~]` Command definition / argument schema
 - `[ ]` Workspace snapshot
-- `[ ]` Instance descriptor
-- `[ ]` Runtime inspection shapes
+- `[x]` Instance descriptor
+- `[x]` Runtime inspection shapes
 
 ## Phase 3: Isolate Side Effects
 
@@ -130,20 +130,20 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 - `[x]` Define the first service layer under `src/application/`
 - `[~]` Promote shared verbs out of interface handlers and into service functions
-- `[~]` Establish one command execution path shared by TUI / API / CLI where practical
+- `[x]` Establish one command execution path shared by TUI / API / CLI where practical
 - `[ ]` Establish one workspace save / load path shared by all interfaces
-- `[~]` Establish one runtime inspection path shared by all interfaces
+- `[x]` Establish one runtime inspection path shared by all interfaces
 
 ### First Verbs To Stabilize
 
 - `[ ]` `openWindow`
 - `[ ]` `closeWindow`
 - `[ ]` `focusWindow`
-- `[ ]` `runCommand`
+- `[x]` `runCommand`
 - `[ ]` `saveWorkspace`
 - `[ ]` `loadWorkspace`
-- `[ ]` `listCommands`
-- `[ ]` `inspectRuntime`
+- `[x]` `listCommands`
+- `[x]` `inspectRuntime`
 
 ## Phase 5: Make Runtime State Instance-Scoped
 
@@ -172,22 +172,22 @@ This file is the execution surface for the refactor. The masterplan stays concep
 
 ## Phase 8: Remove Legacy Paths
 
-- `[ ]` Delete dead or parallel command flows once shared services are stable
+- `[~]` Delete dead or parallel command flows once shared services are stable
 - `[ ]` Delete microapp imports that bypass the canonical SDK surface
-- `[ ]` Delete interface-specific logic that duplicates shared runtime verbs
-- `[ ]` Remove obsolete compatibility shims only after module validation passes
+- `[~]` Delete interface-specific logic that duplicates shared runtime verbs
+- `[~]` Remove obsolete compatibility shims only after module validation passes
 
 ## Verification Gates
 
 - `[x]` `bun run typecheck`
-- `[ ]` Run targeted test suites for touched areas
+- `[x]` Run targeted test suites for touched areas
 - `[x]` Restart the app when `src/` internals change
 - `[x]` Verify `/health`
 - `[x]` Verify `/state`
-- `[ ]` Verify command execution parity across TUI / API / CLI for the refactored slice
+- `[x]` Verify command execution parity across TUI / API / CLI for the refactored slice
 - `[ ]` Perform visual verification in tmux for affected UI behavior
 - `[x]` Capture evidence when behavior changes materially
-- `[ ]` Preserve whole-desktop capture paths with text/API capture as the default path and PNG capture as secondary visual evidence
+- `[x]` Preserve whole-desktop capture paths with text/API capture as the default path and PNG capture as secondary visual evidence
 
 ## Documentation / Planning
 
@@ -221,3 +221,4 @@ This file is the execution surface for the refactor. The masterplan stays concep
 - `[-]` As scripts, skills, or agent tooling break during the refactor, update them in-step rather than leaving stale assumptions behind
 - `[-]` Stable-state automation should default to existing API-driven text capture for whole-TUI artifacts
 - `[-]` PNG capture remains useful as secondary visual evidence when text/API capture is not sufficient
+- `[-]` Add a host-vs-microapp agent runtime efficiency check: compare running a Pi agent or Claude Code agent in normal Ghostty versus inside the WibWob terminal microapp, using concrete metrics such as per-process RSS/PSS, idle memory, active-task peak memory, CPU while streaming, startup latency, and end-to-end command/response latency

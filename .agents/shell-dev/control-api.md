@@ -16,6 +16,7 @@ GET /health
 GET /help                         structured endpoint catalogue with body shapes
 GET /openapi.json                 OpenAPI 3.0 spec
 GET /state                        full live desktop + window state
+GET /runtime/inspection           structured runtime snapshot: state + menu/overlay UI + stats + Scramble
 GET /commands/list                all command ids with descriptions and surfaces
 GET /content/primer-info?path=…   primer content metadata
 GET /windows/text?id=…            window semantic content (JSON, may include ANSI styling)
@@ -29,7 +30,7 @@ GET /screenshot/ansi?id=…         raw ANSI crop of one window rect
 
 ```
 POST /commands/run                {"id":"command-id","args":{}}   ← canonical body only
-POST /windows/batch               {"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true}]}
+POST /windows/batch               {"ops":[{"id":N,"left":L,"top":T,"width":W,"height":H},{"id":M,"close":true}]}
 ```
 
 `/windows/batch` op fields — all optional except `id`:
@@ -37,8 +38,8 @@ POST /windows/batch               {"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id"
 | field | type | effect |
 |-------|------|--------|
 | `id` | number | window id (required) |
-| `x`, `y` | number | move to absolute position |
-| `w`, `h` | number | resize to exact dimensions |
+| `left`, `top` | number | move to absolute position |
+| `width`, `height` | number | resize to exact dimensions |
 | `close` | boolean | close the window (other fields ignored) |
 
 Each op is applied independently in order. A single op can move AND resize in one call.
@@ -46,9 +47,9 @@ Each op is applied independently in order. A single op can move AND resize in on
 ```json
 // Example: move window 3, resize window 7, close window 12
 { "ops": [
-  { "id": 3, "x": 10, "y": 2 },
-  { "id": 7, "w": 60, "h": 20 },
-  { "id": 3, "w": 80, "h": 24 },
+  { "id": 3, "left": 10, "top": 2 },
+  { "id": 7, "width": 60, "height": 20 },
+  { "id": 3, "width": 80, "height": 24 },
   { "id": 12, "close": true }
 ] }
 ```
@@ -91,11 +92,15 @@ curl -s -X POST http://127.0.0.1:8099/overlay/confirm
 # -> banner window created
 ```
 
-### Arg Compatibility
+### Command Invocation Rules
 
-`window.move` accepts both `{x,y}` and `{left,top}` (prefers x/y).
-`window.resize` accepts both `{w,h}` and `{width,height}` (prefers w/h).
-`/windows/batch` ops use `{x,y,w,h}` — the short forms only.
+`POST /commands/run` accepts `{"id":"..."}` only. The older `command` alias is retired.
+API command execution is non-interactive by default. If a command would normally open a picker or prompt from the menu, API callers must pass explicit args instead.
+
+Compatibility that still exists:
+- `window.move` accepts both `{x,y}` and `{left,top}`
+- `window.resize` accepts both `{w,h}` and `{width,height}`
+- `/windows/batch` still accepts `{x,y,w,h}` as fallback, but canonical docs should use `{left,top,width,height}`
 
 ## Window Openers
 
@@ -104,8 +109,7 @@ Dedicated `/view` routes:
 ```
 POST /view/agent/open             {}
 POST /view/primer/open            {"filePath":"/abs/path.txt","x":X,"y":Y,"w":W,"h":H}
-POST /view/editor/open            {"filePath":"/abs/path.txt"}
-POST /view/browser-reader/open    {"filePath":"/abs/path.txt"}
+POST /view/editor/open            {"filePath":"/abs/path.txt"} or {"title":"Scratch","initial":"text"}
 POST /view/reader/open            {"filePath":"/abs/path.md"}
 POST /view/figlet/open            {"text":"HELLO","font":"optional"}  ← prompts if no text; use overlay.confirm to advance
 POST /view/figlet/open-default    {"text":"WIB WOB","font":"optional"}  ← no prompts, opens directly
@@ -141,12 +145,13 @@ Windows without a `/view` route — open via `POST /commands/run`:
 ```
 microapp.wibwob.poetry-clock.set-mode   {"mode":"clock|sentient","voice":"plain|liminal|scramble"}
 theme.set                               {"name":"wibwob-dark|wibwob-dark-nord|wibwob-dark-pastel|wibwob-phosphor|wibwob-light"}
-desktop.clear-all                       {}   ← API/timeline only; agent:false intentional
+desktop.clear-all                       {} or {"all":true}   ← cancels overlays, closes menus, and clears the desktop; `all:true` nukes every window
 text.smear                              {"filePath":"…","mode":"wipe|shear|glitch|stretch"}
-primer.open                             {"filePath":"/abs/path.txt"}
+primer.open                             {"filePath":"/abs/path.txt"}   ← no-arg picker is menu/TUI only
 primer.browse                           {}
 primer-gallery.open                     {}
-editor.open                             {"filePath":"/abs/path.txt"}
+editor.open                             {"filePath":"/abs/path.txt"} or {"title":"Scratch","initial":"text"}   ← no-arg picker is menu/TUI only
+markdown.open                           {"filePath":"/abs/path.md"}   ← no-arg picker is menu/TUI only
 backrooms.open                          {"theme":"…","mode":"…","model":"…","turns":N}
 backrooms.picker.info                   {}   ← inspect Backrooms primer picker state
 backrooms.picker.select                 {"index":N}
@@ -212,6 +217,7 @@ Trust exported text snapshots and state captures over screenshots when debugging
 
 ```bash
 curl -s http://127.0.0.1:8099/state | python3 -m json.tool
+curl -s http://127.0.0.1:8099/runtime/inspection | python3 -m json.tool
 curl -s http://127.0.0.1:8099/screenshot/text          # clean full-screen text
 curl -s http://127.0.0.1:8099/screenshot/text?id=5      # clean single window
 curl -s http://127.0.0.1:8099/screenshot/ansi           # raw ANSI (for colour-aware tools)
