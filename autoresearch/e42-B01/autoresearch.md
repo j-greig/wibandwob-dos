@@ -91,4 +91,36 @@ codebase. This is the foundation bucket — B02–B06 build on a clean dep graph
 
 ## What's Been Tried
 
-_Nothing yet — fresh start._
+### Circular Dependencies — ALL 6 FIXED ✅
+1. **SDK→canvas-types→sy2-chronicles** (CRITICAL): Moved `CEPanelDef` + `PanelType` interfaces
+   from `microapps/sy2-chronicles/panel-types.ts` into `src/core/canvas-types.ts`. Microapp now
+   imports from canvas-types, breaking the cycle. Re-exports maintained for backward compat.
+
+2. **ui-parts.ts ↔ ui-parts-{data,feedback,forms}** (3 cycles): Created `src/core/ui-parts-types.ts`
+   with `Rect`, `LayoutPart`, `FlexBasis`, `TrackSize`, `AxisAlign`. Sub-modules now import from
+   ui-parts-types instead of ui-parts. ui-parts re-exports from ui-parts-types for backward compat.
+
+3. **skeleton-renderer ↔ webcam-renderer**: Moved `WebcamCell` interface into skeleton-renderer
+   (which is the lower-level module). webcam-renderer re-exports for backward compat.
+
+4. **capability-service ↔ chrome-browser-service**: Extracted `findChromeExecutablePath` to
+   `src/services/chrome-path.ts`. Both services import from there.
+
+### Dead Code Removal
+- Removed 8 dead exports: `DEV_RELOAD_EXIT_CODE`, `viewerAppType`, `isMicroappWindow`,
+  `generateOrdered`, `generateHybrid`, `openPatternWindow`, `openArtWindow`, `VOLUME_STEP`
+- Removed 3 dead interfaces: `EditorWindowRecord`, `FinderWindowRecord`, `MicroappWindowRecord`
+- Removed dead `loadSessionMessages` function
+- Un-exported `CapabilityService` class (only singleton instance used)
+
+### Knip Config
+- Created `knip.json` scoped to src/ with microapp entry points
+- **Note**: knip reports ~139 unused exports + ~312 unused types, but majority are false
+  positives from SDK re-export architecture. Microapps import from `microapp-sdk.ts` which
+  re-exports from sub-modules — knip can't fully trace this. Genuine dead code is much lower.
+
+### Remaining B01 Items
+- [ ] Add `bun run health` composite script
+- [ ] Fix scaffold-microapp.sh manifest format
+- [ ] Move `microapps/.disabled/` to `.trash/disabled-microapps/`
+- [ ] Further dead code passes (verify each export individually)
