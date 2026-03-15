@@ -49,7 +49,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.symbient-twitter":   "beta",
   "wibwob.llm-orch-studio":    "beta",
   "wibwob.touchlab":           "beta",
-  "wibwob.journal":            "beta",
+  "wibwob.journal":            "core",
 
   // ── Internal: dev/demo/test only ───────────────────────────────────
   "wibwob.layout-probe":                   "internal",
