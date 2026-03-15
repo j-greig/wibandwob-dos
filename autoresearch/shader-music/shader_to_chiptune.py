@@ -22,6 +22,51 @@ from bricks import *
 GENRE = os.environ.get("GENRE", "cathedral")
 
 GENRE_CONFIGS = {
+    "witchhouse": {
+        "shader": "witchhouse.glsl",
+        "bpm": 65,
+        "duration": 24,
+        "steps_per_beat": 2,
+        "tracks": [
+            {"name": "wh_fog",    "vol": (0.05, 0.40)},
+            {"name": "wh_chop",   "vol": (0.04, 0.45)},
+            {"name": "wh_screw",  "vol": (0.03, 0.30)},
+            {"name": "wh_ritual", "vol": (0.04, 0.35)},
+        ],
+        "time_offsets": [0.0, 6.3, 12.7, 19.1],
+        "entrance_times": [0.0, 2.0, 4.0, 1.0],
+        "swell_periods": [16.0, 8.0, 5.5, 20.0],
+    },
+    "breakcore": {
+        "shader": "breakcore.glsl",
+        "bpm": 165,
+        "duration": 18,
+        "steps_per_beat": 4,
+        "tracks": [
+            {"name": "bc_amen",  "vol": (0.04, 0.40)},
+            {"name": "bc_bass",  "vol": (0.06, 0.50)},
+            {"name": "bc_snare", "vol": (0.0,  0.20)},
+            {"name": "bc_pad",   "vol": (0.03, 0.25)},
+        ],
+        "time_offsets": [0.0, 3.3, 7.1, 11.9],
+        "entrance_times": [0.0, 0.5, 1.0, 0.0],
+        "swell_periods": [5.0, 3.7, 2.5, 9.0],
+    },
+    "spacejazz": {
+        "shader": "spacejazz.glsl",
+        "bpm": 88,
+        "duration": 22,
+        "steps_per_beat": 2,
+        "tracks": [
+            {"name": "sj_walk",   "vol": (0.06, 0.45)},
+            {"name": "sj_rhodes", "vol": (0.04, 0.35)},
+            {"name": "sj_brush",  "vol": (0.0,  0.14)},
+            {"name": "sj_horn",   "vol": (0.04, 0.40)},
+        ],
+        "time_offsets": [0.0, 5.1, 10.3, 16.7],
+        "entrance_times": [0.0, 1.5, 0.5, 3.0],
+        "swell_periods": [10.0, 7.0, 4.5, 13.0],
+    },
     "cathedral": {
         "shader": "cathedral.glsl",
         "bpm": 72,
@@ -150,6 +195,29 @@ CATHEDRAL_CHORDS = [
     ["F2", "C3", "F3", "A3", "C4", "Eb4", "F4"],                     # Fm7 (tension)
     ["Db2", "Ab2", "Db3", "F3", "Ab3", "Db4", "F4", "Ab4", "Db5"],  # Db (home, expanded)
 ]
+
+# Witch House — Bb minor, occult darkness
+WH_SCALE = ["Bb1", "Db2", "Eb2", "F2", "Gb2", "Bb2", "Db3", "Eb3", "F3", "Bb3"]
+WH_CHORDS = [
+    ["Bb1", "Db2", "F2", "Bb2", "Db3"],   # Bbm
+    ["Gb1", "Bb1", "Db2", "Gb2", "Bb2"],  # Gb
+    ["Eb2", "Gb2", "Bb2", "Eb3"],          # Ebm
+    ["F2", "Ab2", "C3", "F3"],             # Fm (the turn)
+]
+
+# Breakcore — C minor, chaotic
+BC_SCALE = ["C2", "Eb2", "F2", "G2", "Bb2", "C3", "Eb3", "F3", "G3", "Bb3", "C4", "Eb4"]
+BC_STAB_NOTES = ["C4", "Eb4", "G4", "Bb4", "C5", "Eb5", "G5"]
+
+# Space Jazz — Bb dominant / altered, chromatic passing tones
+SJ_WALK = ["Bb1", "C2", "D2", "Eb2", "F2", "G2", "A2", "Bb2", "C3", "D3"]
+SJ_RHODES_CHORDS = [
+    ["Bb2", "D3", "F3", "A3"],     # Bb7
+    ["Eb3", "G3", "Bb3", "D4"],    # Ebmaj7
+    ["Ab2", "C3", "Eb3", "G3"],    # Abmaj7
+    ["F2", "A2", "C3", "Eb3"],     # F7 (turnaround)
+]
+SJ_HORN = ["Bb3", "C4", "D4", "Eb4", "F4", "G4", "A4", "Bb4", "C5", "D5", "F5"]
 
 STARFIELD_CHORDS = [
     ["C3", "E3", "G3", "B3", "C4", "E4", "G4", "B4", "C5"],
@@ -482,6 +550,165 @@ def synth_starfield(track_name, brightness, step_dur, step_num, bpm):
     return silence(step_dur)
 
 
+def synth_witchhouse(track_name, brightness, step_dur, step_num, bpm):
+    """Witch House: ▲ screwed, chopped, occult, dark."""
+    beat_dur = 60.0 / bpm
+    bar_dur = 4 * beat_dur
+    chord_idx = int((step_num * step_dur) / (3 * bar_dur)) % len(WH_CHORDS)
+    chord = WH_CHORDS[chord_idx]
+
+    if track_name == "wh_fog":
+        # Dark drone — detuned saws, very low, heavily filtered
+        note = brightness_to_note(brightness, chord[:3])
+        freq = note_freq(note)
+        snd = sawtooth(freq, step_dur) * 0.4 + sawtooth(freq*1.008, step_dur) * 0.3 + sine(freq*0.5, step_dur) * 0.3
+        snd = env(snd, a=0.15, d=step_dur*0.2, s=0.7, r=step_dur*0.5)
+        snd = lowpass(snd, 250 + brightness * 400)
+        snd = bitcrush(snd, depth=6)
+        return snd
+
+    elif track_name == "wh_chop":
+        # Chopped stab — pitched-down square, hard gate
+        note = brightness_to_note(brightness, WH_SCALE)
+        freq = note_freq(note) * 0.5  # pitched DOWN
+        snd = square(freq, step_dur, duty=0.3)
+        snd = env(snd, a=0.001, d=step_dur*0.15, s=0.0, r=step_dur*0.05)
+        snd = bitcrush(snd, depth=4)
+        snd = lowpass(snd, 800 + brightness * 1500)
+        return snd
+
+    elif track_name == "wh_screw":
+        # Screwed texture — time-stretched sine cluster, reverbed to hell
+        note = brightness_to_note(brightness, chord)
+        freq = note_freq(note)
+        snd = sine(freq, step_dur) * 0.5 + sine(freq*1.5, step_dur) * 0.3 + sine(freq*0.75, step_dur) * 0.2
+        snd = env(snd, a=0.2, d=step_dur*0.3, s=0.5, r=step_dur*0.5)
+        snd = reverb(snd, decay=0.6)
+        snd = lowpass(snd, 1000 + brightness * 800)
+        return snd
+
+    elif track_name == "wh_ritual":
+        # Ritual pulse — sub bass throb + noise
+        freq = note_freq(chord[0])
+        snd = sine(freq, step_dur) * 0.7 + noise(step_dur) * 0.3
+        snd = env(snd, a=0.05, d=step_dur*0.4, s=0.3, r=step_dur*0.3)
+        snd = lowpass(snd, 200 + brightness * 600)
+        snd = bitcrush(snd, depth=5)
+        return snd
+
+    return silence(step_dur)
+
+
+def synth_breakcore(track_name, brightness, step_dur, step_num, bpm):
+    """Breakcore: Venetian Snares chaos, chopped amen, distorted."""
+    if track_name == "bc_amen":
+        # Chopped break — alternating kick/snare/hat character based on brightness
+        if brightness < 0.33:
+            # Kick region
+            freq = 55 + brightness * 100
+            snd = sine(freq, step_dur)
+            snd = env(snd, a=0.001, d=step_dur*0.3, s=0.0, r=step_dur*0.1)
+            snd = lowpass(snd, 200)
+        elif brightness < 0.66:
+            # Snare region
+            snd = noise(step_dur) * 0.6 + square(200, step_dur, duty=0.3) * 0.4
+            snd = env(snd, a=0.001, d=step_dur*0.2, s=0.0, r=step_dur*0.1)
+            snd = highpass(snd, 500)
+        else:
+            # Hat region
+            snd = noise(step_dur)
+            snd = env(snd, a=0.001, d=step_dur*0.1, s=0.0, r=step_dur*0.05)
+            snd = highpass(snd, 6000)
+        snd = bitcrush(snd, depth=5)
+        return snd
+
+    elif track_name == "bc_bass":
+        # Distorted bass stab
+        note = brightness_to_note(brightness, BC_SCALE[:6])
+        freq = note_freq(note)
+        snd = sawtooth(freq, step_dur) * 0.5 + square(freq, step_dur, duty=0.2) * 0.5
+        snd = env(snd, a=0.002, d=step_dur*0.3, s=0.15, r=step_dur*0.2)
+        snd = lowpass(snd, 400 + brightness * 1500)
+        snd = bitcrush(snd, depth=4)
+        return snd
+
+    elif track_name == "bc_snare":
+        # Snare roll — rapid fire
+        snd = noise(step_dur)
+        snd = env(snd, a=0.001, d=step_dur*0.12, s=0.0, r=step_dur*0.05)
+        snd = highpass(snd, 1000)
+        snd = bitcrush(snd, depth=6)
+        return snd
+
+    elif track_name == "bc_pad":
+        # Calm pad — contrast to chaos
+        note = brightness_to_note(brightness, BC_SCALE[5:])
+        freq = note_freq(note)
+        snd = triangle(freq, step_dur) * 0.5 + triangle(freq*1.004, step_dur) * 0.5
+        snd = env(snd, a=0.1, d=step_dur*0.3, s=0.6, r=step_dur*0.4)
+        snd = lowpass(snd, 1500)
+        snd = reverb(snd, decay=0.4)
+        return snd
+
+    return silence(step_dur)
+
+
+def synth_spacejazz(track_name, brightness, step_dur, step_num, bpm):
+    """Space Jazz: Miles meets Sun Ra — walking bass, Rhodes, brushes, horn."""
+    beat_dur = 60.0 / bpm
+    bar_dur = 4 * beat_dur
+    chord_idx = int((step_num * step_dur) / (2 * bar_dur)) % len(SJ_RHODES_CHORDS)
+    chord = SJ_RHODES_CHORDS[chord_idx]
+    sr = 22050
+
+    if track_name == "sj_walk":
+        # Walking bass — round, warm, each note different
+        note = brightness_to_note(brightness, SJ_WALK)
+        freq = note_freq(note)
+        # Upright bass = triangle + sine sub
+        snd = triangle(freq, step_dur) * 0.6 + sine(freq, step_dur) * 0.4
+        snd = env(snd, a=0.008, d=step_dur*0.5, s=0.3, r=step_dur*0.3)
+        snd = lowpass(snd, 500 + brightness * 300)
+        return snd
+
+    elif track_name == "sj_rhodes":
+        # Rhodes piano — sine + 2nd harmonic + tremolo = electric piano
+        snd = silence(step_dur)
+        for cn in chord:
+            freq = note_freq(cn)
+            t = np.linspace(0, step_dur, int(sr*step_dur), endpoint=False)
+            voice = np.sin(2*np.pi*freq*t) * 0.6 + np.sin(2*np.pi*freq*2.01*t) * 0.25 + np.sin(2*np.pi*freq*3.0*t) * 0.15
+            snd = snd + voice * 0.2
+        snd = env(snd, a=0.005, d=step_dur*0.5, s=0.25, r=step_dur*0.3)
+        snd = tremolo(snd, rate=5.5, depth=0.12)
+        snd = reverb(snd, decay=0.35)
+        return snd
+
+    elif track_name == "sj_brush":
+        # Brush on cymbal — soft filtered noise swish
+        snd = noise(step_dur)
+        snd = env(snd, a=0.01, d=step_dur*0.3, s=0.1, r=step_dur*0.2)
+        snd = highpass(snd, 3000)
+        snd = lowpass(snd, 8000 + brightness * 4000)
+        return snd
+
+    elif track_name == "sj_horn":
+        # Trumpet/flugelhorn — warm square with breath envelope
+        note = brightness_to_note(brightness, SJ_HORN)
+        freq = note_freq(note)
+        duty = 0.35 + brightness * 0.2  # subtle PWM
+        snd = square(freq, step_dur, duty=duty) * 0.5 + sine(freq, step_dur) * 0.3 + sawtooth(freq, step_dur) * 0.2
+        # Breath-like attack — slower than you'd think
+        snd = env(snd, a=0.04, d=step_dur*0.3, s=0.6, r=step_dur*0.4)
+        snd = lowpass(snd, 1500 + brightness * 2000)
+        # Vibrato on sustained notes
+        snd = tremolo(snd, rate=5.0, depth=0.08)
+        snd = reverb(snd, decay=0.3)
+        return snd
+
+    return silence(step_dur)
+
+
 def synth_cathedral(track_name, brightness, step_dur, step_num, bpm):
     """Cathedral minimalism: Reich + Pärt + Eno + Sigur Rós.
     
@@ -571,6 +798,9 @@ def synth_cathedral(track_name, brightness, step_dur, step_num, bpm):
 
 
 SYNTH_DISPATCH = {
+    "witchhouse": synth_witchhouse,
+    "breakcore": synth_breakcore,
+    "spacejazz": synth_spacejazz,
     "cathedral": synth_cathedral,
     "starfield": synth_starfield,
     "lofi_hiphop": synth_lofi,
