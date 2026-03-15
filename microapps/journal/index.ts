@@ -799,10 +799,31 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       detailBox.hide();
     }
 
-    // Build list items with colored peer glyphs
+    // Build list items with date group headers and index mapping
     const items: string[] = [];
+    const entryIndexMap: number[] = []; // entryIndexMap[visualIdx] → entryIdx or -1 for headers
     const maxTitleW = twoPane ? Math.floor(w * 0.38) - 16 : w - 20;
-    for (const e of entries) {
+
+    function dateGroup(iso: string): string {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    }
+
+    let lastGroup = "";
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i]!;
+      const sortField = sortBy === "createdAt" ? e.createdAt : e.updatedAt;
+      const group = dateGroup(sortField);
+      if (group !== lastGroup) {
+        lastGroup = group;
+        items.push(`  {${muted}-fg}── ${group} ──{/${muted}-fg}`);
+        entryIndexMap.push(-1); // header
+      }
       const icon = KIND_ICON[e.kind] || "░";
       const glyph = PEER_GLYPH[e.peer] || "·";
       const fg = peerColor(e.peer, th);
@@ -810,14 +831,24 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       const title = truncate(e.title, maxTitleW);
       const tagStr = e.tags.length > 0 ? ` {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "";
       items.push(` {${fg}-fg}${glyph}{/${fg}-fg} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
+      entryIndexMap.push(i);
     }
     if (items.length === 0) {
       items.push(`  {${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
+      entryIndexMap.push(-1);
     }
+
+    // Find the visual index for the current selectedIdx
+    let visualIdx = entryIndexMap.indexOf(selectedIdx);
+    if (visualIdx < 0) visualIdx = entryIndexMap.findIndex(i => i >= 0); // first entry
+
     rendering = true;
     listBox.setItems(items as any);
-    if (items.length > 0) listBox.select(Math.min(selectedIdx, items.length - 1));
+    if (visualIdx >= 0) listBox.select(visualIdx);
     rendering = false;
+
+    // Store the index map for selection handlers
+    (listBox as any)._entryIndexMap = entryIndexMap;
 
     // Preview pane (two-pane mode)
     if (twoPane && entries.length === 0) {
@@ -1036,7 +1067,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       sessionIdx = idx;
       sessionMessages = [];
     } else {
-      selectedIdx = idx;
+      // Use index map to skip headers
+      const map = (listBox as any)._entryIndexMap as number[] | undefined;
+      if (map && map[idx] !== undefined) {
+        if (map[idx] === -1) return; // header row — ignore
+        selectedIdx = map[idx]!;
+      } else {
+        selectedIdx = idx;
+      }
     }
     render();
   });
@@ -1045,7 +1083,10 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   listBox.on("click", () => {
     if (mode === "list") {
       const idx = (listBox as any).selected ?? 0;
-      selectedIdx = idx;
+      const map = (listBox as any)._entryIndexMap as number[] | undefined;
+      if (map && map[idx] !== undefined && map[idx] !== -1) {
+        selectedIdx = map[idx]!;
+      }
       render();
     }
   });
@@ -1062,29 +1103,37 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
   listBox.key(["j", "down"], () => {
     if (mode !== "list") return;
-    selectedIdx = Math.min(selectedIdx + 1, entries.length - 1);
-    listBox.select(selectedIdx);
+    if (viewMode === "sessions") {
+      sessionIdx = Math.min(sessionIdx + 1, sessions.length - 1);
+      sessionMessages = [];
+    } else {
+      selectedIdx = Math.min(selectedIdx + 1, entries.length - 1);
+    }
     render();
   });
 
   listBox.key(["k", "up"], () => {
     if (mode !== "list") return;
-    selectedIdx = Math.max(selectedIdx - 1, 0);
-    listBox.select(selectedIdx);
+    if (viewMode === "sessions") {
+      sessionIdx = Math.max(sessionIdx - 1, 0);
+      sessionMessages = [];
+    } else {
+      selectedIdx = Math.max(selectedIdx - 1, 0);
+    }
     render();
   });
 
   listBox.key(["g", "home"], () => {
     if (mode !== "list") return;
-    selectedIdx = 0;
-    listBox.select(selectedIdx);
+    if (viewMode === "sessions") { sessionIdx = 0; sessionMessages = []; }
+    else { selectedIdx = 0; }
     render();
   });
 
   listBox.key(["S-g", "end"], () => {
     if (mode !== "list") return;
-    selectedIdx = Math.max(0, entries.length - 1);
-    listBox.select(selectedIdx);
+    if (viewMode === "sessions") { sessionIdx = Math.max(0, sessions.length - 1); sessionMessages = []; }
+    else { selectedIdx = Math.max(0, entries.length - 1); }
     render();
   });
 
