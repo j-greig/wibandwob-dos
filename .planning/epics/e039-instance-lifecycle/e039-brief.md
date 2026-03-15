@@ -1,7 +1,7 @@
 ---
 id: E039
 title: Instance Lifecycle
-status: not-started
+status: done
 issue: ~
 pr: ~
 depends_on: []
