@@ -7,7 +7,7 @@ that composed it runs live in Ghostty's GPU compositor — audio and visuals
 from one source, displayed simultaneously. The shader IS the score, and
 you see the score while hearing it.
 
-**Links:** [Shader API #2353](https://github.com/ghostty-org/ghostty/discussions/2353) · [Audio-reactive shaders #10201](https://github.com/ghostty-org/ghostty/discussions/10201) · [Shader switcher PR #61](https://github.com/0xhckr/ghostty-shaders/pull/61) · [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) · [Files & refs ↓](#files-referenced)
+**Links:** [Shader API #2353](https://github.com/ghostty-org/ghostty/discussions/2353) · [Audio-reactive shaders #10201](https://github.com/ghostty-org/ghostty/discussions/10201) · [⚡ AppleScript PR #11208](https://github.com/ghostty-org/ghostty/pull/11208) · [Shader switcher PR #61](https://github.com/0xhckr/ghostty-shaders/pull/61) · [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) · [Files & refs ↓](#files-referenced)
 
 ---
 
@@ -48,11 +48,14 @@ through a CRT filter on top of terminal text.
 → prefix → substring. We should adopt this for our `shader-music.play`
 command so users can say `play cathedral` not `play cathedral-overlay.glsl`.
 
-**Reload trigger:** No programmatic reload API exists. Script says
-"Press Cmd+Shift+, in Ghostty to reload." Our `ghostty-shader.sh` uses
-`osascript` to simulate the keypress — fragile but works on macOS. The
-community script punts to the user. For automated timeline playback we
-need our osascript approach.
+**Reload trigger:** Previously no programmatic reload API existed — our
+`ghostty-shader.sh` used `osascript` to simulate Cmd+Shift+, keypress.
+**Ghostty 1.3 changes everything:** [PR #11208](https://github.com/ghostty-org/ghostty/pull/11208)
+(merged) adds native AppleScript with `perform action` — can execute
+`config_reload` or any Ghostty action directly on a terminal object.
+Also exposes `new surface configuration` for setting config properties
+programmatically. This replaces our fragile keystroke simulation with
+proper scriptable control.
 
 **No iTime reset:** Ghostty's `iTime` starts from shader load and
 increments continuously. Reloading config does NOT reset `iTime` to 0
@@ -60,9 +63,10 @@ increments continuously. Reloading config does NOT reset `iTime` to 0
 shader starts at whatever `iTime` Ghostty is at. For our use case this
 is fine — generative patterns don't need frame-0 sync.
 
-**Implication for our plan:** Replace our `ghostty-shader.sh` with a
-hybrid approach — use `shader.sh`'s direct config rewrite for reliability,
-but keep our osascript reload for automation. Support pipeline mode so
+**Implication for our plan:** On Ghostty 1.3+, use AppleScript for
+shader hot-swap: rewrite config (shader.sh pattern), then
+`tell application "Ghostty" to perform action "config_reload"`.
+No keystroke simulation needed. Support pipeline mode so
 music viz + CRT can coexist.
 
 ### VJ Timeline System (done)
@@ -239,9 +243,10 @@ Each genre gets a desktop "mood":
 
 ## Open Questions
 
-- **Ghostty shader reload latency**: 300ms measured on macOS — acceptable for
-  scene transitions, not for beat-synced swaps. Could pre-load via multiple
-  `config-file` includes and toggle a selector uniform?
+- **Ghostty shader reload latency**: 300ms measured via osascript keystroke.
+  With 1.3 AppleScript `perform action "config_reload"` ([#11208](https://github.com/ghostty-org/ghostty/pull/11208))
+  latency may be lower — needs benchmarking. Acceptable for scene transitions,
+  not for beat-synced swaps at >120bpm.
 - **iTime sync**: Ghostty's `iTime` counts from shader load, not from audio
   start. For perfect sync, shader needs a `uniform float audioTime` — not
   currently possible without Ghostty source modification. Workaround: accept
@@ -260,6 +265,7 @@ Each genre gets a desktop "mood":
 |----------|----------------|
 | [ghostty-org/ghostty#2353](https://github.com/ghostty-org/ghostty/discussions/2353) | Shader API discussion — custom uniforms, reload behaviour, `iTime` semantics |
 | [ghostty-org/ghostty#10201](https://github.com/ghostty-org/ghostty/discussions/10201) | Audio-reactive shaders discussion — FFT uniforms, external audio input |
+| [ghostty-org/ghostty#11208](https://github.com/ghostty-org/ghostty/pull/11208) | **AppleScript support (merged, shipping 1.3).** `perform action` executes any Ghostty action on a terminal. `new surface configuration` can set config properties. Replaces our osascript Cmd+Shift+, hack with proper programmatic control. By mitchellh. |
 | [0xhckr/ghostty-shaders#61](https://github.com/0xhckr/ghostty-shaders/pull/61) | Community multi-shader switcher PR (fzf picker, pipeline support) |
 | [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) | Local copy in this dir — config rewrite + fuzzy resolution patterns |
 
