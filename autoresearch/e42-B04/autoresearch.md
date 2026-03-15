@@ -74,4 +74,25 @@ Can run in parallel with B02–B03 (only depends on B01).
 
 ## What's Been Tried
 
-_Nothing yet — fresh start._
+### safe-fs.ts wrapper ✅
+Created `src/core/safe-fs.ts` with: `safeReadFile`, `safeReadJSON`, `safeReadBuffer`,
+`safeWriteFile`, `safeAppendFile`, `safeUnlink`, `listDir`, `pathExists`.
+
+Migrated 28 raw fs calls across 19 files (73 → 45 raw calls remaining).
+
+### Remaining raw fs calls (15)
+- `src/core/app-controller.ts` (4) — complex composition root, high risk to refactor
+- `src/windows/file-manager-window.ts` (4) — 1622-line file, migration deferred
+- `src/services/figlet-service.ts` (1) — readFileSync for font catalog
+- `src/services/chrome-browser-service.ts` (1) — screenshot buffer read
+- `src/services/control-api.ts` (1) — file write for screenshot
+- `src/app.ts` (1) — startup config read
+- `src/cli/wibwob.ts` (1) — CLI (excluded by design)
+- `src/tests/` (1) — test file (excluded by design)
+
+### Exec calls not wrapped (30)
+Exec/spawn calls are specialized per-service (figlet probes, clipboard, capability
+detection). A generic wrapper would add indirection without benefit. Left as-is.
+
+### Platform-commands, append-log, audio-process
+Deferred — the remaining exec calls are too specialized for generic wrappers to help.
