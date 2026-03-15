@@ -204,20 +204,30 @@ def run_shader_to_music():
     print(f"[shader-music] BPM={BPM}, steps={total_steps}, step_dur={step_dur:.3f}s")
     print(f"[shader-music] Duration={DURATION_SECS}s, tracks=4")
 
-    # Collect shader data
+    # Collect shader data — each track samples at a different time offset
+    # This fundamentally decorrelates the tracks since they see different
+    # moments of the starfield evolution
+    TRACK_TIME_OFFSETS = [0.0, 3.7, 7.3, 11.1]  # prime-ish offsets
     all_track_values = []  # [step][track] = brightness
     shader_times = []
 
     t0 = time.time()
     for step in range(total_steps):
-        t = step * step_dur
-        shader_times.append(t)
-        pixels = render_shader_frame(ctx, prog, fbo, vao, t)
-        values = extract_track_values(pixels)
-        all_track_values.append(values)
+        base_t = step * step_dur
+        shader_times.append(base_t)
+        
+        track_vals = []
+        for track_idx in range(4):
+            t = base_t + TRACK_TIME_OFFSETS[track_idx]
+            pixels = render_shader_frame(ctx, prog, fbo, vao, t)
+            # Extract just this track's value from the full extraction
+            all_vals = extract_track_values(pixels)
+            track_vals.append(all_vals[track_idx])
+        
+        all_track_values.append(track_vals)
 
     gpu_time = time.time() - t0
-    print(f"[shader-music] GPU render: {gpu_time:.3f}s ({total_steps} frames)")
+    print(f"[shader-music] GPU render: {gpu_time:.3f}s ({total_steps * 4} frames, 4 time offsets)")
 
     # Log track values for analysis
     log_data = {
