@@ -2,7 +2,7 @@ import blessed from "blessed";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { MicroappHost, WindowHandle } from "../../src/services/microapp-sdk.js";
-import { renderFiglet } from "../../src/services/microapp-sdk.js";
+import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/microapp-sdk.js";
 
 // ── Types ───────────────────────────────────────────────────────
 type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
@@ -81,6 +81,27 @@ function timeAgo(ts: string): string {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+
+// ANSI helpers for detailBox (tags:false — uses raw ANSI, not blessed tags)
+const ANSI = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  fg: (color: string) => {
+    // Handle 6-char hex
+    let h = color.replace("#", "");
+    // Expand 3-char hex: #555 → 555555
+    if (/^[0-9a-fA-F]{3}$/.test(h)) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if (/^[0-9a-fA-F]{6}$/.test(h)) {
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return `\x1b[38;2;${r};${g};${b}m`;
+    }
+    // Named colors — fallback to dim
+    return "\x1b[2m";
+  },
+};
 
 function wrapText(text: string, width: number): string[] {
   if (width < 5) width = 5;
@@ -316,6 +337,10 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   let editingId: string | null = null; // null = new entry
   let searchQuery = "";
   let deleteConfirm = false;
+  type SortMode = "updatedAt" | "createdAt" | "title";
+  let sortBy: SortMode = "updatedAt";
+  const SORT_CYCLE: SortMode[] = ["updatedAt", "createdAt", "title"];
+  const SORT_LABEL: Record<SortMode, string> = { updatedAt: "↓updated", createdAt: "↓created", title: "↓title" };
 
   // ── UI Elements ───────────────────────────────────────────────
   const headerBox = blessed.box({
@@ -366,7 +391,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   const detailBox = blessed.box({
     parent: contentBox,
     top: 0, left: 0, right: 0, bottom: 0,
-    tags: true,
+    tags: false,
     scrollable: true,
     mouse: true,
     scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
@@ -436,6 +461,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         e.title.toLowerCase().includes(q) || e.body.toLowerCase().includes(q) ||
         e.tags.some(tag => tag.toLowerCase().includes(q))
       );
+    }
+    // Sort
+    if (sortBy === "title") {
+      all.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortBy === "createdAt") {
+      all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } else {
+      all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     }
     entries = all;
     if (selectedIdx >= entries.length) selectedIdx = Math.max(0, entries.length - 1);
@@ -536,24 +569,30 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
     // Preview pane (two-pane mode)
     if (twoPane && entries.length === 0) {
+      const dim = ANSI.fg(muted);
       detailBox.setContent(
-        `\n\n\n  {${muted}-fg}no entries yet\n\n  press n to create your first entry{/${muted}-fg}`
+        `\n\n\n  ${dim}no entries yet\n\n  press n to create your first entry${ANSI.reset}`
       );
     } else if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
         const previewW = w - Math.floor(w * 0.40) - 6;
         const ruleW = Math.max(10, previewW - 2);
-        const bodyLines = wrapText(e.body || "(empty)", previewW);
+        const dim = ANSI.fg(muted);
+        const hi = ANSI.fg(accent);
         const icon = KIND_ICON[e.kind] || "░";
+        const markdownBody = renderMarkdown(e.body || "(empty)", previewW, {
+          headingConfig: PLAIN_HEADING_CONFIG,
+          paddingX: 2,
+        });
         const header = [
           "",
-          `  {bold}${icon} ${e.title}{/bold}`,
-          `  {${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}{/${muted}-fg}`,
-          e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : null,
-          `  {${muted}-fg}${"─".repeat(ruleW)}{/${muted}-fg}`,
+          `  ${ANSI.bold}${icon} ${e.title}${ANSI.reset}`,
+          `  ${dim}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}${ANSI.reset}`,
+          e.tags.length ? `  ${hi}${e.tags.map(t => `#${t}`).join(" ")}${ANSI.reset}` : null,
+          `  ${dim}${"─".repeat(ruleW)}${ANSI.reset}`,
           "",
-          ...bodyLines.map(l => `  ${l}`),
+          ...markdownBody,
         ].filter((l): l is string => l !== null);
         detailBox.setContent(header.join("\n"));
         (detailBox as any).scrollTo(0);
@@ -567,7 +606,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const kindCounts = entries.reduce((acc, e) => { acc[e.kind] = (acc[e.kind] || 0) + 1; return acc; }, {} as Record<string, number>);
     const kindStr = Object.entries(kindCounts).map(([k, v]) => `${KIND_ICON[k as EntryKind] || "░"}${v}`).join(" ");
     statusBar.setContent(
-      `{${muted}-fg} [LIST]  ${entries.length} entries  ${kindStr}  ▸${hCount} ▹${aCount}${searchHint}{/${muted}-fg}`
+      `{${muted}-fg} [LIST]  ${entries.length} entries  ${SORT_LABEL[sortBy]}  ${kindStr}  ▸${hCount} ▹${aCount}${searchHint}{/${muted}-fg}`
     );
 
     if (deleteConfirm) {
@@ -575,7 +614,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     } else {
       const pos = entries.length > 0 ? `${selectedIdx + 1}/${entries.length}` : "—";
       commandBar.setContent(
-        `{${muted}-fg} ${pos}  Enter open  n new  e edit  d del  / search  g/G jump{/${muted}-fg}`
+        `{${muted}-fg} ${pos}  Enter open  n new  e edit  d del  / search  s sort  g/G jump{/${muted}-fg}`
       );
     }
   }
@@ -593,19 +632,24 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (!selectedEntry) { setMode("list"); return; }
     const e = selectedEntry;
     const bodyW = Math.max(20, w - 8);
-    const bodyLines = wrapText(e.body || "(empty)", bodyW);
     const ruleW = Math.max(10, bodyW);
     const icon = KIND_ICON[e.kind] || "░";
+    const dim = ANSI.fg(muted);
+    const hi = ANSI.fg(accent);
+    const markdownBody = renderMarkdown(e.body || "(empty)", bodyW, {
+      headingConfig: PLAIN_HEADING_CONFIG,
+      paddingX: 2,
+    });
 
     const content = [
       "",
-      `  {bold}${icon} ${e.title}{/bold}`,
+      `  ${ANSI.bold}${icon} ${e.title}${ANSI.reset}`,
       "",
-      `  {${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · created ${timeAgo(e.createdAt)} · updated ${timeAgo(e.updatedAt)}{/${muted}-fg}`,
-      e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : null,
-      `  {${muted}-fg}${"─".repeat(ruleW)}{/${muted}-fg}`,
+      `  ${dim}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · created ${timeAgo(e.createdAt)} · updated ${timeAgo(e.updatedAt)}${ANSI.reset}`,
+      e.tags.length ? `  ${hi}${e.tags.map(t => `#${t}`).join(" ")}${ANSI.reset}` : null,
+      `  ${dim}${"─".repeat(ruleW)}${ANSI.reset}`,
       "",
-      ...bodyLines.map(l => `  ${l}`),
+      ...markdownBody,
     ].filter((l): l is string => l !== null);
 
     detailBox.setContent(content.join("\n"));
@@ -787,6 +831,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     render();
   });
 
+  listBox.key(["s"], () => {
+    if (mode !== "list") return;
+    const idx = SORT_CYCLE.indexOf(sortBy);
+    sortBy = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]!;
+    refresh();
+    render();
+  });
+
   listBox.key(["enter"], () => {
     if (mode !== "list") return;
     if (deleteConfirm) return;
@@ -929,8 +981,10 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     }
     const allTags = [...new Set(all.flatMap(e => e.tags))];
     return {
-      summary: `Journal — ${all.length} entries, mode: ${mode}`,
+      summary: `Journal — ${all.length} entries, mode: ${mode}, view: journal`,
       mode,
+      viewMode: "journal" as const,
+      sortBy,
       entryCount: all.length,
       selectedId: selectedEntry?.id ?? entries[selectedIdx]?.id ?? null,
       selectedTitle: selectedEntry?.title ?? entries[selectedIdx]?.title ?? null,

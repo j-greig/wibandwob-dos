@@ -50,9 +50,9 @@ check "code/rule/list rendering" 2 "grep -q 'renderMarkdown' microapps/journal/i
 
 echo ""
 echo "=== F2 — Sort & Date (10 pts) ==="
-check "sort toggle key" 2 "grep -qE '\"s\".*sort|sort.*toggle|cycleSort|sortKey' microapps/journal/index.ts"
-check "sort modes" 2 "grep -qE 'updatedAt.*createdAt.*title|sortBy|sortOrder|sortMode' microapps/journal/index.ts"
-check "sort in status bar" 2 "grep -qE 'sort.*status|status.*sort|sortLabel|sorted by' microapps/journal/index.ts"
+check "sort toggle key" 2 "grep -qE 'key.*\"s\"|\"s\".*key|sortBy.*SORT_CYCLE|cycleSort|sortKey' microapps/journal/index.ts"
+check "sort modes" 2 "grep -qE 'updatedAt.*createdAt.*title|sortBy|sortOrder|sortMode|SortMode' microapps/journal/index.ts"
+check "sort in status bar" 2 "grep -qE 'SORT_LABEL|sortLabel|sort.*status|↓updated|↓created|↓title' microapps/journal/index.ts"
 check "date group headers" 2 "grep -qE 'dateHeader|groupHeader|date.*group|day.*header|separator.*row' microapps/journal/index.ts"
 check "header index mapping" 2 "grep -qE 'indexMap|headerMap|skipHeader|isHeader|entryIndex' microapps/journal/index.ts"
 

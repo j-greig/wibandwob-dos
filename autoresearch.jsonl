@@ -1,1 +1,2 @@
 {"type":"config","name":"Journal v3 — Markdown, Sort, Sessions","metricName":"journal_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"e72e77a","metric":28,"metrics":{"feature_score":2,"md_render":0,"list_ux":5,"session_ux":0,"coherence":7,"layout":7,"polish":7},"status":"keep","description":"Baseline: v3 rubric. feature=2/40 (only mode toggle grep match). UI scored generously for existing v2 quality: LIST_UX=5, COHERENCE=7, LAYOUT=7, POLISH=7, MD_RENDER=0, SESSION_UX=0. Total 28.","timestamp":1773568878100,"segment":0}
