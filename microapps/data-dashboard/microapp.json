@@ -1,0 +1,20 @@
+{
+  "name": "data-dashboard",
+  "version": "0.1.0",
+  "description": "Live-updating system info panels with timers and theming.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.data-dashboard",
+    "title": "Data Dashboard",
+    "description": "System info panels: uptime, memory, load, timers. Shows split layout and live updates.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 45, "label": "Data Dashboard" }
+    ],
+    "palette": { "order": 215, "label": "Data Dashboard" },
+    "agent": true,
+    "api": true
+  }
+}
