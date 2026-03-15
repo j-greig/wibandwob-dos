@@ -1,6 +1,6 @@
 ---
 title: "Multi-instance clarity — stop agents and humans losing track of which WibWob is which"
-status: not-started
+status: done
 branch: spike/multi-instance-clarity
 ---
 
@@ -27,175 +27,147 @@ The same commands work on any instance. The problem is **below** the seams:
                                   /workspace/save
 ```
 
-An agent can't run `wibwob which` to find out which instance it's on —
-that's circular (it already had to pick a port to connect). Discovery
-must happen **before** the first API call.
+Discovery must happen **before** the first API call.
 
-## Problem
+## Spike Answers
 
-```
-  Agent A                              Agent B
-    │                                    │
-    │  curl :8099/commands/run ───►  instance "main" (what human sees)
-    │                                    │
-    │                                    │  curl :8099/commands/run ──?
-    │                                    │  port taken? new instance?
-    │                                    │  silent fallback to :8098?
-    │                                    │
-    │  "I opened it" ──► human          │  "I opened it" ──► human
-    │                     sees nothing   │                     sees nothing
-    │                     (wrong one)    │                     (or right one??)
-```
-
-No discovery. No targeting. No way to know before connecting.
-
-## Current /health Response
+### Phase 1a: /health enrichment ✅ SHIPPED
 
 ```json
 {
   "ok": true,
+  "instanceId": "qgx",
+  "instanceLabel": "main",
+  "pid": 59849,
+  "startedAt": "2026-03-15T09:57:34.798Z",
+  "uptime": "8m",
   "port": 8099,
   "host": "127.0.0.1",
-  "instanceId": "cyg",
-  "requestedPort": 8099,
-  "scratchBase": "...",
-  "capturesDir": "...",
-  "workspacesDir": "...",
-  "statePath": "..."
+  "socketPath": "scratch/instances/main.sock"
 }
 ```
 
-**Missing:** `instanceLabel`, `pid`, `startedAt`, `uptime`, `socketPath`.
-The inspection seam doesn't fully describe the instance identity.
+Path config moved to `/config` endpoint. Health IS which.
 
-## Solution: Two Phases
+### Phase 1b: Unix socket transport ✅ SHIPPED
 
-### Phase 1: Fix /health + socket transport (the real fix)
+- `Bun.serve({ unix })` works — dual-listen (socket + HTTP) in same process
+- Socket created at `scratch/instances/<label>.sock` on startup
+- Cleaned on `stop()` — but NOT on crash (see problems below)
 
-**1a. Enrich /health** — make the inspection seam fully describe the instance:
+### CLI targeting ✅ SHIPPED
 
-```json
-{
-  "ok": true,
-  "instanceId": "cyg",
-  "instanceLabel": "main",
-  "pid": 12345,
-  "startedAt": "2026-03-15T09:00:00Z",
-  "uptime": "2h 14m",
-  "port": 8099,
-  "socketPath": "scratch/instances/main.sock",
-  "host": "127.0.0.1"
-}
-```
+- `wibwob --instance main health` — connects via socket
+- `wibwob instances` — lists running instances via `ls *.sock` + health check
+- `wibwob minimap` / `wibwob map` — spatial desktop HUD
+- `WIBWOB_INSTANCE` env var — same as `--instance`
+- Resolution: `--instance` > env vars > default HTTP
 
-Drop the path noise (`scratchBase`, `capturesDir`, etc.) — that's config,
-not identity. Move to a `/config` endpoint if anyone needs it.
+### Bun flag eating ⚠️ GOTCHA
 
-Then `wibwob health` becomes the identity surface. No `which` needed —
-health already answers "who am I talking to?"
+Bun intercepts `-t`, `--instance`, and most `--` flags before the script
+sees them. Only works reliably when:
+- Run via shebang (`#!/usr/bin/env bun` → `./wibwob.ts --instance main`)
+- Or via `bun run script.ts --instance main`
 
-**1b. Unix socket transport** — structural fix for discovery + targeting:
+`bun script.ts --instance main` silently eats the flag. This is a Bun bug/design
+choice. Workaround: the alias `wibwob='.../wibwob.ts'` uses shebang execution.
 
-```
-scratch/instances/
-  main.sock              ← Bun.serve({ unix: path })
-  zuk.sock               ← second instance
-```
+## Problems Discovered During Implementation
 
-Each instance dual-listens:
+### 1. Orphan instances survive terminal death
 
-```
-  ┌─────────────────────────────────────────────┐
-  │  WibWob-DOS  label:"main"  id:cyg           │
-  │                                              │
-  │  Bun.serve({ unix: "instances/main.sock" })  │  ← local agents
-  │  Bun.serve({ port: 8099 })                  │  ← remote/VPS
-  │                                              │
-  │  blessed TUI ◄── same process ──► API        │
-  └─────────────────────────────────────────────┘
-```
+When the terminal closes or crashes, the blessed TUI dies but the Bun process
+often survives. The socket stays alive, the port stays bound. `wibwob health`
+still responds but nobody can see the TUI.
 
-**Discovery** (before any API call):
+**Root cause:** No `SIGHUP` handler. No `process.on('exit')` socket cleanup
+that covers all crash paths.
 
-```bash
-ls scratch/instances/*.sock    # what exists?
-# → main.sock  zuk.sock
+### 2. Workspace restore doesn't cover microapps
 
-# try connect to verify alive:
-curl --unix-socket scratch/instances/main.sock http://localhost/health
-```
+`/workspace/load` uses the snapshot registry (`snapshot-registry.ts`). Only
+window types with `registerSnapshot()` handlers are restored. Most microapps
+(figlet, runtime-inspector, contour, plasma) don't have them.
 
-Dead socket = dead instance. `connect()` fails → auto-clean the file.
-No registry. No health-check polling. The filesystem IS the registry.
+The `desktop-save.sh` script captures full state from `/state` API (including
+microapp details), but `workspace/load` can't replay it because it goes through
+the snapshot registry path, not the command path.
 
-**Targeting:**
+**The gap:** Saved state has `{ appType: "wibwob.figlet", inputText: "JIM", font: "larry3d" }`
+but restore needs either a snapshot handler or a command dispatch path.
 
-```bash
-wibwob -t main cmd figlet.open --text HELLO
-#       ↑ resolves to main.sock, then uses COAT seams normally
+### 3. Default workspace loaded on boot overwrites rescue
 
-wibwob -t zuk screenshot 3
-```
+On startup, the app calls `restoreDefaultWorkspace()` which loads
+`scratch/workspaces/default.json`. If we save an orphan's state to a named
+workspace and then start a new instance, the default workspace loads first,
+overwriting whatever was there. Loading the rescue workspace requires a
+separate `/workspace/load` call after boot.
 
-CLI resolution order:
-1. `-t label` → `scratch/instances/{label}.sock`
-2. `$WIBWOB_INSTANCE` env var → socket
-3. `$WIBWOB_API` → HTTP URL (existing, remote)
-4. Default: first `.sock` found (or `http://127.0.0.1:8099` fallback)
+### 4. No auto-save on disconnect
 
-**Information flow (fixed):**
+When the terminal dies (SIGHUP), there's no auto-save. The orphan's state
+is only preserved while it's running — once killed, it's gone unless
+someone saved it first.
+
+### 5. `default.json` gets wiped
+
+The default workspace file sometimes gets cleared/deleted during restarts,
+leaving `{ windows: [] }` or missing entirely. This means restarts always
+start with an empty desktop.
+
+## Reattach Vision (tmux model)
+
+The dream: WibWob-DOS as a server, TUI as a detachable client.
 
 ```
-  Agent                    Socket               TUI (blessed)
-    │                        │                       │
-    │  ls *.sock ──────────► │ (filesystem)          │
-    │  found: main.sock      │                       │
-    │                        │                       │
-    │  connect main.sock ───►│                       │
-    │  GET /health           │                       │
-    │  ◄── { label:"main",   │── same process ──────►│
-    │       id:"cyg", ... }  │                       │
-    │                        │                       │
-    │  GUARANTEED: this is   │                       │
-    │  the "main" instance   │   ← human sees this   │
-    │  the human is watching │                       │
+  Terminal dies          Server keeps running       New terminal
+      │                        │                        │
+      │  SIGHUP ──────────►   │  auto-save workspace   │
+      │  TUI detaches         │  socket stays alive    │
+      │                       │                        │
+      │                       │  ◄───── wibwob attach  │
+      │                       │         reconnect TUI  │
+      │                       │         restore render  │
 ```
 
-### Phase 2: Evaluate if `wibwob which` is still needed
+**Why it's hard:** blessed assumes one TTY for life. `process.stdout` is
+bound at process start. You can't redirect blessed to a new terminal without
+either:
+- Restarting blessed with a new TTY fd (invasive)
+- Running blessed in a PTY that survives (tmux-inside-tmux)
+- Separating the server (state + API) from the renderer (blessed) into
+  two processes connected by IPC
 
-After phase 1, `wibwob health` returns full identity including label.
-`wibwob -t main health` confirms targeting. `ls *.sock` discovers.
+**Pragmatic alternative (what can ship now):**
 
-`wibwob which` would just be `wibwob health | pretty-print` — probably
-not worth a separate command. If agents need a preamble, it's:
-
-```bash
-wibwob health   # already tells you everything
+```
+  Terminal dies          Orphan auto-saves          wibwob attach
+      │                        │                        │
+      │  SIGHUP ──────►  save workspace              │
+      │                  to orphan-<id>.json          │
+      │                  then exit cleanly            │
+      │                                               │
+      │                                    detect orphan workspace
+      │                                    start new instance
+      │                                    load orphan workspace
+      │                                    clean up
 ```
 
-**Verdict: probably not needed.** Health IS which.
+This is achievable without architectural changes. It's the tmux
+"session restore" model, not the tmux "reattach" model.
 
-## Scope
+## Recommendation: Promote to Epic
 
-**In:** socket transport, /health enrichment, CLI `-t` flag, socket cleanup on exit
-**Out:** remote multi-instance, systemd lifecycle, formal process supervision
+This spike answered its questions but revealed 5 interconnected problems
+that need coordinated work:
 
-## Files Touched
+1. **Orphan cleanup** — SIGHUP handler, socket cleanup on all exit paths
+2. **Microapp snapshot parity** — all Core 7 microapps need `registerSnapshot()`
+3. **Auto-save on disconnect** — SIGHUP → save workspace → clean exit
+4. **Workspace boot sequence** — support loading a named workspace on startup
+5. **`wibwob attach`** — detect orphan workspace, start new instance, load it
 
-| File | Change |
-|------|--------|
-| `src/app.ts` | Create socket on startup, clean on exit |
-| `src/runtime/runtime-node.ts` | Dual-listen (socket + HTTP), socket path in identity |
-| `src/services/control-api.ts` | Enrich `/health` response |
-| `src/cli/wibwob.ts` | `-t` flag, socket-first connect, `instances` subcommand |
-| `scripts/lib/runtime-env.sh` | Socket discovery before HTTP fallback |
-
-## Test Plan
-
-1. Start main instance → `main.sock` appears
-2. Start alt instance → `zuk.sock` appears
-3. `wibwob -t main health` → returns main's identity
-4. `wibwob -t zuk health` → returns zuk's identity
-5. Kill main → `wibwob -t main health` fails → sock auto-cleaned
-6. `wibwob instances` → lists live instances
-7. Agent connects without `-t` → picks first/only socket → correct
+These form a natural epic: **"Instance Lifecycle"** — from birth to death
+to resurrection.
