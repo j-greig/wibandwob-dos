@@ -1,7 +1,7 @@
 # F6: `wibwob plumb` — Inter-Window Routing
 
 **Epic:** E039 Instance Lifecycle
-**Status:** not-started
+**Status:** done
 **Depends on:** F5 (write)
 **GitHub:** #127 (Plan 9 analysis)
 **Reviewed by:** ops lens — original spec failed COAT test, rewritten.
@@ -102,11 +102,9 @@ on plumb.send.
 
 ## Stories (MVP — 2 slices)
 
-- [ ] S1: `plumb.send` catalog command — read source captureText,
-      dispatch `<appType>.write` on destination. Implemented in
-      app-controller or a thin service function.
-- [ ] S2: `wibwob plumb --from <id> --to <id>` CLI subcommand
-- [ ] S3: Verify: `wibwob plumb --from 3 --to 7` routes contour → figlet
+- [-] S1: ~~`plumb.send` catalog command~~ — killed per ops review. CLI-only.
+- [x] S2: `wibwob plumb --from <id> --to <id>` CLI subcommand
+- [x] S3: Verify: cross-app routing (contour → figlet), error handling, edge cases
 
 ## Non-Goals
 
