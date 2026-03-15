@@ -8,3 +8,4 @@
 {"run":2,"commit":"ea1a98a","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100","timestamp":1773580359971,"segment":0}
 {"run":3,"commit":"e01ebc8","metric":100,"metrics":{},"status":"keep","description":"Stability run 2: 100/100 — F8 stable","timestamp":1773580390266,"segment":0}
 {"type":"config","name":"F6 Plumb — inter-window routing","metricName":"plumb_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"2250aff","metric":100,"metrics":{},"status":"keep","description":"F6 plumb: CLI subcommand routes text between windows. No new endpoints, no catalog command. Reuses read+write chain.","timestamp":1773580616448,"segment":0}
