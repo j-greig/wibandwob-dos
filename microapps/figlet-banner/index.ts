@@ -221,25 +221,16 @@ export default function setup(host: MicroappHost) {
         width: "40%",
         bottom: 0,
         border: "line",
+        label: " Fonts ",
         style: {
           ...host.theme().body,
           border: { fg: host.theme().accent.fg },
         },
       });
 
-      const searchLabel = blessed.box({
-        parent: leftPane,
-        top: 0,
-        left: 1,
-        right: 1,
-        height: 1,
-        style: host.theme().header,
-        content: " Search: ",
-      });
-
       const fontList = blessed.list({
         parent: leftPane,
-        top: 1,
+        top: 0,
         left: 0,
         right: 0,
         bottom: 0,
@@ -302,7 +293,7 @@ export default function setup(host: MicroappHost) {
         fontList.setItems(filtered.map((c) => c.label) as unknown as blessed.Widgets.BlessedElement[]);
         fontList.select(0);
         updatePreview();
-        searchLabel.setContent(query ? ` Search: ${query}_ ` : " Search: (type to filter) ");
+        leftPane.setLabel(query ? ` Search: ${query}_ ` : " Fonts ");
         host.screen.render();
       }
 
