@@ -1,1 +1,2 @@
 {"type":"config","name":"E039 Instance Lifecycle","metricName":"lifecycle_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"e608697","metric":10,"metrics":{},"status":"keep","description":"Baseline: 10/100. Only socket-exists-before-kill (5) and process-dead-after-SIGHUP (5) pass. F2 all fail (no registerSnapshot), F1 no cleanup, F3/F4 not implemented.","timestamp":1773572404395,"segment":0}

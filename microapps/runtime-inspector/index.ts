@@ -198,6 +198,19 @@ export default function setup(host: MicroappHost) {
     palette: { order: 165, label: "Runtime Inspector" },
     action: () => openRuntimeInspector(host),
   });
+
+  // ── Workspace snapshot — COAT workspace seam ──
+  host.registerSnapshot({
+    serialize: (window) => {
+      const state = window.describeState?.() ?? {};
+      return {
+        activeTab: state.activeTab ?? "Overview",
+      };
+    },
+    restore: (_snapshot, _payload) => {
+      host.runCommand("open");
+    },
+  });
 }
 
 function openRuntimeInspector(host: MicroappHost) {

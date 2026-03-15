@@ -17,23 +17,23 @@ If an operation needs a shell command, it should be a `wibwob` subcommand.
 Scripts (`scripts/*.sh`) are for multi-step orchestration only — not thin
 wrappers around one API call.
 
-The CLI is at `./src/cli/wibwob.ts` (shebang, runs directly).
-It is NOT on PATH — use the full path or `./src/cli/wibwob.ts`.
+The CLI is at `wibwob` (shebang, runs directly).
+It is NOT on PATH — use the full path or `wibwob`.
 
 ## wibwob commands
 
 ```bash
-./src/cli/wibwob.ts health                    # instance identity (label, pid, uptime)
-./src/cli/wibwob.ts state                     # full desktop state JSON
-./src/cli/wibwob.ts state | jq '.windows[]'   # window list
-./src/cli/wibwob.ts windows -q                # window IDs only (one per line)
-./src/cli/wibwob.ts map                       # spatial desktop HUD (alias: minimap)
-./src/cli/wibwob.ts instances                 # list running instances via sockets
-./src/cli/wibwob.ts screenshot <id>           # per-window text capture
-./src/cli/wibwob.ts commands -q               # list all command IDs
-./src/cli/wibwob.ts cmd <id> [--key val ...]  # run command by ID
-./src/cli/wibwob.ts --instance <label> ...    # target specific instance
-./src/cli/wibwob.ts help                      # full usage
+wibwob health                    # instance identity (label, pid, uptime)
+wibwob state                     # full desktop state JSON
+wibwob state | jq '.windows[]'   # window list
+wibwob windows -q                # window IDs only (one per line)
+wibwob map                       # spatial desktop HUD (alias: minimap)
+wibwob instances                 # list running instances via sockets
+wibwob screenshot <id>           # per-window text capture
+wibwob commands -q               # list all command IDs
+wibwob cmd <id> [--key val ...]  # run command by ID
+wibwob --instance <label> ...    # target specific instance
+wibwob help                      # full usage
 ```
 
 ## Scripts (orchestration only)

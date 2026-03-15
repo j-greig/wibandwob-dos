@@ -6,7 +6,7 @@
 # subcommand, that's a signal to add it to src/cli/wibwob.ts first.
 set -euo pipefail
 
-WIBWOB="./src/cli/wibwob.ts"
+source ~/.wibwob
 SCORE=0
 TOTAL=0
 
@@ -26,16 +26,16 @@ check() {
 # ── 0. Ensure app is running ──────────────────────────────────
 bash scripts/ensure-running.sh > /dev/null 2>&1 || true
 for i in $(seq 1 15); do
-  $WIBWOB health > /dev/null 2>&1 && break
+  wibwob health > /dev/null 2>&1 && break
   sleep 1
 done
-$WIBWOB health > /dev/null 2>&1 || {
+wibwob health > /dev/null 2>&1 || {
   echo "ERROR: wibwob health failed — API not reachable"
   exit 1
 }
 
-INSTANCE_LABEL=$($WIBWOB health | jq -r '.instanceLabel // "?"')
-INSTANCE_PID=$($WIBWOB health | jq -r '.pid')
+INSTANCE_LABEL=$(wibwob health | jq -r '.instanceLabel // "?"')
+INSTANCE_PID=$(wibwob health | jq -r '.pid')
 echo "Instance: $INSTANCE_LABEL (pid $INSTANCE_PID)"
 echo ""
 
@@ -43,14 +43,14 @@ echo ""
 echo "=== F2: Microapp Snapshots (30 pts) ==="
 
 # Open test windows via wibwob command surface
-$WIBWOB cmd microapp.wibwob.figlet.open --text LIFECYCLE --font doom > /dev/null 2>&1
-$WIBWOB cmd microapp.wibwob.runtime-inspector.open > /dev/null 2>&1
-$WIBWOB cmd microapp.wibwob.contour.open > /dev/null 2>&1
+wibwob cmd microapp.wibwob.figlet.open --text LIFECYCLE --font doom > /dev/null 2>&1
+wibwob cmd microapp.wibwob.runtime-inspector.open > /dev/null 2>&1
+wibwob cmd microapp.wibwob.contour.open > /dev/null 2>&1
 sleep 2
 
 # Count windows before save
-BEFORE=$($WIBWOB windows -q | wc -l | tr -d ' ')
-TYPES=$($WIBWOB state | jq -r '[.windows[].appType] | join(" ")')
+BEFORE=$(wibwob windows -q | wc -l | tr -d ' ')
+TYPES=$(wibwob state | jq -r '[.windows[].appType] | join(" ")')
 echo "  before: $BEFORE windows: $TYPES"
 
 # Save workspace
@@ -62,7 +62,7 @@ curl -sf -X POST "http://127.0.0.1:8099/workspace/save" \
 # Restart (clears all windows)
 bash scripts/restart.sh > /dev/null 2>&1
 for i in $(seq 1 15); do
-  $WIBWOB health > /dev/null 2>&1 && break
+  wibwob health > /dev/null 2>&1 && break
   sleep 1
 done
 sleep 2
@@ -76,13 +76,13 @@ sleep 3
 
 # Check what survived
 check "figlet restored" 10 \
-  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.figlet\")] | length > 0'"
+  "wibwob state | jq -e '[.windows[] | select(.appType==\"wibwob.figlet\")] | length > 0'"
 
 check "runtime-inspector restored" 10 \
-  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.runtime-inspector\")] | length > 0'"
+  "wibwob state | jq -e '[.windows[] | select(.appType==\"wibwob.runtime-inspector\")] | length > 0'"
 
 check "contour restored" 10 \
-  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.contour\")] | length > 0'"
+  "wibwob state | jq -e '[.windows[] | select(.appType==\"wibwob.contour\")] | length > 0'"
 
 # ── F1: Clean Death (30 pts) ──────────────────────────────────
 echo ""
@@ -92,7 +92,7 @@ SOCK_PATH="scratch/instances/${INSTANCE_LABEL:-main}.sock"
 PID_FILE="scratch/wibwob.pid"
 
 # Get current PID via wibwob
-CURRENT_PID=$($WIBWOB health | jq -r '.pid')
+CURRENT_PID=$(wibwob health | jq -r '.pid')
 
 check "socket exists before kill" 5 "[ -S '$SOCK_PATH' ]"
 
@@ -116,12 +116,12 @@ check "--workspace flag exists" 10 \
 # Restart and check if orphan workspace auto-detected
 bash scripts/ensure-running.sh > /dev/null 2>&1 || true
 for i in $(seq 1 15); do
-  $WIBWOB health > /dev/null 2>&1 && break
+  wibwob health > /dev/null 2>&1 && break
   sleep 1
 done
 
 check "orphan workspace auto-loaded" 10 \
-  "[ \$($WIBWOB windows -q | wc -l | tr -d ' ') -gt 1 ]"
+  "[ \$(wibwob windows -q | wc -l | tr -d ' ') -gt 1 ]"
 
 # ── F4: wibwob attach (20 pts) ────────────────────────────────
 echo ""

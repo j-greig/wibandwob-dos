@@ -308,4 +308,18 @@ export default function setup(host: MicroappHost) {
     );
     host.windows.resizeWindow(win.id, targetW, targetH);
   }
+
+  // ── Workspace snapshot — COAT workspace seam ──
+  host.registerSnapshot({
+    serialize: (window) => {
+      const state = window.describeState?.() ?? {};
+      return {
+        text: state.inputText ?? "WibWob",
+        font: state.font ?? getDefaultFigletFont(),
+      };
+    },
+    restore: (_snapshot, payload) => {
+      host.runCommand("open", payload);
+    },
+  });
 }

@@ -394,4 +394,21 @@ export default function setup(host: MicroappHost) {
     doLayout();
     player.play();
   }
+
+  // ── Workspace snapshot — COAT workspace seam ──
+  host.registerSnapshot({
+    serialize: (window) => {
+      const state = window.describeState?.() ?? {};
+      return {
+        viewMode: state.viewMode ?? "solo",
+        mode: state.mode,
+        terrain: state.terrain,
+        seed: state.seed,
+        levels: state.levels,
+      };
+    },
+    restore: (_snapshot, _payload) => {
+      host.runCommand("open");
+    },
+  });
 }
