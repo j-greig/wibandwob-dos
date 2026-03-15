@@ -33,7 +33,7 @@ The codebase now has a canon layout SDK matching the E034 design guide:
 - `createTextBlock` no longer crashes at zero width
 - Internal resize listeners removed from flex layout (no more double-fire)
 
-**Migration:** All 16 module files + 3 internal windows updated. Zero old names remain in `src/` or `modules/`.
+**Migration:** All 16 module files + 3 internal windows updated. Zero old names remain in `src/` or `microapps/`.
 
 **Docs:** `sdk-reference.md` has a full layout section with examples.
 

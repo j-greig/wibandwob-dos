@@ -50,13 +50,39 @@ structural foundations. The result:
 
 A codebase where:
 - Every file has one clear responsibility, named by what it does
-- The SDK is complete enough that module authors never need to import from `src/core/`
+- The SDK is complete enough that microapp authors never need to import from `src/core/`
 - The type system catches errors that currently surface as runtime bugs
 - Boot time is minimal — lazy-load everything that is not needed for first paint
 - An agent can read any single file and understand it without reading 5 others
 - Standard UI patterns (panel chrome, text input, scrollable list, tabbed view,
   modal dialog, status bar, toolbar) are SDK primitives with correct blessed defaults
 - Functions do one thing, take explicit parameters, return explicit results
+
+## 2026-03-14 Runtime Refactor Slice Status
+
+The thin runtime-centric slice on `epic/refactor-13` landed these architectural seams:
+
+- canonical runtime-node identity via `instanceId`
+- shared runtime command, inspection, window, and workspace services
+- blocking picker/file-open control paths with inspectable UI blockers
+- runtime-node descriptor with instance-scoped scratch/capture/workspace paths
+- SDK ownership anchors under `src/sdk/` with stable `src/services/microapp-sdk.ts` facade
+- CLI inspection + canonical CLI parity harness
+- Runtime Inspector proof microapp consuming `/runtime/inspection` and `/commands/list`
+- figlet banners sized from rendered content plus explicit chrome math, with the
+  runtime parity harness respecting measured banner height instead of forcing a clipped box
+
+Explicitly parked follow-ons from this slice:
+
+- peer provenance / actor attribution
+  - `.planning/refactor-docs/022-peer-provenance-follow-on.md`
+- host-vs-terminal-microapp agent efficiency benchmark
+  - `.planning/refactor-docs/023-agent-runtime-efficiency-benchmark-follow-on.md`
+- agent-friendly microapp proof/build loop and optional hot reload
+  - `.planning/refactor-docs/025-agent-friendly-microapp-dev-follow-on.md`
+
+This means E042 now has a proven runtime/application/SDK direction to build on,
+even though the broader god-file decomposition and deeper type-system work remain open.
 
 ## Subgoals (Measurable)
 
@@ -112,7 +138,7 @@ Stories:
 
 ### F03 — SDK Completeness
 
-Make `microapp-sdk.ts` the only import module authors ever need.
+Make `microapp-sdk.ts` the only import microapp authors ever need.
 
 Stories:
 - [ ] S10: Audit all modules for direct `src/core/` or `src/services/` imports.
@@ -155,7 +181,7 @@ Stories:
       not at startup. Only core window manager loads eagerly.
 - [ ] S23: Lazy-load services — engines (plasma, contour, terrain), browser
       service, audio controller loaded on first use.
-- [ ] S24: Lazy-load modules — module-loader already scans at startup but
+- [ ] S24: Lazy-load modules — microapp-loader already scans at startup but
       should defer `import()` until window creation.
 
 ### F06 — Function Decomposition
@@ -188,7 +214,7 @@ Secondary metrics tracked but not driving keep/discard:
 - No functional regressions — app must boot and all existing features work
 - Backward compatible imports — old import paths continue to work via re-exports
 - One logical change per commit
-- Module code (`modules/`) is touched only to fix imports (point at SDK)
+- Module code (`microapps/`) is touched only to fix imports (point at SDK)
 
 ## Testing
 
@@ -197,7 +223,7 @@ bun run typecheck                    # must pass
 time bun run typecheck               # primary metric
 wc -l src/core/*.ts | sort -rn       # track god file reduction
 grep -r "as any" src/core/ | wc -l   # track type safety
-grep -rn "from.*src/core/" modules/  # track SDK gaps
+grep -rn "from.*src/core/" microapps/  # track SDK gaps
 ```
 
 ## Non-Goals

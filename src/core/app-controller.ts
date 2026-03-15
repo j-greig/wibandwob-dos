@@ -18,17 +18,15 @@ import {
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
-  SCRATCH_BASE,
   SPIKE_NOTES_PATH,
   SPIKE_ROOT,
-  STATE_PATH,
-  WORKSPACES_DIR,
 } from "./config.js";
 import { appFlags } from "./cli.js";
-import { loadModules } from "../services/module-loader.js";
-import type { MicroappHostDeps } from "../services/module-loader.js";
+import { loadMicroapps, reloadMicroapps } from "../services/microapp-loader.js";
+import type { MicroappHostDeps } from "../sdk/microapp-host.js";
+import { copyToClipboard } from "./clipboard.js";
 import type { AppMenuActions } from "./command-catalog.js";
-import { CommandRegistry } from "./command-registry.js";
+import { CommandRegistry, type CommandSurface } from "./command-registry.js";
 import {
   buildDesktopContextMenu,
   buildWindowContextMenu,
@@ -80,13 +78,7 @@ import {
 } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
-import {
-  getDefaultFigletFont,
-  getFigletCatalogue,
-  getFigletFontChoices,
-  measureFiglet,
-  renderFiglet,
-} from "../services/figlet-service.js";
+
 import {
   openPrimerFile,
   promptForPrimerFile,
@@ -113,17 +105,10 @@ import {
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow,
+  openBrowserReaderWindow as openBrowserReaderContentWindow,
 } from "../windows/browser-windows.js";
 import {
-  openBrowserReaderWindow as openBrowserReaderContentWindow,
-  openFigletFontPicker as openFigletFontPickerWindow,
-  openFigletWindow as openFigletBannerWindow,
-  promptForFigletText as promptForFigletBannerText,
-} from "../windows/figlet-windows.js";
-import {
   openCommandPaletteWindow as openPaletteWindow,
-  openArtWindow as openGenerativeArtWindow,
-  openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
@@ -132,12 +117,8 @@ import {
   openScrambleSmolPopup,
 } from "../windows/scramble-window.js";
 import { ScrambleBrain } from "../services/scramble-brain.js";
-import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
-import { openPlasmaWindow as openPlasmaStudioWindow } from "../windows/plasma-window.js";
-import {
-  extractMoodFromText,
-  type PlasmaModifiers,
-} from "../services/plasma-engine.js";
+
+
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
 // Editor window factory now used via EditorCoordinator
@@ -149,6 +130,32 @@ import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
+import {
+  createRuntimeCommandService,
+  type RuntimeCommandService,
+} from "../application/runtime-command-service.js";
+import {
+  createRuntimeInspectionService,
+  type RuntimeInspectionService,
+} from "../application/runtime-inspection-service.js";
+import {
+  createRuntimeWindowService,
+  type RuntimeWindowService,
+} from "../application/runtime-window-service.js";
+import {
+  createRuntimeWorkspaceService,
+  type RuntimeWorkspaceResult,
+  type RuntimeWorkspaceService,
+} from "../application/runtime-workspace-service.js";
+import type {
+  RuntimeInspectionSnapshot,
+  RuntimeOverlayInspection,
+  RuntimeUiBlockerInspection,
+} from "../domain/runtime-inspection.js";
+import {
+  createRuntimeNode,
+  type RuntimeNodeDescriptor,
+} from "../runtime/runtime-node.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -187,22 +194,37 @@ export class TsTuiMvpApp {
   private readonly overlays: OverlayManager;
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
-  private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
+  private readonly workspace: WorkspaceService;
   private readonly geometry: DesktopGeometryService;
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly runtimeCommands: RuntimeCommandService;
+  private readonly runtimeInspection: RuntimeInspectionService;
+  private readonly runtimeWindows: RuntimeWindowService;
+  private readonly runtimeWorkspace: RuntimeWorkspaceService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
   private readonly scrambleBrain: ScrambleBrain = new ScrambleBrain();
   private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
-  private readonly sessionId: string;
+  private readonly instanceId: string;
+  private readonly runtimeNode: RuntimeNodeDescriptor;
+  private microappReloadEpoch = 0;
+  private microappDeps?: MicroappHostDeps;
 
-  constructor(opts?: { instanceLabel?: string; sessionId?: string }) {
-    this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
-    this.sessionId = opts?.sessionId?.trim() || "???";
+  constructor(opts?: {
+    instanceLabel?: string;
+    instanceId?: string;
+    runtimeNode?: RuntimeNodeDescriptor;
+  }) {
+    this.runtimeNode = opts?.runtimeNode ?? createRuntimeNode({
+      instanceLabel: opts?.instanceLabel,
+      instanceId: opts?.instanceId?.trim() || "???",
+    });
+    this.instanceLabel = this.runtimeNode.instanceLabel;
+    this.instanceId = this.runtimeNode.instanceId;
     log.setIdentity(this.getInstanceDisplayLabel());
     patchBlessedUnicode();
     this.screen = blessed.screen({
@@ -306,6 +328,7 @@ export class TsTuiMvpApp {
       this.windowManager.restoreWindowFocus(),
     );
     capabilityService.probe();
+    this.workspace = new WorkspaceService(this.runtimeNode.workspacesDir);
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
     this.menuUi = new MenuOverlayManager(
@@ -326,45 +349,80 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
+    this.runtimeCommands = createRuntimeCommandService({
+      listCommands: (
+        surface?: CommandSurface,
+        opts?: { includeUnavailable?: boolean },
+      ) => this.commands.list(surface, opts),
+      runCommand: (id: string, args?: Record<string, unknown>) =>
+        this.commands.run(id, args),
+    });
+    this.runtimeInspection = createRuntimeInspectionService({
+      getState: () => this.getDesktopState(),
+      syncState: () => this.state.sync(),
+      getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
+      screenshotText: () => (this.screen as any).screenshot() as string,
+      getSnapshot: (): RuntimeInspectionSnapshot => {
+        const blockers = this.getRuntimeUiBlockers();
+        return {
+          ui: {
+            menu: {
+              open: this.menuUi.isAnyMenuOpen(),
+              label: this.menuUi.getOpenMenuLabel(),
+            },
+            overlay: this.getRuntimeOverlayInspection(),
+            blockers,
+            blocked: blockers.length > 0,
+          },
+          state: this.getDesktopState(),
+          stats: this.runtimeStats.snapshot(),
+          scramble: {
+            status: this.scrambleBrain.status,
+            sleeping: this.scrambleBrain.sleeping,
+            model: this.scrambleBrain.modelName,
+            sessionId: this.scrambleBrain.sessionId,
+            messageCount: this.scrambleBrain.history.length,
+            lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+            logPath: this.scrambleBrain.logPath ?? null,
+          },
+          history: this.scrambleBrain.history.map((m) => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+          })),
+        };
+      },
+    });
+    this.runtimeWindows = createRuntimeWindowService({
+      commands: this.runtimeCommands,
+      windows: this.windowManager,
+    });
+    this.runtimeWorkspace = createRuntimeWorkspaceService({
+      workspace: this.workspace,
+      snapshotWindows: () => this.snapshotWindows(),
+      getThemeName: () => themeName(),
+      clearWindows: () => this.clearWorkspaceWindows(),
+      restoreWindows: (snapshots) => this.restoreWorkspaceSnapshots(snapshots),
+      applyThemeByName: (name) => this.applyThemeByName(name),
+      persistState: () => this.persistState(),
+    });
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
-        getState: () => this.getDesktopState(),
-        syncState: () => this.state.sync(),
-        getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
-        listCommands: (surface, opts) => this.commands.list(surface, opts),
-        runCommand: (id, args) => this.commands.run(id, args),
-        windows: this.windowManager,
-        screenshotText: () => (this.screen as any).screenshot() as string,
-        getRuntimeStats: () => this.runtimeStats.snapshot(),
-        getScrambleState: () => ({
-          status: this.scrambleBrain.status,
-          sleeping: this.scrambleBrain.sleeping,
-          model: this.scrambleBrain.modelName,
-          sessionId: this.scrambleBrain.sessionId,
-          messageCount: this.scrambleBrain.history.length,
-          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
-          logPath: this.scrambleBrain.logPath ?? null,
-        }),
-        getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-        })),
+        commands: this.runtimeCommands,
+        inspection: this.runtimeInspection,
+        windows: this.runtimeWindows,
+        workspace: this.runtimeWorkspace,
       },
-      {
-        instanceLabel: this.instanceLabel,
-        sessionId: this.sessionId,
-      },
+      this.runtimeNode,
     );
     this.state = new StateService(
       {
         appName: "WibWob-DOS TS MVP",
         appMode: "terminal-native",
         cwd: REPO_ROOT,
-        statePath: STATE_PATH,
-        instanceLabel: this.instanceLabel,
-        sessionId: this.sessionId,
+        runtimeNode: this.runtimeNode,
+        getMicroappReloadEpoch: () => this.microappReloadEpoch,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -376,7 +434,7 @@ export class TsTuiMvpApp {
     );
 
     // Set scramble session log path
-    const scrambleLogDir = path.join(SCRATCH_BASE, "scramble-sessions");
+    const scrambleLogDir = path.join(this.runtimeNode.scratchBase, "scramble-sessions");
     fs.mkdirSync(scrambleLogDir, { recursive: true });
     this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
     this.scrambleBrain.startSessionSocket();
@@ -391,23 +449,11 @@ export class TsTuiMvpApp {
   async run(): Promise<void> {
     // Load external modules (themes + microapps) before workspace restore
     // so that external themes and commands are available for restoration.
-    const microappDeps: MicroappHostDeps = {
-      screen: this.screen,
-      windowManager: this.windowManager,
-      commands: this.commands,
-      geometry: this.geometry.getGeometry(),
-      focusOrCreate: (appType, createFn, multiInstance) => {
-        this.focusOrCreate(appType, createFn, multiInstance);
-      },
-      worldChat: worldChatService,
-      overlays: this.overlays,
-      repoRoot: REPO_ROOT,
-    };
-    await loadModules(microappDeps);
+    this.microappDeps = this.buildMicroappDeps();
+    await loadMicroapps(this.microappDeps);
 
     // Rebuild menus after microapps may have registered dynamic commands
-    this.menus.length = 0;
-    this.menus.push(...this.commands.buildMenus());
+    this.rebuildMenusFromCommands();
 
     this.renderChrome();
     this.runtimeStats.init();
@@ -422,30 +468,48 @@ export class TsTuiMvpApp {
     );
   }
 
+  private buildMicroappDeps(): MicroappHostDeps {
+    return {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      commands: this.commands,
+      geometry: this.geometry.getGeometry(),
+      focusOrCreate: (appType, createFn, multiInstance) => {
+        this.focusOrCreate(appType, createFn, multiInstance);
+      },
+      worldChat: worldChatService,
+      overlays: this.overlays,
+      repoRoot: REPO_ROOT,
+    };
+  }
+
+  private rebuildMenusFromCommands(): void {
+    this.menus.length = 0;
+    this.menus.push(...this.commands.buildMenus());
+  }
+
+  private async reloadMicroappsFromDisk(): Promise<{
+    reloaded: number;
+    clearedCommands: number;
+    clearedSnapshots: number;
+  }> {
+    this.microappDeps ??= this.buildMicroappDeps();
+    try {
+      const result = await reloadMicroapps(this.microappDeps);
+      this.rebuildMenusFromCommands();
+      return result;
+    } finally {
+      this.microappReloadEpoch += 1;
+      this.syncLiveState();
+      this.screen.render();
+    }
+  }
+
   /** Restore default workspace on boot. Empty desktop if none exists. */
   private restoreDefaultWorkspace(): void {
-    if (!this.workspace.exists()) return;
-    try {
-      const { windows: snapshots, theme: savedTheme } = this.workspace.load();
-      if (savedTheme) {
-        const variant = allVariants().find((v) => v.name === savedTheme);
-        if (variant) {
-          setThemeVariant(variant);
-          this.applyTheme();
-        }
-      }
-      if (snapshots.length === 0) return;
-      let focusedWindow: WindowRecord | undefined;
-      for (const snapshot of snapshots) {
-        const restored = restoreWindowSnapshot(
-          snapshot,
-          this.getRestoreActions(),
-        );
-        if (snapshot.focused) focusedWindow = restored;
-      }
-      focusedWindow?.focus();
-    } catch {
-      // Corrupt workspace — start with empty desktop
+    const restored = this.runtimeWorkspace.restoreDefault();
+    if (restored && !restored.ok) {
+      log.app(`default workspace restore skipped: ${restored.error}`);
     }
   }
 
@@ -455,11 +519,7 @@ export class TsTuiMvpApp {
 
   /** Save workspace, quit, then send Up arrow to terminal so last command is ready to re-run. */
   private devRestart(): void {
-    try {
-      this.workspace.save(this.snapshotWindows(), themeName());
-    } catch {
-      /* best effort */
-    }
+    this.runtimeWorkspace.autoSave();
     this.runtimeStats.destroy();
     this.shellChrome.destroy();
     this.screen.destroy();
@@ -473,8 +533,8 @@ export class TsTuiMvpApp {
 
   private getInstanceDisplayLabel(): string {
     return this.instanceLabel
-      ? `${this.instanceLabel} · ${this.sessionId}`
-      : this.sessionId;
+      ? `${this.instanceLabel} · ${this.instanceId}`
+      : this.instanceId;
   }
 
   private toggleTheme(): void {
@@ -548,15 +608,10 @@ export class TsTuiMvpApp {
       this.windowManager.resizeFocusedWindow(0, 1),
     );
     this.screen.key(["escape"], () => this.closeMenu());
-    this.screen.key(["tab"], () => {
-      const focused = this.windowManager.getFocusedWindow();
-      if (focused?.kind === "editor") {
-        this.editor.insertText(focused, "  ");
-        return;
-      }
+    this.screen.key(["M-tab"], () => {
       this.windowManager.focusNextWindow(1);
     });
-    this.screen.key(["S-tab"], () => this.windowManager.focusNextWindow(-1));
+    this.screen.key(["M-S-tab"], () => this.windowManager.focusNextWindow(-1));
     this.screen.key(["C-s"], () => this.editor.saveFocused());
     this.screen.on("keypress", (ch, key) => {
       this.editor.handleFocusedKeypress(ch, key);
@@ -647,51 +702,125 @@ export class TsTuiMvpApp {
     return undefined;
   }
 
+  private isNonInteractiveCommand(args?: Record<string, unknown>): boolean {
+    return args?._interactive === false;
+  }
+
+  private getRuntimeOverlayInspection(): RuntimeOverlayInspection | null {
+    const info = this.overlays.getActiveOverlayInfo();
+    if (!info || typeof info.type !== "string") {
+      return null;
+    }
+    return {
+      type: info.type,
+      label: typeof info.label === "string" ? info.label : undefined,
+      selectedIndex:
+        typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
+      count: typeof info.count === "number" ? info.count : undefined,
+      currentDirectory:
+        typeof info.currentDirectory === "string"
+          ? info.currentDirectory
+          : undefined,
+    };
+  }
+
+  private getRuntimeUiBlockers(): RuntimeUiBlockerInspection[] {
+    const blockers: RuntimeUiBlockerInspection[] = [];
+
+    if (this.menuUi.isAnyMenuOpen()) {
+      blockers.push({
+        kind: "menu",
+        type: "menu",
+        label: this.menuUi.getOpenMenuLabel(),
+        escapeCommands: ["menu.close", "desktop.clear-all"],
+      });
+    }
+
+    const overlay = this.getRuntimeOverlayInspection();
+    if (overlay) {
+      blockers.push({
+        kind: "overlay",
+        type: overlay.type,
+        label: overlay.label,
+        selectedIndex: overlay.selectedIndex,
+        count: overlay.count,
+        currentDirectory: overlay.currentDirectory,
+        escapeCommands: ["overlay.cancel", "desktop.clear-all"],
+        continueCommands:
+          overlay.type === "browser" ||
+          overlay.type === "file-browser" ||
+          overlay.type === "centered-list" ||
+          overlay.type === "list"
+            ? ["overlay.select", "overlay.confirm"]
+            : ["overlay.confirm"],
+      });
+    }
+
+    const pickerApi = this.getBackroomsPickerApi();
+    const pickerInfo =
+      typeof pickerApi?.info === "function" ? pickerApi.info() : null;
+    if (pickerInfo && typeof pickerInfo === "object") {
+      const info = pickerInfo as Record<string, unknown>;
+      blockers.push({
+        kind: "picker-window",
+        type: "backrooms-primer-picker",
+        label:
+          typeof info.theme === "string"
+            ? `Backrooms Primer Picker: ${info.theme}`
+            : "Backrooms Primer Picker",
+        windowId: this.findWindowByAppType("backrooms-primer-picker")?.id,
+        selectedIndex:
+          typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
+        count:
+          typeof info.filteredCount === "number" ? info.filteredCount : undefined,
+        escapeCommands: ["backrooms.picker.cancel", "desktop.clear-all"],
+        continueCommands: ["backrooms.picker.select", "backrooms.picker.confirm"],
+      });
+    }
+
+    return blockers;
+  }
+
+  private openSharedOverlayPicker(
+    openPicker: () => void,
+    missingOverlayError: string,
+  ): { ok: true; opened: true; type?: string; label?: string } | { ok: false; error: string } {
+    if (this.overlays.hasActiveOverlay()) {
+      const active = this.overlays.getActiveOverlayInfo();
+      return {
+        error:
+          active && typeof active.type === "string"
+            ? `Another overlay is already active: ${active.type}`
+            : "Another overlay is already active",
+        ok: false,
+      };
+    }
+
+    openPicker();
+
+    const active = this.overlays.getActiveOverlayInfo();
+    if (!active || typeof active.type !== "string") {
+      return { ok: false, error: missingOverlayError };
+    }
+
+    return {
+      ok: true,
+      opened: true,
+      type: active.type,
+      label: typeof active.label === "string" ? active.label : undefined,
+    };
+  }
+
   /** Build TuiToolContext, create the agent session, and open/focus the native agent window. */
   private openWibWobAgentWindow(): WindowRecord | undefined {
     const tuiContext: TuiToolContext = {
-      getState: () => this.state.sync(),
-      listCommands: () => this.commands.list("agent"),
-      runCommand: (id, args) => this.commands.run(id, args),
-      openWindow: (type) => {
-        const map: Record<string, () => WindowRecord | undefined> = {
-          editor: () => this.editor.openWindow(),
-          art: () => this.openArtWindow(),
-          gallery: () => this.openPrimerGalleryWindow(),
-          browser: () => this.openBrowserReaderWindow(),
-          pattern: () => this.openPatternWindow(),
-          plasma: () => {
-            this.openPlasmaWindow();
-            return undefined;
-          },
-          companion: () => this.openCompanionWindow(),
-          inspector: () => this.openStateInspectorWindow(),
-          "music-player": () => this.openMusicPlayerWindow(),
-          primer: () => this.openPrimerBrowserWindow(),
-          figlet: () => this.openFigletWindow("WibWob"),
-        };
-        const fn = map[type];
-        if (!fn) return { error: `unknown window type: ${type}` };
-        const window = fn();
-        return window
-          ? { id: window.id }
-          : { error: `${type} window failed to open` };
-      },
-      openFigletWindow: (text, font) => {
-        const window = this.openFigletWindow(
-          text,
-          font ?? getDefaultFigletFont(),
-        );
-        return window
-          ? { id: window.id }
-          : { error: "figlet window failed to open" };
-      },
-      openChromeBrowser: (url) => {
-        const window = this.openChromeBrowserWindow(url);
-        return window
-          ? { id: window.id }
-          : { error: "chrome browser window failed to open" };
-      },
+      getState: () => this.runtimeInspection.syncState(),
+      listCommands: () => this.runtimeCommands.list("agent"),
+      runCommand: (id, args) =>
+        this.runtimeCommands.run(id, args, {
+          source: "agent",
+          interactive: false,
+        }),
       browserSearch: async (query, numResults) => {
         const svc = new ChromeBrowserService();
         try {
@@ -701,7 +830,7 @@ export class TsTuiMvpApp {
           svc.disconnect();
         }
       },
-      windows: this.windowManager,
+      windows: this.runtimeWindows,
     };
 
     const existing = this.findWindowByAppType("wibwob-agent");
@@ -908,68 +1037,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  private promptForFigletText(): void {
-    promptForFigletBannerText(this.overlays, (text, font) =>
-      this.openFigletFontPicker(text, font),
-    );
-  }
-
-  private openFigletFontPicker(
-    text: string,
-    currentFont: string,
-    onSelect?: (font: string) => void,
-  ): void {
-    openFigletFontPickerWindow({
-      overlays: this.overlays,
-      text,
-      currentFont,
-      onSelect,
-      onOpenWindow: (nextText, font) => this.openFigletWindow(nextText, font),
-    });
-  }
-
-  private openFigletWindow(
-    text: string,
-    initialFont = getDefaultFigletFont(),
-  ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "figlet-banner",
-      () => {
-        openFigletBannerWindow({
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          applyMeasuredWindowSize: (frame, kind, content) =>
-            this.applyMeasuredWindowSize(frame, kind, content),
-          text,
-          initialFont,
-          onOpenFontPicker: (nextText, currentFont, onSelect) =>
-            this.openFigletFontPicker(nextText, currentFont, onSelect),
-          onSyncState: () => this.syncLiveState(),
-        });
-      },
-      true,
-    );
-  }
-
-  private openPatternWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("pattern-animation", () => {
-      openPatternAnimationWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-      });
-    });
-  }
-
-  private openContourWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("contour-studio", () => {
-      openContourStudioWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
-  }
+  // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
   private openTerrainLabWindow(): WindowRecord | undefined {
     return this.focusOrCreate("terrain-lab", () => {
@@ -981,32 +1049,7 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openPlasmaWindow(
-    mood?: string,
-    renderMode?: string,
-    options?: {
-      primerName?: string;
-      primerText?: string;
-      reason?: string;
-      modifiers?: PlasmaModifiers;
-    },
-  ): void {
-    openPlasmaStudioWindow(
-      {
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      },
-      {
-        mood,
-        renderMode: renderMode as any,
-        primerName: options?.primerName,
-        primerText: options?.primerText,
-        reason: options?.reason,
-        modifiers: options?.modifiers,
-      },
-    );
-  }
+  // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
 
   private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
     if (filePath) {
@@ -1029,39 +1072,7 @@ export class TsTuiMvpApp {
     return undefined;
   }
 
-  private openPlasmaFromPrimer(filePath?: string): void {
-    if (filePath) {
-      this.spawnPlasmaForFile(filePath);
-      return;
-    }
-    // No path — open a file picker so the menu item actually works
-    promptForPrimerFile({
-      overlays: this.overlays,
-      content: this.content,
-      repoRoot: REPO_ROOT,
-      onOpenPrimer: (picked) => this.spawnPlasmaForFile(picked),
-    });
-  }
-
-  private spawnPlasmaForFile(filePath: string): void {
-    try {
-      const text = fs.readFileSync(filePath, "utf8");
-      const analysis = extractMoodFromText(text);
-      this.openPlasmaWindow(analysis.mood.name, undefined, {
-        primerName: path.basename(filePath),
-        primerText: text,
-        reason: analysis.reason,
-        modifiers: {
-          density: analysis.density,
-          entropy: analysis.entropy,
-          dominantRatio: analysis.dominantRatio,
-        },
-      });
-      this.overlays.flash(`Plasma: ${analysis.mood.name} — ${analysis.reason}`);
-    } catch {
-      this.openPlasmaWindow();
-    }
-  }
+  // openPlasmaFromPrimer — removed, migrated to microapp.wibwob.plasma.from-primer
 
   private openMusicPlayerWindow(restore?: {
     filePath?: string;
@@ -1164,6 +1175,44 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openPrimerPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => this.promptForPrimer(),
+      "Primer picker did not open",
+    );
+  }
+
+  private openEditorPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => this.editor.openPicker(),
+      "Text file picker did not open",
+    );
+  }
+
+  private openMarkdownPicker(): {
+    ok: true;
+    opened: true;
+    type?: string;
+    label?: string;
+  } | { ok: false; error: string } {
+    return this.openSharedOverlayPicker(
+      () => {
+        this.openMarkdownViewerWindow(undefined);
+      },
+      "Markdown picker did not open",
+    );
+  }
+
   // Editor open/save/keypress behavior delegated to EditorCoordinator
 
   private openPrimerWindow(filePath: string): WindowRecord | undefined {
@@ -1187,14 +1236,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openArtWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("generative-art", () => {
-      openGenerativeArtWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-      });
-    });
-  }
+  // openArtWindow — removed, migrated to microapp.wibwob.generative.art
 
   private openMonsterCam(): WindowRecord | undefined {
     return this.focusOrCreate("monster-cam", () => {
@@ -1217,17 +1259,11 @@ export class TsTuiMvpApp {
       this.overlays.flash("No text to copy from this window.");
       return;
     }
-    try {
-      const { execSync } = require("node:child_process");
-      if (process.platform === "darwin") {
-        execSync("pbcopy", { input: text });
-      } else {
-        execSync("xclip -selection clipboard", { input: text });
-      }
+    if (copyToClipboard(text)) {
       this.overlays.flash(
         `Copied ${text.split("\n").length} lines to clipboard.`,
       );
-    } catch {
+    } else {
       this.overlays.flash("Clipboard not available.");
     }
   }
@@ -1257,7 +1293,7 @@ export class TsTuiMvpApp {
       this.overlays.flash("No text to export from this window.");
       return;
     }
-    const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
+    const capturesDir = this.runtimeNode.capturesDir;
     fs.mkdirSync(capturesDir, { recursive: true });
     const slug = (label ?? windowTitle)
       .replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -1326,7 +1362,7 @@ export class TsTuiMvpApp {
         screen: this.screen,
         windowManager: this.windowManager,
         state: this.state,
-        statePath: STATE_PATH,
+        statePath: this.runtimeNode.statePath,
       });
     });
   }
@@ -1339,19 +1375,56 @@ export class TsTuiMvpApp {
       .map((window) => serializeWindowSnapshot(window, focusedId));
   }
 
+  private applyThemeByName(name: string): void {
+    const variant = allVariants().find((candidate) => candidate.name === name);
+    if (!variant) {
+      return;
+    }
+    setThemeVariant(variant);
+    this.applyTheme();
+  }
+
+  private clearWorkspaceWindows(): void {
+    for (const window of this.windowManager.getWindows()) {
+      if (window.kind !== "workspace") {
+        window.close();
+      }
+    }
+  }
+
+  private restoreWorkspaceSnapshots(snapshots: WindowSnapshot[]): void {
+    let focusedWindow: WindowRecord | undefined;
+    for (const snapshot of snapshots) {
+      const restored = restoreWindowSnapshot(
+        snapshot,
+        this.getRestoreActions(),
+      );
+      if (snapshot.focused) {
+        focusedWindow = restored;
+      }
+    }
+    focusedWindow?.focus();
+  }
+
+  private flashWorkspaceResult(action: "save" | "load", result: RuntimeWorkspaceResult): void {
+    if (!result.ok) {
+      this.overlays.flash(result.error);
+      return;
+    }
+    this.overlays.flash(
+      action === "save"
+        ? `Saved workspace to ${result.path}`
+        : `Loaded workspace from ${result.path}`,
+    );
+  }
+
   private saveWorkspace(): void {
-    this.workspace.save(this.snapshotWindows(), themeName());
-    this.persistState();
-    this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
+    this.flashWorkspaceResult("save", this.runtimeWorkspace.save());
   }
 
   /** Auto-save current layout to the active workspace (silent, no flash). */
   private autoSaveWorkspace(): void {
-    try {
-      this.workspace.save(this.snapshotWindows(), themeName());
-    } catch {
-      /* best-effort — don't block quit */
-    }
+    this.runtimeWorkspace.autoSave();
   }
 
   private getRestoreActions(): WorkspaceRestoreActions {
@@ -1361,8 +1434,10 @@ export class TsTuiMvpApp {
         this.editor.openWindow(filePath, title, initial, restore),
       openBrowserReaderWindow: (filePath) =>
         this.openBrowserReaderWindow(filePath),
-      openFigletWindow: (text, font) => this.openFigletWindow(text, font),
-      openPatternWindow: () => this.openPatternWindow(),
+      openFigletWindow: (text, font) => {
+        this.commands.runDynamic("microapp.wibwob.figlet.open", { text, font });
+        return undefined; // microapp creates its own window
+      },
       openPrimerGalleryWindow: (restore) =>
         this.openPrimerGalleryWindow(restore),
       openPrimerBrowserWindow: (restore) =>
@@ -1380,7 +1455,6 @@ export class TsTuiMvpApp {
       openChromeBrowserWindow: (restore) =>
         this.openChromeBrowserWindow(restore?.url),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
-      openArtWindow: () => this.openArtWindow(),
       openMonsterCamWindow: () => this.openMonsterCam(),
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
       windows: this.windowManager,
@@ -1388,31 +1462,28 @@ export class TsTuiMvpApp {
   }
 
   saveWorkspaceNamed(name: string): void {
-    this.workspace.setCurrentWorkspaceName(name);
-    this.saveWorkspace();
+    this.flashWorkspaceResult("save", this.runtimeWorkspace.save(name));
   }
 
   private promptForWorkspaceSave(): void {
     promptForWorkspaceSave({
       overlays: this.overlays,
-      workspace: this.workspace,
-      onSave: () => this.saveWorkspace(),
-      onAfterChange: () => this.syncLiveState(),
+      workspace: this.runtimeWorkspace,
+      onResult: (result) => this.flashWorkspaceResult("save", result),
     });
   }
 
   private promptForWorkspaceLoad(): void {
     promptForWorkspaceLoad({
       overlays: this.overlays,
-      workspace: this.workspace,
-      workspaceDir: WORKSPACES_DIR,
-      onLoad: () => this.loadWorkspace(),
+      workspace: this.runtimeWorkspace,
+      workspaceDir: this.runtimeNode.workspacesDir,
+      onResult: (result) => this.flashWorkspaceResult("load", result),
     });
   }
 
   loadWorkspaceNamed(name: string): void {
-    this.workspace.setCurrentWorkspaceName(name);
-    this.loadWorkspace();
+    this.flashWorkspaceResult("load", this.runtimeWorkspace.load(name));
   }
 
   private resolveSmearSource(args?: Record<string, unknown>): {
@@ -1648,47 +1719,7 @@ export class TsTuiMvpApp {
 
   /** Restore a workspace: apply theme, tear down existing windows, replay snapshots, restore focus. */
   private loadWorkspace(): void {
-    if (!this.workspace.exists()) {
-      this.overlays.flash(`Workspace file not found: ${this.workspace.path}`);
-      return;
-    }
-    let snapshots: WindowSnapshot[] = [];
-    let savedTheme: string | undefined;
-    try {
-      const loaded = this.workspace.load();
-      snapshots = loaded.windows;
-      savedTheme = loaded.theme;
-    } catch (error) {
-      this.overlays.flash(
-        `Cannot parse workspace: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
-    if (savedTheme) {
-      const variant = allVariants().find((v) => v.name === savedTheme);
-      if (variant) {
-        setThemeVariant(variant);
-        this.applyTheme();
-      }
-    }
-    for (const window of this.windowManager.getWindows()) {
-      if (window.kind !== "workspace") {
-        window.close();
-      }
-    }
-    let focusedWindow: WindowRecord | undefined;
-    for (const snapshot of snapshots) {
-      const restored = restoreWindowSnapshot(
-        snapshot,
-        this.getRestoreActions(),
-      );
-      if (snapshot.focused) {
-        focusedWindow = restored;
-      }
-    }
-    focusedWindow?.focus();
-    this.persistState();
-    this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
+    this.flashWorkspaceResult("load", this.runtimeWorkspace.load());
   }
 
   /** Action bridge between the command catalog/registry and concrete controller behaviour. */
@@ -1696,13 +1727,19 @@ export class TsTuiMvpApp {
     return {
       browsePrimers: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
+      openPrimerPicker: () => this.openPrimerPicker(),
       openPrimerPrompt: (args) => {
         const filePath =
           typeof args?.filePath === "string" ? args.filePath : undefined;
         if (!filePath) {
-          if (args?._apiCall) return { ok: false, error: "primer.open requires filePath arg when called via API" };
-          this.promptForPrimer();
-          return;
+          if (this.isNonInteractiveCommand(args)) {
+            return {
+              ok: false,
+              error:
+                "primer.open requires filePath when called through a non-interactive control surface",
+            };
+          }
+          return this.openPrimerPicker();
         }
         const window = this.openPrimerWindow(filePath);
         if (!window) {
@@ -1741,6 +1778,7 @@ export class TsTuiMvpApp {
       fxShear: (args) => this.runFxScript("shear", args),
       fxBreed: (args) => this.runFxScript("breed", args),
       fxFlip: (args) => this.runFxScript("flip", args),
+      openEditorPicker: () => this.openEditorPicker(),
       openTextFile: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -1763,9 +1801,15 @@ export class TsTuiMvpApp {
           const win = this.editor.openWindow(undefined, title, initial);
           if (win && onSave) win.onSave = onSave;
         } else {
-          // Path C: interactive file picker (skip for API calls)
-          if (args?._apiCall) return { ok: false, error: "editor.open requires filePath, title, or initial arg when called via API" };
-          this.editor.openPicker();
+          // Path C: interactive file picker for keyboard/menu callers only
+          if (this.isNonInteractiveCommand(args)) {
+            return {
+              ok: false,
+              error:
+                "editor.open requires filePath, title, or initial when called through a non-interactive control surface",
+            };
+          }
+          return this.openEditorPicker();
         }
       },
       openEditor: () => this.editor.openWindow(),
@@ -1782,26 +1826,23 @@ export class TsTuiMvpApp {
             : undefined;
         this.exportFocusedWindowText(id, name);
       },
-      openArtWindow: () => this.openArtWindow(),
-      openContourWindow: () => this.openContourWindow(),
       openTerrainLab: () => this.openTerrainLabWindow(),
-      openPlasmaWindow: (args) => {
-        const mood = typeof args?.mood === "string" ? args.mood : undefined;
-        const renderMode =
-          typeof args?.renderMode === "string" ? args.renderMode : undefined;
-        this.openPlasmaWindow(mood, renderMode);
-      },
-      openPlasmaFromPrimer: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" ? args.filePath : undefined;
-        this.openPlasmaFromPrimer(filePath);
-      },
+      openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        if (!filePath && args?._apiCall) return { ok: false, error: "markdown.open requires filePath arg when called via API" };
+        if (!filePath && this.isNonInteractiveCommand(args)) {
+          return {
+            ok: false,
+            error:
+              "markdown.open requires filePath when called through a non-interactive control surface",
+          };
+        }
+        if (!filePath) {
+          return this.openMarkdownPicker();
+        }
         this.openMarkdownViewerWindow(filePath, undefined);
       },
       toggleMarkdownFiglet: () => {
@@ -1829,6 +1870,19 @@ export class TsTuiMvpApp {
             this.overlays.flash(`Agent reload failed: ${message}`);
           });
       },
+      reloadMicroapps: () => {
+        void this.reloadMicroappsFromDisk()
+          .then((result) => {
+            this.overlays.flash(
+              `Reloaded microapps: ${result.reloaded} cmds · cleared ${result.clearedCommands} cmds/${result.clearedSnapshots} snaps`,
+            );
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.overlays.flash(`Microapp reload failed: ${message}`);
+          });
+        return { ok: true, reloading: true };
+      },
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
@@ -1843,22 +1897,40 @@ export class TsTuiMvpApp {
       },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
       moveWindowById: (args) => {
-        const x = args?.x ?? args?.left;
-        const y = args?.y ?? args?.top;
-        this.windowManager.moveWindow(Number(args?.id), Number(x), Number(y));
+        this.windowManager.moveWindow(
+          Number(args?.id),
+          Number(args?.left),
+          Number(args?.top),
+        );
       },
       resizeWindowById: (args) => {
-        const w = args?.w ?? args?.width;
-        const h = args?.h ?? args?.height;
-        this.windowManager.resizeWindow(Number(args?.id), Number(w), Number(h));
+        this.windowManager.resizeWindow(
+          Number(args?.id),
+          Number(args?.width),
+          Number(args?.height),
+        );
       },
-      clearDesktop: () => {
+      clearDesktop: (args) => {
+        const closeAll = args?.all === true;
+        const overlayCancelled = this.overlays.cancelActiveOverlay();
+        this.closeMenus();
         const windows = this.windowManager.getWindows();
+        let closed = 0;
+        let kept = 0;
         for (const w of windows) {
-          if (w.kind !== "chat") {
+          if (closeAll || w.kind !== "chat") {
             this.windowManager.closeWindow(w.id);
+            closed++;
+          } else {
+            kept++;
           }
         }
+        return {
+          closed,
+          kept,
+          overlayCancelled,
+          closeAll,
+        };
       },
       toggleDesktopChrome: () => this.toggleDesktopChrome(),
       closeMenus: () => this.closeMenus(),
@@ -1953,29 +2025,6 @@ export class TsTuiMvpApp {
             : undefined;
         this.openChromeBrowserWindow(url);
       },
-      openFigletBanner: (args) => {
-        const text = args?.text as string | undefined;
-        if (text) {
-          const font = (args?.font as string) || getDefaultFigletFont();
-          this.openFigletWindow(text, font);
-        } else {
-          if (args?._apiCall) return { ok: false, error: "figlet.open requires text arg when called via API" };
-          this.promptForFigletText();
-        }
-      },
-      listFigletFonts: () => {
-        const catalogue = getFigletCatalogue();
-        return {
-          defaultFont: getDefaultFigletFont(),
-          favourites: catalogue.favourites,
-          count: catalogue.allFontsSorted.length,
-          fonts: catalogue.allFontsSorted.map((font) => ({
-            name: font,
-            favourite: catalogue.favourites.includes(font),
-            meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
-          })),
-        };
-      },
       openMusicPlayer: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -1989,7 +2038,6 @@ export class TsTuiMvpApp {
           this.overlays.flash(result.error);
         }
       },
-      openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openScrambleSmol: () => { this.openScrambleSmol(); },
       openScrambleFloating: () => { this.openScrambleFloating(); },

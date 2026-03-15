@@ -1,3 +1,5 @@
+// @name    check-themes
+// @desc    Validate all theme files have required tokens
 /**
  * check-themes.ts
  * Validates all theme variants (built-in + module) against the full ThemeTokens contract.
@@ -127,7 +129,7 @@ async function loadModuleThemes(): Promise<ThemeResult[]> {
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
       const moduleDir = path.join(rootPath, entry.name);
-      const manifestPath = path.join(moduleDir, "module.json");
+      const manifestPath = path.join(moduleDir, "microapp.json");
       if (!fs.existsSync(manifestPath)) continue;
       let manifest: Record<string, unknown>;
       try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { continue; }

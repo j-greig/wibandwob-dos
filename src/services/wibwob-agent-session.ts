@@ -39,6 +39,7 @@ import nodePath from "node:path";
 import { access, readFile, writeFile, mkdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import { execFile } from "node:child_process";
+import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
 
 // -- Path jailing: agent cannot escape REPO_ROOT --
 
@@ -227,7 +228,7 @@ interface AgentSnapshot {
 
 type Listener = (snapshot: AgentSnapshot) => void;
 
-/** Load prompt fragments from modules-private/wibwob-prompts/*.md, sorted by filename. Falls back to legacy single-file path. */
+/** Load prompt fragments from microapps-private/wibwob-prompts/*.md, sorted by filename. Falls back to legacy single-file path. */
 function loadBasePrompt(): string {
   // Load all .md files from the wibwob-prompts module, sorted by filename.
   // This lets identity.md and other fragments live alongside the machinery file
@@ -259,7 +260,7 @@ function loadBasePrompt(): string {
 function buildSenderInfo(windowId: number): string {
   return JSON.stringify({
     sessionName: "wibwob-tui",
-    replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
+    replyVia: `POST ${buildLocalControlApiBaseUrl()}/windows/agent-message`,
     windowId,
   });
 }

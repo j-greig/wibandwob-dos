@@ -31,7 +31,7 @@ c4357e6 (wibwobworld + world-chatroom + wibwobworld-iso with E022 S01+S02 fixes)
      → src/services/wibwob-agent-session.ts — clean bug fix, apply cleanly
 
 0011 fix(e022-s03): iso serialises terrain params not file path
-     → modules-private/wibwobworld-iso — but need to apply to modules-private NOT modules/
+     → microapps-private/wibwobworld-iso — but need to apply to modules-private NOT microapps/
      → Check patch carefully, target file changed due to migration
 
 0012 fix(e022-s04): microapp geometry restored on restart
@@ -39,11 +39,11 @@ c4357e6 (wibwobworld + world-chatroom + wibwobworld-iso with E022 S01+S02 fixes)
      → 16e7b6a may already have some of this — diff carefully first
 
 0016 fix(e022-s05): hybrid iso pane uses pane-sized world
-     → modules-private/wibwobworld — apply to modules-private version
+     → microapps-private/wibwobworld — apply to modules-private version
      → Check patch, path changed due to migration
 
 0021 fix(poetry-clock): graceful fallback when no API key
-     → modules/wibwob-poetry-clock — path same, should apply cleanly
+     → microapps/wibwob-poetry-clock — path same, should apply cleanly
 
 0022 fix(monster-cam): guard against missing venv/deps
      → src/windows/monster-cam-window.ts — should apply cleanly
@@ -78,8 +78,8 @@ c4357e6 (wibwobworld + world-chatroom + wibwobworld-iso with E022 S01+S02 fixes)
      16e7b6a's workspace-snapshots.ts may already handle some of this via
      the registrySerialize path. Diff before applying.
 
-0011/0016: E022 S03/S05 patches — these were applied to modules/ paths,
-     need to redirect to modules-private/ paths instead. Manual edit needed.
+0011/0016: E022 S03/S05 patches — these were applied to microapps/ paths,
+     need to redirect to microapps-private/ paths instead. Manual edit needed.
 
 ---
 
@@ -99,7 +99,7 @@ c4357e6 (wibwobworld + world-chatroom + wibwobworld-iso with E022 S01+S02 fixes)
 
 ## WHAT 16e7b6a ALREADY HAS (don't re-apply)
 - kaomoji + session ID in top right
-- loadModules wired correctly
+- loadMicroapps wired correctly
 - all 60+ commands including legacy aliases, theme.*, finder.*, maximize
 - full control-api routes (world-chat, batch, openapi, maximize)
 - full state-service (instanceLabel, sessionId, capabilities, theme)

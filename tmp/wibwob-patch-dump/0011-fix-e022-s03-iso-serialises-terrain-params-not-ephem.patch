@@ -5,13 +5,13 @@ Subject: [PATCH 11/32] fix(e022-s03): iso serialises terrain params not
  ephemeral file path
 
 ---
- modules/wibwobworld-iso/index.ts | 26 +++++++++++++++++++++-----
+ microapps/wibwobworld-iso/index.ts | 26 +++++++++++++++++++++-----
  1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/modules/wibwobworld-iso/index.ts b/modules/wibwobworld-iso/index.ts
+diff --git a/microapps/wibwobworld-iso/index.ts b/microapps/wibwobworld-iso/index.ts
 index 4c676fa..833a246 100644
---- a/modules/wibwobworld-iso/index.ts
-+++ b/modules/wibwobworld-iso/index.ts
+--- a/microapps/wibwobworld-iso/index.ts
++++ b/microapps/wibwobworld-iso/index.ts
 @@ -250,15 +250,19 @@ export default function setup(host: MicroappHost) {
            });
  

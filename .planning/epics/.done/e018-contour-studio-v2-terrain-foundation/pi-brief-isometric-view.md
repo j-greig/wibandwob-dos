@@ -24,9 +24,9 @@ Do **not** start by merging the two windows.
 The data/export seam and iso scaffold are already in place.
 
 Code:
-- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld/index.ts)
-- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts)
-- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/module.json](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/module.json)
+- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld/index.ts)
+- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts)
+- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/microapp.json](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/microapp.json)
 - [/Users/james/Repos/wibandwob-dos/src/services/terrain-model.ts](/Users/james/Repos/wibandwob-dos/src/services/terrain-model.ts)
 
 Commands already wired:
@@ -146,7 +146,7 @@ Good targets:
 ## Suggested Implementation Direction
 
 Start from:
-- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts)
+- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts)
 
 Likely next seam if needed:
 - `src/services/terrain-iso-render.ts`

@@ -26,7 +26,7 @@ Patchbay Lab v1 should prove:
 
 ## Acceptance Checklist
 
-- [x] Scaffold `modules/patchbay-lab`
+- [x] Scaffold `microapps/patchbay-lab`
 - [x] Register open command and menu/palette entry
 - [x] Build one main Patchbay Lab window
 - [x] Compose the main window using SDK layout primitives

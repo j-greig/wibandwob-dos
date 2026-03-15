@@ -21,7 +21,9 @@ const CHROME_BY_KIND: Partial<Record<WindowKind, ChromeMode>> = {
 
 const CHROME_PADDING: Record<ChromeMode, WindowSize> = {
   standard: { width: 2, height: 2 },
-  toolbar: { width: 4, height: 5 },
+  // Figlet toolbar windows need extra horizontal room for borders, scrollbar,
+  // and the embedded toolbar controls; smaller padding causes render-time wrap.
+  toolbar: { width: 11, height: 5 },
   frameless: { width: 0, height: 0 }
 };
 

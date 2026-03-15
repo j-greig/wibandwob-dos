@@ -6,6 +6,7 @@
 
 import blessed from "blessed";
 import { execSync } from "node:child_process";
+import { copyToClipboard } from "../core/clipboard.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -1513,14 +1514,9 @@ export function openFileManagerWindow(params: {
   const copyPathToClipboard = (index?: number) => {
     const filePath = getEntryPath(index);
     if (!filePath) return;
-    try {
-      if (process.platform === "darwin") {
-        execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
-      } else {
-        execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
-      }
+    if (copyToClipboard(filePath)) {
       params.overlays.flash(`Copied: ${path.basename(filePath)}`);
-    } catch {
+    } else {
       params.overlays.flash("Clipboard not available");
     }
   };
@@ -2079,4 +2075,22 @@ export function openFileManagerWindow(params: {
   fillDivider();
   renderSearchBox();
   frame.focus();
+}
+
+
+/**
+ * Simple browser reader — reads a local file and opens it as a text viewer.
+ * Relocated from figlet-windows.ts during host→microapp migration.
+ */
+export function openBrowserReaderWindow(params: {
+  filePath: string;
+  onOpenTextViewer: (title: string, content: string, kind: "reader", filePath?: string) => void;
+  onError: (message: string) => void;
+}): void {
+  try {
+    const content = fs.readFileSync(params.filePath, "utf8");
+    params.onOpenTextViewer(`Browser: ${path.basename(params.filePath)}`, `Location: ${params.filePath}\n\n${content}`, "reader", params.filePath);
+  } catch (error) {
+    params.onError(`Cannot open browser reader: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }

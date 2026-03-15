@@ -27,7 +27,7 @@ Reference docs compiled from vendor libs:
 
 Before touching any story in this epic, read:
 
-  `wibwob-sdk/modules/pi-markdown-reader/` — 1,523 lines across 5 files.
+  `wibwob-sdk/microapps/pi-markdown-reader/` — 1,523 lines across 5 files.
 
 This prototype already proves the core rendering pipeline works end-to-end
 in native TypeScript. Its approach is not necessarily the best approach for
@@ -141,7 +141,7 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 - [x] createPanel extracted → createBorderedPanel in src/core/ui-parts.ts
 
 **Demo:**
-- [x] modules/e026-demo — 4-panel grid, createStack/createColumns layout, active panel double-border, button bar
+- [x] microapps/e026-demo — 4-panel grid, createStack/createColumns layout, active panel double-border, button bar
 
 ---
 
@@ -204,7 +204,7 @@ The prototype's rendering pipeline is the foundation. This feature promotes it
 from a hardcoded demo into a general-purpose markdown viewer that opens any
 file and integrates with wwdos workspace persistence.
 
-Prototype reference: `wibwob-sdk/modules/pi-markdown-reader/renderer.ts` +
+Prototype reference: `wibwob-sdk/microapps/pi-markdown-reader/renderer.ts` +
 `utils.ts` + `highlight.ts` + `index.ts`. Read before implementing any story
 in this feature.
 
@@ -521,7 +521,7 @@ Test: start 2s tween, close at 100ms, verify no further state changes.
 ### Status
 Status: not-started
 
-`modules/sy2-chronicles/index.ts` contains a battle-tested responsive panel
+`microapps/sy2-chronicles/index.ts` contains a battle-tested responsive panel
 layout engine and 2D string-canvas API currently locked inside one microapp.
 Extract them to SDK. Reference: read sy2-chronicles/index.ts in full first.
 
@@ -700,14 +700,14 @@ Test: `bun run typecheck` with a test import from a different module.
 
 ### Figlet font catalogue — no import needed
 
-Local catalogue `modules/wibwob-figlet-fonts/fonts.json` is identical to the
+Local catalogue `microapps/wibwob-figlet-fonts/fonts.json` is identical to the
 wibwob-sdk copy (148 fonts, same metadata). No import story required.
 figlet-service.ts `getFigletCatalogue()`, `renderFiglet()`, `measureFiglet()`
 are the canonical APIs. Never re-implement font discovery.
 
 ### pi-tui utils — already ported in prototype
 
-`wibwob-sdk/modules/pi-markdown-reader/utils.ts` is a direct port of pi-mono
+`wibwob-sdk/microapps/pi-markdown-reader/utils.ts` is a direct port of pi-mono
 utils. S02 promotes this to wwdos core. Do not re-port from vendor/pi-mono
 unless the prototype's version is found to be incorrect.
 

@@ -1,3 +1,5 @@
+// @name    gen-primitives
+// @desc    Regenerate src/core/primitives.ts index from shared exports
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import ts from "typescript";

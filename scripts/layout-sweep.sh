@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    layout-sweep
+# @desc    Resize a window through breakpoints and dump layout at each
 # layout-sweep.sh — resize a module window through breakpoints and dump layout report at each.
 #
 # Usage:
@@ -31,7 +33,7 @@ BREAKPOINTS=(
 )
 
 # Open the module
-RESULT=$(curl -sf -X POST "$API/commands/run" -H "Content-Type: application/json" -d "{\"command\":\"$CMD\"}")
+RESULT=$(curl -sf -X POST "$API/commands/run" -H "Content-Type: application/json" -d "{\"id\":\"$CMD\"}")
 if ! echo "$RESULT" | python3 -c "import sys,json; assert json.load(sys.stdin).get('ok')" 2>/dev/null; then
   echo "Failed to open: $RESULT" >&2
   exit 1

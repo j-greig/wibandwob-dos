@@ -5,8 +5,8 @@
  * Import `toggleTheme` to cycle variants.
  *
  * Built-in variants are statically imported below.
- * External variants (from modules/ and modules-private/) are registered
- * at startup via registerExternalTheme(), called by module-loader.ts.
+ * External variants (from microapps/ and microapps-private/) are registered
+ * at startup via registerExternalTheme(), called by microapp-loader.ts.
  */
 
 import type { StylePair, ThemeTokens, ThemeVariant } from "./types.js";
@@ -27,7 +27,7 @@ const BUILTIN_VARIANTS: readonly ThemeVariant[] = [
   light,
 ];
 
-/** External variants registered by module-loader.ts at startup. */
+/** External variants registered by microapp-loader.ts at startup. */
 const externalVariants: ThemeVariant[] = [];
 
 let activeVariant: ThemeVariant = dark;
@@ -108,7 +108,7 @@ export function fillThemeTokens(variant: ThemeVariant): ThemeVariant {
 
 /**
  * Register an external theme variant from a module.
- * Called by module-loader.ts during startup, before workspace restore.
+ * Called by microapp-loader.ts during startup, before workspace restore.
  * Missing tokens are filled from the dark baseline so incomplete themes
  * never cause runtime errors.
  * @primitive

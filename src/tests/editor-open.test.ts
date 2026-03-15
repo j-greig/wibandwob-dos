@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const API = "http://localhost:8099";
+const API = process.env.API_URL ?? process.env.WW_API ?? "http://localhost:8099";
 
 async function post(path: string, body?: Record<string, unknown>) {
   const res = await fetch(`${API}${path}`, {
@@ -16,7 +16,7 @@ async function post(path: string, body?: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json() as Promise<any>;
+  return { status: res.status, data: await res.json() as any };
 }
 
 async function get(path: string) {
@@ -33,8 +33,14 @@ async function closeWindow(id: number) {
   await post("/windows/close", { id });
 }
 
+async function clearDesktop() {
+  await post("/commands/run", { id: "desktop.clear-all", args: { all: true } });
+  await new Promise(r => setTimeout(r, 250));
+}
+
 describe("editor open failure paths", () => {
   test("nonexistent file → opens empty buffer with that path", async () => {
+    await clearDesktop();
     const fakePath = path.join(os.tmpdir(), `wibwob-test-nonexistent-${Date.now()}.txt`);
     // Ensure it really doesn't exist
     try { fs.unlinkSync(fakePath); } catch {}
@@ -57,6 +63,7 @@ describe("editor open failure paths", () => {
   });
 
   test("title + initial with no filePath → opens unsaved buffer", async () => {
+    await clearDesktop();
     const before = await getEditorWindows();
     await post("/commands/run", {
       id: "editor.open",
@@ -80,6 +87,7 @@ describe("editor open failure paths", () => {
   });
 
   test("existing readable file → opens with content", async () => {
+    await clearDesktop();
     const tmpFile = path.join(os.tmpdir(), `wibwob-test-readable-${Date.now()}.txt`);
     fs.writeFileSync(tmpFile, "test content here", "utf8");
 
@@ -102,12 +110,18 @@ describe("editor open failure paths", () => {
     try { fs.unlinkSync(tmpFile); } catch {}
   });
 
-  test("no args → does not crash (opens picker or no-op)", async () => {
-    // Just verify it doesn't crash the app
-    await post("/commands/run", { id: "editor.open" });
+  test("no args via API → fails cleanly and leaves no overlay behind", async () => {
+    await clearDesktop();
+    const result = await post("/commands/run", { id: "editor.open" });
+    expect(result.status).toBe(404);
+    expect(result.data.ok).toBe(false);
+    expect(result.data.error).toContain("non-interactive control surface");
     await new Promise(r => setTimeout(r, 300));
     const health = await get("/health");
     expect(health.ok).toBe(true);
-    expect(typeof health.sessionId).toBe("string");
+    expect(typeof health.instanceId).toBe("string");
+    const overlay = await get("/overlay/info");
+    expect(overlay.ok).toBe(true);
+    expect(overlay.result.active).toBe(false);
   });
 });

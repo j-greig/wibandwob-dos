@@ -14,11 +14,11 @@
 |                                 /_/   /_/                                              |
 |                                                                                        |
 |   How to build a microapp window for WibWob-DOS. Read this before touching             |
-|   any file in  modules/  or  modules-private/ .                                        |
+|   any file in  microapps/  or  microapps-private/ .                                        |
 |                                                                                        |
-|   Reference implementation:  modules/hello-world/  (minimal)                           |
-|   Full example with all primitives:  modules/e026-demo/  (F03/F05/F06/F07)             |
-|   Public authoring guide:  docs/module-authoring.md                                    |
+|   Reference implementation:  microapps/hello-world/  (minimal)                           |
+|   Full example with all primitives:  microapps/e026-demo/  (F03/F05/F06/F07)             |
+|   Public authoring guide:  docs/microapp-authoring.md                                    |
 |                                                                                        |
 |   ------------------------------------------------------------------------------       |
 |                                                                                        |

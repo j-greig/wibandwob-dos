@@ -89,7 +89,7 @@ Migrate-only. No new primitive needed.
 ### P06 — Inline search overlay — MEDIUM
 
 Two modules build an identical bottom-of-window search overlay from scratch:
-modules/zine/index.ts:568 and modules/sy2-chronicles/index.ts:2343.
+microapps/zine/index.ts:568 and microapps/sy2-chronicles/index.ts:2343.
 Both: blessed.box at bottom, blessed.textbox inside, Escape/Enter handling,
 show/hide by destroy+recreate. Should be createInlineSearch(parent, opts).
 
@@ -352,7 +352,7 @@ New primitives go into ui-parts.ts only. Migrate-only items need no new code.
 ### F00 — Brand naming, pure strings (N01, N02) — SHIP FIRST
 
 Zero logic risk. Touches only command-catalog.ts string literals and
-module.json ID fields. Cannot break windows, overflow sidebars, or corrupt
+microapp.json ID fields. Cannot break windows, overflow sidebars, or corrupt
 workspace state. Ships as a single PR before any primitive migration begins.
 Gives every subsequent story a system that already looks intentional.
 
@@ -400,7 +400,7 @@ Establish: every production module ID is wibwob.slug (dot + lowercase-hyphen).
   wibwob.e026-demo    → wibwob.example.e026
 
 Module display titles unchanged — only ID slugs change.
-AC: All module.json IDs updated. Module reload via command still works.
+AC: All microapp.json IDs updated. Module reload via command still works.
 State service returns correct IDs. GET /state shows new IDs.
 
 ---

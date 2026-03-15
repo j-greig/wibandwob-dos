@@ -12,7 +12,7 @@ WibWob-DOS has three control surfaces that drift apart:
 command-catalog.ts IS the single source of truth. Every command defined
 there auto-appears in TUI menus, palette, HTTP API (`/commands/run`),
 agent tools (`tui_run_command`), and OpenAPI spec. Microapp modules
-auto-register via `module.json`.
+auto-register via `microapp.json`.
 
 The `wibwob` CLI exists and works — a thin HTTP client (~150 lines)
 that talks to the control API. Pure HTTP, no catalog import. Parity

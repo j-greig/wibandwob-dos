@@ -43,7 +43,6 @@ export interface SnapshotRestoreActions {
   openEditorWindow: (filePath: string | undefined, title: string, initial: string, restore?: { cursor?: number; viewMode?: "edit" | "view"; scrollOffset?: number; figlet?: boolean }) => MaybeWindow;
   openBrowserReaderWindow: (filePath?: string) => MaybeWindow;
   openFigletWindow: (text: string, font: string) => MaybeWindow;
-  openPatternWindow: () => MaybeWindow;
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => MaybeWindow;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => MaybeWindow;
   openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string; searchQuery?: string; searchMode?: "simple" | "advanced"; viewMode?: "list" | "icon"; showHidden?: boolean; sortField?: "name" | "size" | "modified" | "type" }) => MaybeWindow;
@@ -52,7 +51,6 @@ export interface SnapshotRestoreActions {
   openBackroomsPrimerPickerWindow: () => MaybeWindow;
   openChromeBrowserWindow: (restore?: { url?: string }) => MaybeWindow;
   openCompanionWindow: (restore?: { tick?: number; displayMode?: string }) => MaybeWindow;
-  openArtWindow: () => MaybeWindow;
   openMonsterCamWindow: () => MaybeWindow;
   openWibWobAgentWindow: () => MaybeWindow;
   windows: WindowFacade;
@@ -152,13 +150,7 @@ export const snapshotRegistry = {
     },
   },
 
-  // --- kind: "pattern" ---
-  "pattern-animation": {
-    serialize: (_window) => undefined,
-    restore: (_snapshot, _payload, actions) => {
-      return actions.openPatternWindow();
-    },
-  },
+  // --- kind: "pattern" --- (migrated to microapp.wibwob.generative)
 
   // --- kind: "gallery" ---
   "primer-gallery": {
@@ -293,13 +285,7 @@ export const snapshotRegistry = {
     },
   },
 
-  // --- kind: "art" ---
-  "generative-art": {
-    serialize: (_window) => undefined,
-    restore: (_snapshot, _payload, actions) => {
-      return actions.openArtWindow();
-    },
-  },
+  // --- kind: "art" --- (migrated to microapp.wibwob.generative)
 
   // --- kind: "monster-cam" ---
   "monster-cam": {
@@ -337,6 +323,20 @@ export function registerDynamicSnapshot(appType: string, handler: SnapshotHandle
     console.warn(`[snapshot-registry] Duplicate dynamic handler for "${appType}" — overwriting`);
   }
   dynamicHandlers.set(appType, handler);
+}
+
+export function clearDynamicSnapshots(predicate?: (appType: string) => boolean): number {
+  const before = dynamicHandlers.size;
+  if (!predicate) {
+    dynamicHandlers.clear();
+    return before;
+  }
+  for (const appType of [...dynamicHandlers.keys()]) {
+    if (predicate(appType)) {
+      dynamicHandlers.delete(appType);
+    }
+  }
+  return before - dynamicHandlers.size;
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ const legacyAppTypeRemap: Record<string, string> = {
 
 // Maps WindowKind → default PersistableAppType for old workspace files
 // that were saved before the registry existed (no appType in payload).
-const kindFallbackMap: Partial<Record<string, PersistableAppType>> = {
+const kindFallbackMap: Partial<Record<string, PersistableAppType | string>> = {
   primer: "primer-viewer",
   editor: "text-editor",
   reader: "reader-viewer",

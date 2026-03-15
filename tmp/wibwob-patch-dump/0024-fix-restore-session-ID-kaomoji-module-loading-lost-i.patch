@@ -12,11 +12,11 @@ Content-Transfer-Encoding: 8bit
 - app-controller.ts: constructor opts, menus field, statusKaomoji,
   statusIdentity, kaomojiBlink blink timer, renderTopIdentity,
   renderTopKaomoji, getInstanceDisplayLabel — kaomoji top-right restored
-- app-controller.ts: run() uses loadModules + in-place menus mutation
+- app-controller.ts: run() uses loadMicroapps + in-place menus mutation
   (menus.length=0; menus.push(...buildMenus())) so all 6 microapps
   register into the Applications menu after load
 - menu-overlay-manager.ts: revert to static menus[] ref (mutation approach)
-  instead of lazy getter — matches loadModules mutation pattern
+  instead of lazy getter — matches loadMicroapps mutation pattern
 ---
  src/app.ts                 |  37 ++++++++++-
  src/core/app-controller.ts | 133 ++++++++++++++++++++++++++++++++++++-
@@ -92,7 +92,7 @@ index 4753c80..23051aa 100644
  import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
  import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
  import { StateService } from "../services/state-service.js";
-+import { loadModules, type MicroappHostDeps } from "../services/module-loader.js";
++import { loadMicroapps, type MicroappHostDeps } from "../services/microapp-loader.js";
  import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
  import { WorkspaceService } from "../services/workspace-service.js";
  import {
@@ -142,7 +142,7 @@ index 4753c80..23051aa 100644
 +        this.focusOrCreate(appType, createFn, multiInstance);
 +      },
 +    };
-+    await loadModules(microappDeps);
++    await loadMicroapps(microappDeps);
 +
 +    // Rebuild menus in-place after microapps registered dynamic commands
 +    this.menus.length = 0;

@@ -20,8 +20,9 @@ import type {
   AgentToolUpdateCallback,
 } from "@mariozechner/pi-agent-core";
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import type { RuntimeWindowService } from "../application/runtime-window-service.js";
 import type { DesktopState } from "../core/types.js";
-import type { CommandListItem } from "../core/command-registry.js";
+import type { CommandListItem, CommandRunResult } from "../core/command-registry.js";
 import type { SearchResult } from "./chrome-browser-service.js";
 import { BraveSearchService } from "./brave-search-service.js";
 import { fetchYoutubeTranscript } from "./youtube-transcript-service.js";
@@ -31,12 +32,9 @@ import { fetchYoutubeTranscript } from "./youtube-transcript-service.js";
 export interface TuiToolContext {
   getState: () => DesktopState;
   listCommands: () => CommandListItem[];
-  runCommand: (id: string, args?: Record<string, unknown>) => { ok: true } | { ok: false; error: string };
-  openWindow: (type: string) => { id: number } | { error: string };
-  openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
-  openChromeBrowser: (url?: string) => { id: number } | { error: string };
+  runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
   browserSearch: (query: string, numResults?: number) => Promise<SearchResult[]>;
-  windows: import("../core/window-facade.js").WindowFacade;
+  windows: RuntimeWindowService;
 }
 
 // -- Helper to build an AgentTool from our simpler shape --
@@ -119,7 +117,7 @@ const openWindow = tuiTool({
     }),
   }),
   execute: (params, ctx) => {
-    const result = ctx.openWindow(params.type);
+    const result = ctx.windows.open(params.type);
     return JSON.stringify(result);
   },
 });
@@ -135,7 +133,10 @@ const openFigletWindow = tuiTool({
     font: Type.Optional(Type.String({ description: "FIGlet font name (e.g. 'standard', 'banner', 'big', 'slant'). Defaults to app default." })),
   }),
   execute: (params, ctx) => {
-    const result = ctx.openFigletWindow(params.text, params.font);
+    const result = ctx.windows.open("figlet", {
+      text: params.text,
+      ...(params.font ? { font: params.font } : {}),
+    });
     return JSON.stringify(result);
   },
 });
@@ -162,7 +163,7 @@ const closeWindow = tuiTool({
     id: Type.Number({ description: "Window ID to close" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.windows.closeWindow(params.id);
+    const ok = ctx.windows.close(params.id);
     return ok ? "closed" : "window not found";
   },
 });
@@ -181,10 +182,10 @@ const moveWindow = tuiTool({
     height: Type.Optional(Type.Number({ description: "New height" })),
   }),
   execute: (params, ctx) => {
-    const moved = ctx.windows.moveWindow(params.id, params.left, params.top);
+    const moved = ctx.windows.move(params.id, params.left, params.top);
     if (!moved) return "window not found";
     if (params.width !== undefined && params.height !== undefined) {
-      ctx.windows.resizeWindow(params.id, params.width, params.height);
+      ctx.windows.resize(params.id, params.width, params.height);
     }
     return "moved";
   },
@@ -211,22 +212,10 @@ const batchLayout = tuiTool({
     ),
   }),
   execute: (params, ctx) => {
-    const results: string[] = [];
-    for (const op of params.ops) {
-      if (op.close) {
-        const ok = ctx.windows.closeWindow(op.id);
-        results.push(`${op.id}: ${ok ? "closed" : "not found"}`);
-        continue;
-      }
-      if (op.left !== undefined && op.top !== undefined) {
-        const moved = ctx.windows.moveWindow(op.id, op.left, op.top);
-        if (!moved) { results.push(`${op.id}: not found`); continue; }
-      }
-      if (op.width !== undefined && op.height !== undefined) {
-        ctx.windows.resizeWindow(op.id, op.width, op.height);
-      }
-      results.push(`${op.id}: ok`);
-    }
+    const applied = ctx.windows.batch(params.ops);
+    const results = params.ops.map((op, index) =>
+      `${op.id}: ${applied[index] ? (op.close ? "closed" : "ok") : "not found"}`
+    );
     return results.join(", ");
   },
 });
@@ -239,7 +228,7 @@ const focusWindow = tuiTool({
     id: Type.Number({ description: "Window ID to focus" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.windows.focusWindow(params.id);
+    const ok = ctx.windows.focus(params.id);
     return ok ? "focused" : "window not found";
   },
 });
@@ -285,7 +274,7 @@ const openChromeBrowser = tuiTool({
     url: Type.Optional(Type.String({ description: "URL to navigate to on open" })),
   }),
   execute: (params, ctx) => {
-    const result = ctx.openChromeBrowser(params.url);
+    const result = ctx.windows.open("web-reader", params.url ? { url: params.url } : undefined);
     return JSON.stringify(result);
   },
 });

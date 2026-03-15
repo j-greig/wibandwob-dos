@@ -19,7 +19,7 @@ Ship `WibWobWorld` as a deterministic terrain generator with:
 
 - [x] `src/services/terrain-model.ts`
 - [x] `src/services/terrain-render.ts`
-- [x] new private microapp under `modules-private/`
+- [x] new private microapp under `microapps-private/`
 - [x] semantic terrain state in `describeState()`
 
 ## Done Means

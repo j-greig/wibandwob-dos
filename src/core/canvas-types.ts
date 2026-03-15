@@ -5,7 +5,7 @@
  * microapp that consumes canvas documents.
  */
 
-import type { CEPanelDef } from "../../modules/sy2-chronicles/panel-types.js";
+import type { CEPanelDef } from "../../microapps/sy2-chronicles/panel-types.js";
 
 // ── ZineItem: unified layout primitive ────────────────────────────────────
 

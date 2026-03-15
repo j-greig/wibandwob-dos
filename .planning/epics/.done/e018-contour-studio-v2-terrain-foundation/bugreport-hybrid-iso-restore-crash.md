@@ -17,14 +17,14 @@ Status: partially bandaged, root cause open
    (`microapp.wibwobworld-iso.open`, or via the 3D/iso button if wired).
    The ISO window is now open alongside the main WibWobWorld window.
 <codex-note>
-`modules-private/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
+`microapps-private/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
 </codex-note>
 5. The desktop state is saved to workspace (auto-save or manual).
 6. Restart the app. Restore fires. App crashes.
 
 ## What gets serialized
 
-### WibWobWorld main window (modules-private/wibwobworld/index.ts ~862)
+### WibWobWorld main window (microapps-private/wibwobworld/index.ts ~862)
 
 ```ts
 return {
@@ -34,7 +34,7 @@ return {
 };
 ```
 
-### WibWobWorld Iso window (modules-private/wibwobworld-iso/index.ts ~356)
+### WibWobWorld Iso window (microapps-private/wibwobworld-iso/index.ts ~356)
 
 ```ts
 serialize: (window) => {
@@ -49,7 +49,7 @@ restore: (_snapshot, payload) => {
 },
 ```
 <codex-note>
-`modules-private/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
+`microapps-private/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
 </codex-note>
 
 `sourcePath` is an absolute path like
@@ -68,7 +68,7 @@ could have been cleared, renamed, or never written).
 6. If the file exists but is malformed or from an incompatible build:
    `JSON.parse` or `isSavedTerrainArtifact` guard fails → crash or silent bail.
 <codex-note>
-Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`modules-private/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
+Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`microapps-private/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
 </codex-note>
 <codex-note>
 Boot restore is also wrapped in a top-level `try/catch` (`src/core/app-controller.ts:319-340`). Even if a handler throws, startup falls back to empty desktop rather than process crash.
@@ -79,7 +79,7 @@ Boot restore is also wrapped in a top-level `try/catch` (`src/core/app-controlle
 `ae0ad94` added a `restoreSafeMode` guard in WibWobWorld's `openWorld()`:
 
 ```ts
-// modules-private/wibwobworld/index.ts ~186
+// microapps-private/wibwobworld/index.ts ~186
 const restoreSafeMode: TerrainRenderMode | undefined =
   args?.__restoring === true ? "contours" : undefined;
 let renderMode: TerrainRenderMode = restoreSafeMode ?? requestedRenderMode ?? "hybrid";
@@ -102,7 +102,7 @@ So the main window is now survivable. The ISO window restore is NOT protected.
 existence check. `scratch/captures/` files are ephemeral — not committed,
 not guaranteed to survive between sessions.
 <codex-note>
-The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`modules-private/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
+The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`microapps-private/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
 </codex-note>
 
 ### RC-2: Restore does not coordinate ordering between paired windows
@@ -133,16 +133,16 @@ mode, which is why the crash was noticed here.
 ## Files involved
 
 ```
-modules-private/wibwobworld/index.ts
+microapps-private/wibwobworld/index.ts
   ~186   restoreSafeMode bandage
   ~862   serialize block (saves renderMode, seed, etc.)
   ~877   restore block (passes __restoring: true)
 
-modules-private/wibwobworld-iso/index.ts
+microapps-private/wibwobworld-iso/index.ts
   ~356   serialize block (saves sourcePath only)
   ~362   restore block (no guard — the crash site)
 
-src/services/module-loader.ts
+src/services/microapp-loader.ts
   ~90    registerSnapshot — how restore handlers are wired
 
 scratch/captures/          ← ephemeral, never committed
@@ -203,7 +203,7 @@ semantically a child of WibWobWorld, not a peer.
 Option A for the crash (one existsSync guard in ISO restore).
 Option C or D as the proper fix when the ISO/3D surface gets a second pass.
 <codex-note>
-Additional gap worth tracking: dynamic microapp restore currently returns `undefined` by design (`src/services/module-loader.ts:259-261`), so `restoreWindowSnapshot()` cannot apply saved `left/top/width/height` for microapps (`src/core/workspace-snapshots.ts:35-40`). This affects ISO/main window restore parity beyond file-path handling.
+Additional gap worth tracking: dynamic microapp restore currently returns `undefined` by design (`src/services/microapp-loader.ts:259-261`), so `restoreWindowSnapshot()` cannot apply saved `left/top/width/height` for microapps (`src/core/workspace-snapshots.ts:35-40`). This affects ISO/main window restore parity beyond file-path handling.
 </codex-note>
 
 ## Do not do

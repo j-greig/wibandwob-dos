@@ -25,6 +25,7 @@ interface BrowserPromptItem {
 /** Active overlay descriptor for API-driven confirm/cancel. */
 interface ActiveOverlay {
   type: "value" | "path" | "list" | "centered-list" | "browser" | "file-browser";
+  label?: string;
   confirm: () => void;
   cancel: () => void;
   selectIndex?: (index: number) => { ok: boolean; index?: number; count?: number; error?: string };
@@ -53,6 +54,7 @@ export class OverlayManager {
     if (!this.activeOverlay) return null;
     return {
       type: this.activeOverlay.type,
+      ...(this.activeOverlay.label ? { label: this.activeOverlay.label } : {}),
       ...(this.activeOverlay.info ? this.activeOverlay.info() : {}),
     };
   }
@@ -168,6 +170,7 @@ export class OverlayManager {
     // Register as active overlay for API control
     this.activeOverlay = {
       type: "value",
+      label,
       confirm: submitValue,
       cancel: closePrompt,
     };
@@ -272,6 +275,7 @@ export class OverlayManager {
     // Register as active overlay for API control
     this.activeOverlay = {
       type: "path",
+      label,
       confirm: submitValue,
       cancel: closePrompt,
     };
@@ -392,6 +396,7 @@ export class OverlayManager {
     // Register as active overlay for API control
     this.activeOverlay = {
       type: "centered-list",
+      label,
       confirm: applySelection,
       cancel: () => closePrompt(true),
       selectIndex: (requestedIndex) => {
@@ -632,6 +637,7 @@ export class OverlayManager {
     // Register as active overlay for API control
     this.activeOverlay = {
       type: "browser",
+      label,
       confirm: applySelection,
       cancel: closePrompt,
       selectIndex: (requestedIndex) => {
@@ -914,6 +920,7 @@ export class OverlayManager {
     // Register as active overlay for API control
     this.activeOverlay = {
       type: "file-browser",
+      label,
       confirm: applySelection,
       cancel: closePrompt,
       selectIndex: (requestedIndex) => {

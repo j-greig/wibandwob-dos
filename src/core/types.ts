@@ -116,14 +116,12 @@ export type PersistableAppType =
   | "primer-gallery"
   | "figlet-banner"
   | "text-editor"
-  | "generative-art"
   | "companion-widget"
   | "backrooms-tv"
   | "monster-cam"
   | "wibwob-agent"
   | "primer-viewer"
-  | "reader-viewer"
-  | "pattern-animation";
+  | "reader-viewer";
 
 /**
  * Window types that are transient — never saved to workspace files.
@@ -154,7 +152,7 @@ export const viewerAppType: Record<"primer", PersistableAppType> = {
   primer: "primer-viewer",
 };
 
-export const animationAppType: Record<"pattern", PersistableAppType> = {
+export const animationAppType: Record<"pattern", string> = {
   pattern: "pattern-animation",
 };
 
@@ -189,13 +187,19 @@ export interface DesktopState {
     mode: string;
     cwd: string;
     statePath: string;
+    scratchBase?: string;
+    capturesDir?: string;
+    workspacesDir?: string;
+    logsDir?: string;
     instanceLabel?: string;
-    sessionId?: string;
+    instanceId?: string;
     deployProfile?: string | null;
     controlApiEnabled?: boolean;
+    controlApiRequestedPort?: number;
     controlApiPort?: number;
     controlApiHost?: string;
     controlApiBaseUrl?: string;
+    microappReloadEpoch?: number;
     theme?: string;
     capabilities?: Record<string, { ok: boolean; reason?: string; source?: string; checkedAt?: string }>;
   };
@@ -255,7 +259,7 @@ export interface WindowRecord {
   // Finder-specific (set by browser-windows.ts)
   finder?: FinderController;
 
-  // Microapp-specific (set by module-loader.ts via MicroappHost)
+  // Microapp-specific (set by microapp-loader.ts via MicroappHost)
   microappId?: string;
 
   // Maximize state (set by WindowManager on double-click titlebar)
@@ -345,6 +349,7 @@ export interface MenuItem {
 }
 
 export interface MenuConfig {
+  category: string;
   label: string;
   key: string;
   left: number;

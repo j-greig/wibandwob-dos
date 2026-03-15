@@ -26,7 +26,7 @@ fi
 # 2. Every describeState should return a known appType
 echo "2. describeState appType values vs registered types..."
 # Extract all appType string literals from describeState blocks
-DESCRIBED_TYPES=$(grep -A3 'describeState.*=.*()' "$SRC"/windows/*.ts "$SRC"/services/module-loader.ts 2>/dev/null \
+DESCRIBED_TYPES=$(grep -A3 'describeState.*=.*()' "$SRC"/windows/*.ts "$SRC"/services/microapp-loader.ts 2>/dev/null \
   | grep 'appType:.*"' \
   | sed 's/.*appType:[[:space:]]*"\([^"]*\)".*/\1/' \
   | sort -u)
@@ -55,7 +55,7 @@ fi
 # 3. Every registerWindow call should have a preceding describeState
 echo "3. registerWindow calls without describeState..."
 MISSING_DS=0
-for f in "$SRC"/windows/*.ts "$SRC"/services/module-loader.ts; do
+for f in "$SRC"/windows/*.ts "$SRC"/services/microapp-loader.ts; do
   [ -f "$f" ] || continue
   REG_COUNT=$(grep -c 'registerWindow(' "$f" 2>/dev/null || echo 0)
   DS_COUNT=$(grep -c 'describeState' "$f" 2>/dev/null || echo 0)

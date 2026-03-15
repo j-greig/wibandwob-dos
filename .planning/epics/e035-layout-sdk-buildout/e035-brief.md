@@ -15,9 +15,9 @@ demo modules, and a consolidated layout-guide-final.md. E035 builds the actual
 SDK from that design.
 
 Source documents:
-- `.agents/module-dev/.workings/layout-guide-final.md` — canon layout guide
-- `.agents/module-dev/.workings/layout-guide-alignment.md` — 32 turns of design decisions
-- `modules/*-demo-{pi,codex}/` — 10 proving-ground modules
+- `.agents/microapp-dev/.workings/layout-guide-final.md` — canon layout guide
+- `.agents/microapp-dev/.workings/layout-guide-alignment.md` — 32 turns of design decisions
+- `microapps/*-demo-{pi,codex}/` — 10 proving-ground modules
 - `.planning/epics/e034-layout-primitives-sdk/HANDOVER.md` — E034 handover
 
 ## Goal
@@ -30,7 +30,7 @@ The outcome is not just "new primitives exist." The outcome is:
 - one canon layout surface in the SDK
 - real production modules using it
 - old inline/demo-only layout helpers removed or isolated
-- module authors able to build responsive flex+grid layouts from docs alone
+- microapp authors able to build responsive flex+grid layouts from docs alone
 
 ## Build order
 
@@ -112,48 +112,48 @@ Use this order so the migration builds SDK confidence from simpler flex
 layouts toward more complex responsive/grid/scroll cases.
 
 ##### Wave 1 — Reference and low-risk flex modules
-- [x] `modules/heartbeat`
-- [x] `modules/wibwob-poetry-clock`
-- [x] `modules/wibwobworld`
-- [x] `modules/world-chatroom` (no layout SDK usage — no migration needed)
+- [x] `microapps/heartbeat`
+- [x] `microapps/wibwob-poetry-clock`
+- [x] `microapps/wibwobworld`
+- [x] `microapps/world-chatroom` (no layout SDK usage — no migration needed)
 
 ##### Wave 2 — Responsive flex and viewport patterns
-- [x] `modules/hello-world`
-- [x] `modules/wibwob-tidepool` (no old names — no migration needed)
-- [x] `modules/touchlab-mvp` (no old names — no migration needed)
-- [x] `modules/patchbay-lab`
+- [x] `microapps/hello-world`
+- [x] `microapps/wibwob-tidepool` (no old names — no migration needed)
+- [x] `microapps/touchlab-mvp` (no old names — no migration needed)
+- [x] `microapps/patchbay-lab`
 
 ##### Wave 3 — Grid-first production modules
-- [x] `modules/dashboard` (no old names — uses contrib.grid internally)
-- [x] `modules/dashboard-xxl` (no old names)
-- [x] `modules/wibwob-tr808`
+- [x] `microapps/dashboard` (no old names — uses contrib.grid internally)
+- [x] `microapps/dashboard-xxl` (no old names)
+- [x] `microapps/wibwob-tr808`
 
 ##### Wave 4 — Rich content / editor / scroll surfaces
-- [x] `modules/zine` (no old names)
-- [x] `modules/slap-editor` (no old names)
-- [x] `modules/sy2-chronicles` (no old names)
-- [x] `modules/ansi-lab` (no old names)
-- [x] `modules/glitchbox` (no old names)
+- [x] `microapps/zine` (no old names)
+- [x] `microapps/slap-editor` (no old names)
+- [x] `microapps/sy2-chronicles` (no old names)
+- [x] `microapps/ansi-lab` (no old names)
+- [x] `microapps/glitchbox` (no old names)
 
 ##### Wave 5 — Reference catalogue and utility/demo modules
-- [x] `modules/e026-demo`
-- [x] `modules/example-primers` (no old names)
-- [x] `modules/wibwob-figlet-fonts` (no old names)
+- [x] `microapps/e026-demo`
+- [x] `microapps/example-primers` (no old names)
+- [x] `microapps/wibwob-figlet-fonts` (no old names)
 
 ##### Wave 6 — Terminal/custom-rendering review
-- [x] `modules/terminal` (custom rendering — exempt from layout migration)
+- [x] `microapps/terminal` (custom rendering — exempt from layout migration)
 
 ##### Wave 7 — Proving-ground flex demo cleanup
-- [x] `modules/flex-wrap-demo-pi` (no old names)
-- [x] `modules/flex-wrap-demo-codex`
-- [x] `modules/flex-bands-demo-pi`
-- [x] `modules/flex-bands-demo-codex`
-- [x] `modules/responsive-panels-demo-pi`
-- [x] `modules/responsive-panels-demo-codex` (no old names)
-- [x] `modules/flex-workbench-demo-pi`
-- [x] `modules/flex-workbench-demo-codex`
-- [x] `modules/layout-stress-test-pi`
-- [x] `modules/layout-stress-test-codex`
+- [x] `microapps/flex-wrap-demo-pi` (no old names)
+- [x] `microapps/flex-wrap-demo-codex`
+- [x] `microapps/flex-bands-demo-pi`
+- [x] `microapps/flex-bands-demo-codex`
+- [x] `microapps/responsive-panels-demo-pi`
+- [x] `microapps/responsive-panels-demo-codex` (no old names)
+- [x] `microapps/flex-workbench-demo-pi`
+- [x] `microapps/flex-workbench-demo-codex`
+- [x] `microapps/layout-stress-test-pi`
+- [x] `microapps/layout-stress-test-codex`
 
 ##### Private modules
 - [ ] Audit private modules against the same canon surface
@@ -183,7 +183,7 @@ block the whole epic by default.
 ### F08 — Documentation and closeout
 - [x] Remove any `backward-compat alias` crud across the entire /src of wibwobdos and ensure any old functions etc are refactored to the new names
 - [x] Promote the final layout guide into the right long-term docs location (layout-guide-final.md remains canonical)
-- [x] Update `docs/building-custom-modules.md` (no old names found; codebase-analysis.md and feature-parity-matrix.md updated)
+- [x] Update `docs/building-custom-microapps.md` (no old names found; codebase-analysis.md and feature-parity-matrix.md updated)
 - [x] Update agent-facing SDK docs with the final exports (sdk-reference.md updated)
 - [x] Write a migration note for old names and old patterns (aliases removed; all consumers migrated)
 - [ ] Decide which proving-ground demo modules to keep, archive, or delete (human decision)

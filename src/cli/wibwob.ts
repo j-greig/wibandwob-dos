@@ -7,6 +7,7 @@
  *
  * Usage:
  *   wibwob state                        # GET /state
+ *   wibwob inspection                   # GET /runtime/inspection
  *   wibwob windows                      # list windows from /state
  *   wibwob commands                     # GET /commands/list
  *   wibwob <noun>.<verb> [--key val]    # POST /commands/run
@@ -14,15 +15,72 @@
  *   wibwob help                         # show usage
  */
 
-const BASE = process.env.WW_API ?? "http://127.0.0.1:8099";
+import fs from "node:fs";
+import path from "node:path";
+import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
+import { SCRATCH_BASE } from "../core/config.js";
+
+// ── Instance targeting ───────────────────────────────────
+// --instance <label> connects via unix socket: scratch/instances/<label>.sock
+// Falls back to env vars, then default HTTP port.
+
+function findFlag(flag: string): string | undefined {
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === flag && process.argv[i + 1]) return process.argv[i + 1];
+    if (process.argv[i].startsWith(`${flag}=`)) return process.argv[i].slice(flag.length + 1);
+  }
+  return undefined;
+}
+
+function resolveBase(): string {
+  // --instance flag: highest priority (explicit targeting)
+  const label = findFlag("--instance");
+  if (label) {
+    const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
+    if (fs.existsSync(sockPath)) {
+      return `unix://${sockPath}`;
+    }
+    process.stderr.write(`No socket for instance "${label}" at ${sockPath}\n`);
+    process.exit(1);
+  }
+
+  // Explicit env override
+  if (process.env.WW_API) return process.env.WW_API;
+  if (process.env.WIBWOB_API) return process.env.WIBWOB_API;
+
+  // $WIBWOB_INSTANCE env var
+  if (process.env.WIBWOB_INSTANCE) {
+    const sockPath = path.join(SCRATCH_BASE, "instances", `${process.env.WIBWOB_INSTANCE}.sock`);
+    if (fs.existsSync(sockPath)) {
+      return `unix://${sockPath}`;
+    }
+  }
+
+  // Default: HTTP
+  return buildLocalControlApiBaseUrl();
+}
+
+const BASE = resolveBase();
+const IS_SOCKET = BASE.startsWith("unix://");
 const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 
 // ── Helpers ──────────────────────────────────────────────
 
-async function api(path: string, method = "GET", body?: unknown): Promise<unknown> {
+async function api(apiPath: string, method = "GET", body?: unknown): Promise<unknown> {
   const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(`${BASE}${path}`, opts);
+
+  let url: string;
+  if (IS_SOCKET) {
+    // Bun supports fetch() over unix sockets with the unix option
+    const sockPath = BASE.slice("unix://".length);
+    (opts as any).unix = sockPath;
+    url = `http://localhost${apiPath}`;
+  } else {
+    url = `${BASE}${apiPath}`;
+  }
+
+  const res = await fetch(url, opts);
   if (!res.ok) {
     const text = await res.text();
     let parsed: unknown;
@@ -69,6 +127,10 @@ async function cmdState() {
   out(await api("/state"));
 }
 
+async function cmdInspection() {
+  out(await api("/runtime/inspection"));
+}
+
 async function cmdWindows() {
   const state = (await api("/state")) as { windows: Array<{ id: number }> };
   if (QUIET) {
@@ -79,7 +141,16 @@ async function cmdWindows() {
 }
 
 async function cmdCommands() {
-  const data = (await api("/commands/list")) as { commands: Array<{ id: string }> };
+  const flags = parseFlags(process.argv.slice(2));
+  const params = new URLSearchParams();
+  if (typeof flags.surface === "string") {
+    params.set("surface", flags.surface);
+  }
+  if (flags.includeUnavailable === true) {
+    params.set("includeUnavailable", "true");
+  }
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  const data = (await api(`/commands/list${suffix}`)) as { commands: Array<{ id: string }> };
   if (QUIET) {
     for (const c of data.commands) console.log(c.id);
   } else {
@@ -89,6 +160,63 @@ async function cmdCommands() {
 
 async function cmdHealth() {
   out(await api("/health"));
+}
+
+async function cmdMinimap() {
+  const state = await api("/state") as {
+    windows: Array<{ id: number; title: string; left: number; top: number; width: number; height: number; zIndex: number; focused: boolean; appType?: string; kind?: string }>;
+    app?: { theme?: string; instanceId?: string; instanceLabel?: string; termWidth?: number; termHeight?: number };
+  };
+  const wins = state.windows;
+  const app = state.app ?? {};
+  const tw = (app.termWidth ?? 170);
+  const th = (app.termHeight ?? 44);
+  const label = app.instanceLabel ? `${app.instanceLabel}·${app.instanceId ?? "?"}` : (app.instanceId ?? "?");
+  const focusWin = wins.find(w => w.focused);
+
+  // Header
+  process.stdout.write(`WibWob-DOS  ${app.theme ?? "?"}  ${wins.length} windows  focus:${focusWin?.id ?? "-"}:${focusWin?.title ?? "-"}  id:${label}\n`);
+
+  // Scaled minimap
+  const scaleX = 60 / tw;
+  const scaleY = 20 / th;
+  const grid: string[][] = [];
+  for (let y = 0; y < 20; y++) {
+    grid[y] = [];
+    for (let x = 0; x < 62; x++) grid[y][x] = " ";
+  }
+
+  // Draw border
+  for (let x = 0; x < 62; x++) { grid[0][x] = x === 0 || x === 61 ? "+" : "-"; grid[19][x] = x === 0 || x === 61 ? "+" : "-"; }
+  for (let y = 0; y < 20; y++) { grid[y][0] = "|"; grid[y][61] = "|"; }
+  grid[0][0] = "+"; grid[0][61] = "+"; grid[19][0] = "+"; grid[19][61] = "+";
+
+  // Draw windows (sorted by z-index so focused is on top)
+  const sorted = [...wins].sort((a, b) => a.zIndex - b.zIndex);
+  for (const w of sorted) {
+    const x1 = Math.max(1, Math.round(w.left * scaleX) + 1);
+    const y1 = Math.max(1, Math.round(w.top * scaleY) + 1);
+    const x2 = Math.min(60, Math.round((w.left + w.width) * scaleX) + 1);
+    const y2 = Math.min(18, Math.round((w.top + w.height) * scaleY) + 1);
+    const ch = w.focused ? "#" : "+";
+    for (let x = x1; x <= x2; x++) { if (y1 >= 1) grid[y1][x] = ch; if (y2 <= 18) grid[y2][x] = ch; }
+    for (let y = y1; y <= y2; y++) { grid[y][x1] = ch; grid[y][x2] = ch; }
+    // Label
+    const tag = `${w.id}`;
+    if (x2 - x1 > tag.length + 1 && y2 > y1) {
+      for (let i = 0; i < tag.length && x1 + 1 + i < x2; i++) grid[y1 + 1][x1 + 1 + i] = tag[i];
+    }
+  }
+
+  for (const row of grid) process.stdout.write("  " + row.join("") + "\n");
+
+  // Legend
+  process.stdout.write("\n");
+  for (const w of sorted) {
+    const flag = w.focused ? " ◀" : "";
+    const short = w.title.length > 30 ? w.title.slice(0, 27) + "..." : w.title;
+    process.stdout.write(`  ${String(w.id).padStart(3)}  ${short.padEnd(32)} ${w.width}x${w.height} @${w.left},${w.top}${flag}\n`);
+  }
 }
 
 async function cmdHelp(id: string) {
@@ -125,14 +253,57 @@ async function cmdRun(id: string, flags: Record<string, unknown>) {
   out(await api("/commands/run", "POST", body));
 }
 
-async function cmdScreenshot() {
-  const res = await fetch(`${BASE}/screenshot/text`);
+async function cmdScreenshot(id?: string) {
+  const qs = id ? `?id=${id}` : "";
+  const url = IS_SOCKET ? `http://localhost/screenshot/text${qs}` : `${BASE}/screenshot/text${qs}`;
+  const opts: RequestInit = IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {};
+  const res = await fetch(url, opts);
   if (!res.ok) {
-    process.stderr.write(`Error: ${res.status}\n`);
+    process.stderr.write(`Error: ${res.status}${res.status === 404 ? " — window not found" : ""}\n`);
     process.exit(1);
   }
   const text = await res.text();
   process.stdout.write(text);
+}
+
+async function cmdInstances() {
+  const instancesDir = path.join(SCRATCH_BASE, "instances");
+  if (!fs.existsSync(instancesDir)) {
+    process.stderr.write("No instances directory found\n");
+    process.exit(1);
+  }
+  const socks = fs.readdirSync(instancesDir).filter((f: string) => f.endsWith(".sock"));
+  if (socks.length === 0) {
+    process.stderr.write("No instances running (no .sock files)\n");
+    process.exit(1);
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const sock of socks) {
+    const sockPath = path.join(instancesDir, sock);
+    const label = sock.replace(/\.sock$/, "");
+    try {
+      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      if (res.ok) {
+        const health = await res.json() as Record<string, unknown>;
+        results.push({ label, socket: sockPath, ...health });
+      } else {
+        results.push({ label, socket: sockPath, ok: false, error: `HTTP ${res.status}` });
+      }
+    } catch {
+      // Dead socket — clean it up
+      try { fs.unlinkSync(sockPath); } catch {}
+      results.push({ label, socket: sockPath, ok: false, error: "dead (cleaned)" });
+    }
+  }
+
+  if (QUIET) {
+    for (const r of results) {
+      if (r.ok) process.stdout.write(`${r.label}\n`);
+    }
+  } else {
+    out(results);
+  }
 }
 
 async function cmdCompletions() {
@@ -157,7 +328,7 @@ async function cmdCompletions() {
     let out = `#compdef wibwob\n# Generated by wibwob completions --zsh\n\n`;
     out += `_wibwob() {\n`;
     out += `  local -a builtins domains commands\n\n`;
-    out += `  builtins=(state windows commands health screenshot help completions)\n`;
+    out += `  builtins=(state inspection windows commands health screenshot help completions)\n`;
     out += `  domains=(${[...domains.keys()].join(" ")})\n\n`;
     out += `  if (( CURRENT == 2 )); then\n`;
     out += `    commands=(\n`;
@@ -177,7 +348,7 @@ async function cmdCompletions() {
     let out = `# Generated by wibwob completions --bash\n`;
     out += `_wibwob_completions() {\n`;
     out += `  local cur="\${COMP_WORDS[COMP_CWORD]}"\n`;
-    out += `  local commands="${commands.map(c => c.id).join(" ")} state windows commands health screenshot help completions"\n`;
+    out += `  local commands="${commands.map(c => c.id).join(" ")} state inspection windows commands health screenshot help completions"\n`;
     out += `  COMPREPLY=( $(compgen -W "$commands" -- "$cur") )\n`;
     out += `}\n`;
     out += `complete -F _wibwob_completions wibwob\n`;
@@ -191,10 +362,15 @@ function usage() {
 
 Usage:
   wibwob state                        Full desktop state (JSON)
+  wibwob inspection                   Full runtime inspection snapshot (JSON)
   wibwob windows [-q]                 List windows (JSON, -q for IDs only)
-  wibwob commands [-q]                List available commands
+  wibwob commands [-q] [--surface agent|api|menu|palette] [--includeUnavailable]
+                                      List available commands
   wibwob health                       API health check
+  wibwob minimap                      Spatial map of all windows (alias: map)
   wibwob screenshot                   Text screenshot of desktop
+  wibwob screenshot <id>              Text screenshot of a single window
+  wibwob instances                    List running instances (via sockets)
   wibwob cmd <id> [--key val ...]     Run command by ID
   wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
   wibwob <domain> <verb> [--flags]    Run command (noun verb)
@@ -202,10 +378,13 @@ Usage:
   wibwob help                         This message
 
 Flags:
-  -q, --quiet    Output IDs only, one per line (for piping)
+  --instance <label>  Target instance by label (connects via unix socket)
+  -q, --quiet         Output IDs only, one per line (for piping)
 
 Environment:
-  WW_API    Base URL (default: http://127.0.0.1:8099)
+  WIBWOB_INSTANCE  Target instance label (same as --instance)
+  WW_API           Base URL override (default: socket or port 8099)
+  WIBWOB_API       Alias for WW_API
 
 Output: JSON to stdout, errors to stderr. Pipe to jq.
 `);
@@ -222,22 +401,36 @@ async function main() {
 
   const sub = args[0];
 
-  // Strip -q/--quiet from args for dispatch (already captured globally)
-  const cleanArgs = args.filter(a => a !== "-q" && a !== "--quiet");
+  // Strip -q/--quiet and --instance <label> from args for dispatch (already captured)
+  const filteredArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-q" || args[i] === "--quiet") continue;
+    if (args[i] === "--instance") { i++; continue; }
+    if (args[i].startsWith("--instance=")) continue;
+    filteredArgs.push(args[i]);
+  }
+  const cleanArgs = filteredArgs;
   const cleanSub = cleanArgs[0];
   if (!cleanSub) { usage(); return; }
 
   switch (cleanSub) {
     case "state":
       return cmdState();
+    case "inspection":
+      return cmdInspection();
     case "windows":
       return cmdWindows();
     case "commands":
       return cmdCommands();
     case "health":
       return cmdHealth();
+    case "minimap":
+    case "map":
+      return cmdMinimap();
     case "screenshot":
-      return cmdScreenshot();
+      return cmdScreenshot(cleanArgs[1]);
+    case "instances":
+      return cmdInstances();
     case "completions":
       return cmdCompletions();
     case "cmd": {

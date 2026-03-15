@@ -331,7 +331,7 @@ Why it matters:
 - a gallery window is more WibWob-like than a raw file prompt
 
 MVP behavior:
-- left pane list of primers from `modules/` and `modules-private/`
+- left pane list of primers from `microapps/` and `microapps-private/`
 - right pane preview of the selected primer
 - `Enter` opens the primer as its own window
 

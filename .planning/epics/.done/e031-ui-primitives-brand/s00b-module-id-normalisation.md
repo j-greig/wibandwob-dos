@@ -21,13 +21,13 @@ Normalise production module IDs to `wibwob.slug` across module manifests and cal
 
 ## Files to change
 
-- `modules/*/module.json` (target modules listed in brief) — update `id` fields
+- `microapps/*/microapp.json` (target modules listed in brief) — update `id` fields
 - `src/services/state-service.ts` and module-loading references (if needed) — ensure IDs flow through state correctly
 - Docs/skills referencing old IDs (if any) — update references
 
 ## Tasks
 
-- [x] T1: Update target `module.json` IDs to the new canonical `wibwob.slug` names.
+- [x] T1: Update target `microapp.json` IDs to the new canonical `wibwob.slug` names.
 - [x] T2: Update any code/docs references that still point at old IDs.
 - [x] T3: Reload modules and verify commands still appear/execute.
 - [x] T4: Verify `GET /state` returns new IDs.

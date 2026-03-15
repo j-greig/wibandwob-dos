@@ -15,13 +15,13 @@ Two workflows, one toolkit.
 ## Workflow 1: BRICKS — Original Composition
 
 Read the full bricks reference:
-  .pi/skills/chiptune-bricks/SKILL.md
+  .pi/skills/chiptune-studio/SKILL.md
 
 Key points:
 - Three layers: primitives (osc/fx/theory), patterns (compositional gestures), pipeline (pydub/export)
 - All synthesis in numpy float64 at SR=22050
-- Scripts in .pi/skills/chiptune-bricks/scripts/
-- References in .pi/skills/chiptune-bricks/references/
+- Scripts in .pi/skills/chiptune-studio/scripts/
+- References in .pi/skills/chiptune-studio/references/
 
 ## Workflow 2: COVER — Arrange Known Melodies
 

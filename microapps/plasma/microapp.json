@@ -1,0 +1,24 @@
+{
+  "name": "plasma",
+  "version": "0.1.0",
+  "description": "Animated plasma colour-field screensaver with mood analysis.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.plasma.open"
+  },
+  "microapp": {
+    "id": "wibwob.plasma",
+    "title": "Plasma",
+    "description": "Open animated plasma colour-field screensaver. Args: mood, renderMode.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 82, "label": "Plasma" }
+    ],
+    "palette": { "order": 52, "label": "Plasma" },
+    "agent": true,
+    "api": true
+  }
+}

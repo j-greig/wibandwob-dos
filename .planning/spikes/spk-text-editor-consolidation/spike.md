@@ -17,7 +17,7 @@ Three separate engines render or edit text files:
    - Edit + view modes. Markdown view with figlet headings.
    - Weak editing: no gutter, no line numbers, no selection, no find, char-level undo.
 
-2. Slap Editor (modules/slap-editor/editor-engine.ts)
+2. Slap Editor (microapps/slap-editor/editor-engine.ts)
    - Edit only. Strictly better editing features: gutter, line numbers,
      selection, clipboard, find, grouped undo.
    - No file picker, no markdown view, no save-as.

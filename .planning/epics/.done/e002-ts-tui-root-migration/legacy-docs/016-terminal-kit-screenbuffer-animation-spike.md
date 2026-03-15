@@ -232,7 +232,7 @@ Create one standalone prototype, e.g.:
 
 It should support:
 
-- load a primer or primer sequence from `modules-private/wibwob-primers`
+- load a primer or primer sequence from `microapps-private/wibwob-primers`
 - convert frames to `ScreenBuffer`
 - animate at a fixed frame rate
 - optional figlet title overlay

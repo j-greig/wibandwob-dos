@@ -35,10 +35,15 @@ DesktopState (types.ts:192) — returned by GET /state and tui_get_state:
     mode: string
     cwd: string
     statePath: string
+    scratchBase?: string
+    capturesDir?: string
+    workspacesDir?: string
+    logsDir?: string
     instanceLabel?: string
-    sessionId?: string
+    instanceId?: string
     theme?: string
     controlApiEnabled?: boolean
+    controlApiRequestedPort?: number
     controlApiPort?: number
     controlApiHost?: string
     controlApiBaseUrl?: string
@@ -78,10 +83,12 @@ CRITICAL field names agents get wrong:
 
 ## Control API Endpoints
 
-Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
+Base URL: configured runtime API base URL (default `http://127.0.0.1:8099`)
 
-  GET  /health          → { ok: true, port, sessionId, instanceLabel? }
+  GET  /health          → { ok: true, port, requestedPort, host, instanceId, instanceLabel?, scratchBase?, capturesDir?, workspacesDir?, statePath? }
   GET  /state           → DesktopState (full live snapshot)
+  GET  /runtime/inspection → { ok: true, snapshot } where snapshot includes
+                             state, stats, ui.menu, ui.overlay, scramble, history
   GET  /commands/list   → CommandListItem[] (optional ?surface=menu|palette|api|agent)
   POST /commands/run    → { ok, result?, error? }
                           body: { id: string, args?: object }
@@ -92,6 +99,20 @@ Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
   GET  /screenshot/text → clean readable text (default); ?id=N uses captureText
   GET  /screenshot/ansi → raw ANSI blessed dump; ?id=N crops to window rect
 
+### captureText chain
+
+`/screenshot/text?id=N` resolves through:
+
+1. `WindowRecord.captureText?: () => string` — optional, set per window
+2. Built-in windows set it directly: `frame.captureText = () => content`
+3. Microapps set it via SDK: `host.captureText(() => content)`
+4. API tries `captureText(id)` first → semantic text. Falls back to blessed screen crop (lossy).
+
+Three access tiers (simplest first):
+- `wibwob screenshot <id>` — CLI, no curl/python
+- `curl $API/screenshot/text?id=N` — raw API
+- `./scripts/screenshot-window.sh <id|title>` — title lookup + error hints
+
 Scramble endpoints:
   GET  /scramble/state  → { status, model, sleeping, lastMessage, messageCount }
   POST /scramble/say    → { text: string } → reply
@@ -101,6 +122,7 @@ Full catalogue: src/services/control-api.ts:70
 
 Always GET /health before any other call to confirm the app is ready.
 Always GET /state to get real window IDs before targeting windows.
+If a shell script needs API base URL or runtime capture/workspace paths, source `scripts/lib/runtime-env.sh` and read them from the live runtime rather than guessing repo-root paths.
 
 ## describeState() Contract
 
@@ -136,6 +158,15 @@ Available inside the Wib&Wob agent session. Source: src/services/agent-tools.ts.
 Pattern for agents: tui_get_state → read window IDs → tui_menu_command or tui_move_window.
 Never guess window IDs. Never call tui_list_commands with assumed command names.
 
+Important command-pipeline rule:
+  API and agent command execution are non-interactive by default.
+  If `editor.open`, `markdown.open`, `primer.open`, `figlet.open`, etc. need
+  picker/prompt input, menu/TUI callers may use the interactive flow but API/agent
+  callers must pass explicit args or they should receive `{ ok:false, error: ... }`.
+  If the intent is to automate the shared picker itself, use the explicit picker-open
+  commands (`primer.picker.open`, `editor.picker.open`, `markdown.picker.open`) and
+  then drive the overlay with `overlay.select/confirm/cancel`.
+
 ## Invariants
 
 1. GET /state IDs are session-local. Always re-fetch after any window open/close.
@@ -146,6 +177,9 @@ Never guess window IDs. Never call tui_list_commands with assumed command names.
 4. describeState() is called synchronously by StateService.buildState() — it must be fast.
 5. The state cache is NOT thread-safe — all mutations happen on the single Bun event loop.
 6. GET /health must return ok:true before any other endpoint is reliable.
+7. `GET /runtime/inspection` is the canonical blocker view. If `ui.blocked` is true,
+   the caller should inspect `ui.blockers[]` for the correct escape/continue commands
+   instead of guessing how to dismiss the UI.
 
 ## Failure Modes
 
@@ -154,6 +188,10 @@ Never guess window IDs. Never call tui_list_commands with assumed command names.
 | GET /state shows stale window data | sync() not called after mutation | Call stateService.sync() or wire onStateChanged callback |
 | Window missing from /state | registerWindow() not called or window closed | GET /state first; re-open if needed |
 | POST /commands/run returns {ok:false} | Wrong command id, missing required args | GET /commands/list first; check exact id and arg names |
+| POST /commands/run returns 404 for editor.open/markdown.open/primer.open with no args | Non-interactive control surface blocked picker-style UI | Pass filePath/title/initial args explicitly, or use menu/TUI flow |
+| UI gets stranded by a failing live test | Test opened a blocking surface but did not cleanup on assertion failure | Use `try/finally` and always send `desktop.clear-all` in live API tests |
+| Live Bun API tests pass alone but fail in a combined run | Multiple test files are mutating one shared runtime concurrently | Run live API test files serially with `bash scripts/live-api-test-suite.sh` |
+| Bun live test unexpectedly talks to the hosted API | Bun auto-loaded `.env` and picked `WIBWOB_API` instead of the local runtime | In Bun live tests, use `API_URL` or `WW_API`, not hosted `WIBWOB_API` |
 | tui_move_window has no effect | Used "x"/"y" instead of "left"/"top" | Field names are left, top, width, height |
 | Wrong window targeted | Cached/guessed window ID | Always GET /state for fresh IDs before targeting |
 | /health returns connection refused | App not running or wrong port | Check CONTROL_API_PORT; run curl /health; restart if needed |
@@ -171,7 +209,16 @@ DO: call POST /windows/batch for multi-window layout changes
 DON'T: chain individual move calls — batch is atomic and cheaper
 
 DO: check command id with GET /commands/list before POST /commands/run
-DON'T: assume command ids — they change; catalog is source of truth
+DON’T: assume command ids — they change; catalog is source of truth
+
+DO: run shared-runtime live API tests through `bash scripts/live-api-test-suite.sh`
+DON'T: bundle multiple live API test files into one `bun test ...` invocation against the same app
+
+DO: point Bun live tests at `API_URL` or `WW_API`
+DON'T: read hosted `WIBWOB_API` from `.env` inside local runtime tests
+
+DO: treat `/commands/run` as canonical and pass `id`
+DON’T: send the old `command` body field — it is retired
 
 DO: call stateService.sync() after window mutations in app-controller
 DON'T: rely on state auto-updating — it is cache-based
@@ -206,7 +253,7 @@ Proposed pattern: `details.panels: [{ id, title, contentLines, nonEmptyLines }]`
 
 ### focusOrCreate swallows return values — use direct:true for query commands
 
-module-loader.ts:261 — without `direct: true`, registerCommand wraps the action
+microapp-loader.ts:261 — without `direct: true`, registerCommand wraps the action
 in focusOrCreate() and discards the return value. Caller gets `{ok:true}` with no data.
 ALL query/control commands on already-open windows must use `direct: true`:
 
@@ -250,3 +297,8 @@ When adding a control API endpoint:
 | 2026-03-11 | invariant | control-api | GET /runtime/stats endpoint added for structured telemetry | E033 S08 |
 | 2026-03-12 | correction | control-api | Interactive list/file-browser overlays were not fully automatable with confirm/cancel only: no index control → added `overlay.select` endpoint/command and selectedIndex/count in `overlay.info` | Applications API sweep (primer/plasma interactive blockers) |
 | 2026-03-12 | gotcha | control-api | Some interstitials are module-local windows, not shared overlays: `overlay.*` won’t drive them → expose module/window picker commands (`*.picker.info/select/confirm/cancel`) until migrated to OverlayManager | Backrooms and Zine picker automation |
+| 2026-03-14 | correction | command-pipeline | `/commands/run` now accepts canonical `id` only, and API/agent execution is non-interactive by default so picker-style commands fail cleanly instead of hijacking the desktop | Refactor slice: shared runtime verbs + inspection seam |
+| 2026-03-14 | invariant | runtime-inspection | `GET /runtime/inspection` is the inspectable runtime seam for state + menu/overlay UI + stats + Scramble state/history | Refactor slice: runtime inspection consolidation |
+| 2026-03-14 | correction | control-api | Shared picker surfaces now have explicit command entrypoints (`primer.picker.open`, `editor.picker.open`, `markdown.picker.open`) and runtime inspection exposes `ui.blocked` + `ui.blockers[]` with escape/continue commands | Refactor slice: blocking flow hardening |
+| 2026-03-14 | invariant | window-control | `/windows/*` and agent window tools should route through the shared runtime window service rather than talking to `WindowFacade` directly from each interface | Refactor slice: shared runtime window verbs |
+| 2026-03-14 | correction | control-api | `/windows/move`, `/windows/resize`, and `/windows/batch` now require canonical geometry fields only: `left/top/width/height`; short-form `x/y/w/h` aliases are retired | Refactor slice: runtime window verbs cleanup |

@@ -228,7 +228,7 @@ User message → AnthropicAPIProvider::sendQuery()
 
 ### System prompt
 
-Loaded from `modules-private/wibwob-prompts/wibandwob.prompt.md` (searched upward from CWD with fallback paths). Key elements:
+Loaded from `microapps-private/wibwob-prompts/wibandwob.prompt.md` (searched upward from CWD with fallback paths). Key elements:
 
 - **Identity**: "You are Wib & Wob, a dual-minded symbient AI coinhabiting a Turbo Vision TUI with a human."
 - **Output rules**: NO markdown (no bold, no backticks, no headings). Plain prose only. CAPS for emphasis.
@@ -571,7 +571,7 @@ Sender colors are hash-based: each name hashes to one of 5 palette colors (blue,
 
 ### Gotchas
 
-1. **System prompt lives in a private submodule**: `modules-private/wibwob-prompts/wibandwob.prompt.md`. The TS build needs access to this or a fallback.
+1. **System prompt lives in a private submodule**: `microapps-private/wibwob-prompts/wibandwob.prompt.md`. The TS build needs access to this or a fallback.
 2. **Model IDs are hardcoded to 4.6 family**: `claude-sonnet-4-6`, `claude-opus-4-6`, `claude-haiku-4-5`. These will change. Normalize in one place.
 3. **Session resume via sdkSessionId**: The SDK supports multi-turn via `resume: sessionId`. This is important for Wib&Wob's conversational memory. Make sure the TS version captures and passes this.
 4. **Rate limiting for Scramble**: `kRateLimitSeconds` prevents spamming the API. Keep this.

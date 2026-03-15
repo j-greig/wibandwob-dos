@@ -202,8 +202,8 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 
 - `/Users/james/Desktop/ce-1.jpg` — full CE overview screenshot
 - https://calculatingempires.net/about — full essay
-- TouchLab MVP (`modules/touchlab-mvp/`) — panel/layout reference
-- Tide Pool (`modules/wibwob-tidepool/`) — sub-layout pattern reference
+- TouchLab MVP (`microapps/touchlab-mvp/`) — panel/layout reference
+- Tide Pool (`microapps/wibwob-tidepool/`) — sub-layout pattern reference
 
 ---
 

@@ -1,42 +1,48 @@
 #!/usr/bin/env bash
+# @name    scaffold-microapp
+# @desc    Create a new microapp package with manifest + entry file
 set -euo pipefail
 
 if [[ $# -lt 3 || $# -gt 4 ]]; then
-  echo "Usage: bash scripts/scaffold-microapp.sh <module-dir> <app-id> <title> [menu-order]" >&2
-  echo "Example: bash scripts/scaffold-microapp.sh modules/standing-wave symbient.standing-wave \"Standing Wave\" 120" >&2
+  echo "Usage: bash scripts/scaffold-microapp.sh <microapp-dir> <app-id> <title> [menu-order]" >&2
+  echo "Example: bash scripts/scaffold-microapp.sh microapps/standing-wave symbient.standing-wave \"Standing Wave\" 120" >&2
   exit 1
 fi
 
-MODULE_DIR="$1"
+MICROAPP_DIR="$1"
 APP_ID="$2"
 TITLE="$3"
 MENU_ORDER="${4:-120}"
 
-if [[ -e "$MODULE_DIR" ]]; then
-  echo "Refusing to overwrite existing path: $MODULE_DIR" >&2
+if [[ -e "$MICROAPP_DIR" ]]; then
+  echo "Refusing to overwrite existing path: $MICROAPP_DIR" >&2
   exit 1
 fi
 
-MODULE_NAME="$(basename "$MODULE_DIR")"
+MICROAPP_NAME="$(basename "$MICROAPP_DIR")"
 PALETTE_LABEL="Open ${TITLE}"
 ESC_TITLE="${TITLE//\\/\\\\}"
 ESC_TITLE="${ESC_TITLE//\"/\\\"}"
 ESC_APP_ID="${APP_ID//\\/\\\\}"
 ESC_APP_ID="${ESC_APP_ID//\"/\\\"}"
-ESC_MODULE_NAME="${MODULE_NAME//\\/\\\\}"
-ESC_MODULE_NAME="${ESC_MODULE_NAME//\"/\\\"}"
+ESC_MICROAPP_NAME="${MICROAPP_NAME//\\/\\\\}"
+ESC_MICROAPP_NAME="${ESC_MICROAPP_NAME//\"/\\\"}"
 ESC_PALETTE_LABEL="${PALETTE_LABEL//\\/\\\\}"
 ESC_PALETTE_LABEL="${ESC_PALETTE_LABEL//\"/\\\"}"
 
-mkdir -p "$MODULE_DIR"
+mkdir -p "$MICROAPP_DIR"
 
-cat > "$MODULE_DIR/module.json" <<EOF
+cat > "$MICROAPP_DIR/microapp.json" <<EOF
 {
-  "name": "${ESC_MODULE_NAME}",
+  "name": "${ESC_MICROAPP_NAME}",
   "version": "0.1.0",
   "description": "${ESC_TITLE} microapp",
   "type": "microapp",
   "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.${ESC_APP_ID}.open"
+  },
   "microapp": {
     "id": "${ESC_APP_ID}",
     "title": "${ESC_TITLE}",
@@ -53,7 +59,7 @@ cat > "$MODULE_DIR/module.json" <<EOF
 }
 EOF
 
-cat > "$MODULE_DIR/index.ts" <<EOF
+cat > "$MICROAPP_DIR/index.ts" <<EOF
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
@@ -112,10 +118,12 @@ export default function setup(host: MicroappHost) {
 EOF
 
 echo "Created:"
-echo "  $MODULE_DIR/module.json"
-echo "  $MODULE_DIR/index.ts"
+echo "  $MICROAPP_DIR/microapp.json"
+echo "  $MICROAPP_DIR/index.ts"
 echo
 echo "Next:"
 echo "  1. Edit the scaffold"
 echo "  2. Run: bun run typecheck"
-echo "  3. Restart the app (bash scripts/restart.sh) or reload (modules.reload)"
+echo "  3. Stable reload: wibwob cmd microapps.reload"
+echo "  4. Optional watch loop (experimental): bun run watch:microapp -- $MICROAPP_DIR --open"
+echo "  5. If you changed src/, use: bash scripts/restart.sh"

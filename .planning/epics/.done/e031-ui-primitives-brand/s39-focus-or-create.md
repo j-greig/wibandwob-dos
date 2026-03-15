@@ -22,11 +22,11 @@ Add SDK-level `focusOrCreate()` helper and migrate singleton-style modules to co
 ## Files to change
 
 - `src/microapp-sdk.ts` (and helper owner file if needed)
-- `modules/glitchbox/index.ts`
-- `modules/wibwob-tidepool/index.ts`
-- `modules/wibwobworld/index.ts`
-- `modules/patchbay-lab/index.ts`
-- `modules/zine/index.ts`
+- `microapps/glitchbox/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
+- `microapps/wibwobworld/index.ts`
+- `microapps/patchbay-lab/index.ts`
+- `microapps/zine/index.ts`
 
 ## Tasks
 

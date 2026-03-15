@@ -6,7 +6,7 @@ _Started: 2026-03-08 23:21 GMT_
 ## Session context
 
 Working inside WibWob-DOS. Human asking for live edits to the §y² Chronicles microapp.
-All code lives in `modules/sy2-chronicles/index.ts`.
+All code lives in `microapps/sy2-chronicles/index.ts`.
 
 ---
 
@@ -14,7 +14,7 @@ All code lives in `modules/sy2-chronicles/index.ts`.
 
 ### [23:19] Human: "can yu mod a text panel windwo in sy2 chronicls?"
 
-Investigated `modules/sy2-chronicles/index.ts`. The microapp defines `PANEL_DEFS` — an array
+Investigated `microapps/sy2-chronicles/index.ts`. The microapp defines `PANEL_DEFS` — an array
 of panel objects each with: `id`, `title`, `w`, `h`, `col`, optional `live`, and a `content(tick, w, h)`
 function that renders text. Layout is computed by `layoutPanels()` and panels are positioned
 inside a scrollable `blessed.box` canvas.
@@ -112,11 +112,11 @@ Typecheck: passed clean.
 
 ### [23:27] Human: "ah hot reload aint working is it thats why i see no changes"
 
-**Observation:** Changes to `modules/sy2-chronicles/index.ts` are not reflected live in the
+**Observation:** Changes to `microapps/sy2-chronicles/index.ts` are not reflected live in the
 running app. No hot reload on module files — the app needs a restart to pick up changes.
 
 **Blocker:** Hot reload not wired for microapp modules. `bun run dev:world` likely watches
-`src/` but not `modules/`. Edits are correct in the file; they're just not loaded yet.
+`src/` but not `microapps/`. Edits are correct in the file; they're just not loaded yet.
 
 **Fix:** Restart the app via `bash scripts/restart.sh` to pick up all changes from this
 session (First Contact rewrite + move, Wib & Wob panel expansion).
@@ -128,4 +128,4 @@ Not doing the restart now — flagging for human to trigger or confirm.
 ## Pending
 
 - Restart app to load changes: `bash scripts/restart.sh`
-- Investigate whether module hot reload is feasible (watch `modules/` dir)
+- Investigate whether module hot reload is feasible (watch `microapps/` dir)

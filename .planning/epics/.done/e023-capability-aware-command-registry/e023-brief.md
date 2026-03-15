@@ -197,7 +197,7 @@ Acceptance Criteria:
 Files:
 - `src/core/command-catalog.ts`
 - `src/core/command-registry.ts`
-- `src/services/module-loader.ts`
+- `src/services/microapp-loader.ts`
 
 ### S02 - Registry gating (`list` + `run`) and canonical availability sets
 Goal:

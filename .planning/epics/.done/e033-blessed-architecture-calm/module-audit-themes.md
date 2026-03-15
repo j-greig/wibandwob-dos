@@ -18,15 +18,15 @@ It means E033 can win through repeated local discipline, not one heroic rewrite.
 ## Theme 1 — Ambient redraw discipline is still loose
 
 Observed in:
-- `modules/glitchbox/index.ts`
-- `modules/e026-demo/index.ts`
-- `modules/patchbay-lab/index.ts`
-- `modules/sy2-chronicles/index.ts`
-- `modules/touchlab-mvp/index.ts`
-- `modules/wibwob-poetry-clock/index.ts`
-- `modules/wibwob-tidepool/index.ts`
-- `modules/world-chatroom/index.ts`
-- `modules/zine/index.ts`
+- `microapps/glitchbox/index.ts`
+- `microapps/e026-demo/index.ts`
+- `microapps/patchbay-lab/index.ts`
+- `microapps/sy2-chronicles/index.ts`
+- `microapps/touchlab-mvp/index.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
+- `microapps/world-chatroom/index.ts`
+- `microapps/zine/index.ts`
 - and terminal too, though that seam is special-case fragile
 
 Pattern:
@@ -45,11 +45,11 @@ Low-risk next move:
 ## Theme 2 — The public microapp SDK is still porous
 
 Observed in:
-- `modules/e026-demo/index.ts`
-- `modules/heartbeat/index.ts`
-- `modules/patchbay-lab/index.ts`
-- `modules/sy2-chronicles/index.ts`
-- `modules/zine/index.ts`
+- `microapps/e026-demo/index.ts`
+- `microapps/heartbeat/index.ts`
+- `microapps/patchbay-lab/index.ts`
+- `microapps/sy2-chronicles/index.ts`
+- `microapps/zine/index.ts`
 
 Pattern:
 - modules import from `src/core/*` or ad hoc service files directly
@@ -57,7 +57,7 @@ Pattern:
 - some of it is accidental teaching-by-example
 
 Why it matters for E033:
-- module author ergonomics become muddy if canonical examples bypass the SDK
+- microapp author ergonomics become muddy if canonical examples bypass the SDK
 - internal and public surfaces blur together
 
 Useful distinction:
@@ -72,7 +72,7 @@ Low-risk next move:
 ## Theme 3 — Multi-instance honesty is inconsistent
 
 Observed most clearly in:
-- `modules/wibwob-tidepool/index.ts`
+- `microapps/wibwob-tidepool/index.ts`
 - also visible in weaker forms in `glitchbox` and `tr808`
 
 Pattern:
@@ -90,11 +90,11 @@ Low-risk next move:
 ## Theme 4 — Some modules are really subsystems in disguise
 
 Observed in:
-- `modules/patchbay-lab/index.ts`
-- `modules/sy2-chronicles/index.ts`
-- `modules/zine/index.ts`
-- `modules/wibwobworld/index.ts`
-- `modules/wibwob-poetry-clock/index.ts`
+- `microapps/patchbay-lab/index.ts`
+- `microapps/sy2-chronicles/index.ts`
+- `microapps/zine/index.ts`
+- `microapps/wibwobworld/index.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
 
 Pattern:
 - one file owns product logic, content loading, editing or IO, animation, transport, and debugging
@@ -111,12 +111,12 @@ Low-risk next move:
 ## Theme 5 — View modules often own host-side IO directly
 
 Observed in:
-- `modules/hello-world/index.ts` via `spawnSync(figlet)`
-- `modules/patchbay-lab/index.ts` via primer file reads
-- `modules/wibwob-poetry-clock/index.ts` via auth-file reads, direct network calls, and figlet shelling-out
-- `modules/wibwobworld/index.ts` via capture and export writes
-- `modules/zine/index.ts` via file discovery, reads, writes, and watchers
-- `modules/terminal/index.ts` via bridge process management
+- `microapps/hello-world/index.ts` via `spawnSync(figlet)`
+- `microapps/patchbay-lab/index.ts` via primer file reads
+- `microapps/wibwob-poetry-clock/index.ts` via auth-file reads, direct network calls, and figlet shelling-out
+- `microapps/wibwobworld/index.ts` via capture and export writes
+- `microapps/zine/index.ts` via file discovery, reads, writes, and watchers
+- `microapps/terminal/index.ts` via bridge process management
 
 Pattern:
 - modules often act as their own process/file/network coordinators
@@ -132,9 +132,9 @@ Low-risk next move:
 ## Theme 6 — Tiny modules teach habits, good or bad
 
 Observed in:
-- `modules/hello-world/index.ts`
-- `modules/heartbeat/index.ts`
-- `modules/e026-demo/index.ts`
+- `microapps/hello-world/index.ts`
+- `microapps/heartbeat/index.ts`
+- `microapps/e026-demo/index.ts`
 
 Pattern:
 - starter and demo modules are copied by future authors

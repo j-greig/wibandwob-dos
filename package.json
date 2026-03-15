@@ -16,13 +16,15 @@
     "check-surface-parity": "bun run scripts/.archive/check-surface-parity.ts",
     "typecheck": "node_modules/.bin/tsc --noEmit",
     "handover": "bash scripts/handover.sh",
+    "check-coat": "bun run scripts/check-coat.ts",
     "check-themes": "bun run scripts/check-themes.ts",
+    "watch:microapp": "bun run scripts/watch-microapp.ts",
     "planning:status": "bash .claude/scripts/planning.sh status",
     "planning:sync": "bash .claude/scripts/planning.sh sync",
     "planning:branch": "git branch --show-current && git log --oneline -5",
     "planning:inbox": "bun run scripts/planning-inbox.ts",
     "prepare": "git config core.hooksPath .githooks",
-    "lint": "npx eslint 'modules/**/index.ts'",
+    "lint": "npx eslint 'microapps/**/index.ts'",
     "wibwob": "bun run src/cli/wibwob.ts"
   },
   "dependencies": {

@@ -382,7 +382,7 @@ index aa1f6e8..0000000
 -- [x] Menu bar/dropdown/context menus themed (no more hardcoded colours)
 -- [x] Menu bar vs desktop contrast in all variants
 -- [x] Theme file split: `src/core/theme/` with types, resolver, variants/
--- [x] Phosphor theme in `modules-private/wibwob-themes/variants/`
+-- [x] Phosphor theme in `microapps-private/wibwob-themes/variants/`
 -- [x] Fleet audit: 12 window kinds x 5 themes, screenshots in scratch/
 -
 -## Theme Parity — Surface Audit
@@ -471,7 +471,7 @@ index 0000000..43bb05c
 +- Cycle order: dark → nord → pastel → phosphor → light → dark
 +- Menu bar / dropdown / context menus fully themed
 +- Theme file split: `src/core/theme/` with types, resolver, variants/
-+- Phosphor theme in `modules-private/wibwob-themes/variants/`
++- Phosphor theme in `microapps-private/wibwob-themes/variants/`
 +- `highlight` semantic token — warm pink accent for user labels + multi-agent UX
 +- Fleet audit: 12 window kinds × 5 themes, screenshots in `scratch/screenshots/`
 +
@@ -620,7 +620,7 @@ index fd0616d..f5dc88a 100644
 +## Recommended Next Steps
  
 -### 🟢 Creative / features — parked
-+1. **E022 S01** — strip debug breadcrumbs from `modules-private/wibwobworld/index.ts`
++1. **E022 S01** — strip debug breadcrumbs from `microapps-private/wibwobworld/index.ts`
 +   (keep env-gated `debugWibWobWorld` calls, remove granular `render:*` labels)
  
 -| ID | Title |

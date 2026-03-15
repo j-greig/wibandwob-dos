@@ -33,7 +33,7 @@ Full theme system with live switching across all surfaces.
 - [x] Menu bar/dropdown/context menus themed (no more hardcoded colours)
 - [x] Menu bar vs desktop contrast in all variants
 - [x] Theme file split: `src/core/theme/` with types, resolver, variants/
-- [x] Phosphor theme in `modules-private/wibwob-themes/variants/`
+- [x] Phosphor theme in `microapps-private/wibwob-themes/variants/`
 - [x] Fleet audit: 12 window kinds x 5 themes, screenshots in scratch/
 - [x] Theme picker: `Choose Theme...` via View menu / palette / API
 - [x] `app.set_theme` API command: set theme by name without interactive picker

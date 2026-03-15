@@ -70,9 +70,9 @@ for w in d.get('windows',[]):
 " 2>/dev/null)
 
 # 6. Read source for analysis — all .ts files in the module
-SOURCE=$(cat modules/asciicker/*.ts)
-SOURCE_LINES=$(cat modules/asciicker/*.ts | wc -l)
-SOURCE_FILE_COUNT=$(ls modules/asciicker/*.ts | wc -l)
+SOURCE=$(cat microapps/asciicker/*.ts)
+SOURCE_LINES=$(cat microapps/asciicker/*.ts | wc -l)
+SOURCE_FILE_COUNT=$(ls microapps/asciicker/*.ts | wc -l)
 
 echo "--- source: $SOURCE_LINES lines in $SOURCE_FILE_COUNT files ---"
 

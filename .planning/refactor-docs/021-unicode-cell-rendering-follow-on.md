@@ -41,8 +41,8 @@ Observed symptom:
 Microsprint evidence from live app state and source files:
 
 - viewer windows were showing content from:
-  - `/Users/james/Repos/wibandwob-dos/modules-private/wibwob-primers/primers/conscious-matrix-1.txt`
-  - `/Users/james/Repos/wibandwob-dos/modules-private/wibwob-primers/primers/cosmic-horror.txt`
+  - `/Users/james/Repos/wibandwob-dos/microapps-private/wibwob-primers/primers/conscious-matrix-1.txt`
+  - `/Users/james/Repos/wibandwob-dos/microapps-private/wibwob-primers/primers/cosmic-horror.txt`
 - current control API could not export those viewer windows as text, so the
   audit used:
   - live `/state`

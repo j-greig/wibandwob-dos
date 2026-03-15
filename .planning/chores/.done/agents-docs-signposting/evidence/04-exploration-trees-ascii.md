@@ -1,6 +1,6 @@
 # Exploration Trees: Claude vs Codex
 
-How each agent navigated from cold start to "I can build a module now".
+How each agent navigated from cold start to "I can build a microapp now".
 Arrows show what led to what. Indentation = depth of follow-up.
 
 ---
@@ -12,26 +12,26 @@ ls /  (orient)
 │
 └─► AGENTS.md  (agent constitution — where do I start?)
     │
-    ├─► docs/building-custom-modules.md  (AGENTS.md said "read this")
+    ├─► docs/building-custom-microapps.md  (AGENTS.md said "read this")
     │   │
     │   └─► .agents/microapp-sdk.md  (main guide said "SDK surface here")
     │       │
-    │       └─► docs/module-authoring.md  ✗ DEAD LINK — file not found
+    │       └─► docs/microapp-authoring.md  ✗ DEAD LINK — file not found
     │
-    ├─► modules/  (ls — what examples exist?)
+    ├─► microapps/  (ls — what examples exist?)
     │   │
-    │   ├─► modules/hello-world/module.json  (minimal manifest)
-    │   ├─► modules/hello-world/index.ts     (minimal code — responsive figlet)
-    │   ├─► modules/heartbeat/index.ts       (animated — timers, cleanup)
-    │   └─► modules/wibwob-poetry-clock/index.ts  (complex — AI, modes, contour)
+    │   ├─► microapps/hello-world/microapp.json  (minimal manifest)
+    │   ├─► microapps/hello-world/index.ts     (minimal code — responsive figlet)
+    │   ├─► microapps/heartbeat/index.ts       (animated — timers, cleanup)
+    │   └─► microapps/wibwob-poetry-clock/index.ts  (complex — AI, modes, contour)
     │
     ├─► scripts/scaffold-microapp.sh  (what does the generator actually produce?)
     │
     ├─► .agents/architecture.md  (linked at top of AGENTS.md — is this relevant?)
     │   └── verdict: NOT relevant for module work, detour
     │
-    ├─► modules/README.md  (module dir's own onboarding doc)
-    │   └─► docs/module-authoring.md  ✗ DEAD LINK again
+    ├─► microapps/README.md  (module dir's own onboarding doc)
+    │   └─► docs/microapp-authoring.md  ✗ DEAD LINK again
     │
     └─► src/services/microapp-sdk.ts  (the actual SDK barrel — what can I import?)
 
@@ -52,7 +52,7 @@ AGENTS.md  (root contract)
 │
 ├─► .agents/  (ls — what's the doc surface?)
 │
-├─► docs/building-custom-modules.md  (public authoring path)
+├─► docs/building-custom-microapps.md  (public authoring path)
 │   │
 │   └── noted: persistence too light, dream-forecast stale reference
 │
@@ -62,40 +62,40 @@ AGENTS.md  (root contract)
 │
 ├─► .agents/microapp-sdk.md  (deeper authoring contract)
 │   │
-│   ├─► docs/module-authoring.md  ✗ DEAD LINK
+│   ├─► docs/microapp-authoring.md  ✗ DEAD LINK
 │   │
 │   ├─► .agents/specs/window-system.md  (triggered by AGENTS.md pre-change table)
 │   │   │
-│   │   └── verdict: useful but too internal for first-stop module author
+│   │   └── verdict: useful but too internal for first-stop microapp author
 │   │
 │   └─► .agents/specs/agent-session.md  (also triggered by pre-change table)
 │       │
 │       └── noted: module guidance buried inside agent-session filename
 │
-├─► modules/hello-world/index.ts  (minimal example per docs)
+├─► microapps/hello-world/index.ts  (minimal example per docs)
 │   │
 │   ├── noted: no longer minimal — has responsive layout engine
-│   └─► modules/hello-world/module.json  (manifest still clean)
+│   └─► microapps/hello-world/microapp.json  (manifest still clean)
 │
-├─► modules/glitchbox/index.ts  (animated reference per AGENTS.md)
+├─► microapps/glitchbox/index.ts  (animated reference per AGENTS.md)
 │   │
 │   └── verdict: too dense for first-stop teaching
 │
-├─► modules/wibwob-poetry-clock/index.ts  (compact real app)
+├─► microapps/wibwob-poetry-clock/index.ts  (compact real app)
 │   │
-│   ├─► modules/wibwob-poetry-clock/module.json  (persist:true example?)
+│   ├─► microapps/wibwob-poetry-clock/microapp.json  (persist:true example?)
 │   │
-│   └─► modules/wibwob-poetry-clock/index.ts § snapshot  (persistence pattern)
+│   └─► microapps/wibwob-poetry-clock/index.ts § snapshot  (persistence pattern)
 │       │
 │       └── found: serialize mode+voice, restore via open command
 │
-├─► modules/e026-demo/index.ts  (broad SDK sampler)
+├─► microapps/e026-demo/index.ts  (broad SDK sampler)
 │   │
 │   └── verdict: excellent feature map, too much for onboarding
 │
 ├─► .agents/architecture.md  (shell-internal — relevant to modules?)
 │   │
-│   └── verdict: mostly shell maintainer, not module author
+│   └── verdict: mostly shell maintainer, not microapp author
 │
 ├─► .agents/invariants.md  (hard rules — which constrain modules?)
 │   │
@@ -106,19 +106,19 @@ AGENTS.md  (root contract)
 │   │
 │   └── noted: far more exports than docs describe, drift risk
 │
-├─► src/services/module-loader.ts  (the REAL owner of MicroappHost)
+├─► src/services/microapp-loader.ts  (the REAL owner of MicroappHost)
 │   │
 │   ├── found: queueMicrotask registration, focusOrCreate wrapping
 │   ├── found: registerSnapshot — the real persistence seam
 │   │
 │   └─► search: registerSnapshot across modules
 │       │
-│       ├─► modules/wibwob-poetry-clock § snapshot  (clean example)
-│       └─► modules/wibwob-tidepool § snapshot  (different pattern — drift?)
+│       ├─► microapps/wibwob-poetry-clock § snapshot  (clean example)
+│       └─► microapps/wibwob-tidepool § snapshot  (different pattern — drift?)
 │
-├─► modules/README.md  (module dir docs)
+├─► microapps/README.md  (module dir docs)
 │   │
-│   └─► docs/module-authoring.md  ✗ DEAD LINK (third hit)
+│   └─► docs/microapp-authoring.md  ✗ DEAD LINK (third hit)
 │
 └─► search: cross-references and stale links across all docs
 

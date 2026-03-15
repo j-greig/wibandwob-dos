@@ -123,7 +123,7 @@ All paths verified. Open via POST /view/primer/open.
 
 ### Act Three
 - reality-breaks-apart
-  /modules/example-primers/primers/reality-breaks.txt
+  /microapps/example-primers/primers/reality-breaks.txt
 - am-i-dreaming.txt
   /scratch/backrooms-runs/2026-03-03T13-13-23-377Z/primers/am-i-dreaming.txt
 - past-future.txt

@@ -32,14 +32,14 @@ Core rule:
   - `src/core/app-controller.ts`
   - `src/core/window-manager.ts`
   - `src/core/editor-coordinator.ts`
-  - `src/services/module-loader.ts`
+  - `src/services/microapp-loader.ts`
   - `src/services/microapp-sdk.ts`
   - `src/services/control-api.ts`
   - `src/core/command-catalog.ts`
   - `src/core/command-registry.ts`
   - `src/core/render-monitor.ts`
-  - `modules/touchlab-mvp/index.ts`
-  - `modules/zine/index.ts`
+  - `microapps/touchlab-mvp/index.ts`
+  - `microapps/zine/index.ts`
 
 Best parallel pairings:
 
@@ -66,7 +66,7 @@ Best parallel pairings:
   - `control-api.ts`, `command-registry.ts`, `command-catalog.ts` are fine only if Agent 1 is NOT also touching command/state flow
 
 3. If Agent 1 is doing S03 module host contract
-- Agent 2 can do S10 module-author docs draft in `docs/` + `modules/README.md`
+- Agent 2 can do S10 module-author docs draft in `docs/` + `microapps/README.md`
 - Safe pattern:
   - draft docs from current contract
   - mark TODOs where S03 may change semantics
@@ -107,7 +107,7 @@ Best parallel pairings:
   - smoke scripts
   - docs / HANDOVER / notes
 - Caution:
-  - avoid parallel edits to `modules/terminal/index.ts` or any PTY bridge files
+  - avoid parallel edits to `microapps/terminal/index.ts` or any PTY bridge files
 
 Bad pairings — avoid:
 - S01 + S04 if both need `app-controller.ts`
@@ -161,7 +161,7 @@ That means:
 - render as consequence of state change
 - stronger lifecycle ownership
 - thinner composition root
-- better module author ergonomics
+- better microapp author ergonomics
 - stronger API and state parity
 - better telemetry and evidence for visual / performance correctness
 
@@ -213,7 +213,7 @@ Key source files:
 - `src/core/command-registry.ts`
 - `src/services/state-service.ts`
 - `src/services/control-api.ts`
-- `src/services/module-loader.ts`
+- `src/services/microapp-loader.ts`
 - `src/services/microapp-sdk.ts`
 - `src/core/render-monitor.ts`
 - `src/windows/monster-cam-window.ts`
@@ -223,19 +223,19 @@ Key source files:
 - `src/windows/terrain-lab-window.ts`
 - `src/windows/contour-window.ts`
 - `src/windows/wibwob-agent-window.ts`
-- `modules/touchlab-mvp/index.ts`
-- `modules/zine/index.ts`
+- `microapps/touchlab-mvp/index.ts`
+- `microapps/zine/index.ts`
 
 Representative modules to understand the public authoring surface:
-- `modules/hello-world/`
-- `modules/world-chatroom/`
-- `modules/sy2-chronicles/`
-- `modules/glitchbox/`
-- `modules/heartbeat/`
-- `modules/patchbay-lab/`
-- `modules/wibwob-poetry-clock/`
-- `modules/touchlab-mvp/`
-- `modules/zine/`
+- `microapps/hello-world/`
+- `microapps/world-chatroom/`
+- `microapps/sy2-chronicles/`
+- `microapps/glitchbox/`
+- `microapps/heartbeat/`
+- `microapps/patchbay-lab/`
+- `microapps/wibwob-poetry-clock/`
+- `microapps/touchlab-mvp/`
+- `microapps/zine/`
 
 ## Big decisions already made
 
@@ -249,7 +249,7 @@ Representative modules to understand the public authoring surface:
    - better test / telemetry posture
 4. Backward-compat cruft should NOT be preserved by default. If a legacy command, alias route, or compatibility shim stays, it must be justified.
 5. The work should improve both human and agent operation.
-6. `modules/` and `modules-private/` are hero surfaces. Treat module authoring quality as product quality.
+6. `microapps/` and `microapps-private/` are hero surfaces. Treat microapp authoring quality as product quality.
 
 ## Current epic shape
 
@@ -273,7 +273,7 @@ Phase C — local architecture and module contract
 
 Phase D — user-facing operability and authoring
 - S09 macOS-like launcher / switcher
-- S10 third-party developer docs for custom modules
+- S10 third-party developer docs for custom microapps
 
 Phase E — advanced composition
 - S11 composable animated surfaces
@@ -319,7 +319,7 @@ Target pattern for live windows when you refactor one:
 
 ### Microapp host contract
 
-`module-loader.ts` currently uses deferred registration with `setTimeout(ensureRegistered, 0)`.
+`microapp-loader.ts` currently uses deferred registration with `setTimeout(ensureRegistered, 0)`.
 DO NOT just delete that timer.
 First understand and document what ordering guarantee it is protecting.
 Then replace it only if the replacement preserves those guarantees.
@@ -346,10 +346,10 @@ Likewise, Monster Cam’s FPS readout is service FPS, not shell render FPS.
 ### Unicode / cell correctness
 
 Known troublesome primers to test:
-- `modules-private/wibwob-primers/primers/cosmic-horror.txt`
+- `microapps-private/wibwob-primers/primers/cosmic-horror.txt`
   - known bug: dragging a primer window while this file is shown can corrupt render
-- `modules-private/wibwob-primers/primers/graveyard-emoji-flow.txt`
-- `modules-private/wibwob-primers/primers/conscious-matrix-1.txt`
+- `microapps-private/wibwob-primers/primers/graveyard-emoji-flow.txt`
+- `microapps-private/wibwob-primers/primers/conscious-matrix-1.txt`
 
 Also test:
 - narrow sidebar/list truncation
@@ -372,18 +372,18 @@ Core windows / families:
 - `src/windows/backrooms-log-browser-window.ts`
 
 Animated or timer-driven modules:
-- `modules/glitchbox/`
-- `modules/heartbeat/`
-- `modules/touchlab-mvp/`
-- `modules/patchbay-lab/`
-- `modules/wibwob-poetry-clock/`
-- `modules/sy2-chronicles/`
-- `modules/e026-demo/`
-- `modules/zine/`
+- `microapps/glitchbox/`
+- `microapps/heartbeat/`
+- `microapps/touchlab-mvp/`
+- `microapps/patchbay-lab/`
+- `microapps/wibwob-poetry-clock/`
+- `microapps/sy2-chronicles/`
+- `microapps/e026-demo/`
+- `microapps/zine/`
 
 Minimum must-test anchors from the human’s explicit list:
-- `modules/glitchbox/`
-- `modules/heartbeat/`
+- `microapps/glitchbox/`
+- `microapps/heartbeat/`
 - `src/windows/generative-windows.ts`
 - `src/windows/plasma-window.ts`
 - `src/windows/terrain-lab-window.ts`
@@ -392,7 +392,7 @@ Minimum must-test anchors from the human’s explicit list:
 
 ## TouchDesigner-like direction
 
-`modules/touchlab-mvp/` is not a random toy. It already demonstrates:
+`microapps/touchlab-mvp/` is not a random toy. It already demonstrates:
 - source generation
 - mixing / compositing
 - nested frames

@@ -54,7 +54,7 @@ index. i will be on the warm rock.
 
 ### What exists
 
-Six modules live under `modules/`:
+Six modules live under `microapps/`:
 
 | Module | Type | Complexity | SDK coverage |
 |--------|------|-----------|-------------|
@@ -66,7 +66,7 @@ Six modules live under `modules/`:
 | touchlab-mvp | interaction | medium | touch/interaction patterns |
 
 Plus `world-chatroom`, `wibwob-figlet-fonts`, `example-primers` under
-`modules-private/`.
+`microapps-private/`.
 
 ### Patterns already proven
 
@@ -345,8 +345,8 @@ poetry clock voices, or patchbay panels.
 ### Proposed module structure
 
 ```
-modules/wibwob-tidepool/
-  module.json       — manifest with multiInstance: true, persist: true
+microapps/wibwob-tidepool/
+  microapp.json       — manifest with multiInstance: true, persist: true
   index.ts          — host wiring, keyboard, timer, window lifecycle
   engine.ts         — TidePoolEngine: grid, species, rules, tick(), hydrate()
   renderer.ts       — renderTidePool(): engine state → ASCII string (pure)

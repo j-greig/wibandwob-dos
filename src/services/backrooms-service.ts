@@ -57,13 +57,13 @@ export class BackroomsService {
     scanDir(path.join(backroomsPath, "primers"));
 
     // Higher-precedence WibWob primers overwrite bundled backrooms primers on basename collisions.
-    for (const root of ["modules", "modules-private"] as const) {
-      const modulesRoot = path.join(REPO_ROOT, root);
-      if (!fs.existsSync(modulesRoot)) {
+    for (const root of ["microapps", "microapps-private"] as const) {
+      const microappsRoot = path.join(REPO_ROOT, root);
+      if (!fs.existsSync(microappsRoot)) {
         continue;
       }
-      for (const entry of fs.readdirSync(modulesRoot).sort((a, b) => a.localeCompare(b))) {
-        scanDir(path.join(modulesRoot, entry, "primers"));
+      for (const entry of fs.readdirSync(microappsRoot).sort((a, b) => a.localeCompare(b))) {
+        scanDir(path.join(microappsRoot, entry, "primers"));
       }
     }
 

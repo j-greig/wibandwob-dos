@@ -19,7 +19,7 @@ Instead, use the unblessed spike as a forcing function to make the current
 Blessed app calmer, more typed, more modular, more testable, more performant,
 and more legible to both humans and agents. The target shape is explicit
 state, clearer event flow, render as a consequence of state change, stronger
-module/runtime seams, and a cleaner first-run module authoring experience —
+module/runtime seams, and a cleaner first-run microapp authoring experience —
 without losing the desktop feel.
 
 This epic turns the `spk-unblessed-upgrade` findings into implementation work.
@@ -42,7 +42,7 @@ hoc wrappers or bypasses. This was useful for bringing up
 - `/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts`
 - `/Users/james/Repos/wibandwob-dos/src/core/window-manager.ts`
 - `/Users/james/Repos/wibandwob-dos/src/core/editor-coordinator.ts`
-- `/Users/james/Repos/wibandwob-dos/src/services/module-loader.ts`
+- `/Users/james/Repos/wibandwob-dos/src/services/microapp-loader.ts`
 - `/Users/james/Repos/wibandwob-dos/src/services/microapp-sdk.ts`
 
 ## Decision from the spike
@@ -64,7 +64,7 @@ hoc wrappers or bypasses. This was useful for bringing up
   `EditorCoordinator` style of extraction and the mode-aware editor work in E032
 - Make performance and memory use explicit architectural concerns, especially
   for dense multi-window, animation-heavy, high-resolution future scenes
-- Improve module authoring ergonomics because `modules/` and `modules-private/`
+- Improve microapp authoring ergonomics because `microapps/` and `microapps-private/`
   are first-run demo surfaces and extension surfaces
 - Retire unnecessary backward-compat cruft where we can prove it is no longer needed,
   rather than preserving legacy commands, aliases, and dead compatibility paths forever
@@ -86,8 +86,8 @@ Current architectural pressure points:
    remembering to sync state at the right times.
 6. Testing is not yet strong enough for layout regressions, Unicode width bugs,
    animation-heavy windows, or future dense scenes.
-7. Module quality matters disproportionately because `modules/` and
-   `modules-private/` are hero/demo surfaces for first-time users and agents.
+7. Module quality matters disproportionately because `microapps/` and
+   `microapps-private/` are hero/demo surfaces for first-time users and agents.
 8. The control API likely contains some fast-grown, vibe-engineered edges:
    alias routes, overlapping command surfaces, and endpoint contracts that
    may be useful but not yet as coherent as the rest of the architecture.
@@ -117,7 +117,7 @@ After E033:
 - `app-controller.ts` is thinner and more obviously a composition root
 - visual regression and render telemetry are stronger
 - text/cell correctness becomes an explicit engineering track, not an incidental fix
-- module authoring surfaces become cleaner and more trustworthy as first-run demos
+- microapp authoring surfaces become cleaner and more trustworthy as first-run demos
 - the control API becomes easier to discover, trust, and extend without route drift
 - runtime telemetry becomes a real operator tool rather than an unwired primitive
 - composition work has a clearer path toward embeddable Blessed surfaces, not only top-level windows
@@ -128,7 +128,7 @@ After E033:
 
 - As a maintainer, I can change a window’s behaviour without having to reason
   about random render calls across multiple files.
-- As a module author, I get a clear host contract for redraw, lifecycle,
+- As a microapp author, I get a clear host contract for redraw, lifecycle,
   cleanup, state reporting, and SDK imports.
 - As an agent, I can trust that `/state`, `describeState()`, commands, and the
   visible desktop stay in sync.
@@ -186,7 +186,7 @@ After E033:
 - [x] S07 — Visual regression, render telemetry, and dense-scene performance checks
 - [x] S08 — Runtime telemetry, stats surface, and agent/session health metrics
 - [-] S09 — WibWobTUI macOS-ification for app launch and switching (deferred — non-essential)
-- [x] S10 — Third-party developer docs for custom modules
+- [x] S10 — Third-party developer docs for custom microapps
 - [x] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
 - [x] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
@@ -208,7 +208,7 @@ Phase C — local architecture and module contract
 
 Phase D — user-facing operability and authoring
 - S09 WibWobTUI macOS-ification for app launch and switching
-- S10 third-party developer docs for custom modules
+- S10 third-party developer docs for custom microapps
 
 Phase E — advanced composition
 - S11 composable animated surfaces for zine / touchlab / dashboard modules
@@ -372,13 +372,13 @@ Risk: medium
 
 ### User story
 
-As a module author, I want a clearer host contract so I know how to register,
+As a microapp author, I want a clearer host contract so I know how to register,
 redraw, clean up, and describe state without relying on implicit timing hacks.
 
 ### Why this story exists
 
 The spike found the module boundary powerful but too implicit. The `setTimeout`
-registration defer in `module-loader.ts` is a real signal that lifecycle is
+registration defer in `microapp-loader.ts` is a real signal that lifecycle is
 not yet expressed cleanly enough.
 
 The first move here is to understand and document why that defer exists and
@@ -395,9 +395,9 @@ heartbeat, and patchbay-lab.
 
 ### Expected files
 
-- `src/services/module-loader.ts`
+- `src/services/microapp-loader.ts`
 - `src/services/microapp-sdk.ts`
-- representative modules in `modules/` and `modules-private/`
+- representative modules in `microapps/` and `microapps-private/`
 - docs/spec updates if contract changes
 
 ### Tasks
@@ -406,9 +406,9 @@ heartbeat, and patchbay-lab.
 - [x] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
 - [x] define explicit redraw/invalidate guidance for modules
 - [x] tighten `describeState()` expectations for microapps
-- [x] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
+- [x] re-export missing shared helpers through `microapp-sdk.ts` where microapp authors currently reach into `src/core/*`
 - [x] migrate at least two representative modules to the improved contract and SDK import path
-- [x] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `modules/zine/index.ts` and `modules/touchlab-mvp/` as target consumers if feasible
+- [x] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `microapps/zine/index.ts` and `microapps/touchlab-mvp/` as target consumers if feasible
 - [x] check workspace restore behaviour for touched modules
 
 ### Acceptance criteria
@@ -419,7 +419,7 @@ heartbeat, and patchbay-lab.
 - [x] AC-4: module `describeState()` remains trustworthy for `/state` and agent use
 - [x] AC-5: the SDK import anti-pattern is reduced in the touched modules by routing shared helpers through `microapp-sdk.ts`
 - [x] AC-6: existing modules remain compatible during the transition; this is not a flag-day rewrite
-- [x] AC-7: the story records whether a shared animated-subwindow architecture for `modules/zine/index.ts` and `modules/touchlab-mvp/` is feasible now, deferred, or partially landed
+- [x] AC-7: the story records whether a shared animated-subwindow architecture for `microapps/zine/index.ts` and `microapps/touchlab-mvp/` is feasible now, deferred, or partially landed
 - [x] AC-8: migrated modules preserve workspace restore correctness
 - [x] AC-9: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
 - [x] AC-10: `bun run typecheck` passes
@@ -438,7 +438,7 @@ missing helpers through `src/services/microapp-sdk.ts` and migrating multiple
 modules (`patchbay-lab`, `e026-demo`, `zine`, and `sy2-chronicles`) away from
 direct `src/core/*` imports for the touched helpers.
 
-`module-loader.ts` now documents the registration ordering guarantee explicitly
+`microapp-loader.ts` now documents the registration ordering guarantee explicitly
 and reduces the old `setTimeout(ensureRegistered, 0)` defer to a microtask,
 which preserves the same setup contract with less event-loop drift.
 
@@ -611,12 +611,12 @@ drift, and framed or figlet-adjacent text around mixed-width characters.
 
 Known troublesome ASCII / Unicode-heavy primers to test:
 
-- `modules-private/wibwob-primers/primers/cosmic-horror.txt`
+- `microapps-private/wibwob-primers/primers/cosmic-horror.txt`
   - repro note: drag a primer window while showing this file; known render corruption exists
   - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-22ef905e-bc57-4404-9f3d-54c8fbe299de.png`
-- `modules-private/wibwob-primers/primers/graveyard-emoji-flow.txt`
+- `microapps-private/wibwob-primers/primers/graveyard-emoji-flow.txt`
   - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-eeba5096-4476-4614-988b-a60093cdbd9a.png`
-- `modules-private/wibwob-primers/primers/conscious-matrix-1.txt`
+- `microapps-private/wibwob-primers/primers/conscious-matrix-1.txt`
   - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-b4afe3b2-0706-4713-8598-04fd5a2b247a.png`
 
 ### Expected files
@@ -696,18 +696,18 @@ Core windows / window families:
 - `src/windows/backrooms-log-browser-window.ts` (refresh timer)
 
 Animated or timer-driven modules:
-- `modules/glitchbox/`
-- `modules/heartbeat/`
-- `modules/touchlab-mvp/`
-- `modules/patchbay-lab/`
-- `modules/wibwob-poetry-clock/`
-- `modules/sy2-chronicles/`
-- `modules/e026-demo/`
-- `modules/zine/`
+- `microapps/glitchbox/`
+- `microapps/heartbeat/`
+- `microapps/touchlab-mvp/`
+- `microapps/patchbay-lab/`
+- `microapps/wibwob-poetry-clock/`
+- `microapps/sy2-chronicles/`
+- `microapps/e026-demo/`
+- `microapps/zine/`
 
 Minimum must-test anchors from the human's explicit list:
-- `modules/glitchbox/`
-- `modules/heartbeat/`
+- `microapps/glitchbox/`
+- `microapps/heartbeat/`
 - `src/windows/generative-windows.ts`
 - `src/windows/plasma-window.ts`
 - `src/windows/terrain-lab-window.ts`
@@ -798,7 +798,7 @@ Reference bug / architecture anchor for terminal recursion work:
 - `src/core/cli.ts` or the nearest startup/config seam if a debug/stats flag is added
 - `src/services/wibwob-agent-session.ts`
 - `src/windows/wibwob-agent-window.ts`
-- `modules/terminal/index.ts`
+- `microapps/terminal/index.ts`
 - optional diagnostics surface under `src/windows/` or as a small microapp
 - docs / AGENTS updates if a new debug mode or stats command is introduced
 
@@ -940,7 +940,7 @@ windows or app types.
 
 ---
 
-## S10 — Third-party developer docs for custom modules
+## S10 — Third-party developer docs for custom microapps
 
 Status: done
 Depends on: S03
@@ -954,16 +954,16 @@ so I do not have to reverse-engineer the SDK from scattered examples.
 
 ### Why this story exists
 
-The modules are both product surface and extension surface. If module authoring
+The modules are both product surface and extension surface. If microapp authoring
 is only learnable by spelunking examples and random `src/` imports, the system
 looks less modular than it really is. This story makes extensibility legible.
 
 ### Expected files
 
 - one long doc or a small family of docs under `docs/`
-- `modules/README.md` as a landing pointer if needed
+- `microapps/README.md` as a landing pointer if needed
 - `src/services/microapp-sdk.ts` if exports need cleanup for docs accuracy
-- representative example modules in `modules/`
+- representative example modules in `microapps/`
 
 ### Tasks
 
@@ -991,7 +991,7 @@ looks less modular than it really is. This story makes extensibility legible.
 
 ### Outcome note
 
-One long doc at `docs/building-custom-modules.md` covers the full module
+One long doc at `docs/building-custom-microapps.md` covers the full module
 authoring path: manifest, entry point, host API, required lifecycle hooks,
 animation, SDK imports, workspace persistence, and a verification checklist.
 References hello-world and heartbeat as examples, plus the scaffold script.
@@ -1012,16 +1012,16 @@ Risk: medium
 
 ### User story
 
-As a module author building editorial or dashboard-style surfaces, I want a
+As a microapp author building editorial or dashboard-style surfaces, I want a
 shared way to embed animated windows or animated players as subsurfaces inside
-other modules, so I can compose motion-rich layouts in `modules/zine/`,
-`modules/touchlab-mvp/`, and future modules without inventing bespoke
+other modules, so I can compose motion-rich layouts in `microapps/zine/`,
+`microapps/touchlab-mvp/`, and future modules without inventing bespoke
 embedding code each time.
 
 ### Why this story exists
 
 The epic already identifies a future desire to support animated subwindows in
-`modules/zine/index.ts` and `modules/touchlab-mvp/`. The module and telemetry
+`microapps/zine/index.ts` and `microapps/touchlab-mvp/`. The module and telemetry
 stories also surfaced a broad set of animated windows and timer-driven modules.
 If composability matters, it should become a first-class architecture story
 rather than a vague stretch wish.
@@ -1036,8 +1036,8 @@ clear reusable pattern rather than two special-case integrations.
 - `src/services/microapp-sdk.ts`
 - `src/services/animation-service.ts`
 - `src/core/ui-parts.ts`
-- `modules/zine/index.ts`
-- `modules/touchlab-mvp/`
+- `microapps/zine/index.ts`
+- `microapps/touchlab-mvp/`
 - any shared helper extracted for animated embedding
 - docs or notes for the pattern if the contract changes
 
@@ -1047,7 +1047,7 @@ clear reusable pattern rather than two special-case integrations.
 - [ ] define the shared architecture for composable animated subsurfaces
 - [ ] identify the minimum contract needed for embedding an animated player or animated window fragment inside another module
 - [ ] implement the shared path in reusable code rather than per-module hacks
-- [ ] adopt the shared path in `modules/zine/` and `modules/touchlab-mvp/` if feasible in this epic pass, or land one adopter and record the second as a concrete follow-on
+- [ ] adopt the shared path in `microapps/zine/` and `microapps/touchlab-mvp/` if feasible in this epic pass, or land one adopter and record the second as a concrete follow-on
 - [ ] verify the new path plays nicely with restyle, resize, cleanup, and window lifecycle
 
 ### Acceptance criteria
@@ -1055,7 +1055,7 @@ clear reusable pattern rather than two special-case integrations.
 - [ ] AC-1: there is a named shared architecture or helper path for embedding animated subsurfaces inside modules
 - [ ] AC-2: the path is reusable and not specific only to `zine` or only to `touchlab-mvp`
 - [ ] AC-3: at least one real module adopter uses the shared path successfully
-- [ ] AC-4: feasibility and next-step status for both `modules/zine/` and `modules/touchlab-mvp/` are recorded clearly
+- [ ] AC-4: feasibility and next-step status for both `microapps/zine/` and `microapps/touchlab-mvp/` are recorded clearly
 - [ ] AC-5: the embedded animated path preserves cleanup, resize, and restyle correctness
 - [ ] AC-6: the shared path does not require modules to bypass the SDK and reach into random `src/core/*` internals
 - [ ] AC-7: `bun run typecheck` passes
@@ -1090,7 +1090,7 @@ rewriting a bespoke mini-engine for every creative module.
 
 ### Why this story exists
 
-`modules/touchlab-mvp/` already points toward this future: it has source nodes,
+`microapps/touchlab-mvp/` already points toward this future: it has source nodes,
 a mix node, nested frames, a canvas, inspector controls, and simple animation.
 That makes it more than a toy; it is an early proof that WibWob-DOS wants a
 terminal-native composition language.
@@ -1114,8 +1114,8 @@ possibilities and land it in a form that future creative modules can reuse.
 
 ### Expected files
 
-- `modules/touchlab-mvp/index.ts`
-- `modules/zine/index.ts`
+- `microapps/touchlab-mvp/index.ts`
+- `microapps/zine/index.ts`
 - `src/services/microapp-sdk.ts`
 - `src/services/animation-service.ts`
 - `src/core/ui-parts.ts`
@@ -1124,18 +1124,18 @@ possibilities and land it in a form that future creative modules can reuse.
 
 ### Tasks
 
-- [ ] audit what `modules/touchlab-mvp/` already proves: source generation, mixing, nested node frames, inspector state, animation toggle, and simple compositing
+- [ ] audit what `microapps/touchlab-mvp/` already proves: source generation, mixing, nested node frames, inspector state, animation toggle, and simple compositing
 - [ ] define the smallest reusable composition vocabulary for TUI art modules, for example source, transform, mix, output, parameter, and preview
 - [ ] test whether Blessed custom duplex stream routing can help embed one Blessed surface inside another composition surface before inventing a more bespoke architecture
 - [ ] decide which parts belong in shared code versus staying module-local experimentation
 - [ ] extract one or more shared helpers or contracts that let modules compose animated ASCII / ANSI surfaces without reaching into random internals
-- [ ] verify the scaffolding can serve both a patch-oriented creative module (`modules/touchlab-mvp/`) and a layout/editorial surface (`modules/zine/` or similar)
+- [ ] verify the scaffolding can serve both a patch-oriented creative module (`microapps/touchlab-mvp/`) and a layout/editorial surface (`microapps/zine/` or similar)
 - [ ] document what is intentionally not being copied from TouchDesigner, so scope stays terminal-native and honest
 
 ### Acceptance criteria
 
 - [ ] AC-1: the story defines a named shared composition vocabulary for ASCII / ANSI art modules rather than leaving TouchLab as a one-off experiment
-- [ ] AC-2: at least one shared helper, contract, or primitive is extracted from the composition work and is usable outside `modules/touchlab-mvp/`
+- [ ] AC-2: at least one shared helper, contract, or primitive is extracted from the composition work and is usable outside `microapps/touchlab-mvp/`
 - [ ] AC-3: the scaffolding is demonstrated in at least one second context beyond TouchLab, or that second-context feasibility is recorded concretely with blockers
 - [ ] AC-4: the story records whether Blessed custom stream routing is useful, irrelevant, or too awkward for the composition architecture, so the question is closed for future implementers
 - [ ] AC-5: the shared path works with animated surfaces and not only static text blocks
@@ -1148,7 +1148,7 @@ possibilities and land it in a form that future creative modules can reuse.
 - [ ] open TouchLab and verify the composition scaffolding still supports animated source → mix → output style behaviour
 - [ ] exercise the shared path in at least one second module or prototype surface
 - [ ] verify resize, theme switch, and close cleanup remain correct
-- [ ] confirm the resulting pattern is understandable enough to document for future module authors
+- [ ] confirm the resulting pattern is understandable enough to document for future microapp authors
 
 ### Out of scope for this story
 
@@ -1164,7 +1164,7 @@ possibilities and land it in a form that future creative modules can reuse.
 - [ ] AC-1: Blessed remains the runtime; no runtime migration is required for the epic to succeed
 - [ ] AC-2: render/invalidation ownership is more explicit than at spike time
 - [ ] AC-3: at least two live or complex surfaces show a cleaner local state/event/render pattern
-- [ ] AC-4: microapp lifecycle and redraw semantics are clearer for module authors
+- [ ] AC-4: microapp lifecycle and redraw semantics are clearer for microapp authors
 - [ ] AC-5: `app-controller.ts` is thinner and more obviously a composition root
 - [ ] AC-6: Unicode/cell correctness improves on at least one known bad surface
 - [ ] AC-7: visual regression and render telemetry improve materially
@@ -1183,7 +1183,7 @@ possibilities and land it in a form that future creative modules can reuse.
 
 - Overreaching into a fake full-Elm rewrite instead of targeted local discipline
 - Breaking workspace restore or semantic state while cleaning up lifecycle code
-- Making module authoring harder in the name of purity
+- Making microapp authoring harder in the name of purity
 - Chasing performance lore without building usable evidence capture
 - Touching Unicode width handling without enough visual verification
 - Writing developer docs before the module-host contract is stable enough
@@ -1210,7 +1210,7 @@ migration need, retire it.
 ## Parallel work: a2 lane
 
 a2 is building ESLint SDK boundary enforcement (tier 1) on their branch:
-- `eslint.config.js` with `no-restricted-imports` scoped to `modules/**`
+- `eslint.config.js` with `no-restricted-imports` scoped to `microapps/**`
 - bans `../../src/core/*` and `../../src/services/*` except `microapp-sdk`
 - `lint` script in `package.json` (opt-in, not wired into typecheck)
 - fixes violations in modules a2 already touched (patchbay, zine, sy2, e026, dream-forecast)

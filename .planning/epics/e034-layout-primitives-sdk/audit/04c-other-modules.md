@@ -4,14 +4,14 @@
 Analyze layout patterns across 8 production and demo modules to determine FLEX/GRID/CANVAS usage, composition needs, and UiPart interface adequacy.
 
 **Modules audited:**
-1. modules/zine/index.ts
-2. modules/sy2-chronicles/index.ts
-3. modules/hello-world/index.ts
-4. modules/slap-editor/index.ts
-5. modules/glitchbox/index.ts
-6. modules/heartbeat/index.ts
-7. modules/ansi-lab/index.ts
-8. modules/e026-demo/index.ts
+1. microapps/zine/index.ts
+2. microapps/sy2-chronicles/index.ts
+3. microapps/hello-world/index.ts
+4. microapps/slap-editor/index.ts
+5. microapps/glitchbox/index.ts
+6. microapps/heartbeat/index.ts
+7. microapps/ansi-lab/index.ts
+8. microapps/e026-demo/index.ts
 
 ---
 

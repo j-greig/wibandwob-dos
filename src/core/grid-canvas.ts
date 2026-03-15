@@ -9,7 +9,7 @@
  * converted to text via gridToText(). Used by panel-layout microapps and
  * any surface that needs programmatic ASCII drawing.
  *
- * Extracted from modules/sy2-chronicles/index.ts.
+ * Extracted from microapps/sy2-chronicles/index.ts.
  */
 
 import { clipToVisibleWidth, visibleWidth } from "./ansi-utils.js";

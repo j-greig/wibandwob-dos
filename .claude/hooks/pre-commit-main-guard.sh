@@ -2,7 +2,7 @@
 # pre-commit-main-guard.sh — block feature commits directly to main
 #
 # Rejects commits to `main` that touch code under:
-#   src/  modules/  modules-private/
+#   src/  microapps/  microapps-private/
 #
 # Docs, planning, scripts, and config are always allowed on main.
 # Install as .git/hooks/pre-commit (or call from your existing pre-commit).
@@ -16,7 +16,7 @@ if [ "$BRANCH" != "main" ]; then
 fi
 
 # Check if any staged files touch protected paths
-PROTECTED_PATTERN="^(src/|modules/|modules-private/)"
+PROTECTED_PATTERN="^(src/|microapps/|microapps-private/)"
 STAGED=$(git diff --cached --name-only)
 
 if echo "$STAGED" | grep -qE "$PROTECTED_PATTERN"; then

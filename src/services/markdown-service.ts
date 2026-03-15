@@ -1,7 +1,7 @@
 /**
  * markdown-service.ts — Markdown → ANSI terminal rendering.
  *
- * Ported from pi-markdown-reader prototype (wibwob-sdk/modules/pi-markdown-reader/renderer.ts).
+ * Ported from pi-markdown-reader prototype (wibwob-sdk/microapps/pi-markdown-reader/renderer.ts).
  * Architecture: marked.lexer() → AST token dispatch → ANSI-styled lines.
  *
  * Gap-fills vs spike renderer (S01 findings):

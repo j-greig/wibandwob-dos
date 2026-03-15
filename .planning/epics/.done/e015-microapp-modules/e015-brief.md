@@ -24,7 +24,7 @@ containing the current time every minute, inspired by Poem/1 by Matt Webb.
 - [src/core/types.ts](/Users/james/Repos/wibandwob-dos/src/core/types.ts) — WindowKind, AppType, WindowRecord
 - [src/core/snapshot-registry.ts](/Users/james/Repos/wibandwob-dos/src/core/snapshot-registry.ts) — snapshot save/restore
 - [src/core/command-registry.ts](/Users/james/Repos/wibandwob-dos/src/core/command-registry.ts) — command catalog
-- [modules-private/README.md](/Users/james/Repos/wibandwob-dos/modules-private/README.md) — existing module conventions
+- [microapps-private/README.md](/Users/james/Repos/wibandwob-dos/microapps-private/README.md) — existing module conventions
 
 ## Architecture Bucket
 
@@ -66,19 +66,19 @@ awareness, workspace persistence, LLM integration, and agent visibility.
 
 Status: done
 
-Module loader scans `modules/` and `modules-private/` for `module.json`
+Module loader scans `microapps/` and `microapps-private/` for `microapp.json`
 manifests at startup, routes by type. Theme modules are dynamically imported
 and registered via `registerExternalTheme()`. Phosphor stub deleted, real
 module loaded.
 
 Files delivered:
-- [x] `src/services/module-loader.ts` — manifest scanning + theme dispatch
+- [x] `src/services/microapp-loader.ts` — manifest scanning + theme dispatch
 - [x] `src/core/theme/resolver.ts` — `registerExternalTheme()`, stub deleted
-- [x] `src/core/app-controller.ts` — `run()` async, `loadModules()` before workspace restore
+- [x] `src/core/app-controller.ts` — `run()` async, `loadMicroapps()` before workspace restore
 - [x] `src/app.ts` — `await` on `run()`
 
 AC-1: Theme modules discovered and registered at startup.
-Test: `bun -e` script imports resolver, calls loadModules(), verifies
+Test: `bun -e` script imports resolver, calls loadMicroapps(), verifies
 allVariants() includes "wibwob-phosphor" with real tokens.
 
 AC-2: Theme cycle includes external themes.
@@ -100,7 +100,7 @@ dynamic command registration, dynamic snapshot registration, and the type
 system changes to support `"microapp"` as a WindowKind.
 
 Split across two contributors:
-- **wibwob2** (this session): `src/services/module-loader.ts` (microapp loading),
+- **wibwob2** (this session): `src/services/microapp-loader.ts` (microapp loading),
   proof-of-concept module
 - **wibwob1**: `src/core/types.ts`, `src/core/command-registry.ts`,
   `src/core/snapshot-registry.ts`
@@ -138,7 +138,7 @@ Verify `registrySerialize()` calls the handler. Verify `registryRestore()`
 calls the handler on a snapshot with that appType.
 
 #### S04 — MicroappHost implementation (owner: wibwob2) — DONE
-- [x] `MicroappHost` interface in `src/services/module-loader.ts`
+- [x] `MicroappHost` interface in `src/services/microapp-loader.ts`
 - [x] `MicroappWindowHandle` wrapper over `WindowRecord`
 - [x] `createWindow()` sets `kind: "microapp"` and `microappId`
 - [x] `describeState()` host-enforced, injects `appType` from manifest
@@ -147,7 +147,7 @@ calls the handler on a snapshot with that appType.
 - [x] `runCommand()` wraps `CommandRegistry.run()` scoped to module namespace
 - [x] Module loader calls `setup()` for `type: "microapp"` manifests
 
-AC-S04: A microapp module in `modules/` is discovered, loaded, and its
+AC-S04: A microapp module in `microapps/` is discovered, loaded, and its
 window appears in menus, palette, and agent tools.
 Test: Create a minimal test microapp. Start app. Verify command appears
 in `GET /commands/list`. Execute via `POST /commands/run`. Verify window
@@ -160,10 +160,10 @@ Status: in-progress
 A microapp module that displays a new AI-generated poem containing the
 current time every minute. Inspired by Poem/1 (Matt Webb / Acts Not Facts).
 
-Lives in: `modules/wibwob-poetry-clock/`
+Lives in: `microapps/wibwob-poetry-clock/`
 
 #### S05 — Static poetry clock (no LLM) — DONE
-- [x] `module.json` manifest with `type: "microapp"`
+- [x] `microapp.json` manifest with `type: "microapp"`
 - [x] `index.ts` entry point with `setup(host)` default export
 - [x] Window displays current time as formatted text
 - [x] Timer ticks every 30 seconds, updates display

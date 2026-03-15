@@ -13,4 +13,8 @@ e035-layout-sdk-buildout — done
 e036-sdk-design-system — not-started
 e037-llm-orch-cli-studio — in-progress
 e038-autoresearch-visual-scoring — in-progress
+e039-unix-cli-surface — not-started
+e040-cli-music-video — not-started
+e042-solid-foundations — in-progress
+e043-session-capture — not-started
 

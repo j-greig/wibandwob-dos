@@ -33,8 +33,8 @@ It never hardcodes command IDs, never parses TypeScript, never reads
 the catalog directly. When a new command is added to `command-catalog.ts`
 (or a module registers one dynamically), the CLI picks it up automatically.
 
-The only hardcoded surface in the CLI is the five built-in subcommands:
-`state`, `windows`, `commands`, `health`, `screenshot`. Everything else
+The only hardcoded surface in the CLI is the built-in subcommands:
+`state`, `inspection`, `windows`, `commands`, `health`, `screenshot`. Everything else
 dispatches through `POST /commands/run { id, args }`.
 
 This means:
@@ -74,8 +74,10 @@ Then `source ~/.zshrc`. Now `wibwob` is a command.
 # Builtins
 wibwob health                          # is the app running?
 wibwob state                           # full desktop state (JSON)
+wibwob inspection                      # runtime inspection snapshot (JSON)
 wibwob windows                         # list open windows
-wibwob commands                        # all 144 commands
+wibwob commands                        # all available commands
+wibwob commands --surface agent        # filter by control surface
 wibwob screenshot                      # text screenshot of the desktop
 
 # Run commands — three equivalent syntaxes
@@ -84,13 +86,13 @@ wibwob editor.new                      # dot syntax: <domain>.<verb>
 wibwob editor new                      # noun verb: <domain> <verb>
 
 # Flags
-wibwob window.move --id 3 --x 10 --y 5
+wibwob window.move --id 3 --left 10 --top 5
 wibwob theme.set --name flexoki-ink
 wibwob figlet.open --text "HELLO" --font banner
 
 # Positional window targeting
 wibwob window 3 close                  # → window.close --id 3
-wibwob window 3 move --x 10 --y 5     # → window.move --id 3 --x 10 --y 5
+wibwob window 3 move --left 10 --top 5 # → window.move --id 3 --left 10 --top 5
 
 # Quiet mode: IDs only, one per line (for piping)
 wibwob windows -q                      # window IDs
@@ -125,19 +127,30 @@ for i in $(seq 5); do wibwob editor.new; done
 wibwob cmd window.tile && wibwob screenshot
 ```
 
+Saved recipes also live in `scripts/`:
+
+- `bash scripts/cli-runtime-triage.sh` — capture health, inspection, state, and text screenshot into one evidence folder
+- `bash scripts/cli-batch-relayout.sh` — open a stable three-window scene and lay it out with one canonical batch op
+- `bash scripts/cli-text-loop.sh mask` — capture the desktop as text, transform it, and feed it back in as a primer
+
+These helper scripts are local-runtime-first. Override the target with
+`WIBWOB_SCRIPT_API=http://127.0.0.1:8098` when you intentionally want a
+different instance.
+
 ## Agent workflows
 
 Agents (Claude, Codex, etc.) use `wibwob` instead of raw `curl` calls.
 
 ```bash
 # Structured
-wibwob cmd window.move --id 3 --x 10 --y 5
+wibwob cmd window.move --id 3 --left 10 --top 5
 
 # Terse
-wibwob window 3 move --x 10 --y 5
+wibwob window 3 move --left 10 --top 5
 
 # Discovery
 wibwob commands -q | grep window       # what can I do with windows?
+wibwob inspection | jq '.snapshot.ui'  # is the desktop blocked?
 wibwob state | jq '.focus'             # what's focused?
 ```
 
@@ -145,7 +158,8 @@ wibwob state | jq '.focus'             # what's focused?
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WW_API` | `http://127.0.0.1:8099` | Base URL of the control API |
+| `WW_API` | configured local control API | Base URL of the control API |
+| `WIBWOB_API` | unset | Alias for `WW_API` |
 
 ```bash
 # Talk to alt instance on port 8098
@@ -202,8 +216,8 @@ scoped name: `@wibwob/cli`.
 
 ## Test suite
 
-53 automated tests in `autoresearch/unix-control/autoresearch.sh`:
+Canonical live CLI parity gate:
 
 ```bash
-bash autoresearch/unix-control/autoresearch.sh
+bash scripts/ci-cli-test.sh
 ```

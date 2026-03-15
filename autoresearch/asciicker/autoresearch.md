@@ -42,7 +42,7 @@ The visual richness comes from BOTH fg AND bg colour per cell — the two colour
 create a dithering effect that doubles effective colour resolution.
 
 ## Module Structure
-This port uses multiple files under `modules/asciicker/`:
+This port uses multiple files under `microapps/asciicker/`:
 
 | File | Responsibility |
 |------|---------------|
@@ -197,11 +197,11 @@ Goal: the world has life, not just scenery.
 Current: RENDER:8.7 WORLD:8.2 CONTROLS:8.1 BEAUTY:8.1 CRAFT:8.9 = **8.4**
 
 ## Constraints
-- Files: `modules/asciicker/*.ts` (multiple files allowed)
+- Files: `microapps/asciicker/*.ts` (multiple files allowed)
 - Must pass `bun run typecheck`
 - Keep fps ≤ 8 (125ms+ interval)
 - Import only from blessed and `../../src/services/microapp-sdk.js`
-- Reference data files copied to `modules/asciicker/data/`
+- Reference data files copied to `microapps/asciicker/data/`
 - All lifecycle hooks maintained in index.ts
 
 ## Testing Notes

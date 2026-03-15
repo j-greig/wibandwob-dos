@@ -46,7 +46,7 @@ Blessed: a windowed TUI OS where humans and agents share the same workspace,
 commands, and control surface. It already supports overlapping draggable
 windows, a command registry projected into menus/palette/API, live desktop
 state via `/state`, an embedded Wib&Wob coding agent, dynamic microapps loaded
-from `modules/`, workspace save/restore, theme switching, creative windows such
+from `microapps/`, workspace save/restore, theme switching, creative windows such
 as figlet/plasma/terrain/backrooms, and world-chat primitives for multi-window
 and multi-instance interaction. The core proposition is not "a terminal app
 with chat bolted on" but "an agent-native creative operating environment" where
@@ -72,7 +72,7 @@ This spike captures and structures the following program of work:
 3. Support connected windows and multi-window compositions: one window driving
    another, graph-like creative systems, visible links/arrows, multi-window art
    pieces, and multi-instance OS swarms.
-4. Make `modules/` and `modules-private/` more robust and compatible with the
+4. Make `microapps/` and `microapps-private/` more robust and compatible with the
    above.
 5. Keep all of this compatible with the in-app `pi-coding-agent` integration.
 6. Follow Anthropic-style progressive disclosure for memory, skills, examples,
@@ -104,9 +104,9 @@ Upcoming example tasks to keep in view:
 - [x] Review `.agents/control-api.md`
 - [x] Review current planning structure and status
 - [x] Review module loader and current microapp host seam
-- [x] Review `modules/wibwob-poetry-clock`
-- [x] Review `modules/world-chatroom`
-- [x] Review `modules/wibwobworld`
+- [x] Review `microapps/wibwob-poetry-clock`
+- [x] Review `microapps/world-chatroom`
+- [x] Review `microapps/wibwobworld`
 - [x] Review `wibwob-agent-session` and agent tools
 - [x] Review current skill surfaces relevant to window creation and planning
 - [x] Review external TUI references: Textual, Rich, Bubble Tea, Blessed
@@ -166,8 +166,8 @@ This is already a strong foundation for agent parity.
 ### 2. Microapp/module system
 
 The module loader in
-[`src/services/module-loader.ts`](../../../src/services/module-loader.ts)
-already discovers modules from `modules/` and `modules-private/`, loads theme
+[`src/services/microapp-loader.ts`](../../../src/services/microapp-loader.ts)
+already discovers modules from `microapps/` and `microapps-private/`, loads theme
 modules, loads microapps, and exposes a `MicroappHost` with:
 
 - `createWindow`
@@ -201,7 +201,7 @@ already has:
 - jailed coding tools
 - registry-aware TUI tools
 - state injection
-- prompt fragment loading from `modules-private/wibwob-prompts`
+- prompt fragment loading from `microapps-private/wibwob-prompts`
 - session bridge integration
 
 This is architecturally important. The app already treats the agent as a native
@@ -216,9 +216,9 @@ The world chat system already has a good shape:
 - transport seam:
   [`src/services/world-chat-transport.ts`](../../../src/services/world-chat-transport.ts)
 - world UI:
-  [`modules/wibwobworld/index.ts`](../../../modules/wibwobworld/index.ts)
+  [`microapps/wibwobworld/index.ts`](../../../microapps/wibwobworld/index.ts)
 - chatroom UI:
-  [`modules/world-chatroom/index.ts`](../../../modules/world-chatroom/index.ts)
+  [`microapps/world-chatroom/index.ts`](../../../microapps/world-chatroom/index.ts)
 
 This is the seed of multi-instance and eventually multi-host swarm behavior.
 
@@ -237,13 +237,13 @@ generated vs human-authored docs clean and preventing drift between:
 
 ### F1. The microapp seam is promising but still leaky
 
-`module-loader.ts` is the intended extension seam, but modules still import
+`microapp-loader.ts` is the intended extension seam, but modules still import
 from `../../src/...` directly. Current examples:
 
-- `modules/wibwob-poetry-clock/index.ts`
-- `modules/world-chatroom/index.ts`
-- `modules/wibwobworld/index.ts`
-- `modules/wibwobworld/render-iso.ts`
+- `microapps/wibwob-poetry-clock/index.ts`
+- `microapps/world-chatroom/index.ts`
+- `microapps/wibwobworld/index.ts`
+- `microapps/wibwobworld/render-iso.ts`
 
 This breaks the core goal of "agent writes app/window fast and reloads it
 reliably" because the module boundary is not actually self-contained.
@@ -368,7 +368,7 @@ short-term move is not "escape Blessed", it is "encapsulate Blessed better".
 
 Target shape:
 
-- single import path for module authors
+- single import path for microapp authors
 - stable types exported by the host
 - runtime services projected through capabilities, not deep imports
 - safe load/unload/reload semantics
@@ -574,7 +574,7 @@ Status: ongoing
 Decision notes:
 
 - symbients remain a later product-layer concern for now, primarily expressed
-  through `modules/` and `modules-private/`, not as a core runtime primitive
+  through `microapps/` and `microapps-private/`, not as a core runtime primitive
 - agent memory should be scaffolded now toward a future live shared runtime
   substrate, with a simple file-backed project-memory pattern as the likely v1
   bridge
@@ -625,17 +625,17 @@ owned by concrete epic briefs with bounded scope.
 Status: in-progress
 
 Goal:
-make module authorship sane before touching reload, graphing, or mobile reflow.
+make microapp authorship sane before touching reload, graphing, or mobile reflow.
 
 Action checklist:
 
-- [x] Export a single canonical microapp SDK surface for module authors
+- [x] Export a single canonical microapp SDK surface for microapp authors
 - [x] Remove supported direct `../../src/...` imports from current modules
 - [x] Replace duplicated `MicroappHost` / `MicroappWindowHandle` / layout type
       definitions with imported SDK types
-- [x] Upgrade `modules/hello-world` into the canonical scaffold template
+- [x] Upgrade `microapps/hello-world` into the canonical scaffold template
 - [~] Rewrite `new-window-type` and related skills around the SDK path
-- [ ] Rebuild `modules/wibwob-poetry-clock` against the SDK as the brownfield
+- [ ] Rebuild `microapps/wibwob-poetry-clock` against the SDK as the brownfield
       proof case
 - [ ] Record which required Poetry Clock capabilities still cannot be expressed
       cleanly through the SDK
@@ -677,7 +677,7 @@ Action checklist:
 - [ ] Define persistence semantics for agent-authored modules
 - [ ] Make teardown + reopen the default reload path for v1
 - [ ] Define explicit stretch-path semantics for preserved-state reload in v2/v3
-- [ ] Add `/modules/list`, `/modules/reload`, `/modules/unload` API endpoints
+- [ ] Add `/microapps/list`, `/microapps/reload`, `/microapps/unload` API endpoints
 - [ ] Add dev watch mode for module directories
 - [ ] Surface module runtime status in `/state`
 - [ ] Add agent tools for scaffold, reload, and runtime inspection
@@ -686,7 +686,7 @@ Action checklist:
 
 Completion signal:
 
-an agent edits `modules/wibwob-poetry-clock/index.ts` or a fresh test microapp,
+an agent edits `microapps/wibwob-poetry-clock/index.ts` or a fresh test microapp,
 calls reload, and sees the new surface without restarting WibWob-DOS.
 
 ### P3 — Composition foundation
@@ -838,12 +838,12 @@ Action checklist:
 Completion signal:
 
 the SDK has a documented v2 naming map and clustering model that feels
-intentional, teachable, and stable enough for wider module authorship.
+intentional, teachable, and stable enough for wider microapp authorship.
 
 ## Current Architecture Decisions
 
 - Symbient model:
-  later product layer, primarily via `modules/` and `modules-private/`, rather
+  later product layer, primarily via `microapps/` and `microapps-private/`, rather
   than a runtime primitive in the current foundation work
 - Agent memory:
   scaffold now with a simple file-backed project-memory pattern; target a live
@@ -866,9 +866,9 @@ Status: in-progress
 - [x] Replace local `MicroappHost` redefinitions in current modules
 - [x] Remove current supported direct module imports except the SDK path itself
 - [~] Project more internals through host capabilities instead of `../../src`
-- [x] Turn `modules/hello-world` into the canonical scaffold template
-- [x] Add scaffolding script for new modules/microapps
-- [ ] Rebuild `modules/wibwob-poetry-clock` against the SDK as the brownfield
+- [x] Turn `microapps/hello-world` into the canonical scaffold template
+- [x] Add scaffolding script for new microapps/microapps
+- [ ] Rebuild `microapps/wibwob-poetry-clock` against the SDK as the brownfield
       proof case
 
 ### W2 — Runtime foundation
@@ -879,7 +879,7 @@ Status: not-started
 - [ ] Track loaded modules, errors, versions, owned windows, commands, and
       cleanup hooks
 - [ ] Add unload/reload hooks
-- [ ] Add `/modules/list`, `/modules/reload`, `/modules/unload` API endpoints
+- [ ] Add `/microapps/list`, `/microapps/reload`, `/microapps/unload` API endpoints
 - [ ] Add file-watch dev loop for module dirs
 - [ ] Surface module runtime state in `/state`
 - [ ] Use Poetry Clock and one fresh test microapp as reload proofs
@@ -1055,15 +1055,15 @@ module runtime + connection graph program.
 - [`.agents/control-api.md`](../../../.agents/control-api.md)
 - [`.planning/epics/e016-microapp-primitives/e016-brief.md`](../../epics/e016-microapp-primitives/e016-brief.md)
 - [`.planning/spikes/spk-arch-domain-audit/spike.md`](../spk-arch-domain-audit/spike.md)
-- [`src/services/module-loader.ts`](../../../src/services/module-loader.ts)
+- [`src/services/microapp-loader.ts`](../../../src/services/microapp-loader.ts)
 - [`src/services/wibwob-agent-session.ts`](../../../src/services/wibwob-agent-session.ts)
 - [`src/services/agent-tools.ts`](../../../src/services/agent-tools.ts)
 - [`src/services/world-chat-service.ts`](../../../src/services/world-chat-service.ts)
 - [`src/services/world-chat-transport.ts`](../../../src/services/world-chat-transport.ts)
 - [`src/core/ui-parts.ts`](../../../src/core/ui-parts.ts)
-- [`modules/wibwob-poetry-clock/index.ts`](../../../modules/wibwob-poetry-clock/index.ts)
-- [`modules/world-chatroom/index.ts`](../../../modules/world-chatroom/index.ts)
-- [`modules/wibwobworld/index.ts`](../../../modules/wibwobworld/index.ts)
+- [`microapps/wibwob-poetry-clock/index.ts`](../../../microapps/wibwob-poetry-clock/index.ts)
+- [`microapps/world-chatroom/index.ts`](../../../microapps/world-chatroom/index.ts)
+- [`microapps/wibwobworld/index.ts`](../../../microapps/wibwobworld/index.ts)
 - [`wibwob-command-ideas-2026-03-04.md`](../../../wibwob-command-ideas-2026-03-04.md)
 - [`symbient-feedback.md`](./symbient-feedback.md)
 

@@ -1,0 +1,24 @@
+{
+  "name": "journal",
+  "version": "0.1.0",
+  "description": "Symbient journal — entry-based log with list, read, and edit modes",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.journal.open"
+  },
+  "microapp": {
+    "id": "wibwob.journal",
+    "title": "Journal",
+    "description": "Symbient journal — entry-based log with list, read, and edit modes. Two-pane layout, CRUD API, workspace persistence.",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [
+      { "category": "core", "order": 50, "label": "Journal" }
+    ],
+    "palette": { "order": 155, "label": "Open Journal" },
+    "agent": true,
+    "api": true
+  }
+}

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
+import type { RuntimeNodeDescriptor } from "../runtime/runtime-node.js";
 import { themeName } from "../core/theme/resolver.js";
 import { capabilityService } from "./capability-service.js";
 
@@ -9,9 +10,8 @@ interface StateServiceOptions {
   appName: string;
   appMode: string;
   cwd: string;
-  statePath: string;
-  instanceLabel?: string;
-  sessionId: string;
+  runtimeNode: RuntimeNodeDescriptor;
+  getMicroappReloadEpoch?: () => number;
   getControlApiStatus?: () => {
     enabled: boolean;
     port?: number;
@@ -79,8 +79,8 @@ export class StateService {
     this.latestState = nextState;
     // Don't persist corrupt state from headless/piped runs — min sane terminal is 20×6
     if (nextState.screen.width >= 20 && nextState.screen.height >= 6) {
-      fs.mkdirSync(path.dirname(this.options.statePath), { recursive: true });
-      fs.writeFileSync(this.options.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+      fs.mkdirSync(path.dirname(this.options.runtimeNode.statePath), { recursive: true });
+      fs.writeFileSync(this.options.runtimeNode.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
     }
     for (const listener of this.listeners) {
       listener(nextState);
@@ -102,14 +102,20 @@ export class StateService {
         name: this.options.appName,
         mode: this.options.appMode,
         cwd: this.options.cwd,
-        statePath: this.options.statePath,
-        instanceLabel: this.options.instanceLabel,
-        sessionId: this.options.sessionId,
+        statePath: this.options.runtimeNode.statePath,
+        scratchBase: this.options.runtimeNode.scratchBase,
+        capturesDir: this.options.runtimeNode.capturesDir,
+        workspacesDir: this.options.runtimeNode.workspacesDir,
+        logsDir: this.options.runtimeNode.logsDir,
+        instanceLabel: this.options.runtimeNode.instanceLabel,
+        instanceId: this.options.runtimeNode.instanceId,
         deployProfile: process.env.WIBWOB_DEPLOY_PROFILE ?? null,
         controlApiEnabled: controlApi?.enabled,
+        controlApiRequestedPort: this.options.runtimeNode.requestedApiPort,
         controlApiPort: controlApi?.port,
-        controlApiHost: controlApi?.host,
+        controlApiHost: controlApi?.host ?? this.options.runtimeNode.host,
         controlApiBaseUrl: controlApi?.baseUrl,
+        microappReloadEpoch: this.options.getMicroappReloadEpoch?.(),
         theme: themeName(),
         capabilities: capabilityService.snapshot()
       },

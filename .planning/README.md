@@ -15,10 +15,10 @@ files. These docs reflect that reality.
 |------|---------|
 | **TUI** | The Blessed terminal UI — the entire visual surface. Windows, menus, palette, and desktop live here. |
 | **Window** | A Blessed box managed by AppController. Has a `WindowKind`, `WindowRecord`, lifecycle hooks, and workspace serialisation. |
-| **Microapp** | A dynamically-loaded window type registered by a module at runtime. Lives in `modules/` or `modules-private/`. |
-| **Module** | A directory with a `module.json` manifest and `index.ts` entry point. Registers window types, commands, themes, or snapshot handlers. |
+| **Microapp** | A first-class runtime app surface loaded by the host. Identified by `microapp.id`, exposed through commands/state/API, and typically backed by a package in `microapps/` or `microapps-private/`. |
+| **Microapp package** | A directory with a `microapp.json` manifest and `index.ts` entry point. Registers microapp windows, commands, themes, or snapshot handlers. |
 | **Command** | A named, catalogued action in `CommandRegistry`. The single source of truth for what the app can do. Projected into menus, palette, API, and agent tools. |
-| **Primer** | Content module (art, prompts, themes) loaded from `modules/` or `modules-private/`. |
+| **Primer** | Content module (art, prompts, themes) loaded from `microapps/` or `microapps-private/`. |
 | **Workspace** | The persisted JSON snapshot of the desktop: open windows, positions, sizes, and per-window state. Saved and restored automatically. |
 | **Snapshot** | A window's serialised state round-tripped through `describeState()` and `restoreFromState()`. |
 | **Theme** | A named token set registered via `registerExternalTheme()`. All windows observe theme changes via `onRestyle()`. |
@@ -71,7 +71,7 @@ Rules:
 ```
 
 - **type**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `spike`
-- **scope**: short module name — `app`, `tui`, `window`, `microapp`, `module`,
+- **scope**: short owner name — `app`, `tui`, `window`, `microapp`,
   `theme`, `api`, `llm`, `agent`, `primer`, `workspace`, `command`, `snapshot`,
   `build`, `planning`
 - **summary**: imperative mood, lowercase, no trailing period, max ~72 chars
@@ -80,7 +80,7 @@ Examples:
 ```
 feat(microapp): add MicroappHost createWindow + registerSnapshot wiring
 fix(workspace): honour serialised renderMode on restore — remove restoreSafeMode
-refactor(module): return geometry from registerSnapshot so positions restore
+refactor(microapp): return geometry from registerSnapshot so positions restore
 test(snapshot): add round-trip test for wibwobworld renderMode field
 docs(planning): rewrite README for WibWob-DOS — remove C++ engine content
 chore(build): upgrade bun lockfile after @anthropic-ai/claude-code bump
@@ -91,7 +91,7 @@ Multi-line body is encouraged for non-trivial commits. Explain *why*, not *what*
 ### Files and Directories
 
 - TypeScript source: `kebab-case.ts` (files), `PascalCase` (classes/interfaces)
-- Module manifests: `module.json` in module root
+- Microapp manifests: `microapp.json` in the microapp package root
 - Test files: `*.test.ts` or `test-*.ts` under `tests/`
 - ADRs: `adr-NNNN-<kebab-title>.md`
 
@@ -173,10 +173,10 @@ Use these and only these checkbox states:
 Link checkboxes to their GitHub issue when one exists at the epic level:
 
 ```
-- [x] Module loader scans manifests at startup
+- [x] Microapp loader scans manifests at startup
 - [~] Snapshot round-trip for microapp windows
 - [ ] Geometry restored on restart
-- [-] Web-based module registry (out of scope this pass)
+- [-] Web-based microapp registry (out of scope this pass)
 ```
 
 ### Where Progress Lives
@@ -406,7 +406,7 @@ AC-2: WibWobWorld reopens in the serialised renderMode after restart.
 Test: Open in hybrid mode. Save workspace. Kill and restart. Confirm GET /state
       shows renderMode: "hybrid" for the WibWobWorld window.
 
-AC-3: module-loader registerSnapshot returns geometry so positions restore.
+AC-3: microapp-loader registerSnapshot returns geometry so positions restore.
 Test: Open microapp window at non-default position. Save workspace. Restart.
       Confirm window reopens at saved left/top/width/height via GET /state.
 
@@ -472,8 +472,8 @@ Every PR must satisfy these before merge.
 | `docs/` | Architecture docs, guides, reference. Human-readable. |
 | `tests/` | Automated tests proving ACs. |
 | `scripts/` | Developer utilities — restart, smoke test, planning sync. |
-| `modules/` | First-party microapp modules loaded at runtime. |
-| `modules-private/` | Private microapp modules (not committed to public repo). |
+| `microapps/` | First-party microapp modules loaded at runtime. |
+| `microapps-private/` | Private microapp modules (not committed to public repo). |
 
 ## Quick Reference Card
 

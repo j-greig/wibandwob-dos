@@ -10,7 +10,7 @@ restructure that makes the right doc findable from the filepath alone.
 ## The proposal
 
 Split `.agents/` into `module-dev/` and `shell-dev/`. Reorder AGENTS.md
-so module authoring comes first. Fix the dead link, deduplicate content,
+so microapp authoring comes first. Fix the dead link, deduplicate content,
 surface persistence docs, add tiered examples guide.
 
 See `v2-design-notes.md` for full rationale and reading paths.

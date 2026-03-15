@@ -146,10 +146,10 @@ reimplementing the worker, socket protocol, or render logic.
 
 **SDK reference — how microapps are structured:**
 ```ts
-// modules/sy2-chronicles/index.ts is the canonical example
+// microapps/sy2-chronicles/index.ts is the canonical example
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-// MicroappHost is defined in src/services/module-loader.ts
-// microapp-sdk.ts is the re-export surface — add new things there, not to module-loader directly
+// MicroappHost is defined in src/services/microapp-loader.ts
+// microapp-sdk.ts is the re-export surface — add new things there, not to microapp-loader directly
 
 export function setup(host: MicroappHost) {
   const win = host.createWindow({ title: "My App", width: 80, height: 30 });

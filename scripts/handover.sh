@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @name    handover
+# @desc    Generate session handover doc from live state + planning
 # scripts/handover.sh — auto-generate a session handover doc from live sources.
 #
 # Output: tmp/session-handover-YYYY-MM-DD.md

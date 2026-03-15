@@ -1000,7 +1000,7 @@ index f5dc88a..e901034 100644
 +192aa6a chore: bump modules-private (F08 cursor + tile inspect)
 +ba0086b feat: add dev:world script with IRC env vars
 +c63b53e feat(scripts): overlap-check severity tiers, minimap inline hint
-+7aab052 feat(module-loader): export MicroappSnapshotWindow; dedup SnapshotWindow across all microapps
++7aab052 feat(microapp-loader): export MicroappSnapshotWindow; dedup SnapshotWindow across all microapps
 +fa45ee9 chore: bump modules-private (microapp type deduplication)
 +2157d94 chore: bump modules-private (chatroom bottom-anchor layout fix)
 +3437228 chore: bump modules-private (remove applyRect duplicate)
@@ -1069,7 +1069,7 @@ index f5dc88a..e901034 100644
 -## Recommended Next Steps
 +### Planning (2)
  
--1. **E022 S01** — strip debug breadcrumbs from `modules-private/wibwobworld/index.ts`
+-1. **E022 S01** — strip debug breadcrumbs from `microapps-private/wibwobworld/index.ts`
 -   (keep env-gated `debugWibWobWorld` calls, remove granular `render:*` labels)
 +- TODO-8eb8da84: T4-A: Decide E001 fate  `open`
 +- TODO-f9667622: T3-E: Fix and install pre-commit hook  `open`

@@ -21,8 +21,8 @@ Replace duplicated `openSearchPrompt()` logic in zine and sy2-chronicles with `c
 
 ## Files to change
 
-- `modules/zine/index.ts`
-- `modules/sy2-chronicles/index.ts`
+- `microapps/zine/index.ts`
+- `microapps/sy2-chronicles/index.ts`
 
 ## Tasks
 

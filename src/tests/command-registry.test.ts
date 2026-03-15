@@ -23,6 +23,10 @@ describe("control API health", () => {
     const { status, data } = await api("/health");
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
+    expect(typeof data.instanceId).toBe("string");
+    expect(typeof data.requestedPort).toBe("number");
+    expect(typeof data.statePath).toBe("string");
+    expect(typeof data.capturesDir).toBe("string");
   });
 });
 
@@ -96,16 +100,14 @@ describe("command registry", () => {
     expect(data.ok).toBe(false);
   });
 
-  test("commands.run accepts deprecated command alias but prefers id", async () => {
-    // command: is still accepted as a backward-compat alias for id:
+  test("commands.run requires canonical id body field", async () => {
     const { status, data } = await api("/commands/run", "POST", { command: "theme.cycle" });
-    expect(status).toBe(200);
-    expect(data.ok).toBe(true);
-    // Toggle back
-    await api("/commands/run", "POST", { id: "theme.cycle" });
+    expect(status).toBe(400);
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain("id required");
   });
 
-  test("toggle_theme executes without error", async () => {
+  test("theme.cycle executes without error", async () => {
     // Toggle twice to end up back where we started
     const r1 = await api("/commands/run", "POST", { id: "theme.cycle" });
     expect(r1.status).toBe(200);
@@ -116,14 +118,10 @@ describe("command registry", () => {
     expect(r2.data.ok).toBe(true);
   });
 
-  test("legacy alias executes without error", async () => {
-    const r1 = await api("/commands/run", "POST", { id: "app.toggle_theme" });
-    expect(r1.status).toBe(200);
-    expect(r1.data.ok).toBe(true);
-
-    const r2 = await api("/commands/run", "POST", { id: "app.toggle_theme" });
-    expect(r2.status).toBe(200);
-    expect(r2.data.ok).toBe(true);
+  test("microapps.reload executes without error", async () => {
+    const result = await api("/commands/run", "POST", { id: "microapps.reload" });
+    expect(result.status).toBe(200);
+    expect(result.data.ok).toBe(true);
   });
 });
 
@@ -131,6 +129,11 @@ describe("state service", () => {
   test("returns valid desktop state", async () => {
     const { status, data } = await api("/state");
     expect(status).toBe(200);
+    expect(typeof data.app.instanceId).toBe("string");
+    expect(typeof data.app.statePath).toBe("string");
+    expect(typeof data.app.scratchBase).toBe("string");
+    expect(typeof data.app.capturesDir).toBe("string");
+    expect(typeof data.app.workspacesDir).toBe("string");
     expect(data.screen).toBeDefined();
     expect(typeof data.screen.width).toBe("number");
     expect(typeof data.screen.height).toBe("number");
@@ -152,6 +155,19 @@ describe("state service", () => {
     expect(typeof data.stats.agent.streaming).toBe("boolean");
     expect(typeof data.stats.agent.messageCount).toBe("number");
     expect(typeof data.stats.agent.toolRunCount).toBe("number");
+  });
+
+  test("returns runtime inspection snapshot with UI state", async () => {
+    const { status, data } = await api("/runtime/inspection");
+    expect(status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(typeof data.snapshot.state.app.instanceId).toBe("string");
+    expect(typeof data.snapshot.state.app.capturesDir).toBe("string");
+    expect(typeof data.snapshot.ui.menu.open).toBe("boolean");
+    expect(data.snapshot.ui.overlay === null || typeof data.snapshot.ui.overlay.type === "string").toBe(true);
+    expect(typeof data.snapshot.ui.blocked).toBe("boolean");
+    expect(Array.isArray(data.snapshot.ui.blockers)).toBe(true);
+    expect(typeof data.snapshot.stats.render.fps).toBe("number");
   });
 
   test("every window has required fields", async () => {

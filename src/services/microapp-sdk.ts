@@ -1,5 +1,5 @@
 /**
- * microapp-sdk.ts — the ONE canonical import surface for module authors.
+ * microapp-sdk.ts — the ONE canonical import surface for microapp authors.
  *
  * Modules should import types and helpers from this file:
  *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
@@ -51,90 +51,33 @@ import type {
   MicroappHost,
   MicroappSnapshotWindow,
   MicroappWindowHandle,
-} from "./module-loader.js";
+} from "../sdk/microapp-host.js";
 
-export interface AnimationClock {
-  readonly tick: number;
-  subscribe(handler: (tick: number) => void): () => void;  // returns unsubscribe fn
-  play(): void;
-  pause(): void;
-  destroy(): void;
-}
+export {
+  createAnimationClock,
+  createLayoutReporter,
+} from "../sdk/runtime-helpers.js";
+export {
+  fetchRuntimeCommands,
+  fetchRuntimeHealth,
+  fetchRuntimeInspection,
+  getRuntimeControlApiBaseUrl,
+} from "../sdk/runtime-client.js";
 
-export function createAnimationClock(fps: number): AnimationClock {
-  let tick = 0;
-  let running = true;
-  const handlers = new Set<(tick: number) => void>();
-  const interval = setInterval(() => {
-    if (!running) return;
-    tick++;
-    for (const h of handlers) h(tick);
-  }, Math.round(1000 / fps));
-  return {
-    get tick() { return tick; },
-    subscribe(handler) {
-      handlers.add(handler);
-      return () => handlers.delete(handler);
-    },
-    play() { running = true; },
-    pause() { running = false; },
-    destroy() { clearInterval(interval); handlers.clear(); },
-  };
-}
+export type {
+  AnimationClock,
+  LayoutRegionRect,
+  LayoutRegionSnapshot,
+  LayoutReport,
+  LayoutReporter,
+} from "../sdk/runtime-helpers.js";
+export type {
+  RuntimeCommandsEnvelope,
+  RuntimeHealthEnvelope,
+  RuntimeInspectionEnvelope,
+} from "../sdk/runtime-client.js";
 
-export type LayoutRegionRect = { top: number; left: number; width: number; height: number };
-
-export interface LayoutRegionSnapshot {
-  visible: boolean;
-  attached: boolean;
-  collapsed: boolean;
-  rect: LayoutRegionRect;
-}
-
-export interface LayoutReport {
-  schema: "wibwob.layout-report/v1";
-  viewport: { width: number; height: number };
-  regions: Record<string, LayoutRegionSnapshot>;
-}
-
-export interface LayoutReporter {
-  snapshot(viewport: { width: number; height: number }): LayoutReport;
-}
-
-export function createLayoutReporter(regions: Record<string, blessed.Widgets.BoxElement>): LayoutReporter {
-  const rectOf = (node: blessed.Widgets.BoxElement): LayoutRegionRect => {
-    if (!node.parent) return { top: 0, left: 0, width: 0, height: 0 };
-    return {
-      top: Number(node.top) || 0,
-      left: Number(node.left) || 0,
-      width: Number(node.width) || 0,
-      height: Number(node.height) || 0,
-    };
-  };
-
-  return {
-    snapshot(viewport) {
-      const out: Record<string, LayoutRegionSnapshot> = {};
-      for (const [name, node] of Object.entries(regions)) {
-        const rect = rectOf(node);
-        const attached = !!node.parent;
-        out[name] = {
-          visible: !!node.visible,
-          attached,
-          collapsed: !attached || (!node.visible && rect.width === 0 && rect.height === 0),
-          rect,
-        };
-      }
-      return {
-        schema: "wibwob.layout-report/v1",
-        viewport,
-        regions: out,
-      };
-    },
-  };
-}
-
-// Canonical type-only import surface for module authors.
+// Canonical type-only import surface for microapp authors.
 // Runtime capabilities still flow through the host object itself.
 export type {
   MicroappHost,
@@ -165,7 +108,7 @@ export type AnimatedPanelPlayer = LazyMountedPlayer & {
   attachTarget?(target: blessed.Widgets.BoxElement): void;
 };
 
-// Shared runtime helpers that module authors should import from the SDK surface
+// Shared runtime helpers that microapp authors should import from the SDK surface
 // rather than reaching directly into core/service paths.
 export {
   applyRect,
@@ -187,7 +130,7 @@ export {
 };
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
-// See modules/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
+// See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
 // ── ui-parts — layout primitives, directly importable ────────────────────────
 // These are also available on host.ui.* but can be imported directly for
 // cleaner module-level imports. host.ui.createButtonBar(...) and
@@ -349,8 +292,8 @@ export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } f
 
 export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG, DEFAULT_FIGLET_HEADING_CONFIG } from "./markdown-service.js";
 export type { RenderMarkdownOptions, FigletHeadingConfig } from "./markdown-service.js";
-export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE } from "./figlet-service.js";
-export type { FigletMeasurement, FontCascadeTier } from "./figlet-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize } from "./figlet-service.js";
+export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)
@@ -387,8 +330,13 @@ export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
 export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
+// Plasma engine
+export { createPlasmaPlayer, moodNames, RENDER_MODES, extractMoodFromText, getMood } from "./plasma-engine.js";
+export type { PlasmaModifiers, PlasmaRenderMode, PlasmaPlayer, PlasmaMood, MoodAnalysis } from "./plasma-engine.js";
+
 // Contour / terrain engine
 export { renderContourFromHills } from "./contour-engine.js";
+export type { ContourMode, ContourPlayer } from "./contour-engine.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYNTAX HIGHLIGHTING — for code-editing microapps

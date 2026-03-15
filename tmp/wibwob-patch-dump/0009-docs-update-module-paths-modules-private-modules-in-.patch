@@ -25,8 +25,8 @@ index 96a203d..446cc2b 100644
 +++ b/.pi/extensions/gallery.ts
 @@ -1,5 +1,5 @@
  /**
-- * WibWob Primer Gallery — browse ASCII art primers from modules-private/wibwobworld/primers
-+ * WibWob Primer Gallery — browse ASCII art primers from modules/wibwob-primers
+- * WibWob Primer Gallery — browse ASCII art primers from microapps-private/wibwobworld/primers
++ * WibWob Primer Gallery — browse ASCII art primers from microapps/wibwob-primers
   *
   * Commands:
   *   /gallery          open the gallery
@@ -38,16 +38,16 @@ index 8f2b5a8..48be75f 100644
     (`microapp.wibwobworld-iso.open`, or via the 3D/iso button if wired).
     The ISO window is now open alongside the main WibWobWorld window.
  <codex-note>
--`modules-private/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
-+`modules/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
+-`microapps-private/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
++`microapps/wibwobworld/index.ts:85-90` defines mode buttons as `terrain/contours/hybrid/firstperson` only; no ISO-open button is wired in this file.
  </codex-note>
  5. The desktop state is saved to workspace (auto-save or manual).
  6. Restart the app. Restore fires. App crashes.
  
  ## What gets serialized
  
--### WibWobWorld main window (modules-private/wibwobworld/index.ts ~862)
-+### WibWobWorld main window (modules/wibwobworld/index.ts ~862)
+-### WibWobWorld main window (microapps-private/wibwobworld/index.ts ~862)
++### WibWobWorld main window (microapps/wibwobworld/index.ts ~862)
  
  ```ts
  return {
@@ -55,8 +55,8 @@ index 8f2b5a8..48be75f 100644
  };
  ```
  
--### WibWobWorld Iso window (modules-private/wibwobworld-iso/index.ts ~356)
-+### WibWobWorld Iso window (modules/wibwobworld-iso/index.ts ~356)
+-### WibWobWorld Iso window (microapps-private/wibwobworld-iso/index.ts ~356)
++### WibWobWorld Iso window (microapps/wibwobworld-iso/index.ts ~356)
  
  ```ts
  serialize: (window) => {
@@ -64,8 +64,8 @@ index 8f2b5a8..48be75f 100644
  },
  ```
  <codex-note>
--`modules-private/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
-+`modules/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
+-`microapps-private/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
++`microapps/wibwobworld-iso/index.ts:251-267` assigns `sourcePath` inside `win.describeState(...)` only on successful artifact load. On load error, serialize still runs (`:355-360`) but `state.sourcePath` can be `undefined`, so restore may reopen with no path and fall back to "latest file" behavior instead of the original capture.
  </codex-note>
  
  `sourcePath` is an absolute path like
@@ -73,8 +73,8 @@ index 8f2b5a8..48be75f 100644
  6. If the file exists but is malformed or from an incompatible build:
     `JSON.parse` or `isSavedTerrainArtifact` guard fails → crash or silent bail.
  <codex-note>
--Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`modules-private/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
-+Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`modules/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
+-Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`microapps-private/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
++Current `openIso()` wraps `loadArtifact(sourcePath)` in `try/catch` (`microapps/wibwobworld-iso/index.ts:224-275`) and renders a `"load error"` status instead of throwing. The "unhandled crash" claim does not match current code.
  </codex-note>
  <codex-note>
  Boot restore is also wrapped in a top-level `try/catch` (`src/core/app-controller.ts:319-340`). Even if a handler throws, startup falls back to empty desktop rather than process crash.
@@ -82,8 +82,8 @@ index 8f2b5a8..48be75f 100644
  `ae0ad94` added a `restoreSafeMode` guard in WibWobWorld's `openWorld()`:
  
  ```ts
--// modules-private/wibwobworld/index.ts ~186
-+// modules/wibwobworld/index.ts ~186
+-// microapps-private/wibwobworld/index.ts ~186
++// microapps/wibwobworld/index.ts ~186
  const restoreSafeMode: TerrainRenderMode | undefined =
    args?.__restoring === true ? "contours" : undefined;
  let renderMode: TerrainRenderMode = restoreSafeMode ?? requestedRenderMode ?? "hybrid";
@@ -91,8 +91,8 @@ index 8f2b5a8..48be75f 100644
  existence check. `scratch/captures/` files are ephemeral — not committed,
  not guaranteed to survive between sessions.
  <codex-note>
--The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`modules-private/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
-+The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`modules/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
+-The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`microapps-private/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
++The concrete bug now is restore fidelity, not crash: missing/invalid files degrade to in-window load error (`microapps/wibwobworld-iso/index.ts:269-275`) and `path: undefined` can reopen arbitrary latest capture (`:188-191`, `:294-295`).
  </codex-note>
  
  ### RC-2: Restore does not coordinate ordering between paired windows
@@ -100,14 +100,14 @@ index 8f2b5a8..48be75f 100644
  ## Files involved
  
  ```
--modules-private/wibwobworld/index.ts
-+modules/wibwobworld/index.ts
+-microapps-private/wibwobworld/index.ts
++microapps/wibwobworld/index.ts
    ~186   restoreSafeMode bandage
    ~862   serialize block (saves renderMode, seed, etc.)
    ~877   restore block (passes __restoring: true)
  
--modules-private/wibwobworld-iso/index.ts
-+modules/wibwobworld-iso/index.ts
+-microapps-private/wibwobworld-iso/index.ts
++microapps/wibwobworld-iso/index.ts
    ~356   serialize block (saves sourcePath only)
    ~362   restore block (no guard — the crash site)
  
@@ -119,8 +119,8 @@ index 0596e1d..5eb6c52 100644
  Do not turn the existing built-in `Contour Studio` into the terrain model.
  
  Keep this split:
--- `modules-private/wibwobworld/`
-+- `modules/wibwobworld/`
+-- `microapps-private/wibwobworld/`
++- `microapps/wibwobworld/`
    - microapp shell, keys, focus, `describeState()`, command registration
  - `contour-engine.ts`
    - terrain archetypes, raw hills, raw heightmap, contour rendering
@@ -132,8 +132,8 @@ index 5402b77..7bd09bf 100644
  
  - terrain model: [src/services/terrain-model.ts](/Users/james/Repos/wibwob-dos/src/services/terrain-model.ts)
  - terrain render: [src/services/terrain-render.ts](/Users/james/Repos/wibwob-dos/src/services/terrain-render.ts)
--- overworld microapp: [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
-+- overworld microapp: [modules/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules/wibwobworld/index.ts)
+-- overworld microapp: [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
++- overworld microapp: [microapps/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps/wibwobworld/index.ts)
  
  ## External Reference: `pirc-extension`
  
@@ -141,8 +141,8 @@ index 5402b77..7bd09bf 100644
  - commands to move, inspect, and enter a chatspot
  
  This belongs in:
--- [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
-+- [modules/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules/wibwobworld/index.ts)
+-- [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
++- [microapps/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps/wibwobworld/index.ts)
  
  But the world simulation and chat routing should stay in services.
  
@@ -150,8 +150,8 @@ index 5402b77..7bd09bf 100644
  - start as a private microapp for faster iteration, similar to `WibWobWorld`
  
  Example target:
--- `modules-private/world-chatroom/index.ts`
-+- `modules/world-chatroom/index.ts`
+-- `microapps-private/world-chatroom/index.ts`
++- `microapps/world-chatroom/index.ts`
  
  What it shows:
  - channel title
@@ -163,17 +163,17 @@ index 591c904..4c54a92 100644
  - [/Users/james/Repos/wibwob-dos/.agents/control-api.md](/Users/james/Repos/wibwob-dos/.agents/control-api.md)
  
  Relevant code:
--- [modules-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules-private/wibwobworld/index.ts)
-+- [modules/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/modules/wibwobworld/index.ts)
- - [src/services/module-loader.ts](/Users/james/Repos/wibwob-dos/src/services/module-loader.ts)
+-- [microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps-private/wibwobworld/index.ts)
++- [microapps/wibwobworld/index.ts](/Users/james/Repos/wibwob-dos/microapps/wibwobworld/index.ts)
+ - [src/services/microapp-loader.ts](/Users/james/Repos/wibwob-dos/src/services/microapp-loader.ts)
  - [src/services/state-service.ts](/Users/james/Repos/wibwob-dos/src/services/state-service.ts)
  - [src/services/control-api.ts](/Users/james/Repos/wibwob-dos/src/services/control-api.ts)
 @@ -128,7 +128,7 @@ No IRC. No persistence. No threading. No server. Just prove the seams.
  ### 3. Chatroom Frontend
  
  Add a new surface for one channel:
--- either `modules-private/world-chatroom/`
-+- either `modules/world-chatroom/`
+-- either `microapps-private/world-chatroom/`
++- either `microapps/world-chatroom/`
  - or a built-in window if that is materially simpler
  
  Preference:
@@ -185,12 +185,12 @@ index c67e20e..abed568 100644
  The data/export seam and iso scaffold are already in place.
  
  Code:
--- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld/index.ts)
--- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts)
--- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/module.json](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/module.json)
-+- [/Users/james/Repos/wibandwob-dos/modules/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/modules/wibwobworld/index.ts)
-+- [/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/index.ts)
-+- [/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/module.json](/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/module.json)
+-- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld/index.ts)
+-- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts)
+-- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/microapp.json](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/microapp.json)
++- [/Users/james/Repos/wibandwob-dos/microapps/wibwobworld/index.ts](/Users/james/Repos/wibandwob-dos/microapps/wibwobworld/index.ts)
++- [/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/index.ts)
++- [/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/microapp.json](/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/microapp.json)
  - [/Users/james/Repos/wibandwob-dos/src/services/terrain-model.ts](/Users/james/Repos/wibandwob-dos/src/services/terrain-model.ts)
  
  Commands already wired:
@@ -198,8 +198,8 @@ index c67e20e..abed568 100644
  ## Suggested Implementation Direction
  
  Start from:
--- [/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld-iso/index.ts)
-+- [/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/modules/wibwobworld-iso/index.ts)
+-- [/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps-private/wibwobworld-iso/index.ts)
++- [/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/index.ts](/Users/james/Repos/wibandwob-dos/microapps/wibwobworld-iso/index.ts)
  
  Likely next seam if needed:
  - `src/services/terrain-iso-render.ts`
@@ -211,8 +211,8 @@ index 9555bfa..a36ce6a 100644
  which is gitignored and ephemeral. On restart the file may be gone → load-error branch.
  If it ran before terrain was loaded, `sourcePath` is `undefined` → silently reopens
  the wrong (latest) capture file.
--_Files:_ `modules-private/wibwobworld-iso/index.ts ~251, ~356-365`
-+_Files:_ `modules/wibwobworld-iso/index.ts ~251, ~356-365`
+-_Files:_ `microapps-private/wibwobworld-iso/index.ts ~251, ~356-365`
++_Files:_ `microapps/wibwobworld-iso/index.ts ~251, ~356-365`
  
  **RC-2 — No ordering contract between paired windows**
  WibWobWorld and ISO restore independently in array order. ISO can restore before the
@@ -220,25 +220,25 @@ index 9555bfa..a36ce6a 100644
  it to `"contours"` via the `__restoring` flag bandage (commit `ae0ad94`). The user's
  last render mode is silently lost on every restart. High daily pain — every session
  requires manually re-switching mode.
--_Files:_ `modules-private/wibwobworld/index.ts ~186-190`
-+_Files:_ `modules/wibwobworld/index.ts ~186-190`
+-_Files:_ `microapps-private/wibwobworld/index.ts ~186-190`
++_Files:_ `microapps/wibwobworld/index.ts ~186-190`
  
  **RC-4 — Microapp geometry not reapplied on restore**
- `module-loader.ts registerSnapshot` returns `undefined`, so `restoreWindowSnapshot()`
+ `microapp-loader.ts registerSnapshot` returns `undefined`, so `restoreWindowSnapshot()`
 @@ -51,14 +51,14 @@ In hybrid mode the right pane uses a world generated by `worldDimensions(mapView
  (large, contour-optimised) fed into `renderIso` — the stride/scale compresses it down
  to a small diamond. Standalone ISO mode sizes the world directly from canvas dimensions
  (N×N iso-optimised). The right pane should match standalone ISO quality.
--_Files:_ `modules-private/wibwobworld/index.ts render() hybrid branch`
-+_Files:_ `modules/wibwobworld/index.ts render() hybrid branch`
+-_Files:_ `microapps-private/wibwobworld/index.ts render() hybrid branch`
++_Files:_ `microapps/wibwobworld/index.ts render() hybrid branch`
  
  **RC-6 — Debug breadcrumbs left in production code**
  `render:dims`, `render:layout-start`, `render:hybrid-panes`, `render:artifact-built`,
  `render:iso-start/done`, `render:iso-setcontent-done`, `render:before-screen-render`
  were added for diagnosis (session 2026-03-06) and never stripped. Noise for future
  agents; controlled by `WIBWOBWORLD_DEBUG=1` so low-risk but untidy.
--_Files:_ `modules-private/wibwobworld/index.ts`
-+_Files:_ `modules/wibwobworld/index.ts`
+-_Files:_ `microapps-private/wibwobworld/index.ts`
++_Files:_ `microapps/wibwobworld/index.ts`
  
  ---
  
@@ -250,15 +250,15 @@ index 0b0a590..ac662de 100644
  # PRD: WibWobWorld Hybrid Iso Mode (Contour + Isometric Split)
  
  ## Goal
--Implement a **single-window hybrid render mode** in `modules-private/wibwobworld/index.ts` where:
-+Implement a **single-window hybrid render mode** in `modules/wibwobworld/index.ts` where:
+-Implement a **single-window hybrid render mode** in `microapps-private/wibwobworld/index.ts` where:
++Implement a **single-window hybrid render mode** in `microapps/wibwobworld/index.ts` where:
  - LEFT pane shows the existing contour/terrain map view.
  - RIGHT pane shows an isometric terrain projection derived from the same world.
  - Both panes update from the same world state and remain side-by-side in the WibWobWorld window.
  
  ## Root Cause (Intent Gap)
--The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `modules-private/wibwobworld-iso/index.ts` (`renderIso`).
-+The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `modules/wibwobworld-iso/index.ts` (`renderIso`).
+-The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `microapps-private/wibwobworld-iso/index.ts` (`renderIso`).
++The current `"hybrid"` mode in `renderTerrainMap(...)` is a per-cell contour/terrain blend, not a split-pane hybrid. The intended feature is a **layout-level hybrid composition** (2 renderers in one window), using the iso projection logic from `microapps/wibwobworld-iso/index.ts` (`renderIso`).
  
  ## Product Behavior
  
@@ -266,12 +266,12 @@ index 0b0a590..ac662de 100644
  - `if (innerW < 1 || innerH < 1) return;`
  - For hybrid pane draws, also require computed pane widths/heights >= 1 before calling renderers.
  
--## Exact File Changes (`modules-private/wibwobworld/index.ts`)
-+## Exact File Changes (`modules/wibwobworld/index.ts`)
+-## Exact File Changes (`microapps-private/wibwobworld/index.ts`)
++## Exact File Changes (`microapps/wibwobworld/index.ts`)
  
  ### Add
--1. `renderIso(...)` helper (ported from `modules-private/wibwobworld-iso/index.ts`, no file IO code).
-+1. `renderIso(...)` helper (ported from `modules/wibwobworld-iso/index.ts`, no file IO code).
+-1. `renderIso(...)` helper (ported from `microapps-private/wibwobworld-iso/index.ts`, no file IO code).
++1. `renderIso(...)` helper (ported from `microapps/wibwobworld-iso/index.ts`, no file IO code).
  2. Iso constants/helpers used by `renderIso`:
     - `ISO_EXAGGERATION`
     - biome color/glyph lookup helpers.

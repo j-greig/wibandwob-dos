@@ -19,7 +19,7 @@ and how they compare.
 |                        |             | highlighted code blocks    |                  |
 +------------------------+-------------+----------------------------+------------------+
 | Slap Editor (module)   | edit only   | editor-engine.ts (custom)  | microapp window  |
-|  modules/slap-editor   |             | EditorEngine class         |                  |
+|  microapps/slap-editor   |             | EditorEngine class         |                  |
 |                        |             | blessed.box (tags:true)    |                  |
 +------------------------+-------------+----------------------------+------------------+
 | Document Reader        | view only   | markdown-service.ts        | "reader"         |
@@ -32,7 +32,7 @@ and how they compare.
 |                        |             | No syntax, no markdown     |                  |
 +------------------------+-------------+----------------------------+------------------+
 | Zine (module)          | view only   | Custom panel renderer      | microapp window  |
-|  modules/zine          |             | Markdown + figlet via      |                  |
+|  microapps/zine          |             | Markdown + figlet via      |                  |
 |                        |             | host.renderMarkdown() (?)  |                  |
 |                        |             | + plain text panels        |                  |
 +------------------------+-------------+----------------------------+------------------+
@@ -98,7 +98,7 @@ BUILT-IN EDITOR (text-windows.ts + editor-service.ts + editor-coordinator.ts)
 |    file picker via OverlayManager                                         |
 '---------------------------------------------------------------------------'
 
-SLAP EDITOR (modules/slap-editor/editor-engine.ts)
+SLAP EDITOR (microapps/slap-editor/editor-engine.ts)
 .---------------------------------------------------------------------------.
 | Title Bar                                                                 |
 |---------------------------------------------------------------------------|
@@ -214,6 +214,6 @@ SHARED SDK COMPONENTS REFERENCED
   resolveSidebarWidth()      -- src/services/microapp-sdk.ts
   OverlayManager.openFileBrowserPrompt() -- src/core/overlay-manager.ts line 535
   renderMarkdownFile()       -- src/services/markdown-service.ts
-  EditorEngine               -- modules/slap-editor/editor-engine.ts
+  EditorEngine               -- microapps/slap-editor/editor-engine.ts
   editor-service.ts          -- src/services/editor-service.ts (built-in editor state)
   editor-coordinator.ts      -- src/core/editor-coordinator.ts (open/save orchestration)

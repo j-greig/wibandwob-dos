@@ -32,7 +32,7 @@ S08 Runtime telemetry — --stats CLI flag shows shell-level badge, GET
 spawn-helper permissions, writeInput wiring through onInput. Recursive
 nested WibWob-DOS instance verified.
 
-S10 Developer docs — docs/building-custom-modules.md covering manifest,
+S10 Developer docs — docs/building-custom-microapps.md covering manifest,
 entry point, host API, lifecycle hooks, animation (timers + embedded live
 player), direct commands, SDK imports, common mistakes, verification
 checklist. Scaffold script fixed and tested end to end.
@@ -48,7 +48,7 @@ S06 Unicode and S09 macOS launcher deferred as non-essential.
 ## Cross-cutting work
 
 ESLint SDK boundary rule — flat config, one rule, no-restricted-imports
-scoped to modules/**. Zero violations after sweep.
+scoped to microapps/**. Zero violations after sweep.
 
 Nomenclature sweep — renamed appTypes (farjs-file-manager to file-manager,
 chrome-browser to web-reader), command IDs (underscores to hyphens), agent

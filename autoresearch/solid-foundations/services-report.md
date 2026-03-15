@@ -481,7 +481,7 @@
 
 ### 20. `microapp-sdk.ts` (403 lines)
 
-**PURPOSE:** The ONE canonical import surface for module authors — re-exports types and helpers from across the codebase.
+**PURPOSE:** The ONE canonical import surface for microapp authors — re-exports types and helpers from across the codebase.
 
 **EXPORTS:** ~100+ re-exports from `core/ui-parts.ts`, `core/ui-primitives.ts`, `core/ui-parts-forms.ts`, `core/ui-parts-feedback.ts`, `core/ui-parts-data.ts`, `core/grid-canvas.ts`, `core/panel-layout.ts`, `core/skeleton-renderer.ts`, `core/tree-widget.ts`, `core/render-monitor.ts`, `core/canvas-types.ts`, `core/empty-states.ts`, `core/theme/types.ts`, and various services.
 
@@ -503,11 +503,11 @@
 
 ---
 
-### 21. `module-loader.ts` (574 lines)
+### 21. `microapp-loader.ts` (574 lines)
 
-**PURPOSE:** Discovers and loads modules (themes + microapps) from `modules/` and `modules-private/`.
+**PURPOSE:** Discovers and loads modules (themes + microapps) from `microapps/` and `microapps-private/`.
 
-**EXPORTS:** `MicroappHost`, `MicroappWindowHandle`, `MicroappSnapshotWindow`, `MicroappHostDeps`, `WorldChatHostAccess`, `loadThemes`, `loadMicroapps`, `loadModules`
+**EXPORTS:** `MicroappHost`, `MicroappWindowHandle`, `MicroappSnapshotWindow`, `MicroappHostDeps`, `WorldChatHostAccess`, `loadThemes`, `loadMicroapps`, `loadMicroapps`
 
 **IMPORTS:**
 - External: `blessed`, `node:fs`, `node:path`
@@ -1099,7 +1099,7 @@ The `src/services/` folder is a **catch-all service layer** containing 44 files 
 - **Agent/AI**: `wibwob-agent-session`, `scramble-brain`, `agent-tools`, `agent-session-helpers`
 - **Rendering engines**: `contour-engine`, `plasma-engine`, `terrain-model`, `terrain-render`, `webcam-renderer`, `animation-service`
 - **External integrations**: `chrome-browser-service`, `brave-search-service`, `youtube-transcript-service`, `world-chat-transport`
-- **Infrastructure**: `control-api`, `state-service`, `capability-service`, `app-logger`, `module-loader`
+- **Infrastructure**: `control-api`, `state-service`, `capability-service`, `app-logger`, `microapp-loader`
 - **Content**: `content-service`, `content-measurement`, `markdown-service`, `figlet-service`, `syntax-highlight`
 - **Persistence**: `workspace-service`, `canvas-document`
 - **Timeline/VJ**: `timeline-service`, `timeline-types`, `scene-layout`, `scene-planner`
@@ -1135,7 +1135,7 @@ control-api ──→ app-logger
             ──→ strip-ansi
             ──→ world-chat-service ──→ world-chat-transport
 
-module-loader ──→ world-chat-service
+microapp-loader ──→ world-chat-service
               ──→ world-chat-transport
 
 scramble-brain ──→ pi-session-bridge
@@ -1163,7 +1163,7 @@ capability-service ──→ backrooms-service, chrome-browser-service
 
 | Service | core/ imports |
 |---------|--------------|
-| `module-loader.ts` | 12 core/ imports (highest) |
+| `microapp-loader.ts` | 12 core/ imports (highest) |
 | `wibwob-agent-session.ts` | `config.ts`, `types.ts` |
 | `control-api.ts` | `types.ts`, `command-registry.ts`, `command-catalog.ts`, `runtime-stats.ts` |
 | `microapp-sdk.ts` | ~15 core/ imports (barrel re-exports) |

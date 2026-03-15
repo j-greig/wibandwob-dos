@@ -149,7 +149,7 @@ Key insight: the bridge player owns the lifecycle. `setRunning(true)`
 creates the engine player, `setRunning(false)` destroys it. This means
 the engine only runs when visible — no wasted frames.
 
-Used by: poetry clock terrain voice in `modules/wibwob-poetry-clock/index.ts`
+Used by: poetry clock terrain voice in `microapps/wibwob-poetry-clock/index.ts`
 
 ### Pattern C: Direct mode addition (microapp, no new window)
 
@@ -247,7 +247,7 @@ Phase 2 (Pattern A): `terrain-lab-window.ts` uses direct blessed box
 with manual layout. Contour map left, info panel right.
 
 Phase 2 (Pattern B): Poetry clock terrain voice in
-`modules/wibwob-poetry-clock/index.ts`. Bridge player with
+`microapps/wibwob-poetry-clock/index.ts`. Bridge player with
 `attachTarget` + `setRunning`. Shuffles all settings each minute.
 
 Phase 3: Terrain Lab needed full new-window-type checklist. Poetry clock
@@ -259,7 +259,7 @@ terrain voice only needed mode-addition audit (lighter).
 - `src/services/animation-service.ts` — `FramePlayer` interface
 - `src/windows/contour-window.ts` — standalone window (Pattern A consumer)
 - `src/windows/terrain-lab-window.ts` — composed window (Pattern A consumer)
-- `modules/wibwob-poetry-clock/index.ts` — microapp mode (Pattern B consumer)
+- `microapps/wibwob-poetry-clock/index.ts` — microapp mode (Pattern B consumer)
 - `src/core/ui-parts.ts` — `createAnimatedPanel` and layout primitives
 
 ### Example 2: Double-click maximize (window management feature)

@@ -137,7 +137,7 @@ graph TB
             SS["state-service.ts<br/>161L · 2 resp · A"]
             CAPS["capability-service.ts<br/>162L · 2 resp · B"]
             AL["app-logger.ts<br/>61L · 1 resp · A"]
-            ML["module-loader.ts<br/>574L · 4 resp · C"]
+            ML["microapp-loader.ts<br/>574L · 4 resp · C"]
             MSDK["microapp-sdk.ts<br/>403L · barrel · B"]
             WSS["workspace-service.ts<br/>62L · 1 resp · A"]
         end
@@ -200,9 +200,9 @@ graph TB
         end
     end
 
-    subgraph MODULES ["modules/ — Microapp Plugins"]
+    subgraph MODULES ["microapps/ — Microapp Plugins"]
         style MODULES fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-        MOD["loaded via module-loader.ts<br/>theme + microapp modules"]
+        MOD["loaded via microapp-loader.ts<br/>theme + microapp modules"]
     end
 
     subgraph TESTS ["src/tests/ — Test Suite (14 files, ~1,500 lines)"]
@@ -421,13 +421,13 @@ graph TB
 | core → services | 37 | ⚠️ Concentrated | 95%+ from `app-controller.ts` — acceptable for a composition root, but the root does too much |
 | windows → services | 25 | ✅ Correct | Windows delegate to service-layer logic |
 | core → windows | 13 | ⚠️ Concentrated | 100% from `app-controller.ts` — composition root wiring |
-| core → modules | 1 | ❌ Layer violation | `canvas-types.ts` imports from `modules/sy2-chronicles/` |
+| core → modules | 1 | ❌ Layer violation | `canvas-types.ts` imports from `microapps/sy2-chronicles/` |
 | modules → SDK | N | ✅ Correct | Modules import only `microapp-sdk.ts` barrel |
 | CLI → core | 0 | ✅ Excellent | `wibwob.ts` uses HTTP only — zero internal imports |
 
 ### Wrong-Direction Dependencies
 
-1. **`canvas-types.ts` → `modules/sy2-chronicles/panel-types.js`** — Core depends on a plugin module. The type `CEPanelDef` should be defined in core; the module should conform to it.
+1. **`canvas-types.ts` → `microapps/sy2-chronicles/panel-types.js`** — Core depends on a plugin module. The type `CEPanelDef` should be defined in core; the module should conform to it.
 
 2. **`app-controller.ts` → 13 window files** — While composition roots legitimately know about everything, the controller *implements* logic that belongs in services (FX scripts, clipboard, action bridge). This makes it a god object rather than a clean compositor.
 
@@ -449,7 +449,7 @@ graph TB
 | ansi-utils.ts | 378 | 1 | A | — |
 | **app-controller.ts** | **2,244** | **10+** | **F** | God object: composition root + 9 embedded concerns |
 | appearance-service.ts | 24 | 1 | A | Tiny, possibly premature |
-| canvas-types.ts | 61 | 1 | C | Layer violation (imports from modules/) |
+| canvas-types.ts | 61 | 1 | C | Layer violation (imports from microapps/) |
 | cli.ts | 66 | 1 | A | — |
 | command-catalog.ts | 1,307 | 2 | B | 900-line data block, intentional |
 | command-registry.ts | 306 | 2 | B | Legacy alias map |
@@ -508,7 +508,7 @@ graph TB
 | file-actions.ts | 118 | 2 | A | — |
 | markdown-service.ts | 442 | 2 | B | 10+ `as any` (marked types) |
 | microapp-sdk.ts | 403 | 1 | B | Massive barrel, some original types |
-| module-loader.ts | 574 | 4 | C | Wide import surface, 12 core imports |
+| microapp-loader.ts | 574 | 4 | C | Wide import surface, 12 core imports |
 | monster-cam-service.ts | 172 | 2 | B | — |
 | monster-cam-worker.ts | 48 | 1 | A | — |
 | motion-service.ts | 192 | 1 | B | Duck-typed windowManager |
@@ -584,7 +584,7 @@ graph TB
 | File | Fan-Out | Role | Concern |
 |------|--------:|------|---------|
 | app-controller.ts | 32 | Composition root | Expected, but root does too much |
-| module-loader.ts | 14 | Module integration | Expected bridge role |
+| microapp-loader.ts | 14 | Module integration | Expected bridge role |
 | browser-windows.ts | 12 | 4 window types | Too many things in one file |
 | microapp-sdk.ts | ~20 | SDK barrel | By design |
 
@@ -721,7 +721,7 @@ The blessed type gap (`selected` property) accounts for ~25% of all type unsafet
 
 2. **Testing bottleneck.** God objects are hard to unit test. The 6 integration tests all duplicate API helpers and use magic sleep values instead of polling. Adding test coverage requires first making the code testable by extracting dependencies.
 
-3. **One canonical layer violation.** `canvas-types.ts` importing from `modules/` is a live inversion that could spread if not addressed.
+3. **One canonical layer violation.** `canvas-types.ts` importing from `microapps/` is a live inversion that could spread if not addressed.
 
 ### Recommended Priority Order
 

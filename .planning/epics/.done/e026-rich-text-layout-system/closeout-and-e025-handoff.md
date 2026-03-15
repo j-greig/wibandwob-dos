@@ -27,7 +27,7 @@ Three items remain before E026 can close:
 - [ ] Typecheck passes
 
 ### SDK border primitive: createBorderedPanel
-**What:** Extract `createPanel` from `modules/e026-demo/index.ts` into `src/core/ui-parts.ts` as `createBorderedPanel`.
+**What:** Extract `createPanel` from `microapps/e026-demo/index.ts` into `src/core/ui-parts.ts` as `createBorderedPanel`.
 **Why:** Reusable bordered panel with single/double/bold/thin styles. Already proven in demo, just needs SDK extraction.
 **Effort:** 1hr extraction + style enum
 **Acceptance:**

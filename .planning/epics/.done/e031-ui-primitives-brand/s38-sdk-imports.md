@@ -21,9 +21,9 @@ Stop modules from importing internals via `src/core/*` paths by exporting needed
 
 ## Files to change
 
-- `modules/e026-demo/index.ts`
-- `modules/zine/index.ts`
-- `modules/sy2-chronicles/panel-types.ts`
+- `microapps/e026-demo/index.ts`
+- `microapps/zine/index.ts`
+- `microapps/sy2-chronicles/panel-types.ts`
 - `src/microapp-sdk.ts`
 
 ## Tasks

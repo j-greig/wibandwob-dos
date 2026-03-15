@@ -54,7 +54,7 @@ requires manual setContent() — which has a pitfall (ANSI codes confuse
 blessed's line-width calc → wrapping). Fix: use `wrap: false` + plain
 box-drawing chars + `style.fg` for colour (no ANSI in content).
 
-TODO: extract `createPanel` from `modules/e026-demo/index.ts` into
+TODO: extract `createPanel` from `microapps/e026-demo/index.ts` into
 `src/core/ui-parts.ts` as a proper exported SDK primitive once the
 implementation is proven stable.
 
@@ -102,7 +102,7 @@ There is no way for a microapp to call a global system command (e.g. `markdown.o
 `primer.open`, any File menu command) via the host API. The distinction between
 "internal microapp command" and "external system command" is not exposed.
 
-Fix needed in `src/services/module-loader.ts`:
+Fix needed in `src/services/microapp-loader.ts`:
   - Add `host.runGlobalCommand(id, args)` that calls `commands.run(id, args)` directly
     without any namespace prefix.
   - Keep `host.runCommand(localId)` for internal commands (prefixed as now).
@@ -112,7 +112,7 @@ Also add `runGlobalCommand` to the "common mistakes" table:
   WRONG: `host.runCommand("markdown.open", { filePath })`   → silently does nothing
   RIGHT: `host.runGlobalCommand("markdown.open", { filePath })`
 
-TODO: wire the impl in module-loader.ts and export type from microapp-sdk.ts.
+TODO: wire the impl in microapp-loader.ts and export type from microapp-sdk.ts.
 (Type declaration added; impl pending — see fix/e026-demo-runGlobalCommand branch)
 
 ---
@@ -170,7 +170,7 @@ Pattern to codify in microapp-sdk.md common-mistakes table:
 
 ## §y² Chronicles → Calculating Empires → v2 merge lesson (2026-03-09)
 
-Built `modules/calculating-empires/` as a new microapp with CE's data layer
+Built `microapps/calculating-empires/` as a new microapp with CE's data layer
 (CEPanelDef schema, JSON loader, 6 panel type renderers, zoom, search). Then
 noticed it was missing ALL the hard-won interaction from sy2-chronicles (drag,
 double-click edit, screen-level mouse handler, wheel routing, scrollbar,
@@ -191,7 +191,7 @@ sy2-chronicles had:
 
 Resolution: merged both into sy2-chronicles v2. CE's data layer (panel types,
 JSON loading, zoom, search) + sy2's proven interaction layer = one canonical
-module. `modules/calculating-empires/` removed as superseded.
+module. `microapps/calculating-empires/` removed as superseded.
 
 **Rule added to AGENTS.md pattern:** When building a new microapp that extends
 an existing one, read the existing interaction code completely before writing any

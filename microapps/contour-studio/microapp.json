@@ -1,0 +1,24 @@
+{
+  "name": "contour-studio",
+  "version": "0.1.0",
+  "description": "Animated contour map studio. Three modes: chaos, order, hybrid. Solo and triptych views.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.contour.open"
+  },
+  "microapp": {
+    "id": "wibwob.contour",
+    "title": "Contour Studio",
+    "description": "Open animated contour map studio. Three modes: chaos (organic contours), order (binary grids), hybrid (mixed).",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 85, "label": "Contour Studio" }
+    ],
+    "palette": { "order": 55, "label": "Contour Studio" },
+    "agent": true,
+    "api": true
+  }
+}

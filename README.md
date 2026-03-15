@@ -121,7 +121,7 @@ Terminal (iTerm2, kitty, etc.)
             ├── Window Manager    — overlapping, drag, resize, z-order, tile
             ├── Command Registry  — menus, palette, API, keyboard shortcuts
             ├── Theme Engine      — 15+ themes, hot-switchable
-            ├── Microapp Loader   — modules/ directory, hot-reloadable
+            ├── Microapp Loader   — microapps/ directory, hot-reloadable
             ├── Control API       — HTTP on :8099, full desktop automation
             ├── Agent Session     — pi agent with TUI tools
             └── Built-in Windows
@@ -134,7 +134,7 @@ Terminal (iTerm2, kitty, etc.)
 
 **Runtime:** Bun · **Language:** TypeScript · **Renderer:** blessed · **Entry:** `src/app.ts`
 
-The shell itself is ~50 files in `src/`. Microapps live in `modules/` — each is a self-contained directory with an `index.ts` and `module.json`. They get their own window and a full UI toolkit: stacks, rows, grids, tabs, filterable lists, buttons, checkboxes, radio groups, selects, progress bars, spinners, data tables, log views, toasts, text areas, form fields, tweens with easing curves, embedded live players, pattern generators, figlet helpers, and syntax highlighting.
+The shell itself is ~50 files in `src/`. Microapps live in `microapps/` — each is a self-contained directory with an `index.ts` and `microapp.json`. They get their own window and a full UI toolkit: stacks, rows, grids, tabs, filterable lists, buttons, checkboxes, radio groups, selects, progress bars, spinners, data tables, log views, toasts, text areas, form fields, tweens with easing curves, embedded live players, pattern generators, figlet helpers, and syntax highlighting.
 
 ---
 
@@ -221,21 +221,21 @@ Microapps are the extension model. Each one gets a window and a host API.
 
 ```bash
 # Scaffold a new microapp
-bash scripts/scaffold-microapp.sh modules/my-app wibwob.my-app "My App" 50
+bash scripts/scaffold-microapp.sh microapps/my-app wibwob.my-app "My App" 50
 
-# Edit modules/my-app/index.ts
+# Edit microapps/my-app/index.ts
 # Module changes take effect after app restart:
 #   kill $(cat scratch/wibwob.pid) && bun run start
 ```
 
-See `docs/building-custom-modules.md` for the full guide. Example modules by complexity:
+See `docs/building-custom-microapps.md` for the full guide. Example modules by complexity:
 
 | Tier | Module | What it shows |
 |------|--------|---------------|
-| Static | `modules/demo-hello-world/` | Responsive figlet, onResize |
-| Animated | `modules/demo-heartbeat/` | createTimer, cleanup |
-| Persistent | `modules/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration |
-| Full SDK | `modules/demo-e026-demo/` | Trees, tabs, tweens, patterns |
+| Static | `microapps/demo-hello-world/` | Responsive figlet, onResize |
+| Animated | `microapps/demo-heartbeat/` | createTimer, cleanup |
+| Persistent | `microapps/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration |
+| Full SDK | `microapps/demo-e026-demo/` | Trees, tabs, tweens, patterns |
 
 ---
 
@@ -253,7 +253,7 @@ See `docs/building-custom-modules.md` for the full guide. Example modules by com
 | **flexoki-paper** | ![](https://via.placeholder.com/16/FFFCF0/FFFCF0?text=+) ![](https://via.placeholder.com/16/E6E4D9/E6E4D9?text=+) ![](https://via.placeholder.com/16/205EA6/205EA6?text=+) ![](https://via.placeholder.com/16/9F9D96/9F9D96?text=+) ![](https://via.placeholder.com/16/100F0F/100F0F?text=+) | Steph Ango's Flexoki, light mode. |
 | **flexoki-ink** | ![](https://via.placeholder.com/16/1C1B1A/1C1B1A?text=+) ![](https://via.placeholder.com/16/282726/282726?text=+) ![](https://via.placeholder.com/16/4385BE/4385BE?text=+) ![](https://via.placeholder.com/16/6F6E69/6F6E69?text=+) ![](https://via.placeholder.com/16/E6E4D9/E6E4D9?text=+) | Flexoki, dark mode. Warm charcoal. |
 
-Theme files live in `src/core/theme/` (built-in) and `modules/` (external). Use `theme.cycle` or `theme.set` via command palette or API.
+Theme files live in `src/core/theme/` (built-in) and `microapps/` (external). Use `theme.cycle` or `theme.set` via command palette or API.
 
 ---
 
@@ -264,14 +264,14 @@ src/
   core/           # window manager, commands, themes, chrome, types
   services/       # browser, state, API, agent, markdown, audio
   windows/        # built-in window types (chat, browser, editor, etc.)
-modules/          # microapps (self-contained, hot-reloadable)
+microapps/          # microapps (self-contained, hot-reloadable)
 primers/          # ASCII art library — the visual vocabulary that feeds the Backrooms,
                   #   the gallery, and the agent's aesthetic sense
 .planning/        # epics, features, stories — the canonical roadmap
 .agents/          # agent constitution, module-dev docs, shell-dev specs
 scripts/          # restart, scaffold, screenshot helpers
 scratch/          # runtime data, compositions, audio, workspace saves
-docs/             # full module authoring and architecture docs
+docs/             # full microapp authoring and architecture docs
 ```
 
 Every window exposes machine-readable semantic state via `describeState()` — the agent and the control API can introspect any window's content, position, and application-specific metadata. Workspaces can be saved and restored by name, preserving the full desktop layout across sessions.

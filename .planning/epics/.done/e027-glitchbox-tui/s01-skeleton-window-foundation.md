@@ -223,8 +223,8 @@ In `app-controller.ts`: wire to `new GlitchBoxWindow(screen, dancePoseService)`.
 ```
 src/core/skeleton-renderer.ts        — new: renderSkeletonAt() extracted from webcam-renderer
 src/services/dance-pose-service.ts   — new: DancePoseService + IDLE_LANDMARKS + preset table
-modules/glitchbox/index.ts           — new: microapp module (follows sy2-chronicles pattern)
-modules/glitchbox/module.json        — new: module manifest
+microapps/glitchbox/index.ts           — new: microapp module (follows sy2-chronicles pattern)
+microapps/glitchbox/microapp.json        — new: module manifest
 ```
 
 ## Files to touch

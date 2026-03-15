@@ -27,10 +27,10 @@ This is not just "extract a grid helper." It is:
 
 Start here, in this order:
 
-1. `.agents/module-dev/.workings/layout-guide-final.md`
+1. `.agents/microapp-dev/.workings/layout-guide-final.md`
 2. `e035-brief.md`
 3. `.planning/epics/e034-layout-primitives-sdk/HANDOVER.md`
-4. `.agents/module-dev/.workings/layout-guide-alignment.md` only if a design
+4. `.agents/microapp-dev/.workings/layout-guide-alignment.md` only if a design
    detail is unclear
 
 Do not start from the old E034 brief alone. It predates several important
@@ -188,14 +188,14 @@ Do not let low-value pain block the high-value convergence work.
 Primary implementation files:
 - `src/core/ui-parts.ts`
 - `src/services/microapp-sdk.ts`
-- `modules/hello-world/index.ts`
-- `modules/dashboard/index.ts`
-- `modules/zine/index.ts`
+- `microapps/hello-world/index.ts`
+- `microapps/dashboard/index.ts`
+- `microapps/zine/index.ts`
 
 Planning/docs:
 - `.planning/epics/e035-layout-sdk-buildout/e035-brief.md`
 - `.planning/epics/e034-layout-primitives-sdk/HANDOVER.md`
-- `.agents/module-dev/.workings/layout-guide-final.md`
+- `.agents/microapp-dev/.workings/layout-guide-final.md`
 
 ## What success looks like
 
@@ -204,7 +204,7 @@ E035 is done when:
 - real modules use it
 - responsive layouts stack and scroll correctly
 - scroll viewport boilerplate is shared instead of bespoke
-- docs in `.agents/module-dev/` and public docs teach the new surface cleanly
+- docs in `.agents/microapp-dev/` and public docs teach the new surface cleanly
 - old inline/proving-ground layout helpers are no longer the primary path
 
 ## What not to do
@@ -294,7 +294,7 @@ attach to tmux for final sign-off, not for basic verification.
 ## First move for the next agent
 
 Read:
-1. `.agents/module-dev/.workings/layout-guide-final.md`
+1. `.agents/microapp-dev/.workings/layout-guide-final.md`
 2. `e035-brief.md`
 3. `src/core/ui-parts.ts`
 4. `src/services/microapp-sdk.ts`

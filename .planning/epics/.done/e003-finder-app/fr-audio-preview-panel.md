@@ -319,7 +319,7 @@ audioState: !audioPanel.node.hidden
 
 ## Modular inspiration — why UiPart not ad hoc blessed wiring
 
-The poetry clock (`modules/wibwob-poetry-clock/index.ts`) composes its layout
+The poetry clock (`microapps/wibwob-poetry-clock/index.ts`) composes its layout
 from UiParts via `host.ui.createStack`:
 
 ```ts

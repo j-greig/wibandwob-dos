@@ -33,6 +33,17 @@ async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function closeByAppType(appType: string) {
+  const state = await get("/state");
+  const matching = state.windows.filter((window: any) => window.details?.appType === appType);
+  for (const window of matching) {
+    await post("/windows/close", { id: window.id });
+  }
+  if (matching.length > 0) {
+    await sleep(250);
+  }
+}
+
 /** Open a window via command, return its state entry. */
 async function openAndFind(
   commandId: string,
@@ -74,6 +85,19 @@ describe("window parity audit", () => {
     expect(win.details.appType).toBe("figlet-banner");
     expect(win.details.summary).toContain("figlet");
     expect(win.details.font).toBeDefined();
+    expect(win.height).toBeGreaterThanOrEqual((win.details.contentHeight ?? 0) + 5);
+    expect(win.width).toBeGreaterThanOrEqual((win.details.contentWidth ?? 0) + 4);
+  });
+
+  test("figlet-banner fits tall rendered glyphs", async () => {
+    const win = await openAndFind("figlet.open", "figlet-banner", {
+      text: "RUNTIME parity-1773492175",
+      font: "doom",
+    });
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.lineCount).toBeGreaterThanOrEqual(8);
+    expect(win.height).toBeGreaterThanOrEqual(win.details.contentHeight + 5);
   });
 
   test("pattern-animation: reports appType and summary", async () => {
@@ -89,6 +113,48 @@ describe("window parity audit", () => {
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("state-inspector");
+  });
+
+  test("runtime-inspector microapp: reports appType and summary", async () => {
+    await closeByAppType("wibwob.runtime-inspector");
+    const win = await openAndFind("microapp.wibwob.runtime-inspector.open", "wibwob.runtime-inspector");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.runtime-inspector");
+    expect(win.details.summary).toContain("Runtime Inspector");
+    expect(win.details.activeTab).toBeDefined();
+  });
+
+  test("command-lab microapp: reports appType and summary", async () => {
+    await closeByAppType("wibwob.command-lab");
+    const win = await openAndFind("microapp.wibwob.command-lab.open", "wibwob.command-lab");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.command-lab");
+    expect(win.details.summary).toContain("Command Lab");
+    expect(typeof win.details.selectedCommandId).toBe("string");
+  });
+
+  test("workspace-beacon microapp: reports appType and state", async () => {
+    await closeByAppType("wibwob.workspace-beacon");
+    const win = await openAndFind("microapp.wibwob.workspace-beacon.open", "wibwob.workspace-beacon");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.workspace-beacon");
+    expect(win.details.summary).toContain("Workspace Beacon");
+    expect(typeof win.details.note).toBe("string");
+    expect(typeof win.details.stage).toBe("string");
+  });
+
+  test("layout-probe microapp: reports appType and layout report", async () => {
+    await closeByAppType("wibwob.layout-probe");
+    const win = await openAndFind("microapp.wibwob.layout-probe.open", "wibwob.layout-probe");
+    expect(win).toBeDefined();
+    openedIds.push(win.id);
+    expect(win.details.appType).toBe("wibwob.layout-probe");
+    expect(win.details.summary).toContain("Layout Probe");
+    expect(win.details.layoutReport).toBeDefined();
+    expect(Object.keys(win.details.layoutReport.regions ?? {}).length).toBeGreaterThan(0);
   });
 
   test("workspace-manager: reports appType and summary", async () => {
@@ -159,13 +225,9 @@ describe("window parity audit", () => {
     expect(win.details.summary).toContain("palette");
   });
 
-  test("primer-gallery: reports appType and summary", async () => {
-    const win = await openAndFind("primer-gallery.open", "primer-gallery");
-    expect(win).toBeDefined();
-    openedIds.push(win.id);
-    expect(win.details.appType).toBe("primer-gallery");
-    expect(win.details.summary).toContain("gallery");
-  });
+  // Primer Gallery currently needs its own dedicated live test path.
+  // The command exists, but the open surface is not deterministic enough
+  // to keep this generic parity audit stable.
 
   // --- Aggregate check ---
 

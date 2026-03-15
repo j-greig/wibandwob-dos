@@ -13,7 +13,7 @@ cd "$(dirname "$0")/../.."
 
 WIBWOB="bun run src/cli/wibwob.ts"
 BREED="scripts/fx/breed"
-PRIMER_DIR="modules-private/ascii-art-farts/primers"
+PRIMER_DIR="microapps-private/ascii-art-farts/primers"
 OUTDIR="scratch/captures/jgsbreeder-$(date +%s)"
 mkdir -p "$OUTDIR"
 

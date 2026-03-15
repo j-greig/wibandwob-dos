@@ -6,7 +6,10 @@
  */
 import { describe, test, expect } from "bun:test";
 
-const API = "http://localhost:8099";
+const API =
+  process.env.API_URL ??
+  process.env.WW_API ??
+  "http://localhost:8099";
 
 async function post(path: string, body?: Record<string, unknown>) {
   const res = await fetch(`${API}${path}`, {
@@ -31,15 +34,37 @@ async function getWindowSummaries() {
   })).sort((a: any, b: any) => a.title.localeCompare(b.title));
 }
 
+async function getWindowByAppType(appType: string) {
+  const state = await get("/state");
+  return state.windows.find((window: any) => window.details?.appType === appType);
+}
+
+async function clearDesktop() {
+  try {
+    await post("/overlay/cancel");
+  } catch {
+    // Ignore when no overlay is active.
+  }
+  const state = await get("/state");
+  for (const windowRecord of state.windows) {
+    await post("/windows/close", { id: windowRecord.id });
+  }
+  await new Promise((r) => setTimeout(r, 350));
+  const after = await get("/state");
+  expect(after.windows.length).toBe(0);
+}
+
 describe("workspace round-trip", () => {
   const testName = `_test-roundtrip-${Date.now()}`;
 
   test("save → close all → load → windows match", async () => {
+    await clearDesktop();
+
     // 1. Open a known set of windows
     await post("/commands/run", { id: "editor.new" });
     await post("/commands/run", { id: "companion.open" });
     await post("/commands/run", { id: "figlet.open", args: { text: "TEST" } });
-    await post("/view/primer/open", { filePath: "modules/example-primers/primers/hello-world.txt" });
+    await post("/view/primer/open", { filePath: "microapps/example-primers/primers/hello-world.txt" });
 
     await new Promise((r) => setTimeout(r, 500));
     const before = await getWindowSummaries();
@@ -71,9 +96,13 @@ describe("workspace round-trip", () => {
       expect(after[i].kind).toBe(before[i].kind);
       expect(after[i].title).toBe(before[i].title);
     }
+
+    await clearDesktop();
   });
 
   test("theme persists across save/load", async () => {
+    await clearDesktop();
+
     // Set a known theme
     await post("/commands/run", { id: "theme.set", args: { name: "wibwob-dark-nord" } });
     await new Promise((r) => setTimeout(r, 300));
@@ -95,9 +124,49 @@ describe("workspace round-trip", () => {
 
     // Restore dark
     await post("/commands/run", { id: "theme.set", args: { name: "wibwob-dark" } });
+    await clearDesktop();
+  });
+
+  test("workspace-beacon microapp state persists across save/load", async () => {
+    await clearDesktop();
+
+    await post("/commands/run", { id: "microapp.wibwob.workspace-beacon.open" });
+    await new Promise((r) => setTimeout(r, 350));
+    await post("/commands/run", {
+      id: "microapp.wibwob.workspace-beacon.set-note",
+      args: { note: "Microapp proof restore marker" },
+    });
+    await post("/commands/run", { id: "microapp.wibwob.workspace-beacon.cycle-stage" });
+    await post("/commands/run", { id: "microapp.wibwob.workspace-beacon.toggle-pin" });
+    await new Promise((r) => setTimeout(r, 250));
+
+    const before = await getWindowByAppType("wibwob.workspace-beacon");
+    expect(before).toBeDefined();
+    expect(before.details.note).toBe("Microapp proof restore marker");
+    expect(before.details.stage).toBe("draft");
+    expect(before.details.pinned).toBe(true);
+
+    const saveResult = await post("/workspace/save", { name: `${testName}-beacon` });
+    expect(saveResult.ok).toBe(true);
+
+    await clearDesktop();
+
+    const loadResult = await post("/workspace/load", { name: `${testName}-beacon` });
+    expect(loadResult.ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 900));
+
+    const restored = await getWindowByAppType("wibwob.workspace-beacon");
+    expect(restored).toBeDefined();
+    expect(restored.details.note).toBe("Microapp proof restore marker");
+    expect(restored.details.stage).toBe("draft");
+    expect(restored.details.pinned).toBe(true);
+
+    await clearDesktop();
   });
 
   test("move and resize API use canonical field names", async () => {
+    await clearDesktop();
+
     await post("/commands/run", { id: "companion.open" });
     await new Promise((r) => setTimeout(r, 300));
     const state = await get("/state");
@@ -118,5 +187,6 @@ describe("workspace round-trip", () => {
     expect(sized.height).toBe(15);
 
     await post("/windows/close", { id: win.id });
+    await clearDesktop();
   });
 });

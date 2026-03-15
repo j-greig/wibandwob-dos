@@ -39,7 +39,7 @@ gets 3 lines: what it shows, when to use it, what to copy from it.
 
 persistence.md — registerSnapshot surfaced as a first-class doc.
 Poetry-clock's serialize/restore pattern as canonical example.
-Codex had to chase this through module-loader.ts; no agent should
+Codex had to chase this through microapp-loader.ts; no agent should
 have to do that again.
 
 pitfalls.md — common mistakes extracted from the two overlapping
@@ -59,7 +59,7 @@ Unchanged content, new address. Module authors never see them.
 
 ### Fixed
 
-docs/module-authoring.md — now exists. Either a redirect to
+docs/microapp-authoring.md — now exists. Either a redirect to
 building-custom-modules.md or a thin alias. Kills the dead link
 that both agents hit (Claude twice, Codex three times).
 
@@ -88,9 +88,9 @@ contract.
 
 ```
 AGENTS.md §1 "Building Modules"
-  → .agents/module-dev/quick-start.md       (30 sec, start coding)
-  → docs/building-custom-modules.md         (full guide when needed)
-  → .agents/module-dev/examples-by-tier.md  (pick example by pattern)
+  → .agents/microapp-dev/quick-start.md       (30 sec, start coding)
+  → docs/building-custom-microapps.md         (full guide when needed)
+  → .agents/microapp-dev/examples-by-tier.md  (pick example by pattern)
   → one example module                      (copy, modify, done)
 ```
 
@@ -100,12 +100,12 @@ AGENTS.md §1 "Building Modules"
 
 ```
 AGENTS.md §1 "Building Modules"
-  → .agents/module-dev/quick-start.md
-  → docs/building-custom-modules.md
-  → .agents/module-dev/sdk-reference.md     (full API surface)
-  → .agents/module-dev/persistence.md       (if persist:true)
+  → .agents/microapp-dev/quick-start.md
+  → docs/building-custom-microapps.md
+  → .agents/microapp-dev/sdk-reference.md     (full API surface)
+  → .agents/microapp-dev/persistence.md       (if persist:true)
   → src/services/microapp-sdk.ts            (verify exports)
-  → src/services/module-loader.ts           (verify host API)
+  → src/services/microapp-loader.ts           (verify host API)
 ```
 
 6 files. Deeper, but no dead links, no ghosts, no drift surprises.
@@ -118,7 +118,7 @@ agents cross from docs into source — and find what they expect.
 AGENTS.md §1 + §2 (full document)
   → .agents/shell-dev/*
   → .agents/shell-dev/specs/*
-  → .agents/module-dev/* (they maintain the SDK surface)
+  → .agents/microapp-dev/* (they maintain the SDK surface)
 ```
 
 Full read. Module section gives them consumer context for the SDK
@@ -135,6 +135,6 @@ never links to shell-dev/. The @ includes point only into module-dev/
 and docs/. shell-dev/ is below the fold in §2.
 
 For Codex/GPT agents (depth-first), this works because the verify
-arrows terminate at microapp-sdk.ts and module-loader.ts — source
+arrows terminate at microapp-sdk.ts and microapp-loader.ts — source
 files, not shell-dev/ docs. The depth-first path bottoms out in
 code, not in the wrong documentation directory.

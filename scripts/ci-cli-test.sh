@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+# @name    ci-cli-test
+# @desc    CI gate — run CLI parity suite against live API
 set -euo pipefail
-# CI parity gate — runs the wibwob CLI test suite against a live API.
+# CI parity gate — runs the canonical wibwob CLI parity suite against a live API.
 #
 # Prerequisites:
 #   - API running on port 8099 (or WW_API set)
@@ -33,17 +35,12 @@ if [ "${1:-}" = "--quick" ]; then
 fi
 
 # Full suite
-echo "--- running v1 parity suite ---"
-bash autoresearch/unix-control/autoresearch.sh
-V1_EXIT=$?
+echo "--- running canonical cli parity suite ---"
+bash scripts/cli-parity-check.sh
+CLI_EXIT=$?
 
-echo ""
-echo "--- running v2 backlog suite ---"
-bash autoresearch/unix-control-v2/autoresearch.sh
-V2_EXIT=$?
-
-if [ "$V1_EXIT" -ne 0 ]; then
-  echo "FAIL: v1 parity suite failed"
+if [ "$CLI_EXIT" -ne 0 ]; then
+  echo "FAIL: canonical cli parity suite failed"
   exit 1
 fi
 

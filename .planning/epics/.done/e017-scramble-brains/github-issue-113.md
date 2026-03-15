@@ -23,10 +23,10 @@ command catalog entries, two control API routes.
 ### Why at all
 
 Scramble is referenced throughout the system as if she is alive:
-- The system prompt (`modules-private/wibwob-prompts/wibandwob.prompt.md`) describes
+- The system prompt (`microapps-private/wibwob-prompts/wibandwob.prompt.md`) describes
   her as a co-presence on the desktop
 - The poetry clock has a dedicated `scramble` voice mode
-  (`modules/wibwob-poetry-clock/index.ts`, `Voice = "plain" | "liminal" | "scramble"`)
+  (`microapps/wibwob-poetry-clock/index.ts`, `Voice = "plain" | "liminal" | "scramble"`)
 - The VJ command ideas doc (`wibwob-command-ideas-2026-03-04.md`) lists `/pet` and a
   `/plasma` screensaver triggered by Scramble sitting on the keyboard
 

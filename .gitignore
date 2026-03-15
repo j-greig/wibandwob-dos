@@ -45,6 +45,7 @@ cache/
 
 # Local workspace snapshots/artifacts (ephemeral)
 scratch/
+.trash/
 
 # Codex logs (local ephemeral)
 .codex-logs/
@@ -68,3 +69,4 @@ tests/tidepool-smoke/results/
 
 # Large reference media (extracted frames tracked instead)
 asciicker-gameplay-animted.gif
+scripts/lib/find-ghostty-window

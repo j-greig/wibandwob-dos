@@ -4,8 +4,8 @@
 
 Both agents followed essentially the same breadcrumb trail:
 
-  AGENTS.md → docs/building-custom-modules.md → .agents/microapp-sdk.md
-  → scaffold script → example modules → SDK source → module-loader.ts
+  AGENTS.md → docs/building-custom-microapps.md → .agents/microapp-sdk.md
+  → scaffold script → example modules → SDK source → microapp-loader.ts
 
 Claude opened 11 files. Codex opened 26 (went deeper into persistence,
 snapshot patterns, and cross-references). Codex was more thorough in
@@ -15,7 +15,7 @@ following secondary references; Claude stopped earlier and assessed sooner.
 
 | Friction | Claude | Codex |
 |----------|--------|-------|
-| Dead link: docs/module-authoring.md | YES | YES |
+| Dead link: docs/microapp-authoring.md | YES | YES |
 | Content overlap between two main docs | YES | YES |
 | No fast path / 30-second pattern | YES | no |
 | Architecture detour (wrong docs first) | YES | YES (called it "defensive over-reading") |
@@ -62,7 +62,7 @@ signposting failed."
 │   ├── module-author.md
 │   ├── shell-contributor.md
 │   └── operator-agent.md
-├── module-authors/             full module authoring lane
+├── module-authors/             full microapp authoring lane
 │   ├── overview.md
 │   ├── sdk-reference.md
 │   ├── persistence.md
@@ -117,8 +117,8 @@ PHILOSOPHY:
   first move. Codex's is the right eventual state.
 
 THREE AUDIENCES:
-  Claude identified 2 audiences: module authors and core contributors.
-  Codex identified 3: module authors, shell contributors, and operators.
+  Claude identified 2 audiences: microapp authors and core contributors.
+  Codex identified 3: microapp authors, shell contributors, and operators.
   Codex is more precise — control-api.md and launch patterns really do
   serve a third audience (someone running the desktop, not building it).
 

@@ -24,7 +24,7 @@ Replace scattered raw `blessed.list()` usage (outside overlay-manager) with `cre
 - `src/windows/content-windows.ts` (3 list constructions)
 - `src/windows/backrooms-log-browser-window.ts`
 - `src/windows/backrooms-windows.ts`
-- `modules/zine/index.ts`
+- `microapps/zine/index.ts`
 
 ## Tasks
 

@@ -42,7 +42,7 @@ rule_params_current:
 - mutate_rules:
     rate: 0.05
 stamps:
-- path: modules-private/wibwob-primers/primers/conscious-matrix-1.txt
+- path: microapps-private/wibwob-primers/primers/conscious-matrix-1.txt
   x: 0
   y: 41
   locked: false

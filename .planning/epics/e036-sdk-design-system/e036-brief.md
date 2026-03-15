@@ -86,7 +86,7 @@ Every new component must pass:
 
 ### F00 — Component behaviour contract
 Define the standard lifecycle/behaviour contract all SDK components follow.
-Document in `.agents/module-dev/component-contract.md`.
+Document in `.agents/microapp-dev/component-contract.md`.
 
 - [x] Define contract: focus, keybindings, disabled state, value events, restyle, cleanup
 - [x] Define variant model: default / hover / focus / disabled / error / success

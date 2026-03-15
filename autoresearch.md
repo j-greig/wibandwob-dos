@@ -1,102 +1,77 @@
-# E042 Solid Foundations — Autoresearch Brief
+# Journal v3 — Markdown, Sort, Sessions
 
-## What are we optimising?
+## Objective
 
-The structural architecture of WibWob-DOS's `src/` TypeScript codebase, measured by
-how closely the actual file structure matches a defined target architecture.
+Extend the Symbient Journal with markdown body rendering, sort/date controls,
+and a pi session log viewer mode. All features COAT-compliant and SDK-aware.
 
-**Primary metric:** `architecture_score` (0-100, higher is better)
-**Baseline:** 14.2
+## Primary Metric
 
-## Scoring dimensions
+`journal_score = feature_score (0–40) + ui_score (0–60)`
 
-| Dimension | Weight | Baseline | What it measures |
-|-----------|--------|----------|-----------------|
-| God object decomposition | 30% | 0 | How much the 4 god objects have been split toward targets |
-| Layer discipline | 25% | 20 | Cross-layer import violations (core→services, core→windows) |
-| File health | 20% | 18 | Files over 1000/500 line thresholds |
-| Target file existence | 10% | 0 | Whether planned extraction files exist |
-| Deduplication | 10% | 50 | Known code duplications resolved |
-| Type safety | 5% | 12.5 | `as any` casts beyond blessed framework gaps |
+Higher is better.
 
-## Target architecture
+### Feature score (40 pts max)
 
-Full target: `autoresearch/solid-foundations/target-architecture.md`
+| Version | Points | Features |
+|---------|--------|----------|
+| F1 — Markdown Body | 10 | renderMarkdown in preview pane, renderMarkdown in read mode, heading styles, code blocks, horizontal rules, bullet lists |
+| F2 — Sort & Date | 10 | sort toggle key (s), cycle updatedAt/createdAt/title, sort indicator in status bar, date group headers in list, index mapping for headers |
+| F3 — Session Viewer | 14 | detect ~/.pi, session list view, session detail view, mode toggle key, session message rendering, role-colored blocks, tool call summaries |
+| F4 — Integration | 6 | journal.sessions command, journal.session.read command, describeState includes view mode, Core Apps menu (done) |
 
-The 4 god objects and their targets:
-- `app-controller.ts` (2244 → ~600 lines): Extract `action-bridge.ts`, `window-openers.ts`
-- `ui-parts.ts` (2395 → ~200 lines): Extract to 9 focused ui-*.ts files
-- `browser-windows.ts` (2082 → split into 4): `file-manager-window.ts`, `document-reader-window.ts`, etc.
-- `wibwob-agent-session.ts` (1063 → ~400 lines): Extract tool files to `services/agent/`
+### UI + UX score (60 pts max)
 
-## Rules
+| Axis | Max | What it measures |
+|------|-----|-----------------|
+| MD_RENDER | 10 | Headings visually distinct, code blocks bordered, lists indented, rules visible, body text legible |
+| LIST_UX | 10 | Date headers scannable, sort state clear, no dead zones, index mapping correct (selection skips headers) |
+| SESSION_UX | 10 | Session list readable (date, id, preview), detail view clear (user/assistant blocks), tool calls summarised not dumped |
+| COHERENCE | 10 | Consistent across journal mode and session mode, same chrome, same key patterns |
+| LAYOUT | 10 | Two-pane works in both modes, responsive breakpoints maintained, no overflow |
+| POLISH | 10 | Theme tokens throughout, no hardcoded colors, mode indicator clear, transitions smooth |
 
-1. **typecheck must pass** — `bun run typecheck` is the gate
-2. **Backward compatible imports** — original files must still exist as re-export barrels
-3. **No functional regressions** — the app must boot and work
-4. **E039 zone: do not restructure** — `command-catalog.ts`, `command-registry.ts`, `control-api.ts` are being rethought by E039. Trim dead weight only, no structural/interface changes
-5. **CLI naming is E039-owned** — do not rename `cli/wibwob.ts` in E042 unless E039 explicitly requires it
-6. **Blessed `as any` casts are permanent** — `.scrollTo()`, `.selected`, `.iwidth`, `.setValue()`, `'100%' as any` — these are @types gaps, not bugs
-7. **No speculative abstractions** — extract plain modules first; only add registry/factory layers when there is concrete runtime need
-8. **One logical change per iteration** — extract one file or fix one concern per step
-9. **Re-exports from old paths** — any extracted file must have its exports re-exported from the original file
-10. **Operability is mandatory** — no interactive interstitial flow without inspect/select/confirm/cancel control path
+## How to Run
 
-## How to score
+```bash
+bash autoresearch.sh
+```
 
-Run `bash autoresearch.sh` — it outputs all metrics and the composite `architecture_score`.
+## Scoring Discipline
 
-## Analysis reports
+- Score against rubric, not expectations
+- Feature checks are binary (grep + API verification)
+- UI axes: 0-3 bad, 4-6 competent, 7-8 good, 9-10 excellent
+- Don't inflate scores to hit targets
+- Don't overfit to benchmarks or cheat
 
-Read these for deep understanding of each folder:
-- `autoresearch/solid-foundations/core-report.md` — 37 files in src/core/
-- `autoresearch/solid-foundations/services-report.md` — 44 files in src/services/
-- `autoresearch/solid-foundations/windows-report.md` — 17 files in src/windows/
-- `autoresearch/solid-foundations/cli-tests-app-report.md` — CLI, tests, app entry
-- `autoresearch/solid-foundations/codex-architecture-review.md` — external critical review with 5-whys + E039 context
+## Files in Scope
 
-## Suggested iteration order
+- `microapps/journal/microapp.json`
+- `microapps/journal/index.ts`
+- `scratch/journal-v2/entries/*.json`
 
-This order was revised using Codex review (`codex-architecture-review.md`) to prioritise real agent friction before large file churn.
+## Off Limits
 
-### Wave 0: Correctness + operability first
-1. Fix `canvas-types.ts` module import inversion (core must not import modules).
-2. Add explicit overlay control contracts (`inspect/select/confirm/cancel`) for shared pickers.
-3. Ensure query/control commands return structured data on direct paths (`direct: true` semantics).
-4. Enforce menu command rule: required args must have no-arg fallback or picker flow.
-5. Document restart-required vs reload-safe paths where agents actually trip.
+- `src/` — shell internals (except reading SDK exports)
+- Other `microapps/` directories
+- Theme files, SDK source
 
-### Wave 1: Small, high-signal dedup work
-6. Extract shared `html-to-markdown.ts` and remove duplicate implementations.
-7. Extract shared ANSI constants for windows.
-8. Extract shared test HTTP helpers (`src/tests/helpers/api-client.ts`).
-9. Extract shared draft-input helper used by agent/scramble flows.
+## Constraints
 
-### Wave 2: Focused god-object seams (lower risk)
-10. Split `app-controller.ts` into `action-bridge.ts`, `window-openers.ts`, `fx-service.ts`, `clipboard-service.ts`.
-11. Split `wibwob-agent-session.ts` into tool-focused files.
-12. Extract `music-player-window.ts` visualiser/analyser internals.
+- `bun run typecheck` must pass
+- No new npm dependencies
+- All imports from `../../src/services/microapp-sdk.js`
+- Use `host.theme()` tokens only
+- `scripts/restart.sh` required for TS changes (not microapps.reload)
+- Session viewer only appears if `~/.pi` exists
+- Session JSONL files can be large — lazy load, don't slurp all content upfront
 
-### Wave 3: High-churn splits (after contracts are stable)
-13. Split `browser-windows.ts` into dedicated window files.
-14. Split `ui-parts.ts` into focused `ui-*` files while keeping `ui-parts.ts` as a compatibility barrel.
-15. Split `overlay-manager.ts` into prompt modules, preserving operability contracts.
-16. Split `generative-windows.ts` and deprecate companion patterns.
+## Iteration Order
 
-### Wave 4: File-manager stage 2
-17. Move file-manager git/search/OS integration logic into services.
-18. Keep `file-manager-window.ts` focused on rendering and input orchestration.
-19. Extract reusable viewport helpers to core when shared.
-
-### Wave 5: E039 execution (separate epic)
-20. E039 owns CLI naming/packaging and transport evolution.
-21. Add Unix socket transport to `control-api.ts` as additive behavior.
-22. Keep command discovery and response contracts stable while E039 lands.
-
-## What NOT to do
-
-- Don't rename files just to match target names if the content hasn't changed
-- Don't create empty stub files to boost `target_files_exist` score
-- Don't move code between files without understanding what it does
-- Don't touch command system files beyond trimming (E039 zone)
-- Don't break existing imports — always add re-exports
+1. Markdown body rendering (preview pane + read mode)
+2. Sort toggle + status bar indicator
+3. Date group headers with index mapping
+4. Pi session list view
+5. Pi session detail view
+6. Session API commands + describeState

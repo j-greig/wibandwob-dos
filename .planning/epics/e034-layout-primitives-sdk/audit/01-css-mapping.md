@@ -1,7 +1,7 @@
 # Layout Primitives: WibWob-DOS vs CSS / Tailwind Audit
 
 **Date:** 2026-03-12  
-**Scope:** All layout functions, types, and concepts from `ui-parts.ts`, `panel-layout.ts`, `canvas-types.ts`, `modules/hello-world/index.ts`, `microapp-sdk.ts`
+**Scope:** All layout functions, types, and concepts from `ui-parts.ts`, `panel-layout.ts`, `canvas-types.ts`, `microapps/hello-world/index.ts`, `microapp-sdk.ts`
 
 > **CORRECTIONS (post-review decisions):**
 >
@@ -63,9 +63,9 @@ Rename breakpoints to match Tailwind's ascending scale: S→xs, M→sm, L→md, 
 
 | WibWob Concept | CSS Equivalent | Tailwind Equivalent | Location | SDK Export | Status |
 |---|---|---|---|---|---|
-| `Compass` type (9 cardinal points: NW/N/NE/W/C/E/SW/S/SE) | `justify-content` + `align-items` | `justify-{start\|center\|end}` + `items-{start\|center\|end}` | `modules/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
-| `COMPASS_ALIGN` mapping | Maps cardinal → `{align, valign}` blessed props | Maps to Tailwind spacing/alignment | `modules/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
-| `pickBreakpoint()` helper | Media query logic | Tailwind directives or `@apply` | `modules/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
+| `Compass` type (9 cardinal points: NW/N/NE/W/C/E/SW/S/SE) | `justify-content` + `align-items` | `justify-{start\|center\|end}` + `items-{start\|center\|end}` | `microapps/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
+| `COMPASS_ALIGN` mapping | Maps cardinal → `{align, valign}` blessed props | Maps to Tailwind spacing/alignment | `microapps/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
+| `pickBreakpoint()` helper | Media query logic | Tailwind directives or `@apply` | `microapps/hello-world/index.ts` (inlined) | ❌ NOT exported | ⚠️ Candidate |
 
 **Problem:**  
 The compass system and responsive breakpoint logic live *inlined* in hello-world as "candidates for SDK extraction" but are never extracted. They're proven design patterns that should be shared primitives.
@@ -218,7 +218,7 @@ Extract `createGrid()` to `src/core/grid-layout.ts` and export via `microapp-sdk
 ### 🟡 Major (Extractions & Promotions)
 
 3. **Extract `createGrid()` to SDK**
-   - Move from `modules/hello-world/index.ts` → `src/core/grid-layout.ts`
+   - Move from `microapps/hello-world/index.ts` → `src/core/grid-layout.ts`
    - Export via `microapp-sdk.ts`
    - **Types to extract:** `TrackSize`, `GridOptions`, `GridCell`, `Grid`
 
@@ -228,7 +228,7 @@ Extract `createGrid()` to `src/core/grid-layout.ts` and export via `microapp-sdk
    - **Use case:** Alignment helper for all microapps
 
 5. **Extract `pickBreakpoint()` to SDK**
-   - Move from `modules/hello-world/index.ts` → `src/core/responsive.ts` (new file)
+   - Move from `microapps/hello-world/index.ts` → `src/core/responsive.ts` (new file)
    - Export via `microapp-sdk.ts`
    - **Use case:** Responsive logic in all modules
 
@@ -335,7 +335,7 @@ Extract `createGrid()` to `src/core/grid-layout.ts` and export via `microapp-sdk
 
 **Assessment:** ✅ All names are correct. No changes needed.
 
-### `modules/hello-world/index.ts` (500+ lines)
+### `microapps/hello-world/index.ts` (500+ lines)
 
 **Inlined Candidates for SDK Extraction:**
 - ⚠️ `Rect` type — duplicate of `ui-parts.ts`, should import
@@ -407,8 +407,8 @@ Extract `createGrid()` to `src/core/grid-layout.ts` and export via `microapp-sdk
 - `src/core/grid-layout.ts` — NEW, extract createGrid
 - `src/core/responsive.ts` — NEW, extract pickBreakpoint
 - `src/services/microapp-sdk.ts` — add new exports
-- `modules/hello-world/index.ts` — remove inlined versions, import from SDK
-- `modules/*/index.ts` — update breakpoint names S/M/L/XL → xs/sm/md/lg
-- Tests: `src/**/*.test.ts`, `modules/**/*.test.ts`
+- `microapps/hello-world/index.ts` — remove inlined versions, import from SDK
+- `microapps/*/index.ts` — update breakpoint names S/M/L/XL → xs/sm/md/lg
+- Tests: `src/**/*.test.ts`, `microapps/**/*.test.ts`
 - Docs: `.agents/architecture.md`, `.agents/specs/window-system.md`
 

@@ -11,7 +11,7 @@ depends_on: []
 
 ## TL;DR
 
-Create `WibWobWorld`, the first reusable terrain-generation surface for a future SimCity 2000 / Dwarf Fortress-style TUI game played inside the full WibWob-DOS desktop. The first shipped slice is not a game yet: it is a deterministic landscape generator with elevation-aware terrain classification, water, vegetation, hills, peaks, and API-visible state. `WibWobWorld` ships as a new private microapp in `modules-private/`, while the existing built-in `Contour Studio` stays intact as a prototype.
+Create `WibWobWorld`, the first reusable terrain-generation surface for a future SimCity 2000 / Dwarf Fortress-style TUI game played inside the full WibWob-DOS desktop. The first shipped slice is not a game yet: it is a deterministic landscape generator with elevation-aware terrain classification, water, vegetation, hills, peaks, and API-visible state. `WibWobWorld` ships as a new private microapp in `microapps-private/`, while the existing built-in `Contour Studio` stays intact as a prototype.
 
 ## Top-Level Product Assumptions
 
@@ -97,7 +97,7 @@ This means the terrain slice must behave like a first-class desktop app surface:
 - `Contour Studio` already proves the contour prototype and should not be destabilized.
 - `Terrain Lab` is a composition demo proving the player can be embedded with side panels.
 - the game-facing work should start as a separate sibling app surface so iteration can be more aggressive
-- putting it in `modules-private/` matches the likely product boundary for game-specific work
+- putting it in `microapps-private/` matches the likely product boundary for game-specific work
 
 Target outcome:
 - `WibWobWorld` generates a SimCity 2000-ish TUI landscape with water, vegetation, hills, ridges, and peaks
@@ -128,7 +128,7 @@ Current gaps:
 Do not turn the existing built-in `Contour Studio` into the terrain model.
 
 Keep this split:
-- `modules-private/wibwobworld/`
+- `microapps-private/wibwobworld/`
   - microapp shell, keys, focus, `describeState()`, command registration
 - `contour-engine.ts`
   - terrain archetypes, raw hills, raw heightmap, contour rendering
@@ -142,12 +142,12 @@ That keeps the feature modular, testable, and reusable by future game windows.
 ### Module Placement
 
 Implementation target:
-- new microapp under `modules-private/`
-- loaded by `src/services/module-loader.ts`
+- new microapp under `microapps-private/`
+- loaded by `src/services/microapp-loader.ts`
 - opened through dynamic `microapp.*` commands
 
 Important note:
-- `modules-private/` is a git submodule
+- `microapps-private/` is a git submodule
 - planning and integration notes can live in this repo
 - actual private module code should be authored in the private modules repo, then pulled in through the submodule
 
@@ -332,7 +332,7 @@ All stories complete as of 2026-03-07. Firstperson restore bug tracked in E022 S
   - introduce semantic terrain colours
 
 - [x] **F04 — WibWobWorld microapp integration**
-  - add the microapp shell in `modules-private/`
+  - add the microapp shell in `microapps-private/`
   - register commands and snapshot behavior
   - keep UI thin
   - wire state + keybindings to new services

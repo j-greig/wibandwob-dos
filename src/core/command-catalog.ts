@@ -5,8 +5,17 @@
  * by command-registry.ts.
  */
 
-import type { AppType, MenuConfig, MenuItem } from "./types.js";
-import type { CapabilityKey } from "../services/capability-service.js";
+import type { MenuConfig, MenuItem } from "./types.js";
+import type {
+  AppCommandCategory,
+  AppCommandDefinition,
+  AppCommandDescriptor,
+  AppCommandGroup,
+  ContextMenuPlacement,
+  MenuContext,
+  MenuPlacement,
+  PalettePlacement,
+} from "../domain/command-definition.js";
 import { z } from "zod";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
@@ -14,6 +23,7 @@ export interface AppMenuActions {
   browsePrimers: () => void;
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
+  openPrimerPicker: () => unknown;
   listPrimers: () => unknown;
   smearTextSurface: (args?: Record<string, unknown>) => unknown;
   fxGlitch: (args?: Record<string, unknown>) => unknown;
@@ -21,6 +31,7 @@ export interface AppMenuActions {
   fxBreed: (args?: Record<string, unknown>) => unknown;
   fxFlip: (args?: Record<string, unknown>) => unknown;
   openTextFile: (args?: Record<string, unknown>) => void;
+  openEditorPicker: () => unknown;
   openEditor: () => void;
   saveFocusedEditor: () => void;
   saveAsFocusedEditor: () => void;
@@ -28,16 +39,15 @@ export interface AppMenuActions {
   loadWorkspacePrompt: () => void;
   copyFocusedWindowText: () => void;
   exportFocusedWindowText: (args?: Record<string, unknown>) => void;
-  openArtWindow: () => void;
-  openContourWindow: () => void;
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
+  reloadMicroapps: () => unknown;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
-  clearDesktop: () => void;
+  clearDesktop: (args?: Record<string, unknown>) => unknown;
   toggleDesktopChrome: () => void;
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
@@ -52,11 +62,8 @@ export interface AppMenuActions {
   openGallery: () => void;
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
-  openFigletBanner: (args?: Record<string, unknown>) => void;
-  listFigletFonts: () => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
-  openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openScrambleSmol: () => void;
   openScrambleFloating: () => void;
@@ -85,10 +92,8 @@ export interface AppMenuActions {
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
-  // ── Plasma ─────────────────────────────────────────────
-  openPlasmaWindow: (args?: Record<string, unknown>) => void;
-  openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   openMarkdownViewer: (args?: Record<string, unknown>) => void;
+  openMarkdownPicker: () => unknown;
   toggleMarkdownFiglet: () => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
@@ -112,76 +117,6 @@ export interface AppMenuActions {
   viewReadme: () => void;
 }
 
-/** Menu bucket — determines which top-level menu a command appears in. */
-export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "demos" | "help";
-/** Logical clustering within a category, used for future separators and adapters. */
-export type AppCommandGroup =
-  | "browse"
-  | "open"
-  | "save"
-  | "focus"
-  | "layout"
-  | "surface"
-  | "edit"
-  | "inspect"
-  | "system";
-
-/** Where a command appears in a top-level menu. Not executable on its own. */
-export interface MenuPlacement {
-  category: AppCommandCategory;
-  order: number;
-  label?: string;
-  appTypes?: AppType[];
-  separatorAfter?: true;
-  favourite?: true;
-}
-
-/** Where a command appears in the command palette. Not executable on its own. */
-export interface PalettePlacement {
-  order: number;
-  label?: string;
-}
-
-/** Context passed to context-menu visibility checks. */
-export interface MenuContext {
-  focusedWindow?: { kind: string; filePath?: string; title?: string };
-  selection?: "file" | "url" | "none";
-}
-
-/** Coarse context-menu visibility. */
-export interface ContextMenuPlacement {
-  /** Show when these window kinds are focused. Empty/undefined = desktop only. */
-  windowKinds?: string[];
-  /** Show on desktop right-click (no window focused). */
-  desktop?: boolean;
-  /** Fine-grained check. Return false to hide even when coarse match passes. */
-  enabled?: (ctx: MenuContext) => boolean;
-  /** Override label in context menu. */
-  label?: string;
-  /** Sort order within context menu. */
-  order?: number;
-}
-
-/** Authored command definition — the static catalog shape before projection. */
-export interface AppCommandDefinition {
-  id: string;
-  label: string;
-  group: AppCommandGroup;
-  actionKey: keyof AppMenuActions;
-  requires?: CapabilityKey[];
-  description?: string;
-  multiInstance?: boolean;
-  menuPlacements?: MenuPlacement[];
-  palettePlacement?: PalettePlacement;
-  contextMenu?: ContextMenuPlacement;
-  api?: boolean;
-  agent?: boolean;
-  /** Hint for CLI output formatting: json (pretty-print), text (raw), void (silent on success). */
-  returns?: "json" | "text" | "void";
-  /** Zod schema for command arguments. Enables validation, --help generation, and OpenAPI accuracy. */
-  params?: z.ZodType;
-}
-
 interface MenuDefinition {
   category: AppCommandCategory;
   label: MenuConfig["label"];
@@ -189,31 +124,14 @@ interface MenuDefinition {
   left: MenuConfig["left"];
 }
 
-/** Projected command descriptor — normalised shape consumed by registry, palette, and API. */
-export interface AppCommandDescriptor {
-  id: string;
-  label: string;
-  group: AppCommandGroup;
-  actionKey: keyof AppMenuActions;
-  requires?: CapabilityKey[];
-  description?: string;
-  multiInstance?: boolean;
-  menuPlacements: MenuPlacement[];
-  palettePlacement?: PalettePlacement;
-  contextMenu?: ContextMenuPlacement;
-  api: boolean;
-  agent: boolean;
-  returns?: "json" | "text" | "void";
-}
-
 const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "file", label: "File", key: "f", left: 1 },
   { category: "edit", label: "Edit", key: "e", left: 8 },
   { category: "view", label: "View", key: "v", left: 15 },
   { category: "window", label: "Window", key: "w", left: 22 },
-  { category: "applications", label: "Applications", key: "a", left: 31 },
-  { category: "demos", label: "Demos", key: "d", left: 47 },
-  { category: "help", label: "Help", key: "h", left: 55 }
+  { category: "core", label: "Core Apps", key: "c", left: 31 },
+  { category: "applications", label: "Applications", key: "a", left: 42 },
+  { category: "help", label: "Help", key: "h", left: 57 }
 ];
 
 /**
@@ -226,11 +144,11 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
  * compatibility. Kebab-case aliases are registered in LEGACY_COMMAND_ALIASES
  * in command-registry.ts so both forms work.
  *
- * Microapp commands are auto-prefixed: microapp.<moduleId>.<commandId>
+ * Microapp commands are auto-prefixed: microapp.<microappId>.<commandId>
  *
  * Labels: use plain names, not "Open ..." prefix (majority convention).
  */
-const APP_COMMANDS: AppCommandDefinition[] = [
+const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
   {
     id: "primer.browse",
     label: "Browse Primers",
@@ -342,14 +260,21 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.open",
     label: "Open Primer...",
-    description: "Open a primer viewer. Args: filePath (string, absolute path). Optional: x, y, w, h (numbers for position/size — w,h default to recommended dimensions). Without args opens interactive file picker.",
+    description: "Open a primer viewer. Menu use can open the file picker; API/agent callers should pass filePath. Optional: x, y, w, h for position and size.",
     group: "open",
     actionKey: "openPrimerPrompt",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
     api: true,
     agent: true,
-    returns: "json"
+    returns: "json",
+    params: z.object({
+      filePath: z.string().optional().describe("Absolute path to the primer file"),
+      x: z.number().optional().describe("Left position in columns"),
+      y: z.number().optional().describe("Top position in rows"),
+      w: z.number().optional().describe("Window width in columns"),
+      h: z.number().optional().describe("Window height in rows"),
+    })
   },
   {
     id: "primer.list",
@@ -360,6 +285,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     api: true,
     agent: true,
     returns: "json"
+  },
+  {
+    id: "primer.picker.open",
+    label: "Open Primer Picker",
+    description: "Open the shared primer file-browser overlay intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openPrimerPicker",
+    palettePlacement: { order: 21 },
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "text.smear",
@@ -436,25 +372,55 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "editor.open",
     label: "Open Text File...",
-    description: "Open a text file in the editor. Args: filePath (string), title (string, optional), initial (string, optional). Without args opens interactive file picker.",
+    description: "Open a text file in the editor. Menu use can open the file picker; API/agent callers should pass filePath or create an unsaved buffer with title/initial.",
     group: "open",
     actionKey: "openTextFile",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     api: true,
-    agent: true
+    agent: true,
+    params: z.object({
+      filePath: z.string().optional().describe("Path to an existing or new text file"),
+      title: z.string().optional().describe("Unsaved buffer title"),
+      initial: z.string().optional().describe("Initial text for an unsaved buffer"),
+    })
+  },
+  {
+    id: "editor.picker.open",
+    label: "Open Text File Picker",
+    description: "Open the shared text-file browser overlay intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openEditorPicker",
+    palettePlacement: { order: 31 },
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "markdown.open",
     label: "Open Markdown...",
-    description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Args: filePath (string, absolute path to .md file). Without args opens interactive file picker filtered to *.md.",
+    description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Menu use can open the markdown picker; API/agent callers should pass filePath.",
     group: "open",
     actionKey: "openMarkdownViewer",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 35 }],
     palettePlacement: { order: 32 },
     api: true,
-    agent: true
+    agent: true,
+    params: z.object({
+      filePath: z.string().optional().describe("Absolute path to a markdown file"),
+    })
+  },
+  {
+    id: "markdown.picker.open",
+    label: "Open Markdown Picker",
+    description: "Open the shared markdown picker intentionally so API/agent callers can drive it with overlay.select/confirm/cancel.",
+    group: "open",
+    actionKey: "openMarkdownPicker",
+    palettePlacement: { order: 33 },
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "markdown.toggle_figlet",
@@ -570,6 +536,18 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
+    id: "microapps.reload",
+    label: "Reload Microapps",
+    description: "Reload dynamic microapp modules from disk without restarting the shell.",
+    group: "system",
+    actionKey: "reloadMicroapps",
+    menuPlacements: [{ category: "view", order: 95 }],
+    palettePlacement: { order: 196 },
+    api: true,
+    agent: true,
+    returns: "json",
+  },
+  {
     id: "monster-cam.open",
     label: "Monster Cam",
     description: "Open the Monster Cam window.",
@@ -681,7 +659,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "window.move",
     label: "Move Window",
-    description: "Move a window by id. Args: { id: number, x: number, y: number }",
+    description: "Move a window by id. Args: { id: number, left: number, top: number }",
     group: "focus",
     actionKey: "moveWindowById",
     api: true,
@@ -689,14 +667,14 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     returns: "void",
     params: z.object({
       id: z.number().describe("Window ID from GET /state"),
-      x: z.number().describe("Absolute X coordinate"),
-      y: z.number().describe("Absolute Y coordinate"),
+      left: z.number().describe("Absolute left coordinate"),
+      top: z.number().describe("Absolute top coordinate"),
     })
   },
   {
     id: "window.resize",
     label: "Resize Window",
-    description: "Resize a window by id. Args: { id: number, w: number, h: number }",
+    description: "Resize a window by id. Args: { id: number, width: number, height: number }",
     group: "focus",
     actionKey: "resizeWindowById",
     api: true,
@@ -711,12 +689,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "desktop.clear-all",
     label: "Clear Desktop",
-    description: "Close all windows except the Wib&Wob Agent. Use for silence cues in timelines.",
+    description: "Emergency escape hatch: cancel active overlays, close menus, and close all non-agent windows. Pass all=true to nuke every window.",
     group: "focus",
     actionKey: "clearDesktop",
     menuPlacements: [{ category: "window", order: 35 }],
     api: true,
-    agent: false
+    agent: true,
+    returns: "json",
+    params: z.object({
+      all: z.boolean().optional().describe("Close every window, including chat/agent windows. Default false."),
+    })
   },
   {
     id: "desktop.toggle_chrome",
@@ -898,91 +880,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     api: true,
     agent: true
   },
-  {
-    id: "art.open",
-    label: "Generative Art",
-    description: "Open an animated generative art window.",
-    group: "surface",
-    actionKey: "openArtWindow",
-    menuPlacements: [{ category: "demos", order: 60 }],
-    api: true,
-    agent: true
-  },
-
-  {
-    id: "figlet.open",
-    label: "Figlet Banner",
-    description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
-    group: "surface",
-    actionKey: "openFigletBanner",
-    requires: ["bin.figlet"],
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
-    palettePlacement: { order: 50, label: "Figlet Banner" },
-    api: true,
-    agent: true,
-    returns: "json",
-    params: z.object({
-      text: z.string().describe("Text to render as FIGlet"),
-      font: z.string().optional().describe("FIGlet font name"),
-    })
-  },
-  {
-    id: "figlet.fonts",
-    label: "Figlet Fonts",
-    description: "List available FIGlet fonts with default and metadata. Useful for API-driven figlet flows that skip interactive prompts.",
-    group: "inspect",
-    actionKey: "listFigletFonts",
-    requires: ["bin.figlet"],
-    api: true,
-    agent: true
-  },
-  {
-    id: "pattern.open",
-    label: "Plasma Patterns",
-    description: "Open a pattern field window.",
-    group: "surface",
-    actionKey: "openPatternWindow",
-    menuPlacements: [{ category: "applications", order: 80 }],
-    palettePlacement: { order: 60 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "plasma.open",
-    label: "Plasma",
-    description: "Open animated plasma colour-field screensaver. Args: mood (circuit|void|chaos|aurora|sunset|acid|deep-space|chrome), renderMode (plain|emoji|ansi).",
-    group: "surface",
-    actionKey: "openPlasmaWindow",
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 82 }],
-    palettePlacement: { order: 52 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "plasma.from-primer",
-    label: "Plasma: From Primer",
-    description: "Open a plasma screensaver tuned to a primer file's mood. Args: filePath (string). Analyses the text and picks a matching plasma mood.",
-    group: "surface",
-    actionKey: "openPlasmaFromPrimer",
-    multiInstance: true,
-    menuPlacements: [{ category: "applications", order: 83 }],
-    palettePlacement: { order: 53 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "contour.open",
-    label: "Contour Studio",
-    description: "Open animated contour map studio. Three modes: chaos (organic contours), order (binary grids), hybrid (mixed).",
-    group: "surface",
-    actionKey: "openContourWindow",
-    menuPlacements: [{ category: "applications", order: 85 }],
-    palettePlacement: { order: 55 },
-    api: true,
-    agent: true
-  },
+  // ── Migrated to microapps (no backward compat shims) ──────────────
+  // figlet.open, figlet.fonts     → microapp.wibwob.figlet.*
+  // contour.open                  → microapp.wibwob.contour.open
+  // plasma.open, plasma.from-primer → microapp.wibwob.plasma.*
+  // pattern.open, art.open        → microapp.wibwob.generative.*
   {
     id: "terrain-lab.open",
     label: "Terrain Lab",
@@ -1194,11 +1096,11 @@ function byPlacementOrder(
 
 /** Project static catalog data into normalised command descriptors. */
 /** Look up a raw command definition by id (includes params schema). */
-export function getCommandDefinition(id: string): AppCommandDefinition | undefined {
+export function getCommandDefinition(id: string): AppCommandDefinition<keyof AppMenuActions> | undefined {
   return APP_COMMANDS.find((c) => c.id === id);
 }
 
-export function listAppCommands(): AppCommandDescriptor[] {
+export function listAppCommands(): AppCommandDescriptor<keyof AppMenuActions>[] {
   return APP_COMMANDS.map((command) => ({
     id: command.id,
     label: command.label,
@@ -1219,6 +1121,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
 /** Build runtime MenuConfig[] by projecting catalog commands into their menu placements. */
 export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   return MENU_DEFINITIONS.map((menu) => ({
+    category: menu.category,
     label: menu.label,
     key: menu.key,
     left: menu.left,

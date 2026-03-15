@@ -1,6 +1,6 @@
 # Run 001 — LLM Orch Studio UI Quality
 
-First autoresearch visual scoring session. Target: `modules/llm-orch-studio/index.ts`.
+First autoresearch visual scoring session. Target: `microapps/llm-orch-studio/index.ts`.
 
 ## Config
 

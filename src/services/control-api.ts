@@ -29,47 +29,36 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { BackroomsChannel, DesktopState } from "../core/types.js";
-import type { RuntimeStatsSnapshot } from "../core/runtime-stats.js";
-import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
+import type { BackroomsChannel } from "../core/types.js";
+import type { CommandSurface } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
+import type { RuntimeCommandService } from "../application/runtime-command-service.js";
+import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
+import type { RuntimeWindowService } from "../application/runtime-window-service.js";
+import type { RuntimeWorkspaceService } from "../application/runtime-workspace-service.js";
+import type { InstanceDescriptor } from "../domain/instance-descriptor.js";
 
-interface ControlApiHandlers {
-  getState: () => DesktopState;
-  /** Rebuild state from scratch (bypasses cache). */
-  syncState: () => DesktopState;
-  getPrimerInfo: (pathOrName: string) => unknown;
-  listCommands: (
-    surface?: CommandSurface,
-    opts?: { includeUnavailable?: boolean },
-  ) => CommandListItem[];
-  runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
-  windows: import("../core/window-facade.js").WindowFacade;
-  /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
-  screenshotText: () => string;
-  /** Scramble brain state snapshot for agents. */
-  getScrambleState: () => {
-    status: string;
-    sleeping: boolean;
-    model: string;
-    sessionId: string;
-    messageCount: number;
-    lastMessage: string | null;
-    logPath: string | null;
-  };
-  /** Shell-level runtime stats snapshot for diagnostics and benchmark evidence. */
-  getRuntimeStats: () => RuntimeStatsSnapshot;
-  /** Scramble full conversation history. */
-  getScrambleHistory: () => Array<{ role: string; content: string; timestamp: number }>;
+interface ControlApiDeps {
+  commands: RuntimeCommandService;
+  inspection: RuntimeInspectionService;
+  windows: RuntimeWindowService;
+  workspace: RuntimeWorkspaceService;
 }
 
-interface ControlApiIdentity {
-  instanceLabel?: string;
-  sessionId: string;
-}
+type RuntimeControlApiIdentity = Pick<
+  InstanceDescriptor,
+  | "instanceId"
+  | "instanceLabel"
+  | "host"
+  | "apiPort"
+  | "scratchBase"
+  | "capturesDir"
+  | "workspacesDir"
+  | "statePath"
+>;
 
 // ---------------------------------------------------------------------------
 // Endpoint catalogue — single source of truth for GET / and /openapi.json
@@ -78,10 +67,12 @@ interface ControlApiIdentity {
 const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/",                              description: "Service info + endpoint list (this response)" },
   { method: "GET",  path: "/help",                          description: "Alias for /" },
-  { method: "GET",  path: "/health",                        description: "Health check" },
+  { method: "GET",  path: "/health",                        description: "Instance identity: id, label, pid, uptime, port, socketPath" },
+  { method: "GET",  path: "/config",                        description: "Instance config: paths (scratch, captures, workspaces, state)" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/runtime/inspection",            description: "Structured runtime snapshot: desktop state, menu/overlay UI state, runtime stats, and Scramble inspection." },
   { method: "GET",  path: "/runtime/stats",                 description: "Shell-level runtime stats: render FPS, frame time, RAM, and agent activity" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
@@ -92,7 +83,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
   { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
-  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
+  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
   // ── View endpoints — convenience aliases for /commands/run ──
   // All dispatch through the command registry. Prefer /commands/run for new integrations.
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Open primer viewer. Alias: primer.open" },
@@ -182,13 +173,16 @@ function buildOpenApiSpec(port: number) {
 
 export class ControlApiService {
   private server?: { stop: (closeActiveConnections?: boolean) => void };
+  private socketServer?: { stop: (closeActiveConnections?: boolean) => void };
   private actualPort?: number;
+  private socketPath?: string;
+  private readonly startedAt = Date.now();
   private enabled = false;
 
   constructor(
     private readonly port: number,
-    private readonly handlers: ControlApiHandlers,
-    private readonly identity: ControlApiIdentity,
+    private readonly deps: ControlApiDeps,
+    private readonly identity: RuntimeControlApiIdentity,
   ) {}
 
   start(): void {
@@ -197,7 +191,8 @@ export class ControlApiService {
         Bun?: {
           serve: (options: {
             hostname?: string;
-            port: number;
+            port?: number;
+            unix?: string;
             fetch: (request: Request) => Promise<Response> | Response;
           }) => { stop: (closeActiveConnections?: boolean) => void };
         };
@@ -208,6 +203,8 @@ export class ControlApiService {
       this.actualPort = undefined;
       return;
     }
+
+    // ── HTTP listener (port) ──
     const ports = [
       this.port,
       this.port + 1,
@@ -225,24 +222,54 @@ export class ControlApiService {
         this.actualPort = port;
         this.enabled = true;
         log.app(`control API listening on port ${port}`);
-        return;
+        break;
       } catch {
         continue;
       }
     }
-    this.server = undefined;
-    this.actualPort = undefined;
-    this.enabled = false;
+
+    if (!this.enabled) {
+      this.server = undefined;
+      this.actualPort = undefined;
+      return;
+    }
+
+    // ── Unix socket listener (local discovery + targeting) ──
+    if (!this.identity.scratchBase) return;
+    const label = this.identity.instanceLabel || this.identity.instanceId;
+    const instancesDir = path.join(this.identity.scratchBase, "instances");
+    const sockPath = path.join(instancesDir, `${label}.sock`);
+    try {
+      fs.mkdirSync(instancesDir, { recursive: true });
+      // Clean stale socket from previous run
+      try { fs.unlinkSync(sockPath); } catch {}
+      this.socketServer = bunRuntime.serve({
+        unix: sockPath,
+        fetch: async (request) => this.handleRequest(request),
+      });
+      this.socketPath = sockPath;
+      log.app(`control API socket at ${sockPath}`);
+    } catch (err) {
+      log.err(`control API socket failed: ${err}`);
+      // HTTP still works — socket is best-effort
+    }
   }
 
   stop(): void {
     this.server?.stop(true);
     this.server = undefined;
+    this.socketServer?.stop(true);
+    this.socketServer = undefined;
+    // Clean up socket file
+    if (this.socketPath) {
+      try { fs.unlinkSync(this.socketPath); } catch {}
+      this.socketPath = undefined;
+    }
     this.actualPort = undefined;
     this.enabled = false;
   }
 
-  getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string } {
+  getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string; socketPath?: string } {
     const host = "127.0.0.1";
     const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
@@ -250,7 +277,15 @@ export class ControlApiService {
       port: this.actualPort,
       host: this.enabled ? host : undefined,
       baseUrl,
+      socketPath: this.socketPath,
     };
+  }
+
+  private runApiCommand(id: string, args?: Record<string, unknown>) {
+    return this.deps.commands.run(id, args, {
+      source: "api",
+      interactive: false,
+    });
   }
 
   private async handleRequest(request: Request): Promise<Response> {
@@ -261,8 +296,14 @@ export class ControlApiService {
         ok: true,
         service: "wibwob-ts-tui-control-api",
         port: this.actualPort,
+        requestedPort: this.identity.apiPort,
+        host: this.identity.host,
         instanceLabel: this.identity.instanceLabel,
-        sessionId: this.identity.sessionId,
+        instanceId: this.identity.instanceId,
+        scratchBase: this.identity.scratchBase,
+        capturesDir: this.identity.capturesDir,
+        workspacesDir: this.identity.workspacesDir,
+        statePath: this.identity.statePath,
         docs: "GET /openapi.json for full OpenAPI 3.0 spec",
         endpoints: ENDPOINT_CATALOGUE,
       });
@@ -280,50 +321,81 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
+      const uptimeMs = Date.now() - this.startedAt;
+      const uptimeSec = Math.floor(uptimeMs / 1000);
+      const h = Math.floor(uptimeSec / 3600);
+      const m = Math.floor((uptimeSec % 3600) / 60);
+      const uptime = h > 0 ? `${h}h ${m}m` : `${m}m`;
       return Response.json({
         ok: true,
+        instanceId: this.identity.instanceId,
+        instanceLabel: this.identity.instanceLabel ?? null,
+        pid: process.pid,
+        startedAt: new Date(this.startedAt).toISOString(),
+        uptime,
         port: this.actualPort,
-        instanceLabel: this.identity.instanceLabel,
-        sessionId: this.identity.sessionId,
+        host: this.identity.host,
+        socketPath: this.socketPath ?? null,
+      });
+    }
+
+    if (request.method === "GET" && url.pathname === "/config") {
+      return Response.json({
+        instanceId: this.identity.instanceId,
+        requestedPort: this.identity.apiPort,
+        scratchBase: this.identity.scratchBase,
+        capturesDir: this.identity.capturesDir,
+        workspacesDir: this.identity.workspacesDir,
+        statePath: this.identity.statePath,
       });
     }
 
     if (request.method === "GET" && url.pathname === "/state") {
       // Always rebuild state fresh — internal window state may have changed
       // without triggering a window-manager onChange (e.g. direct microapp commands).
-      return Response.json(this.handlers.syncState());
+      return Response.json(this.deps.inspection.syncState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/runtime/inspection") {
+      return Response.json({ ok: true, snapshot: this.deps.inspection.getSnapshot() });
     }
 
     if (request.method === "GET" && url.pathname === "/runtime/stats") {
-      return Response.json({ ok: true, stats: this.handlers.getRuntimeStats() });
+      return Response.json({ ok: true, stats: this.deps.inspection.getSnapshot().stats });
     }
 
     if (request.method === "GET" && url.pathname === "/scramble/state") {
-      return Response.json(this.handlers.getScrambleState());
+      return Response.json(this.deps.inspection.getSnapshot().scramble);
     }
 
     if (request.method === "GET" && url.pathname === "/scramble/history") {
-      return Response.json({ history: this.handlers.getScrambleHistory() });
+      return Response.json({ history: this.deps.inspection.getSnapshot().history });
     }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
+      const tierFilter = url.searchParams.get("tier");
       const includeUnavailableRaw = url.searchParams.get("includeUnavailable");
       const includeUnavailable =
         includeUnavailableRaw === "1" ||
         includeUnavailableRaw === "true" ||
         includeUnavailableRaw === "yes";
+      let commands = this.deps.commands.list(surface ?? undefined, {
+        includeUnavailable,
+      });
+      if (tierFilter) {
+        const tiers = new Set(tierFilter.split(","));
+        commands = commands.filter((cmd: any) => tiers.has(cmd.tier) || (!cmd.tier && tiers.has("builtin")));
+      }
       return Response.json({
         ok: true,
-        commands: this.handlers.listCommands(surface ?? undefined, {
-          includeUnavailable,
-        }),
+        commands,
       });
     }
 
     if (request.method === "GET" && url.pathname === "/content/primer-info") {
       const pathOrName =
         url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
-      return Response.json(this.handlers.getPrimerInfo(pathOrName));
+      return Response.json(this.deps.inspection.getPrimerInfo(pathOrName));
     }
     if (request.method === "GET" && url.pathname === "/world-chat/state") {
       return Response.json({
@@ -368,21 +440,21 @@ export class ControlApiService {
       if (rawId !== null) {
         // Per-window: prefer semantic captureText(), fall back to stripped crop
         const id = Number(rawId);
-        const semantic = this.handlers.windows.captureText(id);
+        const semantic = this.deps.windows.captureText(id);
         if (semantic !== undefined) {
           // captureText may include ANSI styling (e.g. syntax-highlighted editor content)
           return new Response(stripAnsi(semantic), { headers: TEXT_HEADERS });
         }
         // Fallback: crop from blessed screen dump + strip
-        const raw = this.handlers.screenshotText();
-        const win = this.handlers.windows.getWindowById(id);
+        const raw = this.deps.inspection.screenshotText();
+        const win = this.deps.windows.getWindowById(id);
         if (win) {
           const x = Number(win.frame.left);
           const y = Number(win.frame.top);
           const w = Number(win.frame.width);
           const h = Number(win.frame.height);
           const lines = raw.split("\n");
-          const cropped = lines.slice(y, y + h).map(line => {
+          const cropped = lines.slice(y, y + h).map((line: string) => {
             return stripBlessedChrome(line).slice(x, x + w);
           });
           return new Response(cropped.join("\n"), { headers: TEXT_HEADERS });
@@ -390,19 +462,19 @@ export class ControlApiService {
         return new Response("window not found", { status: 404, headers: TEXT_HEADERS });
       }
       // Full screen: strip everything
-      const text = stripBlessedChrome(this.handlers.screenshotText());
+      const text = stripBlessedChrome(this.deps.inspection.screenshotText());
       return new Response(text, { headers: TEXT_HEADERS });
     }
 
     // ── /screenshot/ansi — raw blessed dump (preserves escapes) ─────────
     if (request.method === "GET" && url.pathname === "/screenshot/ansi") {
       const rawId = url.searchParams.get("id");
-      let text = this.handlers.screenshotText();
+      let text = this.deps.inspection.screenshotText();
       const TEXT_HEADERS = { "Content-Type": "text/plain; charset=utf-8" };
 
       if (rawId !== null) {
         const id = Number(rawId);
-        const win = this.handlers.windows.getWindowById(id);
+        const win = this.deps.windows.getWindowById(id);
         if (win) {
           const x = Number(win.frame.left);
           const y = Number(win.frame.top);
@@ -410,7 +482,7 @@ export class ControlApiService {
           const h = Number(win.frame.height);
           const lines = text.split("\n");
           // Strip ANSI only for slicing accuracy, but return raw lines
-          const cropped = lines.slice(y, y + h).map(line => {
+          const cropped = lines.slice(y, y + h).map((line: string) => {
             // We need char-accurate slicing so strip for measurement,
             // but return the raw line segment. This is inherently imperfect
             // with ANSI — return the raw line for now.
@@ -424,7 +496,7 @@ export class ControlApiService {
 
     if (request.method === "GET" && url.pathname === "/windows/text") {
       const id = Number(url.searchParams.get("id"));
-      const text = this.handlers.windows.captureText(id);
+      const text = this.deps.windows.captureText(id);
       return Response.json({ ok: text !== undefined, text: text ?? null });
     }
 
@@ -436,11 +508,9 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id
-        : typeof (body as any).command === "string" ? (body as any).command
-        : "";
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
       if (!id) {
-        return Response.json({ ok: false, error: "id required (also accepts 'command' as deprecated alias)" }, { status: 400 });
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
       const rawArgs = typeof (body as any).args === "object" && (body as any).args !== null
         ? (body as any).args as Record<string, unknown>
@@ -465,9 +535,7 @@ export class ControlApiService {
         args = result.data;
       }
       try {
-        // Mark as API call so action handlers can skip interactive prompts
-        const apiArgs = { ...(args ?? {}), _apiCall: true };
-        const result = this.handlers.runCommand(id, apiArgs);
+        const result = this.runApiCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
@@ -475,7 +543,7 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/view/figlet/fonts") {
-      const result = this.handlers.runCommand("figlet.fonts");
+      const result = this.runApiCommand("figlet.fonts");
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -486,12 +554,15 @@ export class ControlApiService {
       const font = typeof (body as any).font === "string" && (body as any).font.trim()
         ? (body as any).font.trim()
         : undefined;
-      const result = this.handlers.runCommand("figlet.open", font ? { text, font } : { text });
+      const result = this.runApiCommand(
+        "figlet.open",
+        font ? { text, font } : { text },
+      );
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
     if (request.method === "GET" && url.pathname === "/view/zine/canvases") {
-      const result = this.handlers.runCommand("microapp.wibwob.zine.list-canvases");
+      const result = this.runApiCommand("microapp.wibwob.zine.list-canvases");
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -503,7 +574,7 @@ export class ControlApiService {
       if (filePath) {
         args = { filePath };
       } else if (typeof (body as any).index === "number") {
-        const listed = this.handlers.runCommand("microapp.wibwob.zine.list-canvases");
+        const listed = this.runApiCommand("microapp.wibwob.zine.list-canvases");
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
         }
@@ -516,7 +587,7 @@ export class ControlApiService {
       } else {
         return Response.json({ ok: false, error: "filePath or index required" }, { status: 400 });
       }
-      const result = this.handlers.runCommand("microapp.wibwob.zine.open", args);
+      const result = this.runApiCommand("microapp.wibwob.zine.open", args);
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
@@ -561,7 +632,7 @@ export class ControlApiService {
         return Response.json({ ok: false, error: "filePath required" }, { status: 400 });
       }
       try {
-        const result = this.handlers.runCommand(viewRoute.id, args);
+        const result = this.runApiCommand(viewRoute.id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err) }, { status: 500 });
@@ -569,79 +640,105 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
-        ok: this.handlers.windows.focusWindow(Number((body as any).id)),
+        ok: this.deps.windows.focus(Number((body as any).id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       const b = body as any;
+      if (!Number.isFinite(Number(b.left)) || !Number.isFinite(Number(b.top))) {
+        return Response.json(
+          { ok: false, error: "left and top are required numbers" },
+          { status: 400 },
+        );
+      }
       return Response.json({
-        ok: this.handlers.windows.moveWindow(
+        ok: this.deps.windows.move(
           Number(b.id),
-          Number(b.left ?? b.x),
-          Number(b.top ?? b.y),
+          Number(b.left),
+          Number(b.top),
         ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
       const b = body as any;
+      if (!Number.isFinite(Number(b.width)) || !Number.isFinite(Number(b.height))) {
+        return Response.json(
+          { ok: false, error: "width and height are required numbers" },
+          { status: 400 },
+        );
+      }
       return Response.json({
-        ok: this.handlers.windows.resizeWindow(
+        ok: this.deps.windows.resize(
           Number(b.id),
-          Number(b.width ?? b.w),
-          Number(b.height ?? b.h),
+          Number(b.width),
+          Number(b.height),
         ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
-        ok: this.handlers.windows.closeWindow(Number((body as any).id)),
+        ok: this.deps.windows.close(Number((body as any).id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/maximize") {
       return Response.json({
-        ok: this.handlers.windows.toggleMaximize(Number((body as any).id)),
+        ok: this.deps.windows.toggleMaximize(Number((body as any).id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/batch") {
-      // Body: { ops: Array<{ id, x?, y?, w?, h?, close? }> }
+      // Body: { ops: Array<{ id, left?, top?, width?, height?, close? }> }
       // Each op can move, resize, or close a window. All applied in order.
       const ops = (body as any).ops as Array<{
         id: number;
         left?: number; top?: number;
         width?: number; height?: number;
-        // Legacy aliases — accepted but canonical names preferred
-        x?: number; y?: number;
-        w?: number; h?: number;
         close?: boolean;
       }>;
       if (!Array.isArray(ops)) {
         return Response.json({ ok: false, error: "ops must be an array" }, { status: 400 });
       }
-      const results: boolean[] = [];
-      for (const op of ops) {
-        const id = Number(op.id);
+      for (const [index, op] of ops.entries()) {
+        const hasMove = op.left !== undefined || op.top !== undefined;
+        const hasResize = op.width !== undefined || op.height !== undefined;
         if (op.close) {
-          results.push(this.handlers.windows.closeWindow(id));
           continue;
         }
-        const left = op.left ?? op.x;
-        const top = op.top ?? op.y;
-        const width = op.width ?? op.w;
-        const height = op.height ?? op.h;
-        if (left !== undefined && top !== undefined) {
-          results.push(this.handlers.windows.moveWindow(id, Number(left), Number(top)));
+        if (hasMove !== (op.left !== undefined && op.top !== undefined)) {
+          return Response.json(
+            { ok: false, error: `op ${index} requires canonical left and top fields` },
+            { status: 400 },
+          );
         }
-        if (width !== undefined && height !== undefined) {
-          results.push(this.handlers.windows.resizeWindow(id, Number(width), Number(height)));
+        if (hasResize !== (op.width !== undefined && op.height !== undefined)) {
+          return Response.json(
+            { ok: false, error: `op ${index} requires canonical width and height fields` },
+            { status: 400 },
+          );
+        }
+        if (!hasMove && !hasResize) {
+          return Response.json(
+            { ok: false, error: `op ${index} must include canonical move/resize fields or close=true` },
+            { status: 400 },
+          );
         }
       }
+      const results = this.deps.windows.batch(
+        ops.map((op) => ({
+          id: Number(op.id),
+          left: op.left,
+          top: op.top,
+          width: op.width,
+          height: op.height,
+          close: op.close,
+        })),
+      );
       return Response.json({ ok: results.every(Boolean), results });
     }
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
-        ok: this.handlers.windows.sendInput(
+        ok: this.deps.windows.sendInput(
           Number((body as any).id),
           String((body as any).input ?? ""),
           (body as any).sender ? String((body as any).sender) : undefined,
@@ -654,12 +751,12 @@ export class ControlApiService {
       const text = String((body as any).text ?? (body as any).input ?? "");
       const id = Number((body as any).id);
       return Response.json({
-        ok: this.handlers.windows.sendInput(id, text, sender),
+        ok: this.deps.windows.sendInput(id, text, sender),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/editor/write") {
       return Response.json({
-        ok: this.handlers.windows.writeEditorText(
+        ok: this.deps.windows.writeEditorText(
           Number((body as any).id),
           String((body as any).text ?? ""),
         ),
@@ -668,10 +765,12 @@ export class ControlApiService {
 
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
       const id = Number((body as any).id);
-      const text = this.handlers.windows.captureText(id);
+      const text = this.deps.windows.captureText(id);
       if (!text) return Response.json({ ok: false, path: null });
       // File export is a control-API concern, not a facade concern
-      const capturesDir = path.join(process.cwd(), "scratch", "captures");
+      const capturesDir = this.identity.capturesDir
+        ? path.resolve(this.identity.capturesDir)
+        : path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
       const name = typeof (body as any).name === "string" ? (body as any).name
         : typeof (body as any).label === "string" ? (body as any).label
@@ -685,16 +784,19 @@ export class ControlApiService {
     // ── Backrooms + workspace — also dispatch through command registry ──
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
       const channel = normalizeBackroomsChannel(body);
-      const result = this.handlers.runCommand("backrooms.open", channel as unknown as Record<string, unknown>);
+      const result = this.runApiCommand(
+        "backrooms.open",
+        channel as unknown as Record<string, unknown>,
+      );
       return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
     }
     // ── Overlay control ──
     if (request.method === "GET" && url.pathname === "/overlay/info") {
-      const result = this.handlers.runCommand("overlay.info");
+      const result = this.runApiCommand("overlay.info");
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/confirm") {
-      const result = this.handlers.runCommand("overlay.confirm");
+      const result = this.runApiCommand("overlay.confirm");
       const inner = (result as any).result;
       if (inner && !inner.confirmed) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
@@ -702,7 +804,7 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/cancel") {
-      const result = this.handlers.runCommand("overlay.cancel");
+      const result = this.runApiCommand("overlay.cancel");
       const inner = (result as any).result;
       if (inner && !inner.cancelled) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
@@ -714,7 +816,7 @@ export class ControlApiService {
       if (!Number.isFinite(index)) {
         return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
       }
-      const result = this.handlers.runCommand("overlay.select", { index });
+      const result = this.runApiCommand("overlay.select", { index });
       const inner = (result as any).result;
       if (inner && !inner.selected) {
         return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
@@ -722,14 +824,16 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
-      const name = String((body as any).name ?? "default");
-      const result = this.handlers.runCommand("workspace.save", { name });
-      return Response.json({ ...result, name });
+      const rawName = (body as any).name;
+      return Response.json(
+        this.deps.workspace.save(typeof rawName === "string" ? rawName : undefined),
+      );
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
-      const name = String((body as any).name ?? "default");
-      const result = this.handlers.runCommand("workspace.load_named", { name });
-      return Response.json({ ...result, name });
+      const rawName = (body as any).name;
+      return Response.json(
+        this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
+      );
     }
 
     return new Response("not found", { status: 404 });

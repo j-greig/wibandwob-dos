@@ -3,13 +3,15 @@ import {
   createPaletteCommands,
   listAppCommands,
   getCommandDefinition,
-  type AppCommandCategory,
-  type AppCommandDescriptor,
   type AppMenuActions,
-  type MenuContext,
-  type MenuPlacement,
-  type PalettePlacement,
 } from "./command-catalog.js";
+import type {
+  AppCommandCategory,
+  AppCommandDescriptor,
+  MenuContext,
+  MenuPlacement,
+  PalettePlacement,
+} from "../domain/command-definition.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { MenuConfig, MenuItem } from "./types.js";
 import { log } from "../services/app-logger.js";
@@ -32,8 +34,8 @@ export interface CommandListItem {
 }
 
 export type CommandRunResult =
-  | { ok: true; result?: unknown }
-  | { ok: false; error: string };
+  | ({ ok: true; result?: unknown } & Record<string, unknown>)
+  | ({ ok: false; error: string } & Record<string, unknown>);
 
 /** Definition accepted by addDynamic(). Self-contained — no AppMenuActions key needed. */
 export interface DynamicCommandDefinition {
@@ -47,9 +49,20 @@ export interface DynamicCommandDefinition {
   palettePlacement?: PalettePlacement;
   api?: boolean;
   agent?: boolean;
+  /** Host-assigned tier from microapp-registry. */
+  tier?: "core" | "beta" | "internal" | "disabled";
 }
 
 const LEGACY_COMMAND_ALIASES: Record<string, string> = {
+  // ── Short aliases for migrated microapps (ergonomics, not compat) ──
+  "figlet.open": "microapp.wibwob.figlet.open",
+  "figlet.fonts": "microapp.wibwob.figlet.fonts",
+  "contour.open": "microapp.wibwob.contour.open",
+  "plasma.open": "microapp.wibwob.plasma.open",
+  "plasma.from-primer": "microapp.wibwob.plasma.from-primer",
+  "pattern.open": "microapp.wibwob.generative.pattern",
+  "art.open": "microapp.wibwob.generative.art",
+  // ── Legacy renames ──
   "file.browse_primers": "primer.browse",
   "file.open_file_manager": "finder.open",
   "file.open_primer_prompt": "primer.open",
@@ -63,9 +76,6 @@ const LEGACY_COMMAND_ALIASES: Record<string, string> = {
   "browser.open_chrome": "web-reader.open",
   "agent.open_wibwob": "agent.open",
   "cam.open_monster_cam": "monster-cam.open",
-  "app.toggle_theme": "theme.cycle",
-  "app.choose_theme": "theme.choose",
-  "app.set_theme": "theme.set",
   "backrooms.open_prompt": "backrooms.open",
   "backrooms.run": "backrooms.open",
   "backrooms.log_browser": "backrooms_logs.open",
@@ -114,8 +124,29 @@ function safeSerializable(value: unknown): unknown {
   }
 }
 
+function isCommandRunResultLike(value: unknown): value is CommandRunResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (candidate.ok === true) {
+    return true;
+  }
+  return candidate.ok === false && typeof candidate.error === "string";
+}
+
+function normalizeActionResult(result: unknown): CommandRunResult {
+  if (result === undefined) {
+    return { ok: true };
+  }
+  if (isCommandRunResultLike(result)) {
+    return result;
+  }
+  return { ok: true, result: safeSerializable(result) };
+}
+
 export class CommandRegistry {
-  private readonly commands: AppCommandDescriptor[];
+  private readonly commands: AppCommandDescriptor<keyof AppMenuActions>[];
   /** Dynamic commands registered by microapp modules at runtime. */
   private readonly dynamicCommands: DynamicCommandDefinition[] = [];
 
@@ -131,12 +162,28 @@ export class CommandRegistry {
     this.dynamicCommands.push(def);
   }
 
+  clearDynamicCommands(predicate?: (command: DynamicCommandDefinition) => boolean): number {
+    const before = this.dynamicCommands.length;
+    if (!predicate) {
+      this.dynamicCommands.length = 0;
+      return before;
+    }
+    let writeIndex = 0;
+    for (const command of this.dynamicCommands) {
+      if (!predicate(command)) {
+        this.dynamicCommands[writeIndex++] = command;
+      }
+    }
+    this.dynamicCommands.length = writeIndex;
+    return before - writeIndex;
+  }
+
   buildMenus(): MenuConfig[] {
     const menus = createMenuConfigs(this.actions);
     // Append dynamic commands to matching menu categories
     for (const dyn of this.dynamicCommands) {
       for (const placement of dyn.menuPlacements ?? []) {
-        const menu = menus.find((m) => m.label.toLowerCase() === placement.category);
+        const menu = menus.find((m) => m.category === placement.category);
         if (menu) {
           menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action() });
         }
@@ -185,6 +232,7 @@ export class CommandRegistry {
       surfaces: this.getDynamicSurfaces(dyn),
       menuCategories: [...new Set((dyn.menuPlacements ?? []).map((p) => p.category))] as AppCommandCategory[],
       available: true,
+      ...(dyn.tier ? { tier: dyn.tier } : {}),
     }));
 
     const all = [...builtIn, ...dynamic];
@@ -212,14 +260,14 @@ export class CommandRegistry {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+      return normalizeActionResult(result);
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+      return normalizeActionResult(result);
     }
     log.cmd(`${canonicalId}${argsStr} → unknown command`);
     return { ok: false, error: `Unknown command: ${id}` };
@@ -232,7 +280,7 @@ export class CommandRegistry {
       return { ok: false, error: `Unknown dynamic command: ${id}` };
     }
     const result = dyn.action(args);
-    return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+    return normalizeActionResult(result);
   }
 
   /** Return context-menu items for the given context, sorted by order. */
@@ -278,7 +326,7 @@ export class CommandRegistry {
     });
   }
 
-  private getSurfaces(command: AppCommandDescriptor): CommandSurface[] {
+  private getSurfaces(command: AppCommandDescriptor<keyof AppMenuActions>): CommandSurface[] {
     const surfaces = new Set<CommandSurface>();
     if (command.menuPlacements.length > 0) {
       surfaces.add("menu");

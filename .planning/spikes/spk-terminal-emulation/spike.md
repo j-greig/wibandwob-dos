@@ -132,7 +132,7 @@ is the weak link. Swapping term.js for xterm.js headless is the fix.
 1. Fork blessed-xterm.js into our codebase (it's MIT, 450 lines)
 2. Replace direct `node-pty` usage with our bridge pattern
 3. Test if jsdom + xterm 2.8.1 works under Bun
-4. Wire into module-loader as the terminal widget
+4. Wire into microapp-loader as the terminal widget
 
 Pros: already works with blessed, tested cell sync, mouse handling done.
 Cons: old xterm.js, jsdom dependency is heavy and fragile.
@@ -179,9 +179,9 @@ The bridge pattern is already working. Total new code: ~250 lines.
 
 ## Files to create/modify
 
-- `modules/terminal/xterm-widget.ts` — new blessed.Box subclass
-- `modules/terminal/index.ts` — swap term widget creation
-- `modules/terminal/pty-bridge.cjs` — unchanged (already works)
+- `microapps/terminal/xterm-widget.ts` — new blessed.Box subclass
+- `microapps/terminal/index.ts` — swap term widget creation
+- `microapps/terminal/pty-bridge.cjs` — unchanged (already works)
 
 ## Success criteria
 
@@ -208,5 +208,5 @@ blocking any current use case.
 - blessed.terminal source: `node_modules/blessed/lib/widgets/terminal.js`
 - @xterm/headless docs: https://github.com/xtermjs/xterm.js/tree/main/addons/addon-headless
 - xterm.js buffer API: https://xtermjs.org/docs/api/terminal/classes/buffer/
-- Our bridge: `modules/terminal/pty-bridge.cjs`
-- Our current widget: `modules/terminal/index.ts`
+- Our bridge: `microapps/terminal/pty-bridge.cjs`
+- Our current widget: `microapps/terminal/index.ts`

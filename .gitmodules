@@ -2,7 +2,7 @@
 	path = vendor/claude-system
 	url = https://github.com/juanandresgs/claude-system
 [submodule "modules-private"]
-	path = modules-private
+	path = microapps-private
 	url = https://github.com/j-greig/wibandwob-wwdos-modules-private.git
 	ignore = dirty
 [submodule "ralph"]

@@ -1,18 +1,18 @@
 /**
  * eslint.config.js — minimal flat config.
  *
- * Single purpose: enforce SDK import boundary for module authors.
+ * Single purpose: enforce SDK import boundary for microapp authors.
  * Modules must import from microapp-sdk.js, not from src/core/* or
  * src/services/* directly.
  *
  * Run: bun run lint
- * Scope: modules/** only. Does not lint src/ or other directories.
+ * Scope: microapps/** only. Does not lint src/ or other directories.
  */
 import tsParser from "typescript-eslint";
 
 export default [
   {
-    files: ["modules/**/index.ts"],
+    files: ["microapps/**/index.ts"],
     languageOptions: {
       parser: tsParser.parser,
     },
@@ -24,7 +24,7 @@ export default [
             {
               group: ["../../src/core/*", "../../src/core/**"],
               message:
-                "Import from ../../src/services/microapp-sdk.js instead. See docs/module-authoring.md.",
+                "Import from ../../src/services/microapp-sdk.js instead. See docs/microapp-authoring.md.",
             },
             {
               group: [
@@ -34,7 +34,7 @@ export default [
                 "!../../src/services/microapp-sdk",
               ],
               message:
-                "Import from ../../src/services/microapp-sdk.js instead. See docs/module-authoring.md.",
+                "Import from ../../src/services/microapp-sdk.js instead. See docs/microapp-authoring.md.",
             },
           ],
         },

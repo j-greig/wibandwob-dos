@@ -22,7 +22,7 @@ Migrate WibWobWorld’s right percent sidebar (`1/6`, min 14, `i` toggle) to the
 
 ## Files to change
 
-- `modules/wibwobworld/index.ts` (and related files if split) — sidebar migration
+- `microapps/wibwobworld/index.ts` (and related files if split) — sidebar migration
 
 ## Tasks
 

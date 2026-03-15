@@ -27,7 +27,7 @@ index 7a72add..24c6d24 100644
 -Status: [ ] not-started
 +Status: [x] done — commit 2cd1ad3
  
- `module-loader.ts registerSnapshot` must return the snapshot geometry so
+ `microapp-loader.ts registerSnapshot` must return the snapshot geometry so
  `restoreWindowSnapshot()` can reapply `left/top/width/height`.
 -- 
 2.39.5 (Apple Git-154)

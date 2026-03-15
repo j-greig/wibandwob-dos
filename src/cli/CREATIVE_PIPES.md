@@ -1,12 +1,18 @@
-# Creative Pipes — wibwob CLI as Generative Art Tool
+# Creative Pipes — Unix Composition for WibWob CLI
 
-The `wibwob` CLI was built for agents and scripting. But because
+The `wibwob` CLI was built for agents and scripting. Because
 WibWob-DOS is a visual desktop and `wibwob screenshot` decomposes
 the entire TUI back into plain text, you can pipe visual state
-through shell tools and feed it back in — creating a recursive
-loop where the system observes, transforms, and re-renders itself.
+through shell tools and feed it back in — creating recursive loops
+where the system observes, transforms, filters, and re-renders itself.
 
 The desktop becomes both canvas and medium. The CLI becomes the brush.
+
+Saved scripts for the patterns below:
+
+- `bash scripts/cli-runtime-triage.sh`
+- `bash scripts/cli-batch-relayout.sh`
+- `bash scripts/cli-text-loop.sh mask`
 
 ---
 
@@ -18,6 +24,227 @@ SMEAR="python3 .pi/skills/vj-timeline/scripts/smear.py"
 ```
 
 Ensure the app is running (`bun run dev:world` or `bash scripts/restart.sh`).
+
+---
+
+## Unix Canon
+
+The default posture is:
+
+1. query JSON
+2. shape it with `jq`
+3. fan out with `xargs`, `while read`, or shell loops
+4. capture evidence with `tee`
+5. feed the result back into `wibwob`
+
+Core tools that compose well here:
+
+- `jq` for JSON selection, shaping, and inline object generation
+- `xargs` for one-id-per-line fanout
+- `tee` for keeping artifacts while continuing the pipeline
+- `sort`, `uniq`, `head`, `tail`, `wc` for quick reduction
+- `sed`, `awk`, `tr`, `paste` for lightweight text transformation
+- shell heredocs for larger JSON payloads without quote soup
+
+Rules that keep pipelines sane:
+
+- prefer `wibwob state`, `wibwob inspection`, `wibwob windows`, `wibwob commands`
+- prefer canonical ids and canonical geometry fields: `left`, `top`, `width`, `height`
+- if a flow mutates live windows, re-query state before the next targeted step
+- use `desktop.clear-all` intentionally, not casually
+
+---
+
+## Query → Filter → Act
+
+Find real windows, then target them.
+
+```bash
+# Focus the most recent editor window
+wibwob windows \
+  | jq -r '[.[] | select(.appType=="text-editor")] | last | .id' \
+  | xargs -I{} wibwob window {} focus
+
+# Close all primer and reader surfaces, keep everything else
+wibwob windows \
+  | jq -r '.[] | select(.kind=="primer" or .kind=="reader") | .id' \
+  | xargs -I{} wibwob window {} close
+
+# Ask the runtime whether the UI is blocked, and show the escape commands
+wibwob inspection \
+  | jq '.snapshot.ui | {blocked, blockers}'
+```
+
+---
+
+## Batch Geometry With `jq`
+
+Generate batch payloads instead of hand-writing JSON.
+
+```bash
+# Stack all figlet windows down the left edge
+wibwob windows \
+  | jq '[
+      .[]
+      | select(.appType=="figlet-banner")
+      | .id
+    ]
+    | to_entries
+    | {
+        ops: [
+          .[] | {
+            id: .value,
+            width: 72,
+            height: 16,
+            left: 2,
+            top: (2 + (.key * 4))
+          }
+        ]
+      }' \
+  | curl -s -X POST http://127.0.0.1:8099/windows/batch \
+      -H 'Content-Type: application/json' \
+      -d @-
+```
+
+When you need local shaping but still want the canonical CLI for the read side,
+this pattern is usually cleaner than a long shell loop.
+
+---
+
+## Artifact Pipelines
+
+Keep the text artifact while also feeding it onward.
+
+```bash
+# Capture, archive, preview the first 40 lines
+wibwob screenshot \
+  | tee scratch/captures/latest-desktop.txt \
+  | head -n 40
+
+# Capture, count occupied lines, and save
+wibwob screenshot \
+  | tee scratch/captures/latest-desktop.txt \
+  | rg -v '^[[:space:]]*$' \
+  | wc -l
+```
+
+This is useful when an agent needs both evidence and a quick metric in one pass.
+
+---
+
+## Structured Payloads Without Quote Hell
+
+For more complex command args, generate JSON with `jq -n` or a heredoc.
+
+```bash
+# Open a figlet with a generated payload
+jq -n \
+  --arg text "PATCHBAY" \
+  --arg font "doom" \
+  '{id:"figlet.open", args:{text:$text, font:$font}}' \
+| curl -s -X POST http://127.0.0.1:8099/commands/run \
+    -H 'Content-Type: application/json' \
+    -d @-
+
+# Same idea with a heredoc
+cat <<'JSON' | curl -s -X POST http://127.0.0.1:8099/commands/run \
+  -H 'Content-Type: application/json' \
+  -d @-
+{"id":"theme.set","args":{"name":"wibwob-phosphor"}}
+JSON
+```
+
+---
+
+## State-Aware Creative Loops
+
+Branch composition based on current runtime facts.
+
+```bash
+# If blocked, clear; otherwise open a banner
+if wibwob inspection | jq -e '.snapshot.ui.blocked' >/dev/null; then
+  wibwob cmd desktop.clear-all
+else
+  wibwob cmd figlet.open --text "READY" --font banner
+fi
+
+# Open one banner per currently open window kind
+wibwob windows \
+  | jq -r '.[].kind' \
+  | sort -u \
+  | while read -r kind; do
+      wibwob cmd figlet.open --text "$kind" --font mini
+    done
+```
+
+This is where WibWob gets interesting for agents: desktop structure becomes input.
+
+---
+
+## Complex Scenario: Runtime Triage
+
+One shell block, multiple surfaces, text-first output.
+
+```bash
+OUT="scratch/captures/triage-$(date +%s)"
+mkdir -p "$OUT"
+
+wibwob health       | tee "$OUT/health.json"
+wibwob inspection   | tee "$OUT/inspection.json"
+wibwob state        | tee "$OUT/state.json" >/dev/null
+wibwob screenshot   | tee "$OUT/desktop.txt" >/dev/null
+
+jq '.snapshot.ui | {blocked, menu, overlay, blockers}' "$OUT/inspection.json"
+jq '[.windows[] | {id, title, kind, focused, left, top, width, height}]' "$OUT/state.json"
+```
+
+This is a good default operator pattern before doing anything riskier.
+
+---
+
+## Complex Scenario: Pipe-Driven Re-layout
+
+Use real state to compute a new arrangement.
+
+```bash
+wibwob windows \
+  | jq '{
+      ops: [
+        .[]
+        | { id, width: 60, height: 14 }
+        + if .kind == "figlet" then
+            { left: 2, top: 2 }
+          elif .kind == "inspector" then
+            { left: 90, top: 2, width: 76, height: 24 }
+          else
+            { left: 4, top: 20 }
+          end
+      ]
+    }' \
+  | curl -s -X POST http://127.0.0.1:8099/windows/batch \
+      -H 'Content-Type: application/json' \
+      -d @-
+```
+
+For large mutations, `windows/batch` is preferable to repeated move/resize calls.
+
+---
+
+## Complex Scenario: Text Domain Recursion
+
+The screenshot stays in the text domain the whole time.
+
+```bash
+wibwob screenshot \
+  | tee scratch/captures/live.txt \
+  | sed 's/[A-Z]/#/g' \
+  > scratch/captures/live-mask.txt
+
+wibwob cmd primer.open --filePath "$PWD/scratch/captures/live-mask.txt"
+```
+
+The point is not just "automation". It is that the desktop can be converted into
+plain text, transformed with old Unix tools, and reintroduced as content.
 
 ---
 
@@ -234,3 +461,6 @@ The screenshot command strips ANSI colour codes and returns raw
 characters. The smear script operates on character positions, not
 pixels. Everything stays in the text domain. No images are created
 or consumed at any point. It is turtles all the way down.
+
+If you are building more operational or diagnostic flows than artistic ones,
+read this file together with [README.md](/Users/james/Repos/wibandwob-dos/src/cli/README.md). The README covers the CLI contract; this file covers composition patterns.
