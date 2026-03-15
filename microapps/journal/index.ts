@@ -2,7 +2,7 @@ import blessed from "blessed";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { MicroappHost, WindowHandle } from "../../src/services/microapp-sdk.js";
-import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/microapp-sdk.js";
+import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG, createButton } from "../../src/services/microapp-sdk.js";
 
 // ── Types ───────────────────────────────────────────────────────
 type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
@@ -17,6 +17,7 @@ interface SessionSummary {
   sessionId: string;    // UUID prefix
   messageCount: number;
   firstUserMsg: string; // preview
+  model: string;        // e.g. "claude-opus-4-6"
 }
 
 interface SessionMessage {
@@ -411,15 +412,19 @@ function listSessions(limit = 50): SessionSummary[] {
     const date = match ? `${match[1]}T${match[2]}:${match[3]}:${match[4]}Z` : "";
     const sessionId = match ? match[5]!.slice(0, 8) : f.slice(0, 8);
 
-    // Count messages and get first user message (lazy — read line by line)
+    // Count messages, get first user message and model (lazy — read line by line)
     let msgCount = 0;
     let firstUserMsg = "";
+    let model = "";
     try {
       const content = readFileSync(join(dir, f), "utf-8");
       for (const line of content.split("\n")) {
         if (!line.trim()) continue;
         try {
           const d = JSON.parse(line);
+          if (d.type === "model_change" && !model) {
+            model = d.modelId || "";
+          }
           if (d.type === "message") {
             msgCount++;
             if (!firstUserMsg) {
@@ -435,7 +440,7 @@ function listSessions(limit = 50): SessionSummary[] {
       }
     } catch { /* skip unreadable file */ }
 
-    return { filename: f, date, sessionId, messageCount: msgCount, firstUserMsg };
+    return { filename: f, date, sessionId, messageCount: msgCount, firstUserMsg, model };
   });
 }
 
@@ -510,6 +515,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   let sortBy: SortMode = "updatedAt";
   const SORT_CYCLE: SortMode[] = ["updatedAt", "createdAt", "title"];
   const SORT_LABEL: Record<SortMode, string> = { updatedAt: "↓updated", createdAt: "↓created", title: "↓title" };
+  let modelFilter = ""; // empty = all models
 
   // ── UI Elements ───────────────────────────────────────────────
   const headerBox = blessed.box({
@@ -518,29 +524,25 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     tags: true, style: t().body,
   });
 
-  // JRN · LOG toggle indicator (top-right of header)
-  const toggleBox = blessed.box({
-    parent: win.body,
-    top: 0, right: 1, width: 11, height: 1,
-    tags: true,
-    mouse: true,
-    style: t().body,
-  });
-
-  toggleBox.on("click", () => {
+  // JRN / LOG toggle buttons (top-right of header)
+  function toggleToView(target: ViewMode) {
     if (mode !== "list") return;
-    if (!PI_EXISTS) return;
-    if (viewMode === "journal") {
-      viewMode = "sessions";
+    if (target === "sessions" && !PI_EXISTS) return;
+    if (viewMode === target) return;
+    viewMode = target;
+    if (target === "sessions") {
       sessions = listSessions();
       sessionIdx = 0;
       sessionMessages = [];
-    } else {
-      viewMode = "journal";
     }
     refresh();
     render();
-  });
+  }
+
+  const btnJrn = createButton({ label: "JRN", onPress: () => toggleToView("journal") });
+  const btnLog = createButton({ label: "LOG", onPress: () => toggleToView("sessions") });
+  win.body.append(btnJrn.node);
+  win.body.append(btnLog.node);
 
   const sepBox = blessed.box({
     parent: win.body,
@@ -700,10 +702,31 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
-    // Toggle indicator: active mode in accent, inactive in muted
-    const jrnColor = viewMode === "journal" ? accent : muted;
-    const logColor = viewMode === "sessions" ? accent : muted;
-    toggleBox.setContent(`{${jrnColor}-fg}JRN{/${jrnColor}-fg} {${muted}-fg}·{/${muted}-fg} {${logColor}-fg}LOG{/${logColor}-fg}`);
+    // Toggle buttons: active gets inverse (bright bg), inactive gets muted
+    const th_ = t();
+    const activeBg = th_.selected?.fg || accent;
+    const activeFg = th_.body.bg || "#000";
+    const inactiveFg = th_.muted?.fg || "#555";
+    const inactiveBg = th_.body.bg || "#000";
+
+    btnJrn.node.style = viewMode === "journal"
+      ? { fg: activeFg, bg: activeBg, bold: true }
+      : { fg: inactiveFg, bg: inactiveBg };
+    btnLog.node.style = viewMode === "sessions"
+      ? { fg: activeFg, bg: activeBg, bold: true }
+      : { fg: inactiveFg, bg: inactiveBg };
+    btnJrn.node.setContent(viewMode === "journal" ? " [ JRN ] " : "   JRN   ");
+    btnLog.node.setContent(viewMode === "sessions" ? " [ LOG ] " : "   LOG   ");
+
+    // Position top-right
+    btnJrn.node.top = 0;
+    btnJrn.node.width = 9;
+    btnJrn.node.height = 1;
+    btnJrn.node.right = 11;
+    btnLog.node.top = 0;
+    btnLog.node.width = 9;
+    btnLog.node.height = 1;
+    btnLog.node.right = 1;
 
     // Separator
     const sepW = Math.max(0, w - 4);
@@ -723,13 +746,19 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   function renderSessionList(muted: string, accent: string, w: number) {
     const twoPane = w >= 120;
 
+    // Apply model filter
+    const filtered = modelFilter
+      ? sessions.filter(s => s.model === modelFilter)
+      : sessions;
+
     // Build session list items with date group headers
     const items: string[] = [];
-    const sessionIndexMap: number[] = [];
+    const sessionIndexMap: number[] = []; // maps visual index → index in `sessions` array
     const maxW = twoPane ? Math.floor(w * 0.30) - 4 : w - 4;
     let lastDateGroup = "";
-    for (let i = 0; i < sessions.length; i++) {
-      const s = sessions[i]!;
+    for (let i = 0; i < filtered.length; i++) {
+      const s = filtered[i]!;
+      const realIdx = sessions.indexOf(s);
       const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
       if (dateStr !== lastDateGroup) {
         lastDateGroup = dateStr;
@@ -738,9 +767,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       }
       const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
       const msgCount = `${s.messageCount}m`;
-      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 18);
-      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} {${accent}-fg}${msgCount}{/${accent}-fg} ${preview}`);
-      sessionIndexMap.push(i);
+      // Short model label (strip "claude-" prefix)
+      const modelTag = s.model ? s.model.replace(/^claude-/, "") : "";
+      const modelStr = modelTag ? `{${muted}-fg}${modelTag}{/${muted}-fg} ` : "";
+      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 18 - modelTag.length - 1);
+      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} {${accent}-fg}${msgCount}{/${accent}-fg} ${modelStr}${preview}`);
+      sessionIndexMap.push(realIdx);
     }
     if (items.length === 0) {
       items.push(`{${muted}-fg}no pi sessions found{/${muted}-fg}`);
@@ -797,11 +829,13 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     // Status + command bars for session mode
     const selSession = sessions[sessionIdx];
     const sessionInfo = selSession ? `  ${selSession.sessionId} · ${selSession.messageCount} msgs` : "";
+    const modelHint = modelFilter ? `  model:${modelFilter.replace(/^claude-/, "")}` : "";
+    const filteredCount = modelFilter ? filtered.length : sessions.length;
     statusBar.setContent(
-      `{${muted}-fg} [SESSIONS]  ${sessions.length} sessions${sessionInfo}{/${muted}-fg}`
+      `{${muted}-fg} [SESSIONS]  ${filteredCount}/${sessions.length} sessions${sessionInfo}${modelHint}{/${muted}-fg}`
     );
     commandBar.setContent(
-      `{${muted}-fg} ${sessionIdx + 1}/${sessions.length}  Enter open  S journal  j/k nav  g/G jump{/${muted}-fg}`
+      `{${muted}-fg} ${sessionIdx + 1}/${filteredCount}  Enter open  S journal  m model  j/k nav  g/G jump{/${muted}-fg}`
     );
   }
 
@@ -1215,6 +1249,18 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     render();
   });
 
+  listBox.key(["m"], () => {
+    if (mode !== "list" || viewMode !== "sessions") return;
+    // Cycle through available models: "" (all) → model1 → model2 → ... → ""
+    const models = [...new Set(sessions.map(s => s.model).filter(Boolean))].sort();
+    if (models.length === 0) return;
+    const currentIdx = modelFilter ? models.indexOf(modelFilter) : -1;
+    modelFilter = currentIdx < models.length - 1 ? models[currentIdx + 1]! : "";
+    sessionIdx = 0;
+    sessionMessages = [];
+    render();
+  });
+
   listBox.key(["enter"], () => {
     if (mode !== "list") return;
     if (deleteConfirm) return;
@@ -1436,7 +1482,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onRestyle(() => {
     const th = t();
     headerBox.style = th.body;
-    toggleBox.style = th.body;
+    btnJrn.restyle();
+    btnLog.restyle();
     sepBox.style = th.body;
     contentBox.style = th.body;
     listBox.style = { ...th.body, item: { fg: th.body.fg, bg: th.body.bg }, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" }, scrollbar: { fg: th.muted?.fg || "#555" } };
