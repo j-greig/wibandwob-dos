@@ -9,11 +9,10 @@ F5 wibwob write/read: figlet.write command, CLI with fallback convention
 Shipped COAT-aligned: no new endpoints, no new SDK methods. Write dispatches
 through existing `/commands/run`. `wibwob read` aliases `screenshot`.
 
-## F5 Remaining Stories
+## F5 Complete ✅
 
-- **terminal.write** — send text to pty stdin. Needs microapp command +
-  test in harness. The terminal microapp is in `microapps/terminal/`.
-  Challenge: accessing the pty write stream from a command handler.
+All stories shipped: figlet.write, terminal.write, wibwob write/read CLI,
+fallback convention, pipe composition. 100/100 stable.
 
 ## Remaining Polish (won't move score — code quality)
 

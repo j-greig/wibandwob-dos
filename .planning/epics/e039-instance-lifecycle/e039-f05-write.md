@@ -1,7 +1,7 @@
 # F5: `wibwob write` — Text Pipe Into Windows
 
 **Epic:** E039 Instance Lifecycle
-**Status:** not-started
+**Status:** done
 **Depends on:** F1-F4 (shipped)
 **GitHub:** #127 (Plan 9 analysis)
 
@@ -61,11 +61,11 @@ the CLI finds the existing equivalent.
 
 ## Stories
 
-- [ ] S1: `figlet.write` command — update live banner text by windowId
-- [ ] S2: `terminal.write` command — send text to pty stdin
-- [ ] S3: `wibwob write <id>` CLI — read stdin, resolve appType, dispatch
-- [ ] S4: Verify: `echo "HELLO" | wibwob write 3` updates figlet window
-- [ ] S5: Verify: `wibwob read 3 | wibwob write 7` pipes between windows
+- [x] S1: `figlet.write` command — update live banner text by windowId
+- [x] S2: `terminal.write` command — send text to pty stdin
+- [x] S3: `wibwob write <id>` CLI — read stdin, resolve appType, dispatch
+- [x] S4: Verify: `echo "HELLO" | wibwob write 3` updates figlet window
+- [x] S5: Verify: `wibwob read 3 | wibwob write 7` pipes between windows
 
 ## What Write Is NOT
 
