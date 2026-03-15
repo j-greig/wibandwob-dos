@@ -31,80 +31,42 @@ done
 # Health check
 curl -sf "$API/health" > /dev/null || { echo "ERROR: API not reachable at $API" >&2; exit 1; }
 
-# Fetch state and build workspace JSON (same format as workspaces/*.json)
+# Fetch state and build workspace JSON (v2 format — matches WorkspaceService)
 RECIPE=$(curl -sf "$API/state" | python3 -c "
 import sys, json
-from datetime import datetime
 
 state = json.load(sys.stdin)
-name = '''$NAME''' or f'desktop-{datetime.now().strftime(\"%Y%m%d-%H%M%S\")}'
 theme = state.get('app', {}).get('theme', '')
-screen = state.get('screen', {})
 windows = state.get('windows', [])
 focus_id = state.get('focus', {}).get('windowId')
 
-# Map appType → workspace type
-def ws_type(w):
-    app = w.get('appType', '')
-    kind = w.get('kind', '')
-    type_map = {
-        'wibwob.figlet': 'figlet_text',
-        'wibwob.runtime-inspector': 'runtime_inspector',
-        'music-player': 'music_player',
-        'terrain-lab': 'terrain_lab',
-        'wibwob.contour': 'contour',
-    }
-    return type_map.get(app, app or kind)
-
-# Extract props from details
-def extract_props(w):
+# Build payload from details (strip summary/meta, keep app-specific props)
+def build_payload(w):
     d = w.get('details', {})
-    app = w.get('appType', '')
-    props = {}
+    skip = {'summary', 'commandCount', 'focusedWindowId', 'blockerCount'}
+    payload = {k: v for k, v in d.items() if k not in skip}
+    return payload if payload else {}
 
-    if app == 'wibwob.figlet':
-        if d.get('inputText'): props['text'] = d['inputText']
-        if d.get('font'): props['font'] = d['font']
-    elif app == 'terrain-lab':
-        if d.get('terrain'): props['terrain'] = d['terrain']
-        if d.get('seed'): props['seed'] = d['seed']
-        if d.get('mode'): props['mode'] = d['mode']
-    elif app == 'music-player':
-        if d.get('filePath'): props['file'] = d['filePath']
-
-    return props
-
-focused_idx = 0
 ws_windows = []
-for i, w in enumerate(windows):
+for w in windows:
     entry = {
-        'id': f'w{i+1}',
-        'type': ws_type(w),
+        'kind': w.get('kind', 'microapp'),
         'title': w.get('title', ''),
-        'bounds': {
-            'x': w['left'],
-            'y': w['top'],
-            'w': w['width'],
-            'h': w['height'],
-        },
-        'zoomed': w.get('maximized', False),
-        'props': extract_props(w),
+        'left': w['left'],
+        'top': w['top'],
+        'width': w['width'],
+        'height': w['height'],
+        'payload': build_payload(w),
     }
-    ws_windows.append(entry)
     if w['id'] == focus_id:
-        focused_idx = i
+        entry['focused'] = True
+    ws_windows.append(entry)
 
 workspace = {
-    'version': 1,
-    'app': name,
-    'timestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
-    'screen': {'width': screen.get('width', 0), 'height': screen.get('height', 0)},
-    'globals': {},
+    'version': 2,
+    'theme': theme or None,
     'windows': ws_windows,
-    'focusedIndex': focused_idx,
 }
-if theme:
-    workspace['globals']['theme'] = theme
 
 print(json.dumps(workspace, indent=2))
 ")
