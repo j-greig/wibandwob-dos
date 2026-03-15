@@ -131,7 +131,7 @@ export default function setup(host: MicroappHost) {
       height: 1,
       mouse: true,
       clickable: true,
-      content: ` [F] ${initialFont.slice(0, 8)} `,
+      content: " [F] Font ",
       style: { ...t.footer, hover: t.selected },
     });
 
@@ -175,12 +175,26 @@ export default function setup(host: MicroappHost) {
       win.setTitle(`Banner: ${currentText.slice(0, 18) || "Banner"}`);
     }
 
+    function autoSizeWindow() {
+      const measured = measureFiglet(currentText, currentFont, 0);
+      const contentSize = getFigletWindowContentSize(measured);
+      const targetW = Math.min(
+        Math.max(contentSize.width + 4, 24),
+        Math.max(24, (host.geometry?.width ?? 120) - 10),
+      );
+      const targetH = Math.min(
+        Math.max(contentSize.height + 6, 8),
+        Math.max(8, (host.geometry?.height ?? 60) - 4),
+      );
+      host.windows.resizeWindow(win.id, targetW, targetH);
+    }
+
     function rerenderFiglet() {
       const availableWidth = Math.max(20, Number(viewer.width));
       const measured = measureFiglet(currentText, currentFont, availableWidth);
       lastMeasurement = measured;
       viewer.setContent(measured.rendered);
-      fontBtn.setContent(` [F] ${currentFont.slice(0, 8)} `);
+      fontBtn.setContent(" [F] Font ");
       syncTitle();
       host.screen.render();
     }
@@ -309,6 +323,7 @@ export default function setup(host: MicroappHost) {
         viewer.show();
         viewer.focus();
         rerenderFiglet();
+        autoSizeWindow();
       }
 
       // Enter = confirm selection
@@ -419,17 +434,7 @@ export default function setup(host: MicroappHost) {
 
     // Initial render + auto-size
     rerenderFiglet();
-    const measured = measureFiglet(currentText, currentFont, 0);
-    const contentSize = getFigletWindowContentSize(measured);
-    const targetW = Math.min(
-      Math.max(contentSize.width + 4, 24),
-      Math.max(24, (host.geometry?.width ?? 120) - 10),
-    );
-    const targetH = Math.min(
-      Math.max(contentSize.height + 6, 8),
-      Math.max(8, (host.geometry?.height ?? 60) - 4),
-    );
-    host.windows.resizeWindow(win.id, targetW, targetH);
+    autoSizeWindow();
   }
 
   // ── Workspace snapshot — COAT workspace seam ──
