@@ -162,6 +162,63 @@ async function cmdHealth() {
   out(await api("/health"));
 }
 
+async function cmdMinimap() {
+  const state = await api("/state") as {
+    windows: Array<{ id: number; title: string; left: number; top: number; width: number; height: number; zIndex: number; focused: boolean; appType?: string; kind?: string }>;
+    app?: { theme?: string; instanceId?: string; instanceLabel?: string; termWidth?: number; termHeight?: number };
+  };
+  const wins = state.windows;
+  const app = state.app ?? {};
+  const tw = (app.termWidth ?? 170);
+  const th = (app.termHeight ?? 44);
+  const label = app.instanceLabel ? `${app.instanceLabel}·${app.instanceId ?? "?"}` : (app.instanceId ?? "?");
+  const focusWin = wins.find(w => w.focused);
+
+  // Header
+  process.stdout.write(`WibWob-DOS  ${app.theme ?? "?"}  ${wins.length} windows  focus:${focusWin?.id ?? "-"}:${focusWin?.title ?? "-"}  id:${label}\n`);
+
+  // Scaled minimap
+  const scaleX = 60 / tw;
+  const scaleY = 20 / th;
+  const grid: string[][] = [];
+  for (let y = 0; y < 20; y++) {
+    grid[y] = [];
+    for (let x = 0; x < 62; x++) grid[y][x] = " ";
+  }
+
+  // Draw border
+  for (let x = 0; x < 62; x++) { grid[0][x] = x === 0 || x === 61 ? "+" : "-"; grid[19][x] = x === 0 || x === 61 ? "+" : "-"; }
+  for (let y = 0; y < 20; y++) { grid[y][0] = "|"; grid[y][61] = "|"; }
+  grid[0][0] = "+"; grid[0][61] = "+"; grid[19][0] = "+"; grid[19][61] = "+";
+
+  // Draw windows (sorted by z-index so focused is on top)
+  const sorted = [...wins].sort((a, b) => a.zIndex - b.zIndex);
+  for (const w of sorted) {
+    const x1 = Math.max(1, Math.round(w.left * scaleX) + 1);
+    const y1 = Math.max(1, Math.round(w.top * scaleY) + 1);
+    const x2 = Math.min(60, Math.round((w.left + w.width) * scaleX) + 1);
+    const y2 = Math.min(18, Math.round((w.top + w.height) * scaleY) + 1);
+    const ch = w.focused ? "#" : "+";
+    for (let x = x1; x <= x2; x++) { if (y1 >= 1) grid[y1][x] = ch; if (y2 <= 18) grid[y2][x] = ch; }
+    for (let y = y1; y <= y2; y++) { grid[y][x1] = ch; grid[y][x2] = ch; }
+    // Label
+    const tag = `${w.id}`;
+    if (x2 - x1 > tag.length + 1 && y2 > y1) {
+      for (let i = 0; i < tag.length && x1 + 1 + i < x2; i++) grid[y1 + 1][x1 + 1 + i] = tag[i];
+    }
+  }
+
+  for (const row of grid) process.stdout.write("  " + row.join("") + "\n");
+
+  // Legend
+  process.stdout.write("\n");
+  for (const w of sorted) {
+    const flag = w.focused ? " ◀" : "";
+    const short = w.title.length > 30 ? w.title.slice(0, 27) + "..." : w.title;
+    process.stdout.write(`  ${String(w.id).padStart(3)}  ${short.padEnd(32)} ${w.width}x${w.height} @${w.left},${w.top}${flag}\n`);
+  }
+}
+
 async function cmdHelp(id: string) {
   const data = (await api("/commands/list")) as { commands: Array<{
     id: string; label: string; description?: string; returns?: string;
@@ -310,6 +367,7 @@ Usage:
   wibwob commands [-q] [--surface agent|api|menu|palette] [--includeUnavailable]
                                       List available commands
   wibwob health                       API health check
+  wibwob minimap                      Spatial map of all windows (alias: map)
   wibwob screenshot                   Text screenshot of desktop
   wibwob screenshot <id>              Text screenshot of a single window
   wibwob instances                    List running instances (via sockets)
@@ -366,6 +424,9 @@ async function main() {
       return cmdCommands();
     case "health":
       return cmdHealth();
+    case "minimap":
+    case "map":
+      return cmdMinimap();
     case "screenshot":
       return cmdScreenshot(cleanArgs[1]);
     case "instances":
