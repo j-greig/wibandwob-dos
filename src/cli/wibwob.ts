@@ -141,10 +141,11 @@ async function cmdRun(id: string, flags: Record<string, unknown>) {
   out(await api("/commands/run", "POST", body));
 }
 
-async function cmdScreenshot() {
-  const res = await fetch(`${BASE}/screenshot/text`);
+async function cmdScreenshot(id?: string) {
+  const qs = id ? `?id=${id}` : "";
+  const res = await fetch(`${BASE}/screenshot/text${qs}`);
   if (!res.ok) {
-    process.stderr.write(`Error: ${res.status}\n`);
+    process.stderr.write(`Error: ${res.status}${res.status === 404 ? " — window not found" : ""}\n`);
     process.exit(1);
   }
   const text = await res.text();
@@ -213,6 +214,7 @@ Usage:
                                       List available commands
   wibwob health                       API health check
   wibwob screenshot                   Text screenshot of desktop
+  wibwob screenshot <id>              Text screenshot of a single window
   wibwob cmd <id> [--key val ...]     Run command by ID
   wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
   wibwob <domain> <verb> [--flags]    Run command (noun verb)
@@ -258,7 +260,7 @@ async function main() {
     case "health":
       return cmdHealth();
     case "screenshot":
-      return cmdScreenshot();
+      return cmdScreenshot(cleanArgs[1]);
     case "completions":
       return cmdCompletions();
     case "cmd": {
