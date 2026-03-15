@@ -64,18 +64,30 @@ case "${1:-help}" in
     [ -z "$SCRIPT" ] && { echo "Usage: wibwob-record run <script> [args...]"; exit 1; }
     shift 2
     CAST="$REC_DIR/rec-$TS.cast"
-    TMUX_SESSION="${TMUX_TARGET:-wibwob}"
-
-    # Strategy: capture the tmux pane where WibWob-DOS is running,
-    # not the script's stdout. The script talks to the API — the
-    # visuals are in the tmux pane.
-    echo "Recording tmux pane '$TMUX_SESSION' → $CAST"
+    # Strategy: capture via /screenshot/ansi API — works in both
+    # direct and tmux modes. The script talks to the API — the
+    # visuals are captured from the app's own render buffer.
+    echo "Recording → $CAST"
     echo "Running: bash $SCRIPT $*"
 
-    # Detect actual tmux pane dimensions
-    PANE_W=$(tmux display-message -t "$TMUX_SESSION" -p '#{pane_width}' 2>/dev/null || echo "$COLS")
-    PANE_H=$(tmux display-message -t "$TMUX_SESSION" -p '#{pane_height}' 2>/dev/null || echo "$ROWS")
-    echo "Pane size: ${PANE_W}x${PANE_H}"
+    # Detect terminal dimensions: try API state, then tmux, then defaults
+    WW_API="${WW_API:-http://127.0.0.1:8099}"
+    _dims=$(curl -s "$WW_API/state" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    s = json.load(sys.stdin).get('screen', {})
+    print(f\"{s.get('width', 0)}x{s.get('height', 0)}\")
+except: print('0x0')
+" 2>/dev/null || echo "0x0")
+    PANE_W="${_dims%%x*}"
+    PANE_H="${_dims##*x}"
+    # Fallback to tmux if API didn't return dimensions
+    if [[ "$PANE_W" == "0" || -z "$PANE_W" ]]; then
+      TMUX_SESSION="${TMUX_TARGET:-wibwob}"
+      PANE_W=$(tmux display-message -t "$TMUX_SESSION" -p '#{pane_width}' 2>/dev/null || echo "$COLS")
+      PANE_H=$(tmux display-message -t "$TMUX_SESSION" -p '#{pane_height}' 2>/dev/null || echo "$ROWS")
+    fi
+    echo "Capture size: ${PANE_W}x${PANE_H}"
 
     # Write asciicast v2 header with actual dimensions
     echo "{\"version\":2,\"width\":$PANE_W,\"height\":$PANE_H,\"timestamp\":$(date +%s)}" > "$CAST"

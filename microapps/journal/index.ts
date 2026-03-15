@@ -562,8 +562,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (deleteConfirm) {
       commandBar.setContent(` {red-fg}Delete "${entries[selectedIdx]?.title}"? y/n{/red-fg}`);
     } else {
+      const pos = entries.length > 0 ? `${selectedIdx + 1}/${entries.length}` : "—";
       commandBar.setContent(
-        `{${muted}-fg} Enter open  n new  e edit  d delete  / search  Esc clear{/${muted}-fg}`
+        `{${muted}-fg} ${pos}  Enter open  n new  e edit  d delete  / search  Esc clear{/${muted}-fg}`
       );
     }
   }
@@ -643,6 +644,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (idx < 0 || idx >= entries.length) return;
     selectedEntry = entries[idx];
     setMode("read");
+    win.setFocusTarget(detailBox);
     detailBox.focus();
   }
 
@@ -827,6 +829,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   detailBox.key(["escape", "q"], () => {
     if (mode !== "read") return;
     setMode("list");
+    win.setFocusTarget(listBox);
     listBox.focus();
   });
 
@@ -946,6 +949,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   // ── Init ──────────────────────────────────────────────────────
   refresh();
   render();
+  win.setFocusTarget(listBox);
   listBox.focus();
   win.focus();
 }
