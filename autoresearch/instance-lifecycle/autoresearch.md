@@ -59,15 +59,49 @@ add it to `src/cli/wibwob.ts` before writing the test.
        └── score = passed checks / total checks × 100
 ```
 
+## COAT Audit
+
+F2 (snapshots) must go through the **workspace seam**, not host shortcuts.
+
+| Microapp | Current state | COAT fix |
+|----------|--------------|----------|
+| figlet-banner | HOST-side handler in `snapshot-registry.ts` using `actions.openFigletWindow()` — COAT violation | Move to `host.registerSnapshot()` in microapp `index.ts`, remove host handler, remove from `PersistableAppType` |
+| contour-studio | In `TransientAppType` — explicitly excluded from save | Remove from `TransientAppType`, add `host.registerSnapshot()` in microapp |
+| runtime-inspector | Not in either type list — dynamic appType, no handler | Add `host.registerSnapshot()` in microapp |
+
+The COAT pattern (from journal, command-lab, world):
+```ts
+host.registerSnapshot({
+  serialize: (window) => {
+    const state = window.describeState?.() ?? {};
+    return { /* pick what matters */ };
+  },
+  restore: (_snapshot, payload) => {
+    host.runCommand("open", payload);  // ← command seam, not host method
+  },
+});
+```
+
 ## Files in Scope
 
-- `src/app.ts` — signal handlers, PID lifecycle
-- `src/services/control-api.ts` — socket cleanup
-- `src/core/app-controller.ts` — auto-save, boot workspace
-- `src/cli/wibwob.ts` — `attach` subcommand
-- `microapps/figlet-banner/index.ts` — registerSnapshot
-- `microapps/runtime-inspector/index.ts` — registerSnapshot
-- `microapps/contour-studio/index.ts` — registerSnapshot
+### Microapp files (F2 — registerSnapshot)
+- `microapps/figlet-banner/index.ts` — add registerSnapshot, remove host dependency
+- `microapps/runtime-inspector/index.ts` — add registerSnapshot
+- `microapps/contour-studio/index.ts` — add registerSnapshot
+
+### Host files needing cleanup (F2 — remove COAT violations)
+- `src/core/snapshot-registry.ts` — remove `figlet-banner` host handler, remove `openFigletWindow` from `SnapshotRestoreActions`
+- `src/core/types.ts` — remove `figlet-banner` from `PersistableAppType`, remove `contour-studio` from `TransientAppType`
+
+### Host files (F1 — signal handlers)
+- `src/app.ts` — SIGHUP handler, PID cleanup, auto-save
+- `src/services/control-api.ts` — socket cleanup on all exit paths
+
+### Host files (F3 — boot workspace)
+- `src/core/app-controller.ts` — `--workspace` flag, orphan detection
+
+### CLI (F4 — attach)
+- `src/cli/wibwob.ts` — `attach`, `start`, `restart` subcommands
 
 ## Off Limits
 
@@ -86,7 +120,12 @@ add it to `src/cli/wibwob.ts` before writing the test.
 
 ## Iteration Order
 
-1. F2 first — microapp registerSnapshot (most isolated, unblocks F3/F4 testing)
+1. F2 first — microapp registerSnapshot + host cleanup (COAT violation fix)
+   - Add `host.registerSnapshot()` to figlet, contour, runtime-inspector
+   - Remove figlet host handler from `snapshot-registry.ts`
+   - Remove figlet from `PersistableAppType`, contour from `TransientAppType`
+   - This is the COAT migration — microapps own their own persistence
 2. F1 — signal handlers + cleanup (needs careful testing)
-3. F3 — boot workspace selection
+3. F3 — boot workspace selection (`--workspace` flag)
 4. F4 — wibwob attach (depends on F1+F2+F3)
+   - Also add `wibwob start`, `wibwob restart` subcommands (replace script aliases)

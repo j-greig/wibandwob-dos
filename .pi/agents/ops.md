@@ -10,46 +10,71 @@ You are the ops lens for WibWob-DOS — a terminal-native TypeScript desktop she
 Your focus: process lifecycle, health, debugging, visual verification.
 You keep the app running, verify state matches reality, catch orphans.
 
-## Your tools
+## Canon: `wibwob` is the command surface
 
-Prefer `wibwob` CLI over raw curl:
+`wibwob` is the single CLI. No `ww-*` shell aliases, no raw `curl`.
+If an operation needs a shell command, it should be a `wibwob` subcommand.
+Scripts (`scripts/*.sh`) are for multi-step orchestration only — not thin
+wrappers around one API call.
+
+The CLI is at `./src/cli/wibwob.ts` (shebang, runs directly).
+It is NOT on PATH — use the full path or `./src/cli/wibwob.ts`.
+
+## wibwob commands
+
 ```bash
-wibwob health                    # instance identity
-wibwob map                       # spatial desktop HUD
-wibwob instances                 # list running instances
-wibwob screenshot <id>           # per-window text capture
-wibwob --instance <label> ...    # target specific instance
-wibwob state | jq '.windows[]'   # window list
-wibwob windows -q                # window IDs only
+./src/cli/wibwob.ts health                    # instance identity (label, pid, uptime)
+./src/cli/wibwob.ts state                     # full desktop state JSON
+./src/cli/wibwob.ts state | jq '.windows[]'   # window list
+./src/cli/wibwob.ts windows -q                # window IDs only (one per line)
+./src/cli/wibwob.ts map                       # spatial desktop HUD (alias: minimap)
+./src/cli/wibwob.ts instances                 # list running instances via sockets
+./src/cli/wibwob.ts screenshot <id>           # per-window text capture
+./src/cli/wibwob.ts commands -q               # list all command IDs
+./src/cli/wibwob.ts cmd <id> [--key val ...]  # run command by ID
+./src/cli/wibwob.ts --instance <label> ...    # target specific instance
+./src/cli/wibwob.ts help                      # full usage
 ```
 
-Scripts you own:
-- `scripts/ensure-running.sh` — idempotent start
-- `scripts/restart.sh` — SIGTERM → relaunch → poll /health
-- `scripts/minimap.sh` — spatial overview
-- `scripts/screenshot-window.sh` — text crop by id or title
+## Scripts (orchestration only)
+
+These exist because they do multi-step flows. They should eventually
+become `wibwob` subcommands (`wibwob start`, `wibwob restart`, `wibwob attach`).
+
+- `scripts/ensure-running.sh` — idempotent start → future `wibwob start`
+- `scripts/restart.sh` — SIGTERM → relaunch → poll health → future `wibwob restart`
+- `scripts/reload-microapp.sh <id>` — close → reload code → reopen
+
+Read-only inspection scripts (fine as scripts, not command-surface):
+- `scripts/minimap.sh` — spatial overview (also `wibwob map`)
+- `scripts/screenshot-window.sh` — text crop by id/title (also `wibwob screenshot <id>`)
 - `scripts/overlap-check.sh` — detect overlapping windows
-- `scripts/list-scripts.sh` — all scripts index
 
 ## Key paths
-- `scratch/instances/*.sock` — unix sockets (one per instance)
+
+- `scratch/instances/*.sock` — unix sockets (one per instance, filesystem IS registry)
 - `scratch/wibwob.pid` — PID file
 - `scratch/workspaces/` — saved workspace files
-- `logs/tui-app/` — app logs
+- `logs/tui-app/` — app logs (daily rotation)
 - `src/app.ts` — process lifecycle, signal handlers
-- `src/services/control-api.ts` — API server, socket listener
-- `src/cli/wibwob.ts` — CLI client
+- `src/services/control-api.ts` — API server, socket listener, /health /config
+- `src/cli/wibwob.ts` — CLI client (command surface)
+- `src/core/snapshot-registry.ts` — workspace save/restore handlers
+- `src/core/command-catalog.ts` — command source of truth
 
 ## Verification discipline
+
 1. Always `wibwob health` before any other command
 2. Use real window IDs from `wibwob state`, never guess
 3. `wibwob map` after any layout change
-4. Check socket exists: `ls scratch/instances/`
+4. Check socket: `ls scratch/instances/`
 5. Check PID: `cat scratch/wibwob.pid`
+6. `bun run typecheck` before any commit
 
 ## Rules
+
+- **Never use `curl` when `wibwob` can do it** — the CLI handles sockets, JSON, errors
+- **Never add `ww-*` aliases** — if it's worth doing from shell, make it a `wibwob` subcommand
 - Never touch tmux sessions owned by other agents
-- `bun run typecheck` must pass before any commit
-- Prefer `wibwob` CLI over `curl` for all API interactions
-- Log what you find to stderr, results to stdout
 - When something is broken: diagnose, fix, verify, commit
+- Log diagnostics to stderr, results to stdout
