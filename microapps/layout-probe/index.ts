@@ -1,9 +1,10 @@
-import blessed from "blessed"; // blessed required: LayoutPart widget creation
+import type blessed from "blessed"; // blessed required: LayoutPart widget creation
 import type { LayoutReport, MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createGrid,
   createLayoutReporter,
   createNodePart,
+  createCanvas,
   createRow,
   createStack,
   pickBreakpoint,
@@ -34,13 +35,13 @@ function openLayoutProbe(host: MicroappHost) {
   let mode: LayoutMode = "lg";
   let report: LayoutReport | undefined;
 
-  const headerBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const railBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const heroBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const statsBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const logBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const reportBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
-  const footerBox = blessed.box({ parent: win.body, tags: true, style: host.theme().body });
+  const headerBox = createCanvas(win.body).element;
+  const railBox = createCanvas(win.body).element;
+  const heroBox = createCanvas(win.body).element;
+  const statsBox = createCanvas(win.body).element;
+  const logBox = createCanvas(win.body).element;
+  const reportBox = createCanvas(win.body).element;
+  const footerBox = createCanvas(win.body).element;
 
   const headerPart = createNodePart(headerBox);
   const railPart = createNodePart(railBox);

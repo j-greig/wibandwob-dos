@@ -20,7 +20,7 @@
  * Tab / ①②③④ buttons switch focus.
  */
 
-import blessed from "blessed";
+import type blessed from "blessed";
 // All SDK imports from one place — dogfooding TODO-5f986603 fix
 import {
   createRenderMonitor,
@@ -201,10 +201,8 @@ function openDemo(host: MicroappHost) {
 
   // ── TOP-RIGHT panel: createTimer ticker (F06) ─────────────────────────────
 
-  const counterBox = blessed.box({
-    parent: p2.content, top: 0, left: 1, right: 1, bottom: 0,
-    tags: false, style: host.theme().body,
-  });
+  const counterCanvas = createCanvas(p2.content, { tags: false });
+  const counterBox = counterCanvas.element;
   const counterBoxPart = createNodePart(counterBox);
 
   createTimer(() => {
@@ -224,10 +222,9 @@ function openDemo(host: MicroappHost) {
 
   // ── BOTTOM-LEFT panel: Motion cheatsheet (F07) ────────────────────────────
 
-  const motionBox = blessed.box({
-    parent: p3.content, top: 0, left: 1, right: 1, bottom: 0,
-    tags: false, style: host.theme().body,
-    content:
+  const motionCanvas = createCanvas(p3.content, { tags: false });
+  const motionBox = motionCanvas.element;
+  motionBox.setContent(
       `\x1b[96m  tweenWindowPosition\x1b[0m\n` +
       `  tweenWindowSize\n\n` +
       `  easings:\n` +
@@ -236,15 +233,13 @@ function openDemo(host: MicroappHost) {
       `    elasticOut  bounceOut\n\n` +
       `  16ms setInterval tick\n\n` +
       `  keys: t  r  z`,
-  });
+  );
   const motionBoxPart = createNodePart(motionBox);
 
   // ── BOTTOM-RIGHT panel: RenderMonitor ─────────────────────────────────────
 
-  const fpsBox = blessed.box({
-    parent: p4.content, top: 0, left: 1, right: 1, bottom: 0,
-    tags: false, style: host.theme().body,
-  });
+  const fpsCanvas = createCanvas(p4.content, { tags: false });
+  const fpsBox = fpsCanvas.element;
   const fpsBoxPart = createNodePart(fpsBox);
 
   function fpsBar(fps: number): string {
