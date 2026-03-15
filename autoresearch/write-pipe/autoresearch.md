@@ -17,11 +17,12 @@ Higher is better. Each check is binary.
 
 | Feature | Points | Checks |
 |---------|--------|--------|
-| CLI infrastructure | 20 | `wibwob write` subcommand exists (5), reads stdin (5), resolves windowId→appType (5), dispatches write command (5) |
+| CLI infrastructure | 10 | `wibwob write` subcommand exists (5), resolves appType + dispatches (5) |
 | Figlet write | 25 | `figlet.write` command exists (5), updates live banner text (10), original window preserved not new (10) |
 | Fallback convention | 20 | journal falls back to `create` (10), chatroom falls back to `send` (10) |
 | Read alias | 10 | `wibwob read <id>` works as alias for screenshot (10) |
-| Pipe composition | 25 | `echo X \| wibwob write <id>` works (10), `wibwob read <id> \| wibwob write <id>` works (15) |
+| Terminal write | 15 | `terminal.write` command exists (5), dispatches ok (5), text received in pty (5) |
+| Pipe composition | 20 | `echo X \| wibwob write <id>` works (10), `wibwob read <id> \| wibwob write <id>` works (10) |
 
 ## Canon
 

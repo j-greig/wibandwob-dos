@@ -39,20 +39,14 @@ echo ""
 wibwob cmd desktop.clear-all > /dev/null 2>&1
 sleep 1
 
-# ── CLI Infrastructure (20 pts) ──────────────────────────────
-echo "=== CLI Infrastructure (20 pts) ==="
+# ── CLI Infrastructure (10 pts) ──────────────────────────────
+echo "=== CLI Infrastructure (10 pts) ==="
 
 check "wibwob write subcommand exists" 5 \
   "grep -q 'write' src/cli/wibwob.ts"
 
-check "wibwob write reads stdin" 5 \
-  "grep -q 'stdin\|readFileSync.*0\|process.stdin' src/cli/wibwob.ts"
-
-check "wibwob write resolves appType" 5 \
-  "grep -q 'appType' src/cli/wibwob.ts"
-
-check "wibwob write dispatches command" 5 \
-  "grep -q 'commands/run\|cmdRun\|write.*dispatch' src/cli/wibwob.ts"
+check "wibwob write resolves appType and dispatches" 5 \
+  "grep -q 'appType' src/cli/wibwob.ts && grep -q 'commands/run' src/cli/wibwob.ts"
 
 # ── Figlet Write (25 pts) ────────────────────────────────────
 echo ""
@@ -105,16 +99,35 @@ echo "=== Read Alias (10 pts) ==="
 check "wibwob read works" 10 \
   "wibwob read $FIGLET_ID 2>/dev/null | wc -l | xargs test 0 -lt"
 
-# ── Pipe Composition (25 pts) ────────────────────────────────
+# ── Terminal Write (15 pts) ───────────────────────────────────
 echo ""
-echo "=== Pipe Composition (25 pts) ==="
+echo "=== Terminal Write (15 pts) ==="
+
+check "terminal.write command exists" 5 \
+  "wibwob commands -q | grep -q 'microapp.wibwob.terminal.write'"
+
+# Open terminal, write to it, verify via state
+wibwob cmd microapp.wibwob.terminal.open > /dev/null 2>&1 || true
+sleep 2
+TERM_ID=$(wibwob state | jq '[.windows[] | select(.appType=="wibwob.terminal")] | last | .id' 2>/dev/null || echo "")
+
+check "terminal write dispatches" 5 \
+  "echo 'echo HELLO_WRITE_TEST' | wibwob write $TERM_ID 2>/dev/null | jq -e '.ok'"
+
+sleep 1
+check "terminal received text" 5 \
+  "wibwob read $TERM_ID 2>/dev/null | grep -q 'HELLO_WRITE_TEST'"
+
+# ── Pipe Composition (20 pts) ────────────────────────────────
+echo ""
+echo "=== Pipe Composition (20 pts) ==="
 
 check "echo | wibwob write works" 10 \
   "echo 'PIPED' | wibwob write $FIGLET_ID > /dev/null 2>&1 && sleep 1 && wibwob state 2>/dev/null | jq -e '.windows[] | select(.id=='$FIGLET_ID') | .details.inputText' | grep -q 'PIPED'"
 
 # Read figlet → write to journal — count entries before and after
 BEFORE_COUNT=$(wibwob cmd microapp.wibwob.journal.list 2>/dev/null | jq '.entries | length' || echo 0)
-check "wibwob read | wibwob write pipes between windows" 15 \
+check "wibwob read | wibwob write pipes between windows" 10 \
   "wibwob read $FIGLET_ID 2>/dev/null | wibwob write $JOURNAL_ID > /dev/null 2>&1 && sleep 1 && [ \$(wibwob cmd microapp.wibwob.journal.list 2>/dev/null | jq '.entries | length') -gt $BEFORE_COUNT ]"
 
 # ── Summary ───────────────────────────────────────────────────

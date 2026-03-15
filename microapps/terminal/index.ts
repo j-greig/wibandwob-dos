@@ -135,17 +135,40 @@ function installTerminalMousePassthrough(
 }
 
 export default function setup(host: MicroappHost) {
+  // Track open terminals for write command
+  const termWriteHandlers = new Map<number, (text: string) => void>();
+
   host.registerCommand({
     id: "open",
     label: "Terminal",
     description: "Open a terminal emulator window",
     menu: [{ category: "applications", order: 92, label: "Terminal" }],
     palette: { order: 292, label: "Terminal" },
-    action: () => openTerminal(host),
+    action: () => openTerminal(host, termWriteHandlers),
+  });
+
+  host.registerCommand({
+    id: "write",
+    label: "Write to Terminal",
+    description:
+      "Send text to a terminal window's PTY stdin. Args: text (string, required), windowId (number, required).",
+    action: (args) => {
+      const text = args?.text as string | undefined;
+      const windowId = args?.windowId as number | undefined;
+      if (!text) return { error: "text is required" };
+      if (windowId === undefined) return { error: "windowId is required" };
+      const handler = termWriteHandlers.get(windowId);
+      if (!handler) return { error: `no terminal window with id ${windowId}` };
+      handler(text);
+      return { ok: true, windowId, bytesWritten: text.length };
+    },
+    palette: false,
+    menu: false,
+    direct: true,
   });
 }
 
-function openTerminal(host: MicroappHost) {
+function openTerminal(host: MicroappHost, termWriteHandlers: Map<number, (text: string) => void>) {
   const W = 82;
   const H = 26;
   const win = host.createWindow({ title: "Terminal", width: W, height: H });
@@ -304,7 +327,15 @@ function openTerminal(host: MicroappHost) {
     host.screen.render();
   });
 
+  // Register write handler for this terminal
+  termWriteHandlers.set(win.id, (text: string) => {
+    if (bridge && !bridgeDead) {
+      bridge.stdin?.write(text);
+    }
+  });
+
   win.onCleanup(() => {
+    termWriteHandlers.delete(win.id);
     if (bridge && !bridgeDead) {
       bridge.stdin?.write("\x00" + JSON.stringify({ type: "kill" }) + "\n");
       // SIGTERM immediately, SIGKILL after 1s fallback
