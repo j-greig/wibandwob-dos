@@ -50,6 +50,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.llm-orch-studio":    "beta",
   "wibwob.touchlab":           "beta",
   "wibwob.journal":            "core",
+  "wibwob.notepad":            "core",
 
   // ── Internal: dev/demo/test only ───────────────────────────────────
   "wibwob.layout-probe":                   "internal",

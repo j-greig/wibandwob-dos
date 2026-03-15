@@ -1,0 +1,129 @@
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import blessed from "blessed";
+
+/**
+ * Notepad — the simplest possible text editor.
+ * One buffer. Read/write via plumb. No frills.
+ */
+export default function setup(host: MicroappHost) {
+  const writeHandlers = new Map<number, (text: string) => void>();
+
+  host.registerCommand({
+    id: "write",
+    label: "Write to Notepad",
+    description:
+      "Set the text content of an open notepad. Args: text (string), windowId (number).",
+    action: (args) => {
+      const text = args?.text as string | undefined;
+      const windowId = args?.windowId as number | undefined;
+      if (text === undefined) return { error: "text is required" };
+      if (windowId === undefined) return { error: "windowId is required" };
+      const handler = writeHandlers.get(windowId);
+      if (!handler)
+        return { error: `no notepad window with id ${windowId}` };
+      handler(text);
+      return { ok: true, windowId, bytesWritten: text.length };
+    },
+    palette: false,
+    menu: false,
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "open",
+    label: "Open Notepad",
+    description:
+      "Open a plain text notepad. Args: text (string, optional), title (string, optional).",
+    action: (args) => {
+      const initialText = (args?.text as string) ?? "";
+      const title = (args?.title as string) ?? "Notepad";
+      openNotepad(initialText, title);
+      return { ok: true };
+    },
+  });
+
+  function openNotepad(initialText: string, title: string) {
+    const win = host.createWindow({
+      title,
+      width: 60,
+      height: 20,
+    });
+
+    // ── Content viewer (scrollable, no wrap for piped content) ──
+    const viewer = blessed.box({
+      parent: win.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 1,
+      keys: true,
+      mouse: true,
+      vi: true,
+      scrollable: true,
+      alwaysScroll: true,
+      wrap: false,
+      scrollbar: {
+        ch: "▐",
+        track: { bg: "default" },
+        style: { bg: "default", fg: "grey" },
+      },
+      style: {
+        fg: "white",
+        bg: "default",
+      },
+      content: initialText,
+    });
+
+    // ── Status bar at bottom ──
+    const statusBar = blessed.box({
+      parent: win.body,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: {
+        fg: "black",
+        bg: "white",
+      },
+      content: "",
+    });
+
+    let buffer = initialText;
+
+    function updateStatus() {
+      const lines = buffer.split("\n").length;
+      const chars = buffer.length;
+      statusBar.setContent(
+        ` ${title}  │  ${lines} lines  ${chars} chars`,
+      );
+    }
+
+    win.setFocusTarget(viewer);
+    win.captureText(() => buffer);
+
+    win.describeState(() => ({
+      title,
+      lines: buffer.split("\n").length,
+      chars: buffer.length,
+      preview: buffer.slice(0, 200),
+      appType: "wibwob.notepad",
+    }));
+
+    win.onRestyle(() => {
+      // leave styles as explicit fg/bg — safe for blessed
+    });
+
+    writeHandlers.set(win.id, (newText: string) => {
+      buffer = newText;
+      viewer.setContent(newText);
+      updateStatus();
+      host.screen.render();
+    });
+
+    win.onCleanup(() => {
+      writeHandlers.delete(win.id);
+    });
+
+    updateStatus();
+  }
+}

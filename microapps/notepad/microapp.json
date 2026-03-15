@@ -1,0 +1,24 @@
+{
+  "name": "notepad",
+  "version": "0.1.0",
+  "description": "Dead-simple text editor. One buffer, read/write, perfect plumb node.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.notepad.open"
+  },
+  "microapp": {
+    "id": "wibwob.notepad",
+    "title": "Notepad",
+    "description": "Plain text editor — one buffer, keyboard input, pipe-friendly.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "core-apps", "order": 5, "label": "Notepad" }
+    ],
+    "palette": { "order": 5, "label": "Open Notepad" },
+    "agent": true,
+    "api": true
+  }
+}
