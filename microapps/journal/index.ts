@@ -491,11 +491,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
     // Build list items
     const items: string[] = [];
+    const maxTitleW = twoPane ? Math.floor(w * 0.40) - 16 : w - 20;
     for (const e of entries) {
       const icon = KIND_ICON[e.kind] || "░";
       const glyph = PEER_GLYPH[e.peer] || "·";
       const age = timeAgo(e.updatedAt);
-      const title = truncate(e.title, twoPane ? 30 : w - 20);
+      const title = truncate(e.title, maxTitleW);
       const tagStr = e.tags.length > 0 ? ` {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "";
       items.push(` ${glyph} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
     }
@@ -510,14 +511,18 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       const e = entries[selectedIdx];
       if (e) {
         const previewW = w - Math.floor(w * 0.40) - 6;
+        const ruleW = Math.max(10, previewW - 2);
         const bodyLines = wrapText(e.body || "(empty)", previewW);
+        const icon = KIND_ICON[e.kind] || "░";
         const header = [
-          `  {bold}${e.title}{/bold}`,
+          "",
+          `  {bold}${icon} ${e.title}{/bold}`,
           `  {${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}{/${muted}-fg}`,
-          e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
+          e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : null,
+          `  {${muted}-fg}${"─".repeat(ruleW)}{/${muted}-fg}`,
           "",
           ...bodyLines.map(l => `  ${l}`),
-        ].filter(l => l !== undefined);
+        ].filter((l): l is string => l !== null);
         detailBox.setContent(header.join("\n"));
         (detailBox as any).scrollTo(0);
       }
@@ -549,17 +554,21 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
     if (!selectedEntry) { setMode("list"); return; }
     const e = selectedEntry;
-    const bodyW = Math.max(20, w - 6);
+    const bodyW = Math.max(20, w - 8);
     const bodyLines = wrapText(e.body || "(empty)", bodyW);
+    const ruleW = Math.max(10, bodyW);
+    const icon = KIND_ICON[e.kind] || "░";
 
     const content = [
-      `{bold}${e.title}{/bold}`,
       "",
-      `{${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · created ${timeAgo(e.createdAt)} · updated ${timeAgo(e.updatedAt)}{/${muted}-fg}`,
-      e.tags.length ? `{${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
+      `  {bold}${icon} ${e.title}{/bold}`,
       "",
-      ...bodyLines,
-    ].filter(l => l !== undefined);
+      `  {${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · created ${timeAgo(e.createdAt)} · updated ${timeAgo(e.updatedAt)}{/${muted}-fg}`,
+      e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : null,
+      `  {${muted}-fg}${"─".repeat(ruleW)}{/${muted}-fg}`,
+      "",
+      ...bodyLines.map(l => `  ${l}`),
+    ].filter((l): l is string => l !== null);
 
     detailBox.setContent(content.join("\n"));
     (detailBox as any).scrollTo(0);
