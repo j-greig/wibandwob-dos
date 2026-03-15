@@ -2,169 +2,92 @@
 > → Next: [`e42-B02` SDK Composition Helpers](../e42-B02/autoresearch.md)
 > All buckets: B01 → B02 → B03 (strict) · B04 ∥ B02–B03 · B05 last · B06 agent-directed
 
-# Autoresearch: E042 Solid Foundations
+# Autoresearch: E042-B01 — Dead Code + Circular Dep Cleanup
 
 ## Objective
 
-Structural refinement of WibWob-DOS core TypeScript codebase across five sequential
-buckets: dead code cleanup, SDK composition helpers, hero app canonicalization,
-infrastructure wrappers, and test harness. The goal is measurable codebase health
-improvement without functional regressions.
+Remove dead exports/types and fix all 6 circular dependencies in the WibWob-DOS
+codebase. This is the foundation bucket — B02–B06 build on a clean dep graph.
 
-The codebase is ~38K lines across 100 files in `src/`. Key problems: god files
-(app-controller 2244 lines, ui-parts 2395 lines, browser-windows 2082 lines),
-6 circular deps, 28 unused exports, 38 unused types, zero SDK composition helpers,
-34/34 microapps importing blessed directly, 17 test files with no runner.
+**Baseline (2026-03-15):**
+- 123 unused exports (knip `--include exports`)
+- 191 unused exported types (knip `--include types`)
+- 6 circular dependencies (madge)
+- No knip.json config exists
 
 ## Metrics
 
-- **Primary**: `finding_count` (count, lower is better) — composite score across all buckets:
-  - Unused exports (knip)
-  - Circular dependencies (madge)
-  - SDK gap count (microapps importing from src/core/ or src/services/ directly)
-  - Raw platform calls outside wrappers (readFileSync/writeFileSync/execSync outside wrapper files)
-  - Failing tests
+- **Primary**: `finding_count` (count, lower is better) — unused exports + unused types + circular deps
 - **Secondary**:
-  - `typecheck_seconds` — `time bun run typecheck` wall clock
-  - `boot_ms` — cold start to first render (when instrumented)
-  - `max_file_lines` — largest .ts file in src/
-  - `sdk_primitive_count` — composition helpers exported from microapp-sdk.ts
-  - `hero_pass_count` — hero apps passing smoke (describeState + captureText, out of 7)
-  - `test_pass_count` — tests passing under `bun test`
-  - `any_count` — `as any` occurrences in src/core/
+  - `unused_exports` — knip unused exports count
+  - `unused_types` — knip unused exported types count
+  - `circular_deps` — madge circular dependency count
+  - `typecheck_seconds` — regression watch
 
 ## How to Run
 
-`./autoresearch.sh` — outputs `METRIC name=number` lines for all tracked metrics.
+`./autoresearch.sh` — outputs `METRIC name=number` lines.
 
 ## Files in Scope
 
-### Bucket 1 — Dead Code + Circular Deps
 | File | Role |
 |------|------|
-| `src/services/microapp-sdk.ts` | SDK facade — circular dep via canvas-types → sy2 panel-types |
-| `src/core/ui-parts.ts` | 2395-line god file with barrel re-export cycles to ui-parts-data/feedback/forms |
-| `src/windows/skeleton-renderer.ts` | Cross-dep with webcam-renderer |
-| `src/windows/webcam-renderer.ts` | Cross-dep with skeleton-renderer |
-| `src/services/capability-service.ts` | Cross-dep with chrome-browser-service |
-| `src/services/chrome-browser-service.ts` | Cross-dep with capability-service |
-| `knip.json` | Needs creation — configure to ignore microapps/, .pi/, scripts/, .trash/, .disabled/ |
+| `src/services/microapp-sdk.ts` | SDK facade — cycle: canvas-types → sy2-chronicles/panel-types → microapp-sdk |
+| `src/core/canvas-types.ts` | Imports `CEPanelDef` from microapp — must be moved here |
+| `microapps/sy2-chronicles/panel-types.ts` | Defines CEPanelDef, imports from microapp-sdk |
+| `src/core/ui-parts.ts` | Barrel re-exports from ui-parts-{data,feedback,forms} which import Rect/LayoutPart back |
+| `src/core/ui-parts-data.ts` | Imports `Rect, LayoutPart` from ui-parts.ts (cycle) |
+| `src/core/ui-parts-feedback.ts` | Imports `Rect, LayoutPart` from ui-parts.ts (cycle) |
+| `src/core/ui-parts-forms.ts` | Imports `Rect, LayoutPart` from ui-parts.ts (cycle) |
+| `src/core/skeleton-renderer.ts` | Imports `WebcamCell` type from webcam-renderer |
+| `src/services/webcam-renderer.ts` | Imports `renderSkeletonAt` from skeleton-renderer |
+| `src/services/capability-service.ts` | Imports `findChromeExecutablePath` from chrome-browser-service |
+| `src/services/chrome-browser-service.ts` | Imports `capabilityService` from capability-service |
+| `knip.json` | New — configure to scope knip to src/ only |
 | `package.json` | Add `bun run health` script |
+| All files with unused exports | ~50+ files across src/ |
 
-### Bucket 2 — SDK Composition Helpers
-| File | Role |
-|------|------|
-| `src/sdk/` | SDK ownership directory (stubs: microapp-host.ts, runtime-helpers.ts, runtime-client.ts) |
-| `src/services/microapp-sdk.ts` | Stable public import path — new helpers exported here |
-| `docs/sdk-primitives.md` | New doc with inline examples |
+## Circular Dep Fix Plan
 
-Target helpers:
-- `createStatusBar(parent, opts)` → themed bottom bar with left/right text
-- `createSplitView(parent, opts)` → left/right or top/bottom panes
-- `createListPanel(parent, opts)` → selectable list with theme + vi keys
-- `createTextViewer(parent, opts)` → scrollable text box, wrap option
-- `createButtonBar(parent, buttons)` → bottom toolbar with keybindings
+1. **CRITICAL: microapp-sdk → canvas-types → sy2-chronicles/panel-types → microapp-sdk**
+   Move `CEPanelDef` interface from `microapps/sy2-chronicles/panel-types.ts` into `src/core/canvas-types.ts`.
+   Update sy2-chronicles to import it from canvas-types (via SDK).
 
-Each: typed options interface, theme-aware, returns handle with update/destroy.
+2. **ui-parts.ts ↔ ui-parts-{data,feedback,forms}.ts** (3 cycles)
+   Extract `Rect`, `LayoutPart`, `FlexBasis`, `TrackSize`, `AxisAlign` into `src/core/ui-parts-types.ts`.
+   All sub-modules import from ui-parts-types instead of ui-parts.
 
-### Bucket 3 — Hero 7
-| App | Target Lines | Shows | Current |
-|-----|-------------|-------|---------|
-| hello-world | ~30 | Minimum viable: createWindow, describeState | 494 lines — rewrite |
-| notepad | ~130 | Read/write, captureText, onInput, plumb | Exists — cleanup, use SDK primitives |
-| runtime-inspector | ~425 | Live state, command introspection, tree views | Exists — review |
-| figlet-banner | ~400 | Multi-command, font picker, prompts, writeHandlers | Exists — cleanup |
-| layout-stress-test | ~464 | Responsive layout, breakpoints, animation | Rename from demo-layout-stress-test-pi |
-| data-dashboard | ~200 | Live-updating panels, timers, split layout, theming | New build |
-| file-manager | ~1622 | Full app: search, preview, sort, modes | Migrate from src/windows/ |
+3. **skeleton-renderer ↔ webcam-renderer**
+   Move `WebcamCell` interface to a shared types file or into skeleton-renderer.
 
-Every hero: `describeState` + `captureText` + consistent keys (q=close, /=search).
-
-### Bucket 4 — Infra Wrappers
-| File | Role |
-|------|------|
-| `src/core/safe-fs.ts` | New — safeReadFile, safeReadJSON, safeWriteFile, safeUnlink, listDir |
-| `src/core/platform-commands.ts` | New — reveal-in-finder, open-external, quicklook |
-| `src/core/append-log.ts` | New — services bypassing app-logger |
-| `src/services/audio-process.ts` | New — ffplay/ffmpeg spawn boilerplate |
-| 50+ call sites across 12+ files | Repoint to wrappers |
-
-### Bucket 5 — Test + Benchmark Harness
-| File | Role |
-|------|------|
-| `src/tests/*.ts` | 17 existing test files — consolidate, ensure pass |
-| `package.json` | Add `bun run test` script |
-| Hero app smoke tests | New — open via API → describeState → captureText → close |
+4. **capability-service ↔ chrome-browser-service**
+   Extract `findChromeExecutablePath` to a standalone utility or pass it as a parameter.
 
 ## Off Limits
 
-- `blessed` internals — we work with what it gives us
-- New features — this is pure structural improvement
-- Module API contract changes — backward compat required
-- Rendering performance — separate concern
-- microapps/ content (except fixing imports to point at SDK)
+- New features
+- Rendering changes
+- Module API contract changes
+- microapps/ content (except fixing the sy2-chronicles cycle)
 
 ## Constraints
 
 - `bun run typecheck` must pass after every change
-- No functional regressions — app must boot, all features work
+- No functional regressions — `wibwob health` + `wibwob state` must work
 - Backward compatible imports — old paths work via re-exports
 - One logical change per commit
-- Bucket ordering: B1 → B2 → B3 (strict). B4 can parallel B2–B3. B5 last.
 
-## Execution Order
+## Execution Steps
 
-```
-B1 Dead Code + Cycles ──→ B2 SDK Primitives ──→ B3 Hero 7 ──→ B5 Tests
-                     └──→ B4 Infra Wrappers ─────────────────┘
-```
-
-### B1 — Dead Code + Circular Deps (Session 1)
-1. Configure `knip.json` (ignore microapps/, .pi/, scripts/, .trash/, .disabled/)
-2. Kill 28 unused exports + 38 unused types
-3. Fix 6 circular deps:
-   - **CRITICAL**: sever sy2-chronicles panel-types leak from SDK chain
-   - Break ui-parts.ts barrel cycle → direct imports from sub-modules
-   - Fix skeleton-renderer ↔ webcam-renderer cross-dep
-   - Fix capability-service ↔ chrome-browser-service cross-dep
-4. Add `bun run health` script (typecheck + coat + lint + knip + madge --circular)
-5. Fix scaffold-microapp.sh manifest format
-6. Nuke `.disabled/` (or move to `.trash/disabled-microapps/`)
-7. **Gate**: restart app, ops smoke check (health, state, open/close one microapp)
-
-### B2 — SDK Composition Helpers (Sessions 1–2)
-1. Build 5 composition helpers in `src/sdk/`
-2. Export all via `microapp-sdk.ts`
-3. Document in `docs/sdk-primitives.md` with inline examples
-4. Verify: refactor notepad to use SDK primitives (statusBar + textViewer)
-5. **Gate**: 5+ helpers exported, notepad uses ≥2, typecheck clean
-
-### B3 — Hero 7 (Sessions 1–2)
-1. Rewrite hello-world (494 → ~30 lines)
-2. Cleanup notepad (use SDK primitives)
-3. Review runtime-inspector (minor polish)
-4. Cleanup figlet-banner (standardise keyboard shortcuts)
-5. Rename layout-stress-test from demo-layout-stress-test-pi, promote
-6. New build: data-dashboard (~200 lines)
-7. Migrate file-manager from src/windows/ to microapp
-8. All 7: describeState + captureText + consistent keys
-9. Document in `docs/microapp-examples.md`
-10. **Gate**: 7/7 open via API with valid describeState, hello-world ≤40 lines
-
-### B4 — Infra Wrappers (Session 1, parallel with B2–B3)
-1. `src/core/safe-fs.ts` — replace 50+ raw readFileSync/writeFileSync calls
-2. `src/core/platform-commands.ts` — replace 6 raw exec calls
-3. `src/core/append-log.ts` — replace 5 bypassed logging calls
-4. `src/services/audio-process.ts` — replace 6 ffplay/ffmpeg spawns
-5. Animation loop audit — check createFramePlayer compat
-6. **Gate**: grep for raw calls only hits wrapper files + CLI
-
-### B5 — Test + Benchmark Harness (Session 1, after B1–B3)
-1. Consolidate 17 existing tests, ensure all pass under `bun test`
-2. Add 7 hero app smoke tests (open → describeState → captureText → close)
-3. Install hyperfine, benchmark boot time + health latency + typecheck time
-4. Add `bun run test` to package.json
-5. **Gate**: `bun test` runs and passes (17+ tests + 7 smoke tests)
+1. Create `knip.json` scoped to src/
+2. Fix cycle 1: move CEPanelDef to canvas-types.ts
+3. Fix cycles 2–4: extract ui-parts-types.ts with Rect/LayoutPart
+4. Fix cycle 5: move WebcamCell to shared location
+5. Fix cycle 6: decouple capability-service ↔ chrome-browser-service
+6. Remove unused exports batch by batch (typecheck after each)
+7. Remove unused types batch by batch
+8. Add `bun run health` script
+9. Gate: restart app, `wibwob health`, `wibwob state`
 
 ## What's Been Tried
 

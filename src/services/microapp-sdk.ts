@@ -301,7 +301,7 @@ export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontC
 
 export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
 export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
-export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
+export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef, CEPanelDef, PanelType } from "../core/canvas-types.js";
 export type { ZineSourceType } from "../core/canvas-types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
