@@ -29,20 +29,38 @@ wibwob state | jq '.windows[]'   # window list
 wibwob windows -q                # window IDs only (one per line)
 wibwob map                       # spatial desktop HUD (alias: minimap)
 wibwob instances                 # list running instances via sockets
-wibwob screenshot <id>           # per-window text capture
+wibwob read <id>                 # text out of a window (captureText)
+wibwob write <id>                # pipe stdin text into a window
+wibwob plumb --from <id> --to <id>  # route text between windows
 wibwob commands -q               # list all command IDs
 wibwob cmd <id> [--key val ...]  # run command by ID
+wibwob start                     # idempotent launch
+wibwob restart                   # clean restart
+wibwob attach                    # resurrect from orphan workspace
 wibwob --instance <label> ...    # target specific instance
 wibwob help                      # full usage
 ```
 
+### Plumb — inter-window text routing
+
+`wibwob plumb --from 3 --to 7` reads text from source window, writes to dest.
+Fallback chain: `microapp.<appType>.write` → `.send` → `.create` → `<bare>.send`.
+Works for microapps (notepad, figlet, journal) and host windows (agent chat).
+No new endpoints — composes `/screenshot/text` + `/commands/run`.
+
+### Read/Write — Unix pipe model
+
+```bash
+wibwob read 3                    # text from any window (captureText)
+wibwob read 3 | wibwob write 7   # equivalent to plumb --from 3 --to 7
+echo "hello" | wibwob write 5    # pipe arbitrary text into a window
+cat file.txt | wibwob write 5    # pipe a file into notepad
+```
+
 ## Scripts (orchestration only)
 
-These exist because they do multi-step flows. They should eventually
-become `wibwob` subcommands (`wibwob start`, `wibwob restart`, `wibwob attach`).
-
-- `scripts/ensure-running.sh` — idempotent start → future `wibwob start`
-- `scripts/restart.sh` — SIGTERM → relaunch → poll health → future `wibwob restart`
+- `scripts/ensure-running.sh` — idempotent start (wrapped by `wibwob start`)
+- `scripts/restart.sh` — SIGTERM → relaunch → poll health (wrapped by `wibwob restart`)
 - `scripts/reload-microapp.sh <id>` — close → reload code → reopen
 
 Read-only inspection scripts (fine as scripts, not command-surface):
