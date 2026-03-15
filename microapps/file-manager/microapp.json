@@ -1,0 +1,20 @@
+{
+  "name": "file-manager",
+  "version": "0.1.0",
+  "description": "Finder-style file manager with browse, search, preview, and multiple view modes.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.file-manager",
+    "title": "File Manager",
+    "description": "Browse, search, filter files. Icon/list views, preview pane, workspace restore.",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [
+      { "category": "core-apps", "order": 10, "label": "File Manager" }
+    ],
+    "palette": { "order": 10, "label": "Open File Manager" },
+    "agent": true,
+    "api": true
+  }
+}

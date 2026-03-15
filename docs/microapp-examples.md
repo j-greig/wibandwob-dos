@@ -12,7 +12,7 @@ Seven reference microapps ordered by complexity. Each teaches specific SDK patte
 | 4 | **figlet-banner** | ~450 | Multi-command registration, font picker, prompts, `writeHandlers` pattern |
 | 5 | **layout-stress-test** | ~460 | Responsive layout, breakpoints, contrib grid, animation loops |
 | 6 | **data-dashboard** | ~130 | `createSplitView`, `createTextViewer`, `createStatusBar`, timers, `os` module |
-| 7 | **file-manager** | ~1600 | Full app: search, preview, sort, icon/list modes (currently `src/windows/`, migration pending) |
+| 7 | **file-manager** | ~44+1623 | Full app: search, preview, sort, icon/list modes. Host-delegated microapp — thin wrapper at `microapps/file-manager/`, complex implementation at `src/windows/file-manager-window.ts` |
 
 ## Required Hooks
 
@@ -76,4 +76,4 @@ win.onCleanup(() => clearInterval(timer));
 | figlet-banner | `microapps/figlet-banner/` |
 | layout-stress-test | `microapps/demo-layout-stress-test-pi/` |
 | data-dashboard | `microapps/data-dashboard/` |
-| file-manager | `src/windows/file-manager-window.ts` (migration pending) |
+| file-manager | `microapps/file-manager/` (delegates to `src/windows/file-manager-window.ts`) |

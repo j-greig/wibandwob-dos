@@ -1519,6 +1519,10 @@ export function openFileManagerWindow(params: {
   // ── Frame wiring ───────────────────────────────────────
 
   frame.kind = "browser";
+  frame.captureText = () => {
+    const lines = entries.map(e => e.label);
+    return `File Manager: ${currentPath}\n${lines.join("\n")}`;
+  };
   frame.describeState = () => ({
     appType: "file-manager",
     summary: `File manager at ${currentPath}` + (searchActive ? ` (searching: ${searchQuery})` : ""),
