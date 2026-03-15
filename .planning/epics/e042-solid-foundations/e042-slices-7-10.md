@@ -107,3 +107,10 @@ making it hero app #7.
 - [ ] hero_pass_count = 7/7
 
 **Gate:** `bun run health`, `hero_pass_count=7`, no file-manager code in `src/windows/`.
+
+---
+
+## Related: WibMux
+
+MVP at `/Users/james/Repos/wibandwob-dos-wibmux/autoresearch/wibmux/wibmux.sh`.
+May affect scripting patterns and `wibwob attach` v2. Reference if relevant during S8–S10.
