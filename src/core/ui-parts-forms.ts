@@ -7,7 +7,7 @@
  */
 import blessed from "blessed";
 import { theme } from "./theme/resolver.js";
-import type { Rect, LayoutPart } from "./ui-parts.js";
+import type { Rect, LayoutPart } from "./ui-parts-types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES

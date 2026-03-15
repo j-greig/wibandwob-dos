@@ -43,25 +43,9 @@ export type {
 } from "./ui-parts-data.js";
 
 /** @primitive */
-export type Rect = { top: number; left: number; width: number; height: number };
-
-/** @primitive */
-export type LayoutPart<Props = void> = {
-  node: blessed.Widgets.BoxElement;
-  layout(rect: Rect): void;
-  update(props: Props): void;
-  restyle(): void;
-  destroy(): void;
-};
-
-/** @primitive */
-export type FlexBasis = number | `${number}fr`;
-
-/** @primitive */
-export type TrackSize = number | `${number}fr`;
-
-/** @primitive — reserved for future use; not yet applied by layout functions. */
-export type AxisAlign = "start" | "center" | "end";
+// Shared types — canonical source is ui-parts-types.ts (breaks circular dep with sub-modules)
+export type { Rect, LayoutPart, FlexBasis, TrackSize, AxisAlign } from "./ui-parts-types.js";
+import type { Rect, LayoutPart, FlexBasis, TrackSize, AxisAlign } from "./ui-parts-types.js";
 
 /** @primitive — reserved for future use; not yet applied by layout functions. */
 export type Alignment = {
