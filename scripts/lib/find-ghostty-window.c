@@ -1,3 +1,11 @@
+// find-ghostty-window.c — print Ghostty window IDs via CGWindowList (macOS only)
+//
+// Build:  cc -framework CoreGraphics -framework CoreFoundation find-ghostty-window.c -o find-ghostty-window
+// Usage:  ./find-ghostty-window
+// Output: <windowID> <x> <y> <width> <height>  (one line per Ghostty window)
+//
+// The compiled binary is gitignored — capture-tui-png.sh auto-builds it on first run.
+
 #include <CoreGraphics/CoreGraphics.h>
 #include <stdio.h>
 #include <string.h>
