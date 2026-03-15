@@ -6,270 +6,196 @@ branch: spike/multi-instance-clarity
 
 # Spike: Multi-instance Clarity
 
-**Prior session review:** `scratch/devlog-2026-03-15-direct-mode-and-screenshot.md`
-— reviewed this spike's option D (hybrid registry file), concluded it's over-engineered.
-Recommends unix sockets (`Bun.serve({ unix })` works today) as the structural fix
-+ `wibwob which` as the immediate 30-minute fix. See § Revised Recommendation below.
+**Prior art:** `scratch/devlog-2026-03-15-direct-mode-and-screenshot.md`
 
 ## One-liner
 
-Agents and humans routinely act on the wrong WibWob instance because nothing
-enforces or surfaces which instance an API call targets.
+Agents hit the wrong WibWob instance because the transport layer has no
+discovery or targeting — fix the transport, not the commands.
 
-## Problem Statement
+## The COAT Framing
 
-When multiple pi agents are active, each may launch or connect to a different
-WibWob-DOS instance. An agent reports "I opened the window" and confirms via
-API — but the human is looking at a *different* instance in their Ghostty
-terminal. The API response is truthful but for the wrong audience.
-
-**Symptoms observed:**
-- Agent says "done, window is open" → human sees nothing (wrong instance)
-- Human says "session 0t6" → agent connects to whatever is on port 8099
-- Stale bun processes accumulate (3+ instances, 95%+ CPU each)
-- `instanceId` is a random 3-char code — meaningless to humans, never displayed
-  prominently, changes every restart
-- No discovery: agents can't ask "which instances exist?" — they just try 8099
-
-## Current Architecture
+COAT seams (command, inspection, window, workspace) are instance-agnostic.
+The same commands work on any instance. The problem is **below** the seams:
 
 ```
- ┌─────────────────────────────────────────────────────────────────┐
- │                        Human's view                             │
- │                                                                 │
- │   Ghostty terminal                                              │
- │   └─ tmux session "wibwob"                                     │
- │      └─ WibWob-DOS (blessed TUI)  ← what the human SEES        │
- │         instanceId: ???                                         │
- │         port: 8099                                              │
- └─────────────────────────────────────────────────────────────────┘
-
- ┌─────────────────────────────────────────────────────────────────┐
- │                      Agent A's view                             │
- │                                                                 │
- │   pi session (headless)                                         │
- │   └─ curl http://127.0.0.1:8099/...  ← what the agent TALKS TO │
- │      └─ maybe the same instance, maybe not                     │
- │         instanceId: checked once via /health, then forgotten    │
- └─────────────────────────────────────────────────────────────────┘
-
- ┌─────────────────────────────────────────────────────────────────┐
- │                      Agent B's view                             │
- │                                                                 │
- │   pi session (headless)                                         │
- │   └─ starts NEW instance (tmux new / bun run dev)              │
- │      └─ port 8099 already taken → silent failure? or steals it? │
- │         OR: uses 8098 → human doesn't know to look there       │
- └─────────────────────────────────────────────────────────────────┘
+  Transport layer (BROKEN)        COAT seams (fine as-is)
+  ────────────────────────        ──────────────────────
+  which socket/port?          →   /commands/run
+  how to discover instances?  →   /state (inspection)
+  how to target one?          →   /windows/batch
+                                  /workspace/save
 ```
 
-### Identity & Port Model (current)
+An agent can't run `wibwob which` to find out which instance it's on —
+that's circular (it already had to pick a port to connect). Discovery
+must happen **before** the first API call.
 
-| Concept | How it works | Problem |
-|---------|-------------|---------|
-| `instanceId` | Random 3-char (e.g. `2c6`), generated at startup | Meaningless, changes every restart, not memorable |
-| `instanceLabel` | Env var `WIBWOB_INSTANCE_LABEL` (e.g. `main`, `zuk`) | Only set in package.json scripts, agents don't use it |
-| Port | `CONTROL_API_PORT` env var, default `8099` | Fixed per-process, no auto-discovery of others |
-| PID file | `scratch/wibwob.pid` (or `scratch/alt/wibwob.pid`) | Per scratch dir, not queryable cross-instance |
-| tmux session | Convention: `wibwob` for main | Agents create ad-hoc sessions, no naming convention |
-
-### Information Flow (current)
+## Problem
 
 ```
-  Agent                    API                     TUI (blessed)
-    │                       │                          │
-    │  curl /health  ──────►│                          │
-    │  ◄── { instanceId,    │                          │
-    │       port, ... }     │                          │
-    │                       │                          │
-    │  curl /commands/run ─►│──── opens window ───────►│
-    │  ◄── { ok: true }    │                          │  ← human may be
-    │                       │                          │    looking at a
-    │  "I opened it" ──────────────────────────────────│    DIFFERENT instance
-    │  (to human)           │                          │
-    │                       │                          │
-
-  No feedback loop: agent doesn't know which TUI the human is watching.
-  Human doesn't know which port the agent is using.
+  Agent A                              Agent B
+    │                                    │
+    │  curl :8099/commands/run ───►  instance "main" (what human sees)
+    │                                    │
+    │                                    │  curl :8099/commands/run ──?
+    │                                    │  port taken? new instance?
+    │                                    │  silent fallback to :8098?
+    │                                    │
+    │  "I opened it" ──► human          │  "I opened it" ──► human
+    │                     sees nothing   │                     sees nothing
+    │                     (wrong one)    │                     (or right one??)
 ```
 
-## Questions to Answer
+No discovery. No targeting. No way to know before connecting.
 
-1. **Discovery:** How should an agent find all running WibWob instances?
-   - PID files? Unix sockets? Port scan? Registry file?
-2. **Targeting:** How should an agent specify *which* instance to talk to?
-   - `wibwob --instance main cmd ...`? `WIBWOB_API=:8098`?
-3. **Visibility:** How should the human know which instance they're seeing?
-   - Instance label in tmux window title? In status bar (already shows id)?
-4. **Port conflicts:** What happens when two instances try port 8099?
-   - Currently: Bun picks next available, but nothing announces the actual port
-5. **Lifecycle:** Who owns starting/stopping instances?
-   - Should agents be forbidden from launching? Or must they register?
-6. **Staleness:** How to detect and kill orphaned instances?
+## Current /health Response
 
-## Prior Art (from devlog W11)
-
-The devlog already identified the solution direction:
-
-> Unix sockets = primary for local CLI/agent (fast, no port conflicts,
-> discovery via `ls *.sock`). HTTP ports = keep for remote access, server
-> deployments. CLI should try socket first, fall back to HTTP. Same pattern
-> as Docker daemon.
-
-And:
-
-> v4 backlog planned: multi-instance discovery & targeting (tmux-style `-t` flag)
-
-## Candidate Solutions
-
-### A. Socket-based discovery (devlog direction)
-
-```
-scratch/
-  instances/
-    main.sock          ← unix socket, auto-discovered
-    main.json          ← { pid, port, instanceId, label, startedAt }
-    zuk.sock
-    zuk.json
+```json
+{
+  "ok": true,
+  "port": 8099,
+  "host": "127.0.0.1",
+  "instanceId": "cyg",
+  "requestedPort": 8099,
+  "scratchBase": "...",
+  "capturesDir": "...",
+  "workspacesDir": "...",
+  "statePath": "..."
+}
 ```
 
-- `wibwob --list` → shows all `*.json` in instances/
-- `wibwob -t main cmd ...` → connects via `main.sock`
-- CLI tries `$WIBWOB_INSTANCE` → default label → first available socket
-- Dead sockets detected by failed connect → auto-cleaned
+**Missing:** `instanceLabel`, `pid`, `startedAt`, `uptime`, `socketPath`.
+The inspection seam doesn't fully describe the instance identity.
 
-**Pros:** No port conflicts, fast, discoverable, Docker-proven pattern.
-**Cons:** Needs socket support in Bun's HTTP server, doesn't help remote.
+## Solution: Two Phases
 
-### B. Registry file (lighter weight)
+### Phase 1: Fix /health + socket transport (the real fix)
 
+**1a. Enrich /health** — make the inspection seam fully describe the instance:
+
+```json
+{
+  "ok": true,
+  "instanceId": "cyg",
+  "instanceLabel": "main",
+  "pid": 12345,
+  "startedAt": "2026-03-15T09:00:00Z",
+  "uptime": "2h 14m",
+  "port": 8099,
+  "socketPath": "scratch/instances/main.sock",
+  "host": "127.0.0.1"
+}
 ```
-scratch/instances.json
-  [{ label: "main", pid: 1234, port: 8099, instanceId: "2c6", startedAt: ... },
-   { label: "zuk",  pid: 5678, port: 8098, instanceId: "x9f", startedAt: ... }]
-```
 
-- Each instance registers on startup, deregisters on clean exit
-- `wibwob --list` reads the file, health-checks each, prunes dead ones
-- Simpler than sockets, works today
+Drop the path noise (`scratchBase`, `capturesDir`, etc.) — that's config,
+not identity. Move to a `/config` endpoint if anyone needs it.
 
-**Pros:** No new server infrastructure, just a JSON file.
-**Cons:** Stale entries if crash (needs health-check pruning).
+Then `wibwob health` becomes the identity surface. No `which` needed —
+health already answers "who am I talking to?"
 
-### C. Agent convention only (no code change)
-
-- Document: "agents MUST NOT launch instances, only connect to existing"
-- Document: "agents MUST check /health and log instanceId at session start"
-- Add `wibwob which` command that prints instance info prominently
-
-**Pros:** Zero code. **Cons:** Agents will violate conventions.
-
-### D. Hybrid: registry file + CLI targeting + agent guardrails
-
-Combine B + C:
-1. Registry file for discovery (auto-register/deregister)
-2. CLI `-t` flag for targeting (like tmux)
-3. `wibwob which` / `wibwob instances` for visibility
-4. Agent session preamble: "I am connected to instance {label} ({id}) on port {port}"
-5. Status bar shows label prominently (already shows id, make label primary)
-
-## Recommendation
-
-**Option D (hybrid)** — registry file is the minimum viable change.
-Unix sockets (option A) are better long-term but need Bun socket server support
-and are a larger change. The registry file solves the immediate pain:
-
-1. Instance registers in `scratch/instances/` on startup
-2. `wibwob instances` lists all live instances (health-check prunes dead)
-3. `wibwob -t main` targets by label
-4. Agent skills document: "always run `wibwob which` at session start"
-
-## Scope
-
-This spike answers: **what's the minimum change to stop instance confusion?**
-
-Not in scope:
-- Unix socket transport (future, larger)
-- Remote/VPS multi-instance (different auth model)
-- Formal instance lifecycle management (systemd-style)
-
-## Revised Recommendation (post-review)
-
-Option D's registry file adds moving parts (register/deregister/prune) to solve
-a problem that unix sockets solve structurally. `Bun.serve({ unix })` works today.
-
-**Two-phase plan:**
-
-### Phase 1: Immediate (30 min, no architecture)
-- `wibwob which` command — prints label, port, instanceId, PID prominently
-- Agent preamble convention in ww-ops skill: "run `wibwob which` at session start"
-- Make `instanceLabel` primary in TUI status bar (currently shows id)
-
-### Phase 2: Unix sockets (structural fix)
+**1b. Unix socket transport** — structural fix for discovery + targeting:
 
 ```
 scratch/instances/
   main.sock              ← Bun.serve({ unix: path })
   zuk.sock               ← second instance
-
-  wibwob -t main ...     ← connects via main.sock
-  wibwob instances       ← ls *.sock, try connect, show live ones
 ```
 
-```
-  Agent                     Socket                    TUI
-    │                         │                         │
-    │  connect main.sock ────►│                         │
-    │  ◄── guaranteed this ───│── same process ────────►│
-    │      is "main"          │                         │
-    │                         │                         │
-    No port guessing. No registry. Dead socket = dead instance.
-```
-
-**Why sockets > registry:**
-- Port conflicts impossible — each instance has its own socket path
-- Discovery is `ls *.sock` — no health-check pruning needed
-- Dead sockets detected by failed connect → auto-clean
-- `wibwob -t main` resolves to `scratch/instances/main.sock` — no port lookup
-- HTTP stays available for remote/VPS (dual-listen: socket + port)
-
-**Why not sockets alone:**
-- Remote agents (VPS, Docker) still need HTTP ports
-- Both listeners in same Bun process — one `Bun.serve()` each
-
-### Architecture (phase 2)
+Each instance dual-listens:
 
 ```
-  ┌──────────────────────────────────────────────────────┐
-  │  WibWob-DOS instance (label: "main", id: 2c6)       │
-  │                                                      │
-  │  Bun.serve({ unix: "scratch/instances/main.sock" })  │
-  │  Bun.serve({ port: 8099 })                          │
-  │                                                      │
-  │  blessed TUI ◄──── same process ────► API handlers   │
-  └──────────────────────────────────────────────────────┘
-        ▲                                    ▲
-        │                                    │
-   human sees                          agents connect
-   (Ghostty/tmux)                      (socket or HTTP)
-
-  ┌──────────────────────────────────────────────────────┐
-  │  WibWob-DOS instance (label: "zuk", id: x9f)        │
-  │                                                      │
-  │  Bun.serve({ unix: "scratch/instances/zuk.sock" })   │
-  │  Bun.serve({ port: 8098 })                          │
-  └──────────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────┐
+  │  WibWob-DOS  label:"main"  id:cyg           │
+  │                                              │
+  │  Bun.serve({ unix: "instances/main.sock" })  │  ← local agents
+  │  Bun.serve({ port: 8099 })                  │  ← remote/VPS
+  │                                              │
+  │  blessed TUI ◄── same process ──► API        │
+  └─────────────────────────────────────────────┘
 ```
 
-## Files Likely Touched
+**Discovery** (before any API call):
 
-### Phase 1
-- `src/cli/wibwob.ts` — `which` subcommand
-- `.agents/skills/ww-ops/SKILL.md` — agent preamble convention
+```bash
+ls scratch/instances/*.sock    # what exists?
+# → main.sock  zuk.sock
 
-### Phase 2
-- `src/app.ts` — create socket in instances dir, clean up on exit
-- `src/runtime/runtime-node.ts` — dual-listen (socket + HTTP)
-- `src/cli/wibwob.ts` — `instances` subcommand, `-t` flag, socket-first connect
-- `scripts/lib/runtime-env.sh` — discover via socket before HTTP fallback
-- `~/.wibwob` — aliases
+# try connect to verify alive:
+curl --unix-socket scratch/instances/main.sock http://localhost/health
+```
+
+Dead socket = dead instance. `connect()` fails → auto-clean the file.
+No registry. No health-check polling. The filesystem IS the registry.
+
+**Targeting:**
+
+```bash
+wibwob -t main cmd figlet.open --text HELLO
+#       ↑ resolves to main.sock, then uses COAT seams normally
+
+wibwob -t zuk screenshot 3
+```
+
+CLI resolution order:
+1. `-t label` → `scratch/instances/{label}.sock`
+2. `$WIBWOB_INSTANCE` env var → socket
+3. `$WIBWOB_API` → HTTP URL (existing, remote)
+4. Default: first `.sock` found (or `http://127.0.0.1:8099` fallback)
+
+**Information flow (fixed):**
+
+```
+  Agent                    Socket               TUI (blessed)
+    │                        │                       │
+    │  ls *.sock ──────────► │ (filesystem)          │
+    │  found: main.sock      │                       │
+    │                        │                       │
+    │  connect main.sock ───►│                       │
+    │  GET /health           │                       │
+    │  ◄── { label:"main",   │── same process ──────►│
+    │       id:"cyg", ... }  │                       │
+    │                        │                       │
+    │  GUARANTEED: this is   │                       │
+    │  the "main" instance   │   ← human sees this   │
+    │  the human is watching │                       │
+```
+
+### Phase 2: Evaluate if `wibwob which` is still needed
+
+After phase 1, `wibwob health` returns full identity including label.
+`wibwob -t main health` confirms targeting. `ls *.sock` discovers.
+
+`wibwob which` would just be `wibwob health | pretty-print` — probably
+not worth a separate command. If agents need a preamble, it's:
+
+```bash
+wibwob health   # already tells you everything
+```
+
+**Verdict: probably not needed.** Health IS which.
+
+## Scope
+
+**In:** socket transport, /health enrichment, CLI `-t` flag, socket cleanup on exit
+**Out:** remote multi-instance, systemd lifecycle, formal process supervision
+
+## Files Touched
+
+| File | Change |
+|------|--------|
+| `src/app.ts` | Create socket on startup, clean on exit |
+| `src/runtime/runtime-node.ts` | Dual-listen (socket + HTTP), socket path in identity |
+| `src/services/control-api.ts` | Enrich `/health` response |
+| `src/cli/wibwob.ts` | `-t` flag, socket-first connect, `instances` subcommand |
+| `scripts/lib/runtime-env.sh` | Socket discovery before HTTP fallback |
+
+## Test Plan
+
+1. Start main instance → `main.sock` appears
+2. Start alt instance → `zuk.sock` appears
+3. `wibwob -t main health` → returns main's identity
+4. `wibwob -t zuk health` → returns zuk's identity
+5. Kill main → `wibwob -t main health` fails → sock auto-cleaned
+6. `wibwob instances` → lists live instances
+7. Agent connects without `-t` → picks first/only socket → correct
