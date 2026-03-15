@@ -117,44 +117,76 @@ Key entry points for audit:
 - COAT: every change must work without the TUI
 - One logical change per commit
 
-## Chosen Focus: God File Decomposition — `ui-parts.ts`
+## Chosen Focus: Terminal Design System — Extract, Name, Specify
 
 ### Why This
 
-`ui-parts.ts` is 2,379 lines — the largest file in the codebase. It mixes 5 unrelated
-concerns in one file: layout primitives, chrome components, scroll containers, sidebar/tabs,
-and pattern generators. This directly violates invariant #1 (single source of truth per
-concern) and makes it impossible for an agent to understand one component without reading
-2,400 lines. [Human: YES THIS NEEDS MAJOR WORK - THINK DESIGN COMPONENT SYSTEM LIKE NERDY BRAND DESIGNES WOULD MAKE IN FIGMA EXCEPT ITS FOR THE TERMINAL]
+`ui-parts.ts` (2168 lines) isn't just a big file — it's a **bag of functions with no
+design system**. Two incompatible API shapes coexist, naming is inconsistent, and there's
+no component hierarchy.
 
-The other god files (app-controller 2,334; file-manager 1,623) are harder to split safely —
-app-controller is a composition root, file-manager is a single window. `ui-parts.ts` has
-clear natural seams that map to subdirectory modules.
+**Current naming chaos:**
+- `createSimpleStatusBar` (B02) vs `createStatusBar` (old LayoutPart) — "Simple" = hack
+- `createTextViewer` vs `createTextBlock` — what's the difference?
+- `createListPanel` vs `createSelectableList` — same concept, different names
+- Handle methods: sometimes `update()`, sometimes `setContent()`, sometimes `getSelected()`
+- Types: sometimes `FooOptions`, sometimes `FooProps`, sometimes inline
+
+**Two incompatible component contracts:**
+1. **LayoutPart** (old): `{ node, layout(rect), update(props), restyle(), destroy() }`
+2. **Handle** (B02): `{ element, update(opts), destroy() }`
+
+### Target Nomenclature
+
+| Pattern | Convention | Example |
+|---------|-----------|---------|
+| Constructor | `create<Component>` | `createStatusBar`, `createList`, `createViewer` |
+| Options type | `<Component>Options` | `StatusBarOptions`, `ListOptions` |
+| Handle type | `<Component>Handle` | `StatusBarHandle`, `ListHandle` |
+| Handle.update | `update(props: Partial<Options>)` | Always partial, always consistent |
+| Handle.read | `get<Property>()` | `getSelected()`, `getContent()` |
+| Handle.events | `on<Event>(cb)` | `onSelect(cb)`, `onChange(cb)` |
+| Handle.cleanup | `destroy()` | Always — releases nodes, timers, listeners |
+| Handle.restyle | `restyle()` | Re-apply theme tokens |
+
+The B02 handle-based API is the standard. The old LayoutPart API is internal
+infrastructure for layout engines. No `Simple` prefix — the handle versions ARE the
+canonical SDK surface.
+
+### Terminal Design System Layers
+
+| Layer | Components |
+|-------|-----------|
+| **Tokens** | Theme semantic slots, spacing scale, border styles |
+| **Atoms** | Text, Divider, Spacer, Glyph |
+| **Molecules** | StatusBar, HeaderBar, TextViewer, List, InputLine, Rule, Button |
+| **Organisms** | SplitView, TabbedContainer, SidebarPanel, ScrollViewport, Modal |
+| **Layouts** | Stack, Row, Grid, responsive breakpoints |
+| **Patterns** | Pattern generators, data simulation, gradient helpers |
+
+### B06 Scope
+
+1. ✅ **Extract patterns** — done (ui-parts-patterns.ts, 227 lines)
+2. **Extract chrome molecules** → `ui-parts-chrome.ts`
+3. **Extract scroll/container organisms** → `ui-parts-containers.ts`
+4. **ui-parts.ts shrinks to layout-only** (~600 lines)
+5. **Rename B02 helpers** — drop `Simple` prefix, canonical names via SDK
+6. **Write `docs/design-system.md`** — component inventory, nomenclature rules,
+   layer hierarchy, target contract, migration path for old LayoutPart API
 
 ### Primary Metric
 
-`max_ui_parts_lines` (lower is better) — line count of `src/core/ui-parts.ts` after extraction.
-Target: ≤500 lines (barrel re-exports + layout primitives only).
-
-### Plan
-
-Extract into `src/core/ui/` subdirectory:
-
-| File | Contains | ~Lines |
-|------|----------|--------|
-| `ui-parts-chrome.ts` | createHeaderBar, createStatusBar, createTextBlock, createRule, createFigletDisplay, createAnimatedPanel, createButtonBar | ~400 |
-| `ui-parts-scroll.ts` | createScrollViewport, createBorderedPanel, createCollapsibleBlock, createContentStack | ~400 |
-| `ui-parts-panels.ts` | createSidebarPanel, resolveSidebarWidth, createSelectableList, createInlineSearch, createRestyleBundle, deferRender, createTabs | ~470 |
-| `ui-parts-patterns.ts` | 11 pattern generators, PATTERNS, sinWave, randHistory, xLabels, hslToRgb, ansiGradientLine | ~210 |
-| `ui-parts.ts` (remains) | Layout primitives (clamp, applyRect, createNodePart, createStack, createRow, breakpoints, createGrid) + barrel re-exports from sub-modules | ~500 |
+`max_ui_parts_lines` (lower is better). Target: ≤600 lines.
 
 ### Constraints
 
-- Every existing import of `ui-parts.ts` must continue to work (barrel re-exports)
-- `microapp-sdk.ts` imports unchanged
-- `bun run health` must pass after each extraction
-- One sub-module per commit
+- Barrel re-exports from ui-parts.ts — all existing imports unchanged
+- `bun run health` after each extraction
+- No functional changes — file moves, renames with re-exports, docs
+- SDK consumers get clean names; old names stay as aliases
 
 ## What's Been Tried
 
-_Starting now._
+### Step 1: Extract patterns ✅
+Moved pattern generators, data sim helpers, colour helpers to `ui-parts-patterns.ts` (227 lines).
+ui-parts.ts: 2379 → 2168 lines.

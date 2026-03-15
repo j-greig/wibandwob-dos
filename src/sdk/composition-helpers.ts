@@ -4,7 +4,7 @@
  * Each helper creates a themed blessed widget with sensible defaults.
  * Returns a handle: { element, update(opts), destroy() }.
  *
- * Import via: import { createStatusBar, ... } from "../../src/services/microapp-sdk.js";
+ * Import via: import { createSimpleStatusBar, ... } from "../../src/services/microapp-sdk.js";
  */
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
