@@ -1,15 +1,15 @@
-import blessed from "blessed";
 import type {
   CommandListItem,
   MicroappHost,
   RuntimeInspectionSnapshot,
-  TabDef,
 } from "../../src/services/microapp-sdk.js";
 import {
   clearTimers,
-  createScrollbar,
-  createTabs,
   createTimer,
+  createHeaderBar,
+  createStatusBar,
+  createScrollView,
+  createTabs,
   fetchRuntimeCommands,
   fetchRuntimeInspection,
 } from "../../src/services/microapp-sdk.js";
@@ -37,15 +37,17 @@ function fmtList(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
+// ── Pane renderers ────────────────────────────────────────────────────────
+
 function renderOverview(state: InspectorState): string {
   if (!state.snapshot) {
     return state.error ? `Runtime Inspector\n\nError: ${state.error}` : "Runtime Inspector\n\nLoading…";
   }
-  const snapshot = state.snapshot;
-  const app = snapshot.state.app;
-  const focus = snapshot.state.focus;
-  const overlay = snapshot.ui.overlay;
-  const blockerLabels = snapshot.ui.blockers.map((blocker) => blocker.label || blocker.type);
+  const s = state.snapshot;
+  const app = s.state.app;
+  const focus = s.state.focus;
+  const overlay = s.ui.overlay;
+  const blockerLabels = s.ui.blockers.map((b) => b.label || b.type);
   return [
     "Runtime Inspector",
     "",
@@ -56,72 +58,66 @@ function renderOverview(state: InspectorState): string {
     `  api             ${app.controlApiBaseUrl ?? "-"}`,
     "",
     "Desktop",
-    `  windows         ${snapshot.state.windows.length}`,
+    `  windows         ${s.state.windows.length}`,
     `  focus           ${focus.windowId ?? "none"} ${focus.title ?? ""}`.trimEnd(),
-    `  menu            ${snapshot.ui.menu.open ? snapshot.ui.menu.label ?? "open" : "closed"}`,
+    `  menu            ${s.ui.menu.open ? s.ui.menu.label ?? "open" : "closed"}`,
     `  overlay         ${overlay ? `${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}` : "none"}`,
-    `  blocked         ${fmtBool(snapshot.ui.blocked)}`,
+    `  blocked         ${fmtBool(s.ui.blocked)}`,
     `  blockers        ${fmtList(blockerLabels)}`,
     "",
     "Health",
-    `  render fps      ${snapshot.stats.render.fps.toFixed(1)}`,
-    `  avg frame       ${snapshot.stats.render.avgFrameMs.toFixed(1)}ms`,
-    `  rss             ${snapshot.stats.rssMb.toFixed(1)}MB`,
-    `  heap            ${snapshot.stats.heapUsedMb.toFixed(1)}MB`,
-    `  agent           ${snapshot.stats.agent.active ? "active" : "idle"}`,
-    `  scramble        ${snapshot.scramble.status} · ${snapshot.scramble.model}`,
+    `  render fps      ${s.stats.render.fps.toFixed(1)}`,
+    `  avg frame       ${s.stats.render.avgFrameMs.toFixed(1)}ms`,
+    `  rss             ${s.stats.rssMb.toFixed(1)}MB`,
+    `  heap            ${s.stats.heapUsedMb.toFixed(1)}MB`,
+    `  agent           ${s.stats.agent.active ? "active" : "idle"}`,
+    `  scramble        ${s.scramble.status} · ${s.scramble.model}`,
     "",
     `Commands visible: ${state.commands.length}`,
     `Updated: ${state.updatedAt}`,
   ].join("\n");
 }
 
-function renderUi(snapshot: RuntimeInspectionSnapshot | undefined): string {
-  if (!snapshot) return "Loading UI state…";
-  const overlay = snapshot.ui.overlay;
+function renderUi(s: RuntimeInspectionSnapshot | undefined): string {
+  if (!s) return "Loading UI state…";
+  const overlay = s.ui.overlay;
   const lines = [
     "UI State",
     "",
-    `menu.open     ${fmtBool(snapshot.ui.menu.open)}`,
-    `menu.label    ${snapshot.ui.menu.label ?? "-"}`,
+    `menu.open     ${fmtBool(s.ui.menu.open)}`,
+    `menu.label    ${s.ui.menu.label ?? "-"}`,
     `overlay.type  ${overlay?.type ?? "-"}`,
     `overlay.label ${overlay?.label ?? "-"}`,
-    `blocked       ${fmtBool(snapshot.ui.blocked)}`,
+    `blocked       ${fmtBool(s.ui.blocked)}`,
     "",
     "Blockers",
   ];
-
-  if (snapshot.ui.blockers.length === 0) {
+  if (s.ui.blockers.length === 0) {
     lines.push("  none");
   } else {
-    for (const blocker of snapshot.ui.blockers) {
-      lines.push(`  - ${blocker.type}${blocker.label ? ` · ${blocker.label}` : ""}`);
-      if (blocker.escapeCommands?.length) {
-        lines.push(`      escape: ${blocker.escapeCommands.join(", ")}`);
-      }
-      if (blocker.continueCommands?.length) {
-        lines.push(`      continue: ${blocker.continueCommands.join(", ")}`);
-      }
+    for (const b of s.ui.blockers) {
+      lines.push(`  - ${b.type}${b.label ? ` · ${b.label}` : ""}`);
+      if (b.escapeCommands?.length) lines.push(`      escape: ${b.escapeCommands.join(", ")}`);
+      if (b.continueCommands?.length) lines.push(`      continue: ${b.continueCommands.join(", ")}`);
     }
   }
-
   return lines.join("\n");
 }
 
-function renderWindows(snapshot: RuntimeInspectionSnapshot | undefined): string {
-  if (!snapshot) return "Loading windows…";
-  if (snapshot.state.windows.length === 0) return "No open windows.";
-  const windows = snapshot.state.windows.slice().sort((a, b) => a.zIndex - b.zIndex);
+function renderWindows(s: RuntimeInspectionSnapshot | undefined): string {
+  if (!s) return "Loading windows…";
+  if (s.state.windows.length === 0) return "No open windows.";
+  const windows = s.state.windows.slice().sort((a, b) => a.zIndex - b.zIndex);
   return [
     "Windows",
     "",
     " id  type                     title                          pos       size     z  f",
-    ...windows.map((window) => {
-      const appType = clip(window.appType ?? window.kind, 24).padEnd(24);
-      const title = clip(window.title, 30).padEnd(30);
-      const pos = `@${window.left},${window.top}`.padEnd(9);
-      const size = `${window.width}x${window.height}`.padEnd(8);
-      return `${String(window.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(window.zIndex).padStart(2)}  ${window.focused ? "*" : "-"}`;
+    ...windows.map((w) => {
+      const appType = clip(w.appType ?? w.kind, 24).padEnd(24);
+      const title = clip(w.title, 30).padEnd(30);
+      const pos = `@${w.left},${w.top}`.padEnd(9);
+      const size = `${w.width}x${w.height}`.padEnd(8);
+      return `${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${w.focused ? "*" : "-"}`;
     }),
   ].join("\n");
 }
@@ -133,61 +129,42 @@ function renderCommands(commands: CommandListItem[]): string {
     `Commands (${rows.length})`,
     "",
     " id                                 surf         availability  label",
-    ...rows.map((command) => {
-      const surfaces = clip(command.surfaces.join(","), 12).padEnd(12);
-      const availability = (command.available ? "ready" : "off").padEnd(12);
-      return ` ${clip(command.id, 34).padEnd(34)} ${surfaces} ${availability} ${command.label}`;
+    ...rows.map((c) => {
+      const surfaces = clip(c.surfaces.join(","), 12).padEnd(12);
+      const availability = (c.available ? "ready" : "off").padEnd(12);
+      return ` ${clip(c.id, 34).padEnd(34)} ${surfaces} ${availability} ${c.label}`;
     }),
   ].join("\n");
 }
 
-function renderStats(snapshot: RuntimeInspectionSnapshot | undefined): string {
-  if (!snapshot) return "Loading stats…";
-  const render = snapshot.stats.render;
-  const agent = snapshot.stats.agent;
-  const scramble = snapshot.scramble;
+function renderStats(s: RuntimeInspectionSnapshot | undefined): string {
+  if (!s) return "Loading stats…";
   return [
     "Runtime Stats",
     "",
     "Render",
-    `  fps              ${render.fps.toFixed(1)}`,
-    `  avgFrameMs       ${render.avgFrameMs.toFixed(1)}`,
-    `  totalFrames      ${render.totalFrames}`,
+    `  fps              ${s.stats.render.fps.toFixed(1)}`,
+    `  avgFrameMs       ${s.stats.render.avgFrameMs.toFixed(1)}`,
+    `  totalFrames      ${s.stats.render.totalFrames}`,
     "",
     "Memory",
-    `  rssMb            ${snapshot.stats.rssMb.toFixed(1)}`,
-    `  heapUsedMb       ${snapshot.stats.heapUsedMb.toFixed(1)}`,
+    `  rssMb            ${s.stats.rssMb.toFixed(1)}`,
+    `  heapUsedMb       ${s.stats.heapUsedMb.toFixed(1)}`,
     "",
     "Agent",
-    `  active           ${fmtBool(agent.active)}`,
-    `  streaming        ${fmtBool(agent.streaming)}`,
-    `  messageCount     ${agent.messageCount}`,
-    `  toolRunCount     ${agent.toolRunCount}`,
+    `  active           ${fmtBool(s.stats.agent.active)}`,
+    `  streaming        ${fmtBool(s.stats.agent.streaming)}`,
+    `  messageCount     ${s.stats.agent.messageCount}`,
+    `  toolRunCount     ${s.stats.agent.toolRunCount}`,
     "",
     "Scramble",
-    `  status           ${scramble.status}`,
-    `  model            ${scramble.model}`,
-    `  sessionId        ${scramble.sessionId}`,
+    `  status           ${s.scramble.status}`,
+    `  model            ${s.scramble.model}`,
+    `  sessionId        ${s.scramble.sessionId}`,
   ].join("\n");
 }
 
-function createScrollPane(parent: blessed.Widgets.BoxElement, themeFn: MicroappHost["theme"]) {
-  return blessed.box({
-    parent,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    tags: true,
-    scrollable: true,
-    alwaysScroll: true,
-    mouse: true,
-    keys: true,
-    vi: true,
-    scrollbar: createScrollbar(),
-    style: themeFn().body,
-  });
-}
+// ── Setup ─────────────────────────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -199,19 +176,18 @@ export default function setup(host: MicroappHost) {
     action: () => openRuntimeInspector(host),
   });
 
-  // ── Workspace snapshot — COAT workspace seam ──
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
-      return {
-        activeTab: state.activeTab ?? "Overview",
-      };
+      return { activeTab: state.activeTab ?? "Overview" };
     },
-    restore: (_snapshot, _payload) => {
+    restore: () => {
       host.runCommand("open");
     },
   });
 }
+
+// ── Window ────────────────────────────────────────────────────────────────
 
 function openRuntimeInspector(host: MicroappHost) {
   const win = host.createWindow({
@@ -221,109 +197,76 @@ function openRuntimeInspector(host: MicroappHost) {
     left: 6,
     top: 3,
   });
+
   const timers = new Set<ReturnType<typeof setInterval>>();
   const state: InspectorState = {
     commands: [],
     updatedAt: "never",
     refreshInFlight: false,
   };
-  const panes = new Map<PaneKey, blessed.Widgets.BoxElement>();
-  const paneOrder: PaneKey[] = ["overview", "ui", "windows", "commands", "stats"];
 
-  const root = blessed.box({
-    parent: win.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    style: host.theme().body,
+  const paneKeys: PaneKey[] = ["overview", "ui", "windows", "commands", "stats"];
+  const paneContent = new Map<PaneKey, string>();
+  for (const k of paneKeys) paneContent.set(k, "Loading…");
+
+  // ── SDK Handle components ──
+
+  const header = createHeaderBar(win.body, { left: " Runtime Inspector", height: 2 });
+
+  const tabs = createTabs(win.body, {
+    tabs: paneKeys.map((k) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), content: "" })),
+    active: 0,
+    bottomOffset: 2,
   });
-  const header = blessed.box({
-    parent: root,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    tags: true,
-    style: host.theme().body,
-  });
-  const tabsHost = blessed.box({
-    parent: root,
-    top: 2,
-    left: 0,
-    right: 0,
-    bottom: 2,
-    style: host.theme().body,
-    keys: true,
-    mouse: true,
-  });
-  const footer = blessed.box({
-    parent: root,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 2,
-    tags: true,
-    style: host.theme().body,
+  // Offset tabs below header
+  (tabs.element as any).top = 2;
+
+  const footer = createStatusBar(win.body, { height: 2 });
+
+  const scroll = createScrollView(win.body, {
+    topOffset: 3,
+    bottomOffset: 2,
+    vi: true,
   });
 
-  const tabDefs: Array<TabDef & { key: PaneKey }> = [
-    { key: "overview", name: "Overview", build: (parent) => panes.set("overview", createScrollPane(parent, host.theme)) },
-    { key: "ui", name: "UI", build: (parent) => panes.set("ui", createScrollPane(parent, host.theme)) },
-    { key: "windows", name: "Windows", build: (parent) => panes.set("windows", createScrollPane(parent, host.theme)) },
-    { key: "commands", name: "Commands", build: (parent) => panes.set("commands", createScrollPane(parent, host.theme)) },
-    { key: "stats", name: "Stats", build: (parent) => panes.set("stats", createScrollPane(parent, host.theme)) },
-  ];
-
-  const tabs = createTabs(tabsHost, tabDefs);
+  // ── Render ──
 
   function activeKey(): PaneKey {
-    return tabDefs[tabs.active]?.key ?? "overview";
-  }
-
-  function activePane(): blessed.Widgets.BoxElement | undefined {
-    return panes.get(activeKey());
+    return paneKeys[tabs.getActive()] ?? "overview";
   }
 
   function updatePaneContent() {
-    panes.get("overview")?.setContent(renderOverview(state));
-    panes.get("ui")?.setContent(renderUi(state.snapshot));
-    panes.get("windows")?.setContent(renderWindows(state.snapshot));
-    panes.get("commands")?.setContent(renderCommands(state.commands));
-    panes.get("stats")?.setContent(renderStats(state.snapshot));
+    paneContent.set("overview", renderOverview(state));
+    paneContent.set("ui", renderUi(state.snapshot));
+    paneContent.set("windows", renderWindows(state.snapshot));
+    paneContent.set("commands", renderCommands(state.commands));
+    paneContent.set("stats", renderStats(state.snapshot));
   }
 
   function renderChrome() {
     const app = state.snapshot?.state.app;
     const focus = state.snapshot?.state.focus;
-    header.setContent([
-      "{bold}Runtime Inspector{/bold}",
-      `instance ${app?.instanceId ?? "?"} · windows ${state.snapshot?.state.windows.length ?? 0} · focus ${clip(focus?.title ?? "none", 48)} · updated ${state.updatedAt}`,
-    ].join("\n"));
-    footer.setContent([
-      `tab ${tabs.active + 1}/${tabDefs.length} · ${tabDefs[tabs.active]?.name ?? "Overview"} · source: /runtime/inspection + /commands/list`,
-      state.error
-        ? `error: ${state.error}`
-        : "keys: 1-5 switch · Tab next · Shift-Tab prev · j/k or PgUp/PgDn scroll · g/G top/bottom · r refresh",
-    ].join("\n"));
+    header.update({
+      left: ` {bold}Runtime Inspector{/bold}  instance ${app?.instanceId ?? "?"} · windows ${state.snapshot?.state.windows.length ?? 0} · focus ${clip(focus?.title ?? "none", 40)}`,
+      right: `updated ${state.updatedAt} `,
+    });
+    const tabName = paneKeys[tabs.getActive()] ?? "overview";
+    footer.update({
+      left: ` tab ${tabs.getActive() + 1}/${paneKeys.length} · ${tabName}`,
+      right: state.error
+        ? `error: ${clip(state.error, 60)} `
+        : "1-5 switch · Tab next · j/k scroll · r refresh ",
+    });
   }
 
   function renderAll() {
     updatePaneContent();
+    scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
     host.screen.render();
   }
 
-  function focusActivePane() {
-    activePane()?.focus();
-  }
-
-  function scrollActive(delta: number) {
-    const pane = activePane();
-    if (!pane) return;
-    pane.scroll(delta);
-    host.screen.render();
-  }
+  // ── Data fetch ──
 
   async function refresh() {
     if (state.refreshInFlight) return;
@@ -342,84 +285,81 @@ function openRuntimeInspector(host: MicroappHost) {
     } finally {
       state.refreshInFlight = false;
       renderAll();
-      focusActivePane();
     }
   }
 
-  root.key(["tab"], () => {
-    tabs.switchTo((tabs.active + 1) % tabDefs.length);
-  });
-  root.key(["S-tab"], () => {
-    tabs.switchTo((tabs.active + tabDefs.length - 1) % tabDefs.length);
-  });
-  root.key(["r"], () => {
-    void refresh();
-  });
-  root.key(["j", "down"], () => scrollActive(1));
-  root.key(["k", "up"], () => scrollActive(-1));
-  root.key(["pagedown"], () => scrollActive(12));
-  root.key(["pageup"], () => scrollActive(-12));
-  root.key(["g"], () => {
-    activePane()?.setScroll(0);
+  // ── Key bindings ──
+
+  win.body.key(["tab"], () => {
+    const next = (tabs.getActive() + 1) % paneKeys.length;
+    tabs.update({ active: next });
+    scroll.update({ content: paneContent.get(paneKeys[next]!) ?? "" });
+    renderChrome();
     host.screen.render();
   });
-  root.key(["G"], () => {
-    const pane = activePane();
-    if (!pane) return;
-    pane.setScroll(Math.max(0, pane.getScrollHeight() - (Number(pane.height) || 0)));
+  win.body.key(["S-tab"], () => {
+    const prev = (tabs.getActive() + paneKeys.length - 1) % paneKeys.length;
+    tabs.update({ active: prev });
+    scroll.update({ content: paneContent.get(paneKeys[prev]!) ?? "" });
+    renderChrome();
     host.screen.render();
   });
+  for (let i = 1; i <= 5; i++) {
+    win.body.key([String(i)], () => {
+      tabs.update({ active: i - 1 });
+      scroll.update({ content: paneContent.get(paneKeys[i - 1]!) ?? "" });
+      renderChrome();
+      host.screen.render();
+    });
+  }
+  win.body.key(["r"], () => void refresh());
+  win.body.key(["j", "down"], () => scroll.scrollTo((scroll.element as any).childBase + 1));
+  win.body.key(["k", "up"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 1)));
+  win.body.key(["pagedown"], () => scroll.scrollTo((scroll.element as any).childBase + 12));
+  win.body.key(["pageup"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 12)));
+
+  // ── Lifecycle ──
 
   tabs.onSwitch(() => {
+    scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
-    focusActivePane();
     host.screen.render();
   });
 
-  createTimer(() => {
-    void refresh();
-  }, 1000, timers);
+  createTimer(() => void refresh(), 1000, timers);
 
-  win.onResize(() => {
-    renderAll();
-    focusActivePane();
-  });
+  win.onResize(() => renderAll());
   win.onRestyle(() => {
-    root.style = host.theme().body;
-    header.style = host.theme().body;
-    tabsHost.style = host.theme().body;
-    footer.style = host.theme().body;
-    for (const pane of panes.values()) {
-      pane.style = host.theme().body;
-    }
-    tabs.renderBar();
+    header.update({});
+    footer.update({});
+    scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderAll();
   });
+
   win.describeState(() => ({
-    summary: `Runtime Inspector · ${tabDefs[tabs.active]?.name ?? "Overview"} · ${state.snapshot?.state.windows.length ?? 0} windows · ${state.commands.length} commands`,
-    activeTab: tabDefs[tabs.active]?.name ?? "Overview",
+    summary: `Runtime Inspector · ${paneKeys[tabs.getActive()]} · ${state.snapshot?.state.windows.length ?? 0} windows · ${state.commands.length} commands`,
+    activeTab: paneKeys[tabs.getActive()],
     instanceId: state.snapshot?.state.app.instanceId,
     blockerCount: state.snapshot?.ui.blockers.length ?? 0,
     commandCount: state.commands.length,
     focusedWindowId: state.snapshot?.state.focus.windowId,
   }));
-  win.captureText(() => {
-    const pane = activePane();
-    return [
-      header.getContent(),
-      "",
-      pane?.getContent() ?? "",
-      "",
-      footer.getContent(),
-    ].join("\n");
-  });
+
+  win.captureText(() => [
+    `Runtime Inspector · ${activeKey()}`,
+    "",
+    paneContent.get(activeKey()) ?? "",
+  ].join("\n"));
+
   win.onCleanup(() => {
     clearTimers(timers);
+    header.destroy();
     tabs.destroy();
+    footer.destroy();
+    scroll.destroy();
   });
 
+  win.setFocusTarget(scroll.element);
   renderAll();
   void refresh();
-  win.setFocusTarget(root);
-  focusActivePane();
 }
