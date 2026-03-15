@@ -85,7 +85,7 @@ Full index: `.agents/shell-dev/architecture.md`
 ```bash
 bun run typecheck                      # minimum gate before any commit
 bun run check-coat                     # COAT enforcement (6 checks)
-bash scripts/ensure-running.sh         # idempotent start
+bash scripts/ensure-running.sh         # idempotent start (--direct default)
 bash scripts/restart.sh                # stop → relaunch → verify
 bash scripts/reload-microapp.sh <id>   # close → reload code → reopen
 bash scripts/discover.sh               # full discovery index
@@ -99,6 +99,26 @@ bash scripts/list-scripts.sh           # all scripts with descriptions
 Always `GET /state` first — use real window ids, never guessed ones.
 
 ## App Lifecycle
+
+### Process modes: --direct (default) vs --tmux
+
+OPS scripts support two modes via `scripts/lib/process-manager.sh`:
+
+| Mode | Flag | How it works |
+|------|------|-------------|
+| **direct** (default) | `--direct` or omit | PTY via `script`, background process, log at `scratch/wibwob.log` |
+| **tmux** | `--tmux` | Named tmux session, `send-keys` launch (legacy) |
+
+All modes use the same HTTP API for health checks, state queries, and command dispatch.
+Set `export WW_MODE="tmux"` in `~/.wibwob` to default to tmux mode.
+
+Shell aliases (from `~/.wibwob`):
+```bash
+ww-start                    # ensure-running (direct)
+ww-restart                  # restart (direct)
+ww-attach                   # status + tail log (direct) or tmux attach (--tmux)
+ww-alt                      # second instance on port 8098
+```
 
 | Script | What |
 |--------|------|
