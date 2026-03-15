@@ -377,6 +377,30 @@ export default function setup(host: MicroappHost) {
     });
   }
 
+  host.registerCommand({
+    id: "toggle-view",
+    label: "Toggle Journal/Sessions View",
+    description: "Switch between journal entries and session log views.",
+    direct: true,
+    action: () => {
+      if (!_viewToggle) return { ok: false, error: "Journal window not open" };
+      const newMode = _viewToggle();
+      return { ok: true, viewMode: newMode };
+    },
+  });
+
+  host.registerCommand({
+    id: "filter-model",
+    label: "Filter Sessions by Model",
+    description: "Cycle model filter in session view. Args: { model? } — set specific model or omit to cycle.",
+    direct: true,
+    action: (args) => {
+      if (!_modelFilter) return { ok: false, error: "Journal window not open" };
+      const result = _modelFilter(args?.model as string | undefined);
+      return { ok: true, ...result };
+    },
+  });
+
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
@@ -482,8 +506,10 @@ function readSession(filename: string): SessionMessage[] {
   return messages;
 }
 
-// ── Live refresh callback ───────────────────────────────────────
+// ── Live callbacks (wired by openJournal, cleared on cleanup) ───
 let _liveRefresh: (() => void) | null = null;
+let _viewToggle: (() => ViewMode) | null = null;
+let _modelFilter: ((model?: string) => { viewMode: ViewMode; modelFilter: string }) | null = null;
 
 // ── Window ──────────────────────────────────────────────────────
 function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
@@ -729,8 +755,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     btnLog.style = viewMode === "sessions"
       ? { fg: activeFg, bg: activeBg, bold: true }
       : { fg: inactiveFg, bg: inactiveBg };
-    btnJrn.setContent(viewMode === "journal" ? " [ JRN ] " : "   JRN   ");
-    btnLog.setContent(viewMode === "sessions" ? " [ LOG ] " : "   LOG   ");
+    btnJrn.setContent(viewMode === "journal" ? " ▪ JRN " : "   JRN ");
+    btnLog.setContent(viewMode === "sessions" ? " ▪ LOG " : "   LOG ");
 
     // Separator
     const sepW = Math.max(0, w - 4);
@@ -811,16 +837,34 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
           "",
         ];
 
-        for (const msg of sessionMessages.slice(0, 40)) {
-          const roleColor = msg.role === "user" ? hi : msg.role === "assistant" ? ANSI.fg(muted) : dim;
-          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+        // Show only human + assistant messages (skip toolResult noise)
+        let shownMsgs = 0;
+        for (const msg of sessionMessages) {
+          if (shownMsgs >= 30) break;
+          if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+          // Skip assistant messages that are only tool calls with no text
+          if (msg.role === "assistant" && !msg.text && msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+            continue;
+          }
+
           if (msg.text) {
+            const roleColor = msg.role === "user" ? hi : dim;
+            const roleLabel = msg.role === "user" ? "▸ human" : "▹ agent";
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
-            const bodyLines = renderBody(msg.text.slice(0, 800), previewW - 4);
+            // Truncate long messages to keep preview scannable
+            const maxChars = msg.role === "user" ? 200 : 400;
+            const truncatedText = msg.text.length > maxChars
+              ? msg.text.slice(0, maxChars) + "…"
+              : msg.text;
+            const bodyLines = renderBody(truncatedText, previewW - 4);
             lines.push(...bodyLines);
             lines.push("");
+            shownMsgs++;
           }
-          if (msg.toolCalls.length > 0) {
+
+          if (msg.role === "assistant" && msg.toolCalls.length > 0) {
             lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
           }
         }
@@ -1291,15 +1335,23 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         ];
 
         for (const msg of sessionMessages) {
-          const roleColor = msg.role === "user" ? hi : dim;
-          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+          if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+          if (msg.role === "assistant" && !msg.text && msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+            continue;
+          }
+
           if (msg.text) {
+            const roleColor = msg.role === "user" ? hi : dim;
+            const roleLabel = msg.role === "user" ? "▸ human" : "▹ agent";
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
             const bodyLines = renderBody(msg.text.slice(0, 2000), bodyW - 4);
             lines.push(...bodyLines);
             lines.push("");
           }
-          if (msg.toolCalls.length > 0) {
+
+          if (msg.role === "assistant" && msg.toolCalls.length > 0) {
             lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
           }
         }
@@ -1475,9 +1527,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       // Session info when in LOG mode
       sessionCount: viewMode === "sessions" ? sessions.length : undefined,
       selectedSessionId: viewMode === "sessions" ? sessions[sessionIdx]?.sessionId ?? null : undefined,
+      modelFilter: viewMode === "sessions" ? (modelFilter || null) : undefined,
       availableCommands: [
         "journal.open", "journal.create", "journal.read",
         "journal.update", "journal.list", "journal.delete",
+        "journal.toggle-view", "journal.filter-model",
         "journal.export-markdown", "journal.import-legacy",
       ],
     };
@@ -1498,7 +1552,36 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onResize(() => render());
 
   _liveRefresh = () => { refresh(); render(); };
-  win.onCleanup(() => { _liveRefresh = null; });
+
+  _viewToggle = () => {
+    if (viewMode === "journal") {
+      viewMode = "sessions";
+      sessions = listSessions();
+      sessionIdx = 0;
+      sessionMessages = [];
+    } else {
+      viewMode = "journal";
+    }
+    refresh();
+    render();
+    return viewMode;
+  };
+
+  _modelFilter = (model?: string) => {
+    if (model !== undefined) {
+      modelFilter = model;
+    } else {
+      const models = [...new Set(sessions.map(s => s.model).filter(Boolean))].sort();
+      const currentIdx = modelFilter ? models.indexOf(modelFilter) : -1;
+      modelFilter = currentIdx < models.length - 1 ? models[currentIdx + 1]! : "";
+    }
+    sessionIdx = 0;
+    sessionMessages = [];
+    render();
+    return { viewMode, modelFilter };
+  };
+
+  win.onCleanup(() => { _liveRefresh = null; _viewToggle = null; _modelFilter = null; });
 
   // ── Init ──────────────────────────────────────────────────────
   refresh();
