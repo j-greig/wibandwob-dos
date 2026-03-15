@@ -1,3 +1,4 @@
 {"type":"config","name":"F7 Self-Maintaining CLI Help","metricName":"help_score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"3d5d010","metric":100,"metrics":{},"status":"keep","description":"F7 CLI_COMMANDS table: replaces switch+hardcoded usage. completions now in help. All dispatch + fallthrough working.","timestamp":1773579956877,"segment":0}
 {"run":2,"commit":"982ec84","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100. Fixed test to use idempotent primer.list instead of theme.cycle.","timestamp":1773579993095,"segment":0}
+{"run":3,"commit":"749a3cc","metric":100,"metrics":{},"status":"keep","description":"Stability run 2: 100/100","timestamp":1773580006274,"segment":0}
