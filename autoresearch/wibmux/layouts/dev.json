@@ -1,0 +1,7 @@
+{
+  "tabs": [
+    { "name": "wibwob", "command": "bun run dev" },
+    { "name": "agent", "command": "echo 'agent tab ready'" },
+    { "name": "logs", "command": "tail -f scratch/wibwob.log 2>/dev/null || echo 'no log yet'" }
+  ]
+}
