@@ -7,7 +7,7 @@ API="http://127.0.0.1:8099"
 SCORE=0
 
 # ── 1. Restart app ──────────────────────────────────────────────
-bash scripts/restart.sh > /dev/null 2>&1 || {
+bash scripts/restart.sh --tmux > /dev/null 2>&1 || {
   echo "WARNING: restart.sh failed, trying manual restart"
   kill $(cat scratch/wibwob.pid 2>/dev/null) 2>/dev/null || true
   sleep 2
