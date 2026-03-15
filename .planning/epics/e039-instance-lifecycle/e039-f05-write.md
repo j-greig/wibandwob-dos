@@ -74,13 +74,11 @@ the CLI finds the existing equivalent.
 - Not for output-only apps — they simply have no `write` command
 - Not a replacement for per-app commands — those are richer (args, fields)
 
-## Stretch (Plan 9 Plumb — Future Spec)
+## Stretch
 
-- `wibwob plumb --from <id> --to <id>` — inter-window routing
-  with content-type awareness. Needs its own design doc.
 - `wibwob read <id>` alias for `wibwob screenshot <id>` (symmetry)
-- Per-app content-type declarations for smart plumb routing
 - `wibwob read 3 | wibwob write 7` as the canonical symbient pipe
+- → **[e039-f06-plumb.md](e039-f06-plumb.md)** for inter-window routing (depends on F5)
 
 ## Key Files
 

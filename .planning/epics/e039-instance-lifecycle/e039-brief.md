@@ -157,11 +157,18 @@ cleans up resources.
 
 ### F5: `wibwob write` — Text Pipe Into Windows
 
-→ **See [f05-write.md](f05-write.md)** for full spec.
+→ **See [e039-f05-write.md](e039-f05-write.md)** for full spec.
 
 Push text into a live window from stdin via the existing command seam.
 `echo "HELLO" | wibwob write 3`. No new endpoint, no new SDK method —
 COAT: just a command convention + CLI sugar. Plan 9 Rio inspired (#127).
+
+### F6: `wibwob plumb` — Inter-Window Nervous System
+
+→ **See [e039-f06-plumb.md](e039-f06-plumb.md)** for full spec.
+
+Route data between windows. Plan 9's plumber for the symbient desktop.
+Depends on F5 (write). Port registry, rules engine, `wibwob plumb`/`wire` CLI.
 
 ---
 
