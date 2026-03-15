@@ -63,7 +63,7 @@ export function openAnimatedWindow(
   frame.focus();
 }
 
-export function openPatternWindow(deps: BaseWindowDeps): void {
+function openPatternWindow(deps: BaseWindowDeps): void {
   openAnimatedWindow(deps, "Pattern Field", "pattern", (tick, width, height) => {
     const glyphs = ["░", "▒", "▓", "█"];
     const rows: string[] = [];
@@ -123,7 +123,7 @@ export function openCompanionWindow(
   frame.focus();
 }
 
-export function openArtWindow(deps: BaseWindowDeps): void {
+function openArtWindow(deps: BaseWindowDeps): void {
   const frame = deps.windowManager.createFrame("Generative Art", "art");
   const canvas = blessed.box({
     parent: frame.body,

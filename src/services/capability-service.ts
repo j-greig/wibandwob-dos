@@ -42,7 +42,7 @@ function buildStatus(ok: boolean, reason?: string): CapabilityStatus {
   };
 }
 
-export class CapabilityService {
+class CapabilityService {
   private _snapshot: CapabilitySnapshot | null = null;
   private readonly backrooms = new BackroomsService();
 

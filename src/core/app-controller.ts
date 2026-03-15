@@ -155,7 +155,7 @@ import {
 } from "../runtime/runtime-node.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
-export const DEV_RELOAD_EXIT_CODE = 75;
+const DEV_RELOAD_EXIT_CODE = 75;
 
 /** Recursively collect .md file paths under root, skipping node_modules/.git/vendor. */
 function collectMarkdownFiles(root: string): string[] {

@@ -144,9 +144,7 @@ export type AppType = PersistableAppType | TransientAppType | (string & {});
  * Add entries HERE when a new generic factory produces a persistable appType.
  * Using these instead of template-literal casts gives real compile-time safety.
  */
-export const viewerAppType: Record<"primer", PersistableAppType> = {
-  primer: "primer-viewer",
-};
+// viewerAppType removed — unused (2026-03-15)
 
 export const animationAppType: Record<"pattern", string> = {
   pattern: "pattern-animation",
@@ -303,10 +301,7 @@ export interface MicroappWindowRecord extends WindowRecord {
   microappId: string;
 }
 
-/** Narrow to a microapp window with guaranteed microappId. */
-export function isMicroappWindow(w: WindowRecord): w is MicroappWindowRecord {
-  return w.kind === "microapp" && typeof w.microappId === "string";
-}
+// isMicroappWindow removed — unused (2026-03-15)
 
 /** Controller interface exposed by Finder windows for command dispatch. */
 export interface FinderController {
