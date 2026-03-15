@@ -4,3 +4,4 @@
 {"run":3,"commit":"3fc1d98","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100","timestamp":1773578810459,"segment":0}
 {"run":4,"commit":"4418ab8","metric":100,"metrics":{},"status":"keep","description":"Stability run 2: 100/100","timestamp":1773578832929,"segment":0}
 {"run":5,"commit":"a4f855c","metric":100,"metrics":{},"status":"keep","description":"Stability run 3: 100/100 — F5 stable","timestamp":1773578855162,"segment":0}
+{"run":6,"commit":"0b70b70","metric":100,"metrics":{},"status":"keep","description":"F5 terminal.write: send text to pty stdin, expanded harness to 100pts with terminal section","timestamp":1773579003987,"segment":0}
