@@ -18,7 +18,7 @@
     "test:integration": "bun test --filter '*.test.ts' src/tests/integration/",
     "test:all": "bun test --filter '*.test.ts' src/tests/",
     "typecheck": "node_modules/.bin/tsc --noEmit",
-    "health": "bun run typecheck && bun run check-coat && bash -c 'cycles=$(npx madge --circular --extensions ts src/ 2>&1 | grep -c \"^[0-9])\" || true); [ \"$cycles\" = \"0\" ] && echo \"✅ No circular deps\" || (echo \"❌ $cycles circular deps\"; exit 1)' && echo '✅ All health checks passed'",
+    "health": "bun run test && bun run typecheck && bun run check-coat && bash -c 'cycles=$(npx madge --circular --extensions ts src/ 2>&1 | grep -c \"^[0-9])\" || true); [ \"$cycles\" = \"0\" ] && echo \"✅ No circular deps\" || (echo \"❌ $cycles circular deps\"; exit 1)' && echo '✅ All health checks passed'",
     "handover": "bash scripts/handover.sh",
     "check-coat": "bun run scripts/check-coat.ts",
     "check-themes": "bun run scripts/check-themes.ts",

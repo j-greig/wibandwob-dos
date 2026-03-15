@@ -78,4 +78,20 @@ model, etc). No smoke tests for microapp lifecycle.
 
 ## What's Been Tried
 
-_Nothing yet — fresh start._
+### Test Structure ✅
+- Split 17 test files into `src/tests/unit/` (9 files, 36 tests) and `src/tests/integration/` (8 files, 63 tests)
+- Fixed all import paths after directory move
+- Unit tests: **36/36 pass** (100%) — always green, no app required
+- Integration tests: need running app instance — 5 pass when app running, rest need specific windows
+- `bun run test` → unit only (always green)
+- `bun run test:integration` → integration (needs running app)
+- `bun run test:all` → everything
+
+### Health Script ✅
+- `bun run health` now runs: tests → typecheck → COAT → madge circular
+- All 4 gates pass
+
+### Remaining
+- [ ] Hero app smoke tests (via API — needs running instance)
+- [ ] Hyperfine benchmarks for boot time
+- [ ] Fix flaky integration tests (theme-cycle strict screenshot comparison)
