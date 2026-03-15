@@ -5,3 +5,4 @@
 {"run":4,"commit":"9d03dd7","metric":100,"metrics":{},"status":"keep","description":"Stability run 3: 100/100 — F7 stable","timestamp":1773580020710,"segment":0}
 {"type":"config","name":"F8 wibwob start/restart CLI subcommands","metricName":"start_score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"c8d2ebf","metric":100,"metrics":{},"status":"keep","description":"F8 wibwob start/restart: thin wrappers over scripts, CLI_COMMANDS table entries, idempotent start, clean restart","timestamp":1773580328226,"segment":0}
+{"run":2,"commit":"ea1a98a","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100","timestamp":1773580359971,"segment":0}
