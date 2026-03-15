@@ -44,6 +44,39 @@ Standing notes are rolling — prune when items land or die.
 - **Quick fix for now:** add `export WIBWOB_DISPLAY=2` to `~/.wibwob` so agents stop guessing
 - Long-term: `/screenshot/png` endpoint rendering ANSI→SVG→PNG server-side would bypass the display problem entirely
 
+## 2026-03-15 — Shader→Music Pipeline & Ghostty AppleScript Discovery
+
+### Ghostty 1.3 AppleScript — game changer
+- **`perform action "reload_config" on terminal 1 of selected tab of front window`** — programmatic config reload, no keystroke simulation
+- Replaces fragile `osascript` Cmd+Shift+, hack in `ghostty-shader.sh`
+- Full API: `new window`, `input text`, `split`, `focus`, `close`, `send key` (with modifiers)
+- `new surface configuration` supports `initial working directory`, `command`, `environment variables`
+- SDEF at `/Applications/Ghostty.app/Contents/Resources/Ghostty.sdef`
+- Shader hot-swap recipe: `sed` rewrite `custom-shader` line → `perform action "reload_config"` → instant
+- Refs: [PR #11208](https://github.com/ghostty-org/ghostty/pull/11208), [audio-reactive #10201](https://github.com/ghostty-org/ghostty/discussions/10201)
+
+### Shader→Music autoresearch: 90.2 best score
+- Cathedral minimalism genre (organ+FM bells+glass harmonics+5-voice choir) in Db Lydian
+- Harmonic interference shader: sine waves at musical ratios (3:2, 5:4, 7:4, 1.01:1)
+- Key technique: per-track time offsets decorrelate voices (biggest independence boost)
+- Double breakdown (inverse voicings at 20% and 50%) creates energy arc
+- 11 genres total: cathedral, starfield, eno×DM×hyper, lofi, dnb, synthwave, acid, ambient, spacejazz, breakcore, witchhouse
+- 29 shots in `autoresearch/shader-music/shots/`, manifest in `manifest.jsonl`
+- Report: `shots/REPORT.md`
+
+### desktop-save.sh + desktop-compose.sh
+- `scripts/experimental/desktop-save.sh` — snapshots live desktop to v2 workspace JSON
+- v2 format (current): flat `kind/left/top/width/height/payload`, top-level `theme`
+- v1 format (dead): `workspaces/last_workspace.json` with `bounds:{x,y,w,h}` — obsolete
+- `desktop-compose.sh` had wrong ROOT path (`..` not `../..` from `scripts/experimental/`)
+- Workspace save goes to `scratch/workspaces/` (defined in `src/core/config.ts`)
+
+### Ghostty shader performance
+- `cineShader-Lava.glsl`: 16 spheres × 64 ray steps = GPU hog
+- `cineShader-Lava-lite.glsl`: 6 spheres × 32 steps + half-res pixel snapping = ~1/10 cost
+- tmux does NOT affect shader GPU cost — shader runs in Ghostty compositor over final pixels
+- tmux DOES slow blessed render (extra PTY hop) — 23fps observed
+
 ### Journal v2 architecture
 - Each entry = individual JSON file in `scratch/journal-v2/entries/<id>.json`
 - Modes: LIST (two-pane), READ (full-screen), EDIT (title + body textarea)
