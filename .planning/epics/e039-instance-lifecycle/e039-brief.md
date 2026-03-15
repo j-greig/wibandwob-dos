@@ -170,6 +170,14 @@ COAT: just a command convention + CLI sugar. Plan 9 Rio inspired (#127).
 Route data between windows. Plan 9's plumber for the symbient desktop.
 Depends on F5 (write). Port registry, rules engine, `wibwob plumb`/`wire` CLI.
 
+### F7: Self-Maintaining CLI Help
+
+→ **See [e039-f07-cli-help.md](e039-f07-cli-help.md)** for full spec.
+
+Replace hardcoded `usage()` + `switch` with single `CLI_COMMANDS` table.
+Help auto-generates from the same array that drives dispatch. `completions`
+already missing from help — proves the drift problem is real.
+
 ---
 
 ## Out of Scope
