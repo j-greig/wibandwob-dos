@@ -8,15 +8,39 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 ### Core
 
 - `src/app.ts` — runtime bootstrap only; normalise env before importing the app controller
-- `src/core/app-controller.ts` — composition root; owns menus, startup, window creation, workspace restore, high-level command flow; should coordinate, not accumulate utilities (~2050 lines — decompose further)
+- `src/core/app-controller.ts` — composition root; owns menus, startup, window creation, workspace restore, high-level command flow
 - `src/core/window-facade.ts` — 11-method interface for all window operations (query, geometry, content); implemented by WindowManager; single seam consumed by workspace restore, agent tools, control API, and controller
 - `src/core/command-catalog.ts` — source of truth for user-visible command metadata; owns ids, groups, menu placements, palette placement, surface visibility; each command defined ONCE
 - `src/core/command-registry.ts` — execution-capable adapter over the catalog; builds menus, palette, lists commands for API/agent use, runs commands by id
 - `src/core/window-manager.ts` — z-order, focus, drag, resize, tile, cascade, close; implements WindowFacade
 - `src/core/desktop-geometry.ts` — canonical terminal geometry snapshot; exposes `{width, height, cellAspect}`
 - `src/core/window-chrome.ts` — maps content size to window size; chrome offsets live here, never inline in window code
-- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers. Tracks active overlay with confirm/cancel callbacks for API-driven modal control (`overlay.confirm`, `overlay.cancel`, `overlay.info` commands).
+- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers
+- `src/core/safe-fs.ts` — filesystem wrappers (safeReadFile, safeWriteFile, safeReadJSON, etc.)
 - `src/core/theme/resolver.ts` — runtime theme state, cycle, external theme registration with token fallback fill
+- `src/core/ui-parts.ts` — **shim**: re-exports from `src/ui/` for backward compat
+
+### UI Design System (`src/ui/`)
+
+Terminal component library. See `docs/design-system.md` for full reference.
+
+- `src/ui/types.ts` — Rect, LayoutPart, FlexBasis, TrackSize, AxisAlign
+- `src/ui/layout.ts` — Stack, Row, Grid, responsive breakpoints, rect helpers
+- `src/ui/chrome.ts` — HeaderBar, StatusBar, TextBlock, InputLine, MessageHistory, Rule, FigletDisplay, AnimatedPanel, ButtonBar
+- `src/ui/containers.ts` — ScrollViewport, BorderedPanel, CollapsibleBlock, ContentStack, SidebarPanel, SelectableList, InlineSearch, Tabs
+- `src/ui/data.ts` — KeyValuePanel, LogView, DataTable
+- `src/ui/feedback.ts` — ProgressBar, Spinner, Toast
+- `src/ui/forms.ts` — Button, Checkbox, RadioGroup, Select, FilterableList, FormField, TextArea
+- `src/ui/patterns.ts` — 11 pattern generators, data simulation helpers, colour utilities
+
+### SDK (`src/sdk/`)
+
+Microapp-facing surface. Stable import path: `src/services/microapp-sdk.ts`.
+
+- `src/sdk/composition-helpers.ts` — handle-based UI helpers (createSimpleStatusBar, createTextViewer, createListPanel, createSplitView, createSimpleButtonBar)
+- `src/sdk/microapp-host.ts` — host/window/chat contract for microapp authors
+- `src/sdk/runtime-helpers.ts` — reusable SDK helpers
+- `src/sdk/runtime-client.ts` — read-only runtime API helpers
 
 ### Services
 
