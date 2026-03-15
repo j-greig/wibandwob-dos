@@ -62,6 +62,18 @@ The benchmark uses 5 diverse sessions from `~/.pi/agent/sessions/--Users-james-R
 - Pick sessions with varying lengths (short 5-msg, medium 20-msg, long 50+ msg)
 - Pick sessions with different activities (coding, debugging, planning, creative)
 
+## Agent Setup
+
+This loop runs in the **creative / quality lens** but relies on the **ops agent**
+(`ww-ops` skill) for verification:
+
+- After keeping a result, ask ops to `bash scripts/restart.sh` and visually verify
+  the journal window still renders correctly
+- Use `bash scripts/reload-microapp.sh wibwob.journal` for fast UI iteration
+- Ops can also run `bun run typecheck` independently if `autoresearch.checks.sh` is slow
+
+The ops skill is at `.agents/skills/ww-ops/SKILL.md` — read it for launch/restart/screenshot commands.
+
 ## What's Been Tried
 
 _Nothing yet — baseline run pending._
