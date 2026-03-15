@@ -1893,11 +1893,14 @@ export class TsTuiMvpApp {
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       editorWrite: (args?: Record<string, unknown>) => {
         const text = typeof args?.text === "string" ? args.text : "";
-        const focused = this.windowManager.getFocusedWindow();
-        if (focused?.writeInput) {
-          focused.writeInput(text);
+        const windowId = typeof args?.windowId === "number" ? args.windowId : undefined;
+        const win = windowId
+          ? this.windowManager.getWindowById(windowId)
+          : this.windowManager.getFocusedWindow();
+        if (win?.writeInput) {
+          win.writeInput(text);
         } else {
-          this.overlays.flash("No editor window focused");
+          this.overlays.flash("No editor window found");
         }
       },
       agentSend: (args?: Record<string, unknown>) => {

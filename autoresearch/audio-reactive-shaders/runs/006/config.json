@@ -1,0 +1,10 @@
+{
+  "run": "006",
+  "shader_name": "audio-reactive-overlay",
+  "shader_path": "/Users/james/Repos/wibandwob-dos/shaders/audio-reactive-overlay.glsl",
+  "wav": "021-cathedral.wav",
+  "bands": 32,
+  "fps": 30,
+  "capture_delay": 4,
+  "timestamp": "2026-03-15T15:04:57+00:00"
+}
