@@ -694,21 +694,34 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   function renderSessionList(muted: string, accent: string, w: number) {
     const twoPane = w >= 120;
 
-    // Build session list items
+    // Build session list items with date group headers
     const items: string[] = [];
-    const maxW = twoPane ? Math.floor(w * 0.30) - 8 : w - 8;
-    for (const s of sessions) {
+    const sessionIndexMap: number[] = [];
+    const maxW = twoPane ? Math.floor(w * 0.30) - 4 : w - 4;
+    let lastDateGroup = "";
+    for (let i = 0; i < sessions.length; i++) {
+      const s = sessions[i]!;
       const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
+      if (dateStr !== lastDateGroup) {
+        lastDateGroup = dateStr;
+        items.push(`{${muted}-fg}─ ${dateStr} ─{/${muted}-fg}`);
+        sessionIndexMap.push(-1);
+      }
       const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
-      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 25);
-      items.push(` {${muted}-fg}${dateStr} ${timeStr}{/${muted}-fg} {${accent}-fg}${s.sessionId}{/${accent}-fg} ${preview}`);
+      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 15);
+      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} ${preview}`);
+      sessionIndexMap.push(i);
     }
     if (items.length === 0) {
-      items.push(`  {${muted}-fg}no pi sessions found{/${muted}-fg}`);
+      items.push(`{${muted}-fg}no pi sessions found{/${muted}-fg}`);
+      sessionIndexMap.push(-1);
     }
+    (listBox as any)._sessionIndexMap = sessionIndexMap;
+    let visualIdx = sessionIndexMap.indexOf(sessionIdx);
+    if (visualIdx < 0) visualIdx = sessionIndexMap.findIndex(i => i >= 0);
     rendering = true;
     listBox.setItems(items as any);
-    if (items.length > 0) listBox.select(Math.min(sessionIdx, items.length - 1));
+    if (visualIdx >= 0) listBox.select(visualIdx);
     rendering = false;
 
     // Preview: show session detail if two-pane
@@ -720,28 +733,25 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         const hi = ANSI.fg(accent);
 
         // Lazy-load messages for selected session
-        if (sessionMessages.length === 0 || true) {
+        if (sessionMessages.length === 0) {
           sessionMessages = readSession(s.filename);
         }
 
         const lines: string[] = [
           "",
-          `  ${ANSI.bold}Session ${s.sessionId}${ANSI.reset}`,
-          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"} · ${s.messageCount} messages${ANSI.reset}`,
+          `  ${ANSI.bold}⚡ ${s.sessionId}${ANSI.reset}  ${dim}${s.messageCount} msgs${ANSI.reset}`,
+          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"}${ANSI.reset}`,
           `  ${dim}${"─".repeat(Math.max(10, previewW - 4))}${ANSI.reset}`,
           "",
         ];
 
-        for (const msg of sessionMessages.slice(0, 30)) {
+        for (const msg of sessionMessages.slice(0, 40)) {
           const roleColor = msg.role === "user" ? hi : msg.role === "assistant" ? ANSI.fg(muted) : dim;
           const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
           if (msg.text) {
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
-            const wrapped = renderMarkdown(msg.text.slice(0, 500), previewW - 4, {
-              headingConfig: PLAIN_HEADING_CONFIG,
-              paddingX: 4,
-            });
-            lines.push(...wrapped);
+            const bodyLines = renderBody(msg.text.slice(0, 800), previewW - 4);
+            lines.push(...bodyLines);
             lines.push("");
           }
           if (msg.toolCalls.length > 0) {
@@ -1070,7 +1080,13 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   listBox.on("select item", (_item: any, idx: number) => {
     if (rendering) return; // avoid recursion from setItems
     if (viewMode === "sessions") {
-      sessionIdx = idx;
+      const smap = (listBox as any)._sessionIndexMap as number[] | undefined;
+      if (smap && smap[idx] !== undefined) {
+        if (smap[idx] === -1) return; // header row
+        sessionIdx = smap[idx]!;
+      } else {
+        sessionIdx = idx;
+      }
       sessionMessages = [];
     } else {
       // Use index map to skip headers
@@ -1186,8 +1202,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
         const lines: string[] = [
           "",
-          `  ${ANSI.bold}Session ${s.sessionId}${ANSI.reset}`,
-          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"} · ${s.messageCount} messages${ANSI.reset}`,
+          `  ${ANSI.bold}⚡ ${s.sessionId}${ANSI.reset}  ${dim}${s.messageCount} msgs${ANSI.reset}`,
+          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"}${ANSI.reset}`,
           `  ${dim}${"─".repeat(Math.max(10, bodyW - 4))}${ANSI.reset}`,
           "",
         ];
@@ -1197,11 +1213,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
           const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
           if (msg.text) {
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
-            const wrapped = renderMarkdown(msg.text.slice(0, 2000), bodyW - 4, {
-              headingConfig: PLAIN_HEADING_CONFIG,
-              paddingX: 4,
-            });
-            lines.push(...wrapped);
+            const bodyLines = renderBody(msg.text.slice(0, 2000), bodyW - 4);
+            lines.push(...bodyLines);
             lines.push("");
           }
           if (msg.toolCalls.length > 0) {
