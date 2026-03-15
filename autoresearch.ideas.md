@@ -3,22 +3,18 @@
 ## COMPLETE — 100/100 ✅
 
 F1 Clean Death, F2 Microapp Snapshots, F3 Boot Workspace, F4 wibwob attach.
-All shipped in 4 experiments (10 → 40 → 70 → 90 → 100).
+COAT cleanup done: host-side figlet handler removed, legacy remaps added,
+figlet-banner/contour-studio removed from built-in type unions.
 
-## Polish & Hardening
+## Remaining Polish (won't move the score — code quality)
 
-- **Test hygiene**: harness should `desktop.clear-all` before opening test windows to prevent accumulation across runs
-- **COAT cleanup**: remove host-side figlet-banner handler from `snapshot-registry.ts` + `PersistableAppType` — dead code now that microapp owns its own snapshot
-- **Remove contour-studio from TransientAppType** — it's no longer transient, it has a snapshot handler
-- **wibwob start / wibwob restart subcommands** — replace `ensure-running.sh` and `restart.sh` script aliases
-- **wibwob workspace.save / workspace.load subcommands** — replace curl in test harness
-- **Orphan workspace renamed to .restored.json** — should we delete after successful restore instead?
-- **Multiple orphan workspaces** — what if main and zuk both orphan? Currently only detects `orphan-<label>.json`
+- **wibwob start / wibwob restart subcommands** — replace `ensure-running.sh` and `restart.sh` script aliases. Aligns with "wibwob is the command surface" canon
+- **wibwob workspace.save / workspace.load subcommands** — replace the 2 remaining curl calls in test harness
+- **openFigletWindow in SnapshotRestoreActions** — still in interface, still used by `canvas-document.ts` and `agent-tools.ts`. Bigger refactor to remove
+- **Multiple orphan workspaces** — what if main and zuk both orphan? Currently only detects `orphan-<label>.json` — works fine because label is per-instance
 
-## Future Features
+## Future Features (different epic)
 
-- **wibwob attach --instance zuk** — attach to alt instance
-- **Blessed TTY cleanup on SIGHUP** — verify terminal escape sequences don't leak when terminal is already dead
+- **Auto-save interval** — periodic background save (every 5 min?) so orphan workspace is always recent even without SIGHUP
 - **Workspace diff** — compare saved vs current desktop state
-- **Auto-save interval** — periodic background save (every 5 min?) so orphan workspace is always recent
-- **Process supervision** — launchd/systemd plist for auto-restart (overkill for dev tool, but nice for server)
+- **Process supervision** — launchd plist for auto-restart (overkill for dev tool)
