@@ -10,7 +10,7 @@ import { createScrollbar, safeSetStyle, scrollableStyle } from "../core/ui-primi
 import type { Rect, LayoutPart } from "./types.js";
 import { applyRect, clamp, clampSize, clipText, padLine, renderAlignedBar, wrapIndentedText } from "./layout.js";
 
-export function createHeaderBar(
+export function createLayoutHeaderBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
 ): LayoutPart<{ left: string; right?: string }> {
@@ -150,7 +150,7 @@ export interface InputLineProps {
 }
 
 /** @primitive */
-export function createInputLine(
+export function createLayoutInputLine(
   screen: blessed.Widgets.Screen,
   onSubmit: (value: string) => void
 ): LayoutPart<InputLineProps> {
@@ -254,7 +254,7 @@ export function createMessageHistory(
 }
 
 /** @primitive */
-export function createRule(
+export function createLayoutRule(
   parent: blessed.Widgets.Node,
   opts: { axis: "horizontal" | "vertical"; inset?: number }
 ): LayoutPart<{ visible: boolean }> {

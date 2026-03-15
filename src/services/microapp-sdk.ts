@@ -143,12 +143,12 @@ export {
   createScrollViewport,
   pickBreakpoint,
   DEFAULT_BREAKPOINTS,
-  createHeaderBar,
+  createLayoutHeaderBar,
   createLayoutStatusBar,
   createTextBlock,
-  createInputLine,
+  createLayoutInputLine,
   createMessageHistory,
-  createRule,
+  createLayoutRule,
   createFigletDisplay,
   createAnimatedPanel,
   createLayoutButtonBar,
@@ -162,7 +162,7 @@ export {
   createRestyleBundle,
   deferRender,
   // Tabbed container
-  createTabs,
+  createLayoutTabs,
   // Pattern generators
   PATTERNS,
   patternBlockGradient,
@@ -207,7 +207,7 @@ export type {
   RestyleEntry,
   RestyleBundleHandle,
   // Tabs
-  TabDef,
+  TabDef as LayoutTabDef,
   TabbedContainerHandle,
   // Grid
   GridOptions,
@@ -360,6 +360,11 @@ export {
   createListPanel,
   createSplitView,
   createButtonBar,
+  createHeaderBar,
+  createScrollView,
+  createTabs,
+  createRule,
+  createInputLine,
 } from "../sdk/composition-helpers.js";
 
 export type {
@@ -374,4 +379,15 @@ export type {
   ButtonBarButton,
   ButtonBarOptions,
   ButtonBarHandle,
+  HeaderBarOptions,
+  HeaderBarHandle,
+  ScrollViewOptions,
+  ScrollViewHandle,
+  HandleTabDef as TabDef,
+  TabsOptions,
+  TabsHandle,
+  RuleOptions,
+  RuleHandle,
+  InputLineOptions,
+  InputLineHandle,
 } from "../sdk/composition-helpers.js";

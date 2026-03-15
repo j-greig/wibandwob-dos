@@ -413,3 +413,398 @@ export function createButtonBar(
     },
   };
 }
+
+// ── New Handle components (S08) ───────────────────────────────────────────
+
+export interface HeaderBarOptions {
+  /** Text for left side. Default: "" */
+  left?: string;
+  /** Text for right side. Default: "" */
+  right?: string;
+  /** Height in rows. Default: 1 */
+  height?: number;
+}
+
+export interface HeaderBarHandle {
+  element: blessed.Widgets.BoxElement;
+  update(opts: Partial<HeaderBarOptions>): void;
+  destroy(): void;
+}
+
+/**
+ * Themed header bar pinned to the top of a parent element.
+ * Shows left-aligned and right-aligned text. Uses theme().header tokens.
+ */
+export function createHeaderBar(
+  parent: blessed.Widgets.BoxElement,
+  opts: HeaderBarOptions = {},
+): HeaderBarHandle {
+  const height = opts.height ?? 1;
+  let left = opts.left ?? "";
+  let right = opts.right ?? "";
+
+  const t = theme();
+  const el = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    right: 0,
+    height,
+    tags: true,
+    style: { fg: t.header.fg, bg: t.header.bg },
+    content: "",
+  });
+
+  function render() {
+    const w = (el.width as number) || 40;
+    const gap = Math.max(1, w - left.length - right.length);
+    el.setContent(`${left}${" ".repeat(gap)}${right}`);
+  }
+
+  render();
+
+  return {
+    element: el,
+    update(o) {
+      if (o.left !== undefined) left = o.left;
+      if (o.right !== undefined) right = o.right;
+      const t2 = theme();
+      el.style.fg = t2.header.fg;
+      el.style.bg = t2.header.bg;
+      render();
+    },
+    destroy() {
+      el.destroy();
+    },
+  };
+}
+
+// ── ScrollView ────────────────────────────────────────────────────────────
+
+export interface ScrollViewOptions {
+  /** Initial content. Default: "" */
+  content?: string;
+  /** Wrap long lines. Default: false */
+  wrap?: boolean;
+  /** Enable vi keys. Default: true */
+  vi?: boolean;
+  /** Reserve top rows. Default: 0 */
+  topOffset?: number;
+  /** Reserve bottom rows. Default: 0 */
+  bottomOffset?: number;
+}
+
+export interface ScrollViewHandle {
+  element: blessed.Widgets.BoxElement;
+  update(opts: { content?: string }): void;
+  getContent(): string;
+  scrollTo(line: number): void;
+  destroy(): void;
+}
+
+/**
+ * Scrollable content area with themed scrollbar. Handles vi keys, mouse.
+ * Like createTextViewer but with topOffset and scrollTo.
+ */
+export function createScrollView(
+  parent: blessed.Widgets.BoxElement,
+  opts: ScrollViewOptions = {},
+): ScrollViewHandle {
+  const t = theme();
+  const el = blessed.box({
+    parent,
+    top: opts.topOffset ?? 0,
+    left: 0,
+    right: 0,
+    bottom: opts.bottomOffset ?? 0,
+    keys: true,
+    mouse: true,
+    vi: opts.vi ?? true,
+    scrollable: true,
+    alwaysScroll: true,
+    wrap: opts.wrap ?? false,
+    scrollbar: {
+      ch: "▐",
+      track: { bg: t.scrollbar.track },
+      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
+    },
+    style: { fg: t.body.fg, bg: t.body.bg },
+    content: opts.content ?? "",
+  });
+
+  return {
+    element: el,
+    update(o) {
+      if (o.content !== undefined) el.setContent(o.content);
+      const t2 = theme();
+      el.style.fg = t2.body.fg;
+      el.style.bg = t2.body.bg;
+    },
+    getContent() {
+      return el.getContent();
+    },
+    scrollTo(line) {
+      el.scrollTo(line);
+    },
+    destroy() {
+      el.destroy();
+    },
+  };
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+
+export interface HandleTabDef {
+  /** Tab label shown in the tab bar */
+  label: string;
+  /** Content to render when this tab is active */
+  content: string;
+}
+
+export interface TabsOptions {
+  /** Tab definitions */
+  tabs: HandleTabDef[];
+  /** Initially active tab index. Default: 0 */
+  active?: number;
+  /** Reserve bottom rows. Default: 0 */
+  bottomOffset?: number;
+}
+
+export interface TabsHandle {
+  element: blessed.Widgets.BoxElement;
+  update(opts: { tabs?: HandleTabDef[]; active?: number }): void;
+  getActive(): number;
+  onSwitch(cb: (index: number) => void): void;
+  destroy(): void;
+}
+
+/**
+ * Tabbed container — tab bar at top, content area below.
+ * Switch tabs with left/right arrow keys or number keys.
+ */
+export function createTabs(
+  parent: blessed.Widgets.BoxElement,
+  opts: TabsOptions,
+): TabsHandle {
+  let tabs = opts.tabs;
+  let active = opts.active ?? 0;
+  const bottomOffset = opts.bottomOffset ?? 0;
+  const switchCallbacks: ((index: number) => void)[] = [];
+  const t = theme();
+
+  const container = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: bottomOffset,
+  });
+
+  const tabBar = blessed.box({
+    parent: container,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { fg: t.header.fg, bg: t.header.bg },
+  });
+
+  const contentArea = blessed.box({
+    parent: container,
+    top: 1,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    style: { fg: t.body.fg, bg: t.body.bg },
+  });
+
+  function renderTabBar() {
+    const t2 = theme();
+    const parts = tabs.map((tab, i) => {
+      if (i === active) return `{bold} ${tab.label} {/bold}`;
+      return ` ${tab.label} `;
+    });
+    tabBar.setContent(parts.join("│"));
+    tabBar.style.fg = t2.header.fg;
+    tabBar.style.bg = t2.header.bg;
+  }
+
+  function renderContent() {
+    const t2 = theme();
+    contentArea.setContent(tabs[active]?.content ?? "");
+    contentArea.style.fg = t2.body.fg;
+    contentArea.style.bg = t2.body.bg;
+  }
+
+  function switchTo(idx: number) {
+    if (idx < 0 || idx >= tabs.length) return;
+    active = idx;
+    renderTabBar();
+    renderContent();
+    for (const cb of switchCallbacks) cb(active);
+  }
+
+  // Key bindings
+  container.on("keypress", (_ch: string, key: { name: string }) => {
+    if (key.name === "right") switchTo((active + 1) % tabs.length);
+    else if (key.name === "left") switchTo((active - 1 + tabs.length) % tabs.length);
+    else if (key.name >= "1" && key.name <= "9") {
+      const idx = parseInt(key.name) - 1;
+      if (idx < tabs.length) switchTo(idx);
+    }
+  });
+
+  renderTabBar();
+  renderContent();
+
+  return {
+    element: container,
+    update(o) {
+      if (o.tabs !== undefined) tabs = o.tabs;
+      if (o.active !== undefined) active = o.active;
+      renderTabBar();
+      renderContent();
+    },
+    getActive() {
+      return active;
+    },
+    onSwitch(cb) {
+      switchCallbacks.push(cb);
+    },
+    destroy() {
+      switchCallbacks.length = 0;
+      container.destroy();
+    },
+  };
+}
+
+// ── Rule ──────────────────────────────────────────────────────────────────
+
+export interface RuleOptions {
+  /** Character to repeat. Default: "─" */
+  char?: string;
+  /** Height in rows. Default: 1 */
+  height?: number;
+  /** Position from top. Default: undefined (auto) */
+  top?: number | string;
+}
+
+export interface RuleHandle {
+  element: blessed.Widgets.BoxElement;
+  update(opts: Partial<RuleOptions>): void;
+  destroy(): void;
+}
+
+/**
+ * Horizontal divider line. Uses theme().muted tokens.
+ */
+export function createRule(
+  parent: blessed.Widgets.BoxElement,
+  opts: RuleOptions = {},
+): RuleHandle {
+  let char = opts.char ?? "─";
+  const t = theme();
+
+  const el = blessed.box({
+    parent,
+    top: opts.top,
+    left: 0,
+    right: 0,
+    height: opts.height ?? 1,
+    style: { fg: t.muted.fg, bg: t.muted.bg },
+    content: "",
+  });
+
+  function render() {
+    const w = (el.width as number) || 40;
+    el.setContent(char.repeat(w));
+  }
+
+  render();
+
+  return {
+    element: el,
+    update(o) {
+      if (o.char !== undefined) char = o.char;
+      const t2 = theme();
+      el.style.fg = t2.muted.fg;
+      el.style.bg = t2.muted.bg;
+      render();
+    },
+    destroy() {
+      el.destroy();
+    },
+  };
+}
+
+// ── InputLine ─────────────────────────────────────────────────────────────
+
+export interface InputLineOptions {
+  /** Placeholder text. Default: "" */
+  placeholder?: string;
+  /** Reserve bottom rows. Default: 0 (sits at bottom by default) */
+  bottom?: number;
+}
+
+export interface InputLineHandle {
+  element: blessed.Widgets.BoxElement;
+  getValue(): string;
+  setValue(text: string): void;
+  focus(): void;
+  onSubmit(cb: (value: string) => void): void;
+  destroy(): void;
+}
+
+/**
+ * Single-line text input. Uses theme().input tokens. Emits submit on enter.
+ */
+export function createInputLine(
+  parent: blessed.Widgets.BoxElement,
+  opts: InputLineOptions = {},
+): InputLineHandle {
+  const t = theme();
+  const submitCallbacks: ((value: string) => void)[] = [];
+
+  const el = blessed.textbox({
+    parent,
+    bottom: opts.bottom ?? 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    mouse: true,
+    keys: true,
+    inputOnFocus: true,
+    style: t.input ?? t.body,
+  } as any);
+
+  if (opts.placeholder) {
+    el.setContent(opts.placeholder);
+  }
+
+  el.on("submit", (value: string) => {
+    for (const cb of submitCallbacks) cb(value);
+    el.clearValue();
+    el.focus();
+  });
+
+  return {
+    element: el as any,
+    getValue() {
+      return el.getValue();
+    },
+    setValue(text) {
+      el.setValue(text);
+    },
+    focus() {
+      el.focus();
+    },
+    onSubmit(cb) {
+      submitCallbacks.push(cb);
+    },
+    destroy() {
+      submitCallbacks.length = 0;
+      el.destroy();
+    },
+  };
+}

@@ -1005,7 +1005,7 @@ export interface TabbedContainerHandle {
 }
 
 /** @primitive */
-export function createTabs(
+export function createLayoutTabs(
   parent: blessed.Widgets.BoxElement,
   tabs: TabDef[],
   opts?: { keys?: boolean },

@@ -164,3 +164,94 @@ export default function setup(host: MicroappHost) {
   });
 }
 ```
+
+---
+
+## `createHeaderBar(parent, opts?)`
+
+Top-pinned bar with left/right text slots. Uses `theme().header` tokens.
+
+```typescript
+const header = createHeaderBar(win.body, { left: " My App", right: "v1.0 " });
+header.update({ left: " Updated Title" });
+header.destroy();
+```
+
+**Options**: `left?`, `right?`, `height?` (default 1)
+**Returns**: `{ element, update(opts), destroy() }`
+
+---
+
+## `createScrollView(parent, opts?)`
+
+Scrollable content area with themed scrollbar, vi keys, mouse support.
+Like `createTextViewer` but with `topOffset` and `scrollTo`.
+
+```typescript
+const scroll = createScrollView(win.body, {
+  content: longText,
+  topOffset: 1,
+  bottomOffset: 1,
+  wrap: false,
+});
+scroll.scrollTo(50);
+scroll.update({ content: newText });
+```
+
+**Options**: `content?`, `wrap?`, `vi?`, `topOffset?`, `bottomOffset?`
+**Returns**: `{ element, update(opts), getContent(), scrollTo(line), destroy() }`
+
+---
+
+## `createTabs(parent, opts)`
+
+Tabbed container — tab bar at top, content area below.
+Switch with left/right arrows or number keys (1-9).
+
+```typescript
+const tabs = createTabs(win.body, {
+  tabs: [
+    { label: "Info", content: "System info here..." },
+    { label: "Logs", content: "Log output..." },
+  ],
+  active: 0,
+  bottomOffset: 1,
+});
+
+tabs.onSwitch((index) => status.update({ left: ` Tab ${index + 1}` }));
+tabs.update({ active: 1 });
+```
+
+**Options**: `tabs` (array of `{ label, content }`), `active?`, `bottomOffset?`
+**Returns**: `{ element, update(opts), getActive(), onSwitch(cb), destroy() }`
+
+---
+
+## `createRule(parent, opts?)`
+
+Horizontal divider line. Uses `theme().muted` tokens.
+
+```typescript
+const rule = createRule(win.body, { char: "═", top: 5 });
+rule.update({ char: "─" });
+```
+
+**Options**: `char?` (default "─"), `height?`, `top?`
+**Returns**: `{ element, update(opts), destroy() }`
+
+---
+
+## `createInputLine(parent, opts?)`
+
+Single-line text input. Uses `theme().input` tokens. Fires submit on Enter.
+
+```typescript
+const input = createInputLine(win.body, { placeholder: "Type here..." });
+input.onSubmit((value) => {
+  viewer.update({ content: value });
+});
+input.focus();
+```
+
+**Options**: `placeholder?`, `bottom?`
+**Returns**: `{ element, getValue(), setValue(text), focus(), onSubmit(cb), destroy() }`
