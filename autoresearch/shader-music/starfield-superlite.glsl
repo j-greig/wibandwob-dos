@@ -1,9 +1,7 @@
-// Starfield Superlite — 4 layers, sparse stars
+// Starfield Superlite — 4 layers, each with unique density + speed
 // Output: each layer's brightness drives one chiptune track
 
-// 4 layers = 4 audio tracks
 const float layers = 4.0;
-const float repeats = 8.0;  // fewer grid cells = fewer stars
 
 float N21(vec2 p) {
     p = fract(p * vec2(233.34, 851.73));
@@ -16,16 +14,16 @@ vec2 N22(vec2 p) {
     return vec2(n, N21(p + n));
 }
 
-// Returns per-layer brightness (0-1 range, clamped)
-float starLayer(vec2 uv, float offset, float time) {
-    float timeScale = -(time + offset) / layers;
+// Per-layer grid density and time speed for decorrelation
+float starLayer(vec2 uv, float offset, float time, float gridSize, float speed) {
+    float timeScale = -(time * speed + offset) / layers;
     float trans = fract(timeScale);
     float newRnd = floor(timeScale);
 
     uv -= 0.5;
     uv *= trans;  // zoom
     uv += 0.5;
-    uv *= repeats;
+    uv *= gridSize;
 
     vec2 ipos = floor(uv);
     uv = fract(uv);
@@ -43,11 +41,15 @@ float starLayer(vec2 uv, float offset, float time) {
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
 
-    // Each channel = one layer's total brightness
-    float r = starLayer(uv, 0.0, iTime);
-    float g = starLayer(uv, 1.0, iTime);
-    float b = starLayer(uv, 2.0, iTime);
-    float a = starLayer(uv, 3.0, iTime);
+    // Each layer: different grid density + time speed
+    // Lead:    sparse grid (6), fast — melodic, active
+    // Harmony: medium grid (10), slow — sustained, smooth
+    // Bass:    very sparse (4), very slow — ponderous, low
+    // Perc:    dense grid (14), fast — busy, staccato
+    float r = starLayer(uv, 0.0, iTime, 6.0,  1.2);
+    float g = starLayer(uv, 1.0, iTime, 10.0, 0.6);
+    float b = starLayer(uv, 2.0, iTime, 4.0,  0.4);
+    float a = starLayer(uv, 3.0, iTime, 14.0, 1.5);
 
     fragColor = vec4(r, g, b, a);
 }
