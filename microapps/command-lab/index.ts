@@ -1,6 +1,11 @@
-import blessed from "blessed";
 import type { MicroappHost, MicroappSnapshotWindow } from "../../src/services/microapp-sdk.js";
-import { createScrollbar } from "../../src/services/microapp-sdk.js";
+import {
+  createHeaderBar,
+  createStatusBar,
+  createSplitView,
+  createListPanel,
+  createScrollView,
+} from "../../src/services/microapp-sdk.js";
 
 interface CommandEntry {
   id: string;
@@ -9,10 +14,7 @@ interface CommandEntry {
 }
 
 interface RestoreArgs {
-  _restore?: {
-    selectedIndex?: number;
-    log?: string[];
-  };
+  _restore?: { selectedIndex?: number; log?: string[] };
 }
 
 const COMMANDS: CommandEntry[] = [
@@ -27,17 +29,6 @@ const COMMANDS: CommandEntry[] = [
 
 function clipLog(lines: string[]): string[] {
   return lines.slice(-18);
-}
-
-function listStyle(host: MicroappHost) {
-  return {
-    ...host.theme().body,
-    item: { ...host.theme().body },
-    selected: {
-      fg: "black",
-      bg: "white",
-    },
-  };
 }
 
 export default function setup(host: MicroappHost) {
@@ -65,8 +56,7 @@ export default function setup(host: MicroappHost) {
 }
 
 function openCommandLab(host: MicroappHost, args?: RestoreArgs) {
-  const selected = Math.max(0, Math.min(COMMANDS.length - 1, Number(args?._restore?.selectedIndex ?? 0)));
-  let selectedIndex = selected;
+  let selectedIndex = Math.max(0, Math.min(COMMANDS.length - 1, Number(args?._restore?.selectedIndex ?? 0)));
   let logLines = clipLog(args?._restore?.log?.map(String) ?? ["Command Lab ready."]);
 
   const win = host.createWindow({
@@ -77,80 +67,35 @@ function openCommandLab(host: MicroappHost, args?: RestoreArgs) {
     top: 4,
   });
 
-  const root = blessed.box({
-    parent: win.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    style: host.theme().body,
+  const header = createHeaderBar(win.body, { height: 2 });
+  const split = createSplitView(win.body, {
+    direction: "horizontal",
+    ratio: 0.42,
+    bottomOffset: 2,
+  });
+  (split.element as any).top = 2;
+
+  const commandsList = createListPanel(split.first, {
+    items: COMMANDS.map((e) => `${e.label}  (${e.id})`),
   });
 
-  const header = blessed.box({
-    parent: root,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    tags: true,
-    style: host.theme().body,
-  });
-
-  const commandsList = blessed.list({
-    parent: root,
-    top: 2,
-    left: 0,
-    width: "42%",
-    bottom: 2,
-    keys: true,
-    mouse: true,
-    vi: true,
-    items: COMMANDS.map((entry) => `${entry.label}  {gray-fg}${entry.id}{/gray-fg}`),
-    tags: true,
-    scrollbar: createScrollbar(),
-    style: listStyle(host),
-  });
-
-  const logBox = blessed.box({
-    parent: root,
-    top: 2,
-    left: "42%",
-    right: 0,
-    bottom: 2,
-    tags: true,
-    scrollable: true,
-    alwaysScroll: true,
-    mouse: true,
-    keys: true,
-    vi: true,
-    scrollbar: createScrollbar(),
-    style: host.theme().body,
-  });
-
-  const footer = blessed.box({
-    parent: root,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 2,
-    tags: true,
-    style: host.theme().body,
-  });
+  const logView = createScrollView(split.second, { content: logLines.join("\n") });
+  const footer = createStatusBar(win.body, { height: 2 });
 
   function render() {
     const current = COMMANDS[selectedIndex];
-    header.setContent([
-      "{bold}Command Lab{/bold}",
-      `selected ${selectedIndex + 1}/${COMMANDS.length} · ${current.id}`,
-    ].join("\n"));
-    logBox.setContent(logLines.join("\n"));
-    footer.setContent("Enter run · j/k move · g/G top/bottom log · q close");
-    commandsList.select(selectedIndex);
+    header.update({
+      left: ` {bold}Command Lab{/bold}`,
+      right: `${selectedIndex + 1}/${COMMANDS.length} · ${current?.id ?? "?"} `,
+    });
+    logView.update({ content: logLines.join("\n") });
+    footer.update({ left: " Enter run · j/k move · q close" });
     host.screen.render();
   }
 
   async function runSelected() {
     const current = COMMANDS[selectedIndex];
+    if (!current) return;
     const stamp = new Date().toLocaleTimeString();
     logLines = clipLog([...logLines, `[${stamp}] ${current.id}`]);
     render();
@@ -158,38 +103,19 @@ function openCommandLab(host: MicroappHost, args?: RestoreArgs) {
       const result = host.runGlobalCommand(current.id, current.args) as unknown;
       logLines = clipLog([...logLines, JSON.stringify(result ?? { ok: true })]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logLines = clipLog([...logLines, `error: ${message}`]);
+      const msg = error instanceof Error ? error.message : String(error);
+      logLines = clipLog([...logLines, `error: ${msg}`]);
     }
     render();
   }
 
-  commandsList.on("select item", () => {
-    selectedIndex = commandsList.selected;
+  commandsList.onSelect((index) => {
+    selectedIndex = index;
     render();
-  });
-  commandsList.key(["enter"], () => {
     void runSelected();
   });
-  commandsList.key(["j", "down"], () => {
-    selectedIndex = Math.min(COMMANDS.length - 1, selectedIndex + 1);
-    render();
-  });
-  commandsList.key(["k", "up"], () => {
-    selectedIndex = Math.max(0, selectedIndex - 1);
-    render();
-  });
-  logBox.key(["g"], () => {
-    logBox.setScroll(0);
-    host.screen.render();
-  });
-  logBox.key(["G"], () => {
-    logBox.setScroll(Math.max(0, logBox.getScrollHeight() - (Number(logBox.height) || 0)));
-    host.screen.render();
-  });
-  root.key(["q"], () => {
-    win.close();
-  });
+
+  win.setFocusTarget(commandsList.element);
 
   win.describeState(() => ({
     summary: `Command Lab · ${COMMANDS[selectedIndex]?.id ?? "none"} · ${logLines.length} log lines`,
@@ -197,24 +123,30 @@ function openCommandLab(host: MicroappHost, args?: RestoreArgs) {
     selectedCommandId: COMMANDS[selectedIndex]?.id,
     log: logLines,
   }));
+
   win.captureText(() => [
-    header.getContent(),
-    "",
-    "Commands",
-    ...COMMANDS.map((entry, index) => `${index === selectedIndex ? ">" : " "} ${entry.id}`),
+    "Command Lab",
+    ...COMMANDS.map((e, i) => `${i === selectedIndex ? ">" : " "} ${e.id}`),
     "",
     "Log",
     ...logLines,
   ].join("\n"));
+
   win.onRestyle(() => {
-    root.style = host.theme().body;
-    header.style = host.theme().body;
-    logBox.style = host.theme().body;
-    footer.style = host.theme().body;
-    commandsList.style = listStyle(host);
+    header.update({});
+    footer.update({});
+    logView.update({});
+    commandsList.update({ items: COMMANDS.map((e) => `${e.label}  (${e.id})`) });
     render();
   });
-  win.onCleanup(() => {});
-  win.setFocusTarget(commandsList);
+
+  win.onCleanup(() => {
+    header.destroy();
+    split.destroy();
+    commandsList.destroy();
+    logView.destroy();
+    footer.destroy();
+  });
+
   render();
 }
