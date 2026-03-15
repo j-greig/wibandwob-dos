@@ -1,8 +1,11 @@
-import blessed from "blessed";
+import type blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,
+  createCanvas,
+  createStatusBar,
+  createRule,
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════
@@ -670,29 +673,13 @@ function openSporeClock(host: MicroappHost) {
   const win = host.createWindow({ title: "Spore Clock", width: 64, height: 28 });
   const timers = new Set<ReturnType<typeof setInterval>>();
 
-  const canvas = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 2,
-    style: host.theme().body,
-    tags: false,
-  });
+  const canvasHandle = createCanvas(win.body, { bottomOffset: 2, tags: false });
+  const canvas = canvasHandle.element;
 
-  const status = blessed.box({
-    parent: win.body,
-    bottom: 0, left: 0, right: 0, height: 1,
-    style: host.theme().muted
-      ? { fg: host.theme().muted.fg, bg: host.theme().body.bg }
-      : { fg: "grey", bg: host.theme().body.bg },
-    tags: false,
-  });
+  const sepHandle = createRule(win.body, { top: undefined });
+  (sepHandle.element as any).bottom = 1;
 
-  const sep = blessed.box({
-    parent: win.body,
-    bottom: 1, left: 0, right: 0, height: 1,
-    content: "",
-    style: host.theme().body,
-    tags: false,
-  });
+  const statusHandle = createStatusBar(win.body);
 
   let field: MycelialField | null = null;
   let lastMinute = -1;
@@ -837,8 +824,8 @@ function openSporeClock(host: MicroappHost) {
 
     // Breathing separator
     const sepPulse = Math.sin(tick * 0.08) * 0.5 + 0.5;
-    sep.setContent(TENDRIL_H[Math.floor(sepPulse * (TENDRIL_H.length - 1))].repeat(w));
-    sep.style = { fg: colour, bg: host.theme().body.bg };
+    sepHandle.element.setContent(TENDRIL_H[Math.floor(sepPulse * (TENDRIL_H.length - 1))].repeat(w));
+    (sepHandle.element as any).style = { fg: colour, bg: host.theme().body.bg };
 
     // Rich status bar with symbolic indicators
     const wild = field!.wildColonies;
@@ -854,7 +841,7 @@ function openSporeClock(host: MicroappHost) {
     if (field!.competitionEvents > 0) parts.push(`⚔${field!.competitionEvents}`);
     if (field!.cycleCount > 0) parts.push(`↻${field!.cycleCount}`);
     if (transition.active) parts.push(transition.phase === "sporulating" ? "⟡SPORE" : "⟡BIRTH");
-    status.setContent(` ${parts.join("  ")}`);
+    statusHandle.update({ left: ` ${parts.join("  ")}` });
 
     host.screen.render();
     tick++;
@@ -898,8 +885,8 @@ function openSporeClock(host: MicroappHost) {
   win.onRestyle(() => {
     const t = host.theme();
     canvas.style = { ...t.body };
-    status.style = t.muted ? { fg: t.muted.fg, bg: t.body.bg } : { fg: "grey", bg: t.body.bg };
-    sep.style = { ...t.body };
+    (statusHandle.element as any).style = t.muted ? { fg: t.muted.fg, bg: t.body.bg } : { fg: "grey", bg: t.body.bg };
+    (sepHandle.element as any).style = { ...t.body };
     host.screen.render();
   });
 

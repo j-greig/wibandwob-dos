@@ -444,7 +444,7 @@ export function openFileManagerWindow(params: {
       if (untracked) parts.push(`${untracked}?`);
       gitSummary = parts.length ? ` git:${parts.join("/")}` : " git:clean";
     }
-    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search`);
+    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search q:close`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -887,7 +887,7 @@ export function openFileManagerWindow(params: {
     frame.frame.setLabel(` \u2302 ${dirName}${branchTag} `);
     // Show breadcrumb with file type summary
     const bc = renderBreadcrumb();
-    pathLabel.setContent(` ${bc}`);
+    pathLabel.setContent(` 📁 File Manager │ ${bc}`);
     applyFilter(selectedIndex);
   };
 

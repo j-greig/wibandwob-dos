@@ -808,3 +808,65 @@ export function createInputLine(
     },
   };
 }
+
+// ── Canvas ────────────────────────────────────────────────────────────────
+
+export interface CanvasOptions {
+  /** Reserve top rows. Default: 0 */
+  topOffset?: number;
+  /** Reserve bottom rows. Default: 0 */
+  bottomOffset?: number;
+  /** Enable blessed tags for ANSI content. Default: true */
+  tags?: boolean;
+}
+
+export interface CanvasHandle {
+  /** The raw blessed box — render engines write frames to this via setContent() */
+  element: blessed.Widgets.BoxElement;
+  /** Update content (shorthand for element.setContent) */
+  setContent(content: string): void;
+  /** Get current dimensions */
+  getSize(): { width: number; height: number };
+  destroy(): void;
+}
+
+/**
+ * Canvas — a themed blessed box for render engines to draw frames into.
+ *
+ * Provides a raw blessed element that render engines can setContent() on directly.
+ * This is the SDK-sanctioned way to do canvas-level rendering without importing blessed.
+ *
+ * Use for: plasma, contour, generative art, terrain, any animation that composes
+ * its own text frames rather than using layout primitives.
+ */
+export function createCanvas(
+  parent: blessed.Widgets.BoxElement,
+  opts: CanvasOptions = {},
+): CanvasHandle {
+  const t = theme();
+  const el = blessed.box({
+    parent,
+    top: opts.topOffset ?? 0,
+    left: 0,
+    right: 0,
+    bottom: opts.bottomOffset ?? 0,
+    tags: opts.tags ?? true,
+    style: { fg: t.body.fg, bg: t.body.bg },
+  });
+
+  return {
+    element: el,
+    setContent(content) {
+      el.setContent(content);
+    },
+    getSize() {
+      return {
+        width: Math.max(1, Number(el.width) || 40),
+        height: Math.max(1, Number(el.height) || 20),
+      };
+    },
+    destroy() {
+      el.destroy();
+    },
+  };
+}

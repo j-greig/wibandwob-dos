@@ -414,6 +414,7 @@ export {
   createTabs,
   createRule,
   createInputLine,
+  createCanvas,
 } from "../sdk/composition-helpers.js";
 
 /** @public */
@@ -440,4 +441,6 @@ export type {
   RuleHandle,
   InputLineOptions,
   InputLineHandle,
+  CanvasOptions,
+  CanvasHandle,
 } from "../sdk/composition-helpers.js";

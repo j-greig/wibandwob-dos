@@ -13,10 +13,11 @@ import {
   createStatusBar,
   createTextBlock,
   createRule,
+  createCanvas,
   type PlasmaModifiers,
   type PlasmaRenderMode,
 } from "../../src/services/microapp-sdk.js";
-import blessed from "blessed";
+
 import fs from "node:fs";
 import path from "node:path";
 
@@ -107,11 +108,8 @@ export default function setup(host: MicroappHost) {
 
     const win = host.createWindow({ title: "Plasma", width: 100, height: 35 });
 
-    const canvas = blessed.box({
-      parent: win.body,
-      top: 0, left: 0, width: 0, height: 0,
-      style: host.theme().body,
-    });
+    const canvasHandle = createCanvas(win.body);
+    const canvas = canvasHandle.element;
 
     const infoBlock = createTextBlock(win.body, { paddingLeft: 1, paddingTop: 0 });
     const header = createHeaderBar(win.body);

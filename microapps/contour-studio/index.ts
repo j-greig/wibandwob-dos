@@ -14,7 +14,7 @@ import {
   type ContourPlayer,
   type LayoutPart,
 } from "../../src/services/microapp-sdk.js";
-import blessed from "blessed";
+import type blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -66,23 +66,10 @@ export default function setup(host: MicroappHost) {
 
     let viewMode: ViewMode = "solo";
 
-    const canvas = blessed.box({
-      parent: win.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      style: host.theme().body,
-    });
-    const status = blessed.box({
-      parent: win.body,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: 1,
-      tags: false,
-      style: host.theme().header,
-    });
+    const canvasHandle = createCanvas(win.body, { bottomOffset: 1 });
+    const canvas = canvasHandle.element;
+    const statusHandle = createStatusBar(win.body);
+    const status = statusHandle.element;
 
     let triptych: TriptychState | null = null;
 
@@ -122,16 +109,10 @@ export default function setup(host: MicroappHost) {
     };
 
     const mountTriptych = () => {
-      const panelBoxes = Array.from({ length: PANEL_COUNT }, () =>
-        blessed.box({
-          parent: win.body,
-          top: 0,
-          left: 0,
-          width: 0,
-          height: 0,
-          style: host.theme().body,
-        })
+      const panelCanvases = Array.from({ length: PANEL_COUNT }, () =>
+        createCanvas(win.body)
       );
+      const panelBoxes = panelCanvases.map(c => c.element);
 
       const header = createHeaderBar(win.body);
       const dividerA = createRule(win.body, { axis: "vertical" });
