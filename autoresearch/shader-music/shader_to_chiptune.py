@@ -48,11 +48,12 @@ CHORD_SCALES = [
 BARS_PER_CHORD = 2  # each chord lasts 2 bars
 
 # Track configs: waveform, octave offset, volume range
+# Wider volume ranges for more dynamic contrast
 TRACK_CONFIG = [
-    {"wave": square,    "octave": 0,  "vol": (0.15, 0.5),  "duty": 0.5,  "name": "lead"},
-    {"wave": triangle,  "octave": -1, "vol": (0.1, 0.35),  "duty": None, "name": "harmony"},
-    {"wave": sawtooth,  "octave": -2, "vol": (0.1, 0.3),   "duty": None, "name": "bass"},
-    {"wave": noise,     "octave": 0,  "vol": (0.0, 0.15),  "duty": None, "name": "perc"},
+    {"wave": square,    "octave": 0,  "vol": (0.05, 0.6),  "duty": 0.5,  "name": "lead"},
+    {"wave": triangle,  "octave": -1, "vol": (0.03, 0.45),  "duty": None, "name": "harmony"},
+    {"wave": sawtooth,  "octave": -2, "vol": (0.05, 0.4),   "duty": None, "name": "bass"},
+    {"wave": noise,     "octave": 0,  "vol": (0.0, 0.2),   "duty": None, "name": "perc"},
 ]
 
 
@@ -284,6 +285,31 @@ def run_shader_to_music():
 
         track_canvases.append(track_audio)
 
+    # Apply structural dynamics per track — staggered entrances, macro swell
+    print("[shader-music] Applying structural dynamics...")
+    sr = 22050
+    n_samples = len(track_canvases[0])
+    
+    # Track entrance offsets (in seconds) — staggered for build-up
+    entrance_times = [0.0, 1.5, 0.5, 2.0]  # bass enters early, perc last
+    
+    for i, tc in enumerate(track_canvases):
+        # Fade in at track entrance
+        entrance_sample = int(entrance_times[i] * sr)
+        fade_len = int(1.0 * sr)  # 1 second fade in
+        if entrance_sample > 0:
+            tc[:entrance_sample] *= 0.0
+        end = min(entrance_sample + fade_len, n_samples)
+        actual_fade = end - entrance_sample
+        if actual_fade > 0:
+            tc[entrance_sample:end] *= np.linspace(0, 1, actual_fade)
+        
+        # Macro swell: gentle sine-wave volume modulation (different period per track)
+        periods = [5.3, 7.1, 4.7, 3.3]  # seconds per swell cycle
+        t = np.linspace(0, DURATION_SECS, n_samples)
+        swell = 0.6 + 0.4 * np.sin(2 * np.pi * t / periods[i])
+        tc *= swell
+
     # Mix all tracks
     print("[shader-music] Mixing tracks...")
     mixed = make(DURATION_SECS)
@@ -293,8 +319,8 @@ def run_shader_to_music():
     mixed = normalize(mixed)
 
     # Gentle fade in/out
-    mixed[:int(0.1 * 22050)] *= np.linspace(0, 1, int(0.1 * 22050))
-    mixed[-int(0.3 * 22050):] *= np.linspace(1, 0, int(0.3 * 22050))
+    mixed[:int(0.2 * sr)] *= np.linspace(0, 1, int(0.2 * sr))
+    mixed[-int(0.5 * sr):] *= np.linspace(1, 0, int(0.5 * sr))
 
     synth_time = time.time() - t0
     print(f"[shader-music] Synthesis: {synth_time:.3f}s")
