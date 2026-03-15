@@ -2,55 +2,15 @@
 
 ## Objective
 
-Make the journal window's two view modes — **Journal** (structured entries) and
-**Log** (raw pi session browser) — first-class with a visible toggle in the chrome,
-then iterate on rendering quality, interaction feel, and visual polish.
-
-Currently the `S` key silently switches `viewMode` between `"journal"` and `"sessions"`.
-Users don't know the mode exists. v4 adds a visible `JRN · LOG` indicator in the
-top-right of the window, with accent color on the active mode and muted on the inactive.
-
-### What each view does
-
-**JRN view** (current default):
-- Structured entries with CRUD (create, read, edit, delete)
-- Two-pane: list + preview at wide breakpoints
-- Date group headers, sort (updated/created/title), search, tags
-- Kind icons, peer glyphs, time-ago labels
-
-**LOG view** (session browser):
-- Raw pi agent session JSONL files from `~/.pi/agent/sessions/`
-- Two-pane: session list + conversation preview
-- Read-only — no editing
-- Role-colored messages (human = accent, agent = muted), tool call summaries
-- Date headers by session date
-
-### The toggle
-
-Top-right of the journal window body (not chrome title — inside the content area):
-`JRN · LOG` with the active mode in accent color and the inactive in muted.
-Keyboard: `S` to switch. Mouse: click the label to toggle.
-
-Design: **Option B** — `JRN · LOG` with accent highlight on active, muted on inactive.
-Minimal, consistent with existing aesthetic.
-
-### Backlinks
-
-Auto-captured entries (future Feature 1) will link back to their source session via
-`meta.sessionId`. In JRN view, auto-captured entries show a `⚡` icon. Pressing a key
-jumps to LOG view filtered to that session. (Backlink wiring is in scope; auto-capture
-pipeline is NOT — that's a separate spike.)
+Polish the journal window's **JRN/LOG toggle** and **LOG session browser view**.
+The toggle and basic mode switching already work. Now iterate on visual quality,
+interaction feel, and information density.
 
 ## Metrics
 
-- **Primary**: `ui_quality` (0–100, higher is better) — composite heuristic:
-  - Toggle visibility (15 pts): indicator renders in correct position, readable
-  - Mode switching (20 pts): S key and click both work, state updates correctly
-  - JRN view rendering (20 pts): list items, date headers, two-pane preview all render
-  - LOG view rendering (20 pts): session list, conversation preview, role colors
-  - Theme compliance (15 pts): uses `host.theme()` colors, responds to restyle
-  - State reporting (10 pts): `describeState()` reports correct viewMode
-- **Secondary**: `render_time_ms`, `memory_delta_kb`
+- **Primary**: `ui_quality` (0–100, higher is better) — composite heuristic across
+  toggle visibility, mode switching, JRN rendering, LOG rendering, theme, state reporting
+- **Secondary**: `jrn_has_toggle`, `log_has_role_glyphs`, `log_has_tool_calls`
 
 ## How to Run
 
@@ -58,43 +18,41 @@ pipeline is NOT — that's a separate spike.)
 cd autoresearch && ./autoresearch.sh
 ```
 
-Outputs `METRIC name=number` lines. Runs the app, opens journal, exercises both
-modes via the control API, scores the results.
-
-## Agent Setup
-
-This loop relies on the **ops subagent** (`.pi/agents/ops.md`) for verification:
-
-- `wibwob restart` after code changes
-- `wibwob cmd wibwob.journal.open` to open the journal
-- `wibwob state | jq '.windows[]'` to verify window state
-- `wibwob read <id>` to capture rendered text for scoring
-- `wibwob map` for spatial overview
-- `bun run typecheck` for type safety
+Requires the app running in tmux session `journal`. Outputs `METRIC name=number` lines.
 
 ## Files in Scope
 
 | File | Purpose |
 |------|---------|
-| `microapps/journal/index.ts` | Journal microapp — all UI code lives here |
-| `microapps/journal/microapp.json` | Microapp manifest |
+| `microapps/journal/index.ts` | Journal microapp — all UI code |
 
 ## Off Limits
 
-- `src/` — no shell internals changes
-- Session JSONL files — read-only
+- `src/` — no shell internals
 - Other microapps
-- Auto-capture / summarisation pipeline (separate spike)
+- Session JSONL files (read-only)
 
 ## Constraints
 
 - `bun run typecheck` must pass
-- Must work at both narrow (<120 col) and wide (≥120 col) breakpoints
-- Toggle must be keyboard-accessible (S key) and mouse-clickable
-- Must respect theme changes (onRestyle callback)
-- `describeState()` must report the active viewMode
+- Must work at narrow (<120 col) and wide (≥120 col) breakpoints
+- Keyboard shortcuts must work (S toggle, m model filter, j/k nav)
+- Must respect theme changes
 - No new dependencies
 
 ## What's Been Tried
 
-_Nothing yet — baseline run pending._
+### Baseline (commits f3d87482 → f90eb164)
+- Added toggleBox as blessed.box with blessed tags — invisible on dark themes (muted color lost against bg)
+- Replaced with SDK createButton — **broke all keyboard shortcuts** because buttons set focusable:true
+- Fixed: plain blessed.box with focusable:false, mouse:true, click handlers refocus listBox
+- Added model extraction from session JSONL (model_change events)
+- Added m key to cycle model filter in LOG view
+- Current state: toggle works, both views render, keyboard works
+
+### Known issues to improve
+- Toggle contrast could be stronger on some themes
+- LOG view conversation preview is raw text dump — could be more structured
+- Session list only shows 2 sessions (this worktree has few) — test with more
+- No visual feedback on mode switch (instant jump, no transition cue)
+- Command bar hints could show S key more prominently
