@@ -64,15 +64,18 @@ The benchmark uses 5 diverse sessions from `~/.pi/agent/sessions/--Users-james-R
 
 ## Agent Setup
 
-This loop runs in the **creative / quality lens** but relies on the **ops agent**
-(`ww-ops` skill) for verification:
+This loop runs in the **creative / quality lens** but relies on the **ops subagent**
+(`.pi/agents/ops.md`) for verification:
 
-- After keeping a result, ask ops to `bash scripts/restart.sh` and visually verify
+- After keeping a result, use `wibwob restart` and visually verify
   the journal window still renders correctly
-- Use `bash scripts/reload-microapp.sh wibwob.journal` for fast UI iteration
-- Ops can also run `bun run typecheck` independently if `autoresearch.checks.sh` is slow
+- Use `wibwob cmd wibwob.journal.open` to reopen the journal after reload
+- `wibwob health` to confirm the instance is alive
+- `wibwob map` for spatial desktop overview
+- `bun run typecheck` for type safety
 
-The ops skill is at `.agents/skills/ww-ops/SKILL.md` — read it for launch/restart/screenshot commands.
+The ops subagent definition is at `.pi/agents/ops.md` — it owns process
+lifecycle, health, debugging, and visual verification via the `wibwob` CLI.
 
 ## What's Been Tried
 
