@@ -9,6 +9,7 @@
  */
 
 import { execSync } from "node:child_process";
+import { copyToClipboard } from "./clipboard.js";
 import type { CommandRegistry, MenuContext } from "./command-registry.js";
 import type { MenuItem, WindowRecord } from "./types.js";
 
@@ -22,15 +23,7 @@ export function createFilePathMenuItems(filePath: string): MenuItem[] {
   const items: MenuItem[] = [
     {
       label: "Copy Path to Clipboard",
-      action: () => {
-        try {
-          if (process.platform === "darwin") {
-            execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
-          } else {
-            execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
-          }
-        } catch { /* clipboard not available */ }
-      }
+      action: () => { copyToClipboard(filePath); }
     }
   ];
   if (process.platform === "darwin") {

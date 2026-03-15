@@ -24,6 +24,7 @@ import {
 import { appFlags } from "./cli.js";
 import { loadMicroapps, reloadMicroapps } from "../services/microapp-loader.js";
 import type { MicroappHostDeps } from "../sdk/microapp-host.js";
+import { copyToClipboard } from "./clipboard.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry, type CommandSurface } from "./command-registry.js";
 import {
@@ -1279,17 +1280,11 @@ export class TsTuiMvpApp {
       this.overlays.flash("No text to copy from this window.");
       return;
     }
-    try {
-      const { execSync } = require("node:child_process");
-      if (process.platform === "darwin") {
-        execSync("pbcopy", { input: text });
-      } else {
-        execSync("xclip -selection clipboard", { input: text });
-      }
+    if (copyToClipboard(text)) {
       this.overlays.flash(
         `Copied ${text.split("\n").length} lines to clipboard.`,
       );
-    } catch {
+    } else {
       this.overlays.flash("Clipboard not available.");
     }
   }
