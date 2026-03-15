@@ -266,6 +266,98 @@ async function cmdScreenshot(id?: string) {
   process.stdout.write(text);
 }
 
+async function cmdAttach() {
+  const { spawn } = await import("node:child_process");
+  const label = findFlag("--instance") || process.env.WIBWOB_INSTANCE || "main";
+  const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
+  const pidFile = path.join(SCRATCH_BASE, "wibwob.pid");
+  const orphanWorkspace = `orphan-${label}`;
+  const workspacesDir = path.join(SCRATCH_BASE, "workspaces");
+  const orphanFile = path.join(workspacesDir, `${orphanWorkspace}.json`);
+
+  process.stderr.write(`[attach] looking for instance '${label}'...\n`);
+
+  // 1. Check if instance is alive
+  let alive = false;
+  if (fs.existsSync(sockPath)) {
+    try {
+      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      alive = res.ok;
+    } catch {
+      alive = false;
+    }
+  }
+
+  if (alive) {
+    process.stderr.write(`[attach] instance '${label}' is already running\n`);
+    // Just print health
+    const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+    const health = await res.json();
+    process.stdout.write(JSON.stringify(health, null, 2) + "\n");
+    return;
+  }
+
+  // 2. Kill stale process if PID file exists
+  if (fs.existsSync(pidFile)) {
+    const stalePid = parseInt(fs.readFileSync(pidFile, "utf8").trim(), 10);
+    if (stalePid && !isNaN(stalePid)) {
+      try {
+        process.kill(stalePid, "SIGTERM");
+        process.stderr.write(`[attach] killed stale process ${stalePid}\n`);
+      } catch {
+        process.stderr.write(`[attach] stale PID ${stalePid} already dead\n`);
+      }
+      try { fs.unlinkSync(pidFile); } catch {}
+    }
+  }
+
+  // 3. Clean stale socket
+  if (fs.existsSync(sockPath)) {
+    try { fs.unlinkSync(sockPath); } catch {}
+    process.stderr.write(`[attach] cleaned stale socket\n`);
+  }
+
+  // 4. Detect orphan workspace
+  const hasOrphan = fs.existsSync(orphanFile);
+  if (hasOrphan) {
+    process.stderr.write(`[attach] found orphan workspace: ${orphanWorkspace}\n`);
+  } else {
+    process.stderr.write(`[attach] no orphan workspace found, starting fresh\n`);
+  }
+
+  // 5. Start new instance with workspace flag if orphan exists
+  const startArgs = ["run", "src/app.ts"];
+  if (hasOrphan) {
+    startArgs.push("--workspace", orphanWorkspace);
+  }
+
+  process.stderr.write(`[attach] starting instance '${label}'...\n`);
+  const child = spawn("bun", startArgs, {
+    cwd: path.resolve(SCRATCH_BASE, ".."),
+    env: { ...process.env, WIBWOB_INSTANCE_LABEL: label },
+    stdio: ["ignore", "ignore", "ignore"],
+    detached: true,
+  });
+  child.unref();
+
+  // 6. Wait for health
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      if (res.ok) {
+        const health = await res.json();
+        process.stderr.write(`[attach] instance '${label}' ready (pid ${(health as any).pid})\n`);
+        process.stdout.write(JSON.stringify(health, null, 2) + "\n");
+        return;
+      }
+    } catch {}
+  }
+
+  process.stderr.write(`[attach] timeout waiting for instance '${label}'\n`);
+  process.exit(1);
+}
+
 async function cmdInstances() {
   const instancesDir = path.join(SCRATCH_BASE, "instances");
   if (!fs.existsSync(instancesDir)) {
@@ -371,6 +463,7 @@ Usage:
   wibwob screenshot                   Text screenshot of desktop
   wibwob screenshot <id>              Text screenshot of a single window
   wibwob instances                    List running instances (via sockets)
+  wibwob attach                       Resurrect from orphan workspace (detect → kill stale → start → load)
   wibwob cmd <id> [--key val ...]     Run command by ID
   wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
   wibwob <domain> <verb> [--flags]    Run command (noun verb)
@@ -431,6 +524,8 @@ async function main() {
       return cmdScreenshot(cleanArgs[1]);
     case "instances":
       return cmdInstances();
+    case "attach":
+      return cmdAttach();
     case "completions":
       return cmdCompletions();
     case "cmd": {

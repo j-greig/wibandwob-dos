@@ -16,12 +16,15 @@ export interface AppFlags {
   customCursor: boolean;
   /** Show help and exit. */
   help: boolean;
+  /** Boot into a named workspace instead of default. */
+  workspace: string | undefined;
 }
 
 const FLAG_DEFS = {
   dev:           { type: "boolean" as const, default: false, description: "Dev mode: reload button (Ctrl+R), auto-save on reload" },
   stats:         { type: "boolean" as const, default: false, description: "Show runtime stats badge (render FPS, frame ms, RAM, agent activity)" },
   "custom-cursor": { type: "boolean" as const, default: false, description: "Enable custom TUI cursor overlay" },
+  workspace:     { type: "string" as const, description: "Boot into a named workspace (e.g. --workspace orphan-main)" },
   help:          { type: "boolean" as const, short: "h", default: false, description: "Show this help" },
 };
 
@@ -42,6 +45,7 @@ export function parseAppFlags(): AppFlags {
     stats: Boolean(values.stats),
     customCursor: Boolean(values["custom-cursor"]),
     help: Boolean(values.help),
+    workspace: (values.workspace as string | undefined) || process.env.WIBWOB_WORKSPACE || undefined,
   };
 
   return parsed;
@@ -59,7 +63,7 @@ export function printHelp(): void {
   console.log("Flags:");
   for (const [name, def] of Object.entries(FLAG_DEFS)) {
     const short = "short" in def ? `-${def.short}, ` : "    ";
-    const dflt = def.default ? " (default: on)" : "";
+    const dflt = "default" in def && def.default ? " (default: on)" : "";
     console.log(`  ${short}--${name.padEnd(18)} ${(def as any).description}${dflt}`);
   }
   console.log("");

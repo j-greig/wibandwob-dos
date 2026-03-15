@@ -506,6 +506,38 @@ export class TsTuiMvpApp {
 
   /** Restore default workspace on boot. Empty desktop if none exists. */
   private restoreDefaultWorkspace(): void {
+    const flags = appFlags();
+
+    // --workspace flag or WIBWOB_WORKSPACE env: boot into a named workspace
+    if (flags.workspace) {
+      const result = this.runtimeWorkspace.load(flags.workspace, { replaceExisting: true });
+      if (result.ok) {
+        log.app(`booted into workspace: ${flags.workspace}`);
+      } else {
+        log.app(`workspace '${flags.workspace}' failed: ${result.error} — falling back to default`);
+        const restored = this.runtimeWorkspace.restoreDefault();
+        if (restored && !restored.ok) {
+          log.app(`default workspace restore skipped: ${restored.error}`);
+        }
+      }
+      return;
+    }
+
+    // Auto-detect orphan workspace if no flag given
+    const orphanName = `orphan-${this.runtimeNode.instanceLabel}`;
+    const orphanPath = path.join(this.runtimeNode.workspacesDir, `${orphanName}.json`);
+    if (fs.existsSync(orphanPath)) {
+      log.app(`orphan workspace detected: ${orphanName}`);
+      const result = this.runtimeWorkspace.load(orphanName, { replaceExisting: true });
+      if (result.ok) {
+        log.app(`restored orphan workspace: ${orphanName} (${result.windows} windows)`);
+        // Rename to avoid re-loading on next boot
+        try { fs.renameSync(orphanPath, orphanPath.replace(".json", ".restored.json")); } catch {}
+        return;
+      }
+      log.app(`orphan workspace load failed: ${result.error} — falling back to default`);
+    }
+
     const restored = this.runtimeWorkspace.restoreDefault();
     if (restored && !restored.ok) {
       log.app(`default workspace restore skipped: ${restored.error}`);
