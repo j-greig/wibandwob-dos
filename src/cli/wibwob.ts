@@ -267,17 +267,18 @@ async function cmdScreenshot(id?: string) {
 }
 
 async function cmdAttach() {
-  const { spawn } = await import("node:child_process");
+  const { spawnSync } = await import("node:child_process");
   const label = findFlag("--instance") || process.env.WIBWOB_INSTANCE || "main";
   const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
   const pidFile = path.join(SCRATCH_BASE, "wibwob.pid");
   const orphanWorkspace = `orphan-${label}`;
   const workspacesDir = path.join(SCRATCH_BASE, "workspaces");
   const orphanFile = path.join(workspacesDir, `${orphanWorkspace}.json`);
+  const repoRoot = path.resolve(SCRATCH_BASE, "..");
 
   process.stderr.write(`[attach] looking for instance '${label}'...\n`);
 
-  // 1. Check if instance is alive
+  // 1. Check if instance is alive (headless orphan?)
   let alive = false;
   if (fs.existsSync(sockPath)) {
     try {
@@ -288,13 +289,32 @@ async function cmdAttach() {
     }
   }
 
+  // If alive, it's a headless orphan — kill it so we can take over the terminal
   if (alive) {
-    process.stderr.write(`[attach] instance '${label}' is already running\n`);
-    // Just print health
-    const res = await fetch("http://localhost/health", { unix: sockPath } as any);
-    const health = await res.json();
-    process.stdout.write(JSON.stringify(health, null, 2) + "\n");
-    return;
+    process.stderr.write(`[attach] found headless instance — taking over\n`);
+    // Save its state first
+    try {
+      await fetch("http://localhost/workspace/save", {
+        unix: sockPath,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: orphanWorkspace }),
+      } as any);
+      process.stderr.write(`[attach] saved workspace as ${orphanWorkspace}\n`);
+    } catch {
+      process.stderr.write(`[attach] warning: could not save workspace\n`);
+    }
+    // Kill it
+    try {
+      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      const health = await res.json() as Record<string, unknown>;
+      if (health.pid) {
+        process.kill(Number(health.pid), "SIGTERM");
+        process.stderr.write(`[attach] killed headless process ${health.pid}\n`);
+      }
+    } catch {}
+    // Wait for it to die
+    await new Promise(r => setTimeout(r, 1500));
   }
 
   // 2. Kill stale process if PID file exists
@@ -325,37 +345,21 @@ async function cmdAttach() {
     process.stderr.write(`[attach] no orphan workspace found, starting fresh\n`);
   }
 
-  // 5. Start new instance with workspace flag if orphan exists
+  // 5. Start the TUI in THIS terminal — stdio: "inherit" so blessed gets the TTY
   const startArgs = ["run", "src/app.ts"];
   if (hasOrphan) {
     startArgs.push("--workspace", orphanWorkspace);
   }
 
-  process.stderr.write(`[attach] starting instance '${label}'...\n`);
-  const child = spawn("bun", startArgs, {
-    cwd: path.resolve(SCRATCH_BASE, ".."),
+  process.stderr.write(`[attach] launching TUI...\n`);
+  const result = spawnSync("bun", startArgs, {
+    cwd: repoRoot,
     env: { ...process.env, WIBWOB_INSTANCE_LABEL: label },
-    stdio: ["ignore", "ignore", "ignore"],
-    detached: true,
+    stdio: "inherit",
   });
-  child.unref();
 
-  // 6. Wait for health
-  for (let i = 0; i < 15; i++) {
-    await new Promise(r => setTimeout(r, 1000));
-    try {
-      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
-      if (res.ok) {
-        const health = await res.json();
-        process.stderr.write(`[attach] instance '${label}' ready (pid ${(health as any).pid})\n`);
-        process.stdout.write(JSON.stringify(health, null, 2) + "\n");
-        return;
-      }
-    } catch {}
-  }
-
-  process.stderr.write(`[attach] timeout waiting for instance '${label}'\n`);
-  process.exit(1);
+  // TUI exited — pass through its exit code
+  process.exit(result.status ?? 1);
 }
 
 async function cmdInstances() {
