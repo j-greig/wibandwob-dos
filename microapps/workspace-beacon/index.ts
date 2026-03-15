@@ -1,8 +1,11 @@
-import blessed from "blessed";
 import type { MicroappHost, MicroappSnapshotWindow } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,
+  createHeaderBar,
+  createStatusBar,
+  createTextViewer,
+  createRule,
 } from "../../src/services/microapp-sdk.js";
 
 type BeaconStage = "seed" | "draft" | "review" | "ship";
@@ -21,11 +24,11 @@ interface RestoreArgs {
 const STAGES: BeaconStage[] = ["seed", "draft", "review", "ship"];
 const DEFAULT_NOTE = "Name the current workspace intent.";
 
-const STAGE_STYLE: Record<BeaconStage, { label: string; fg: string; bar: string }> = {
-  seed:   { label: "SEED",   fg: "green",   bar: "░" },
-  draft:  { label: "DRAFT",  fg: "cyan",    bar: "▒" },
-  review: { label: "REVIEW", fg: "yellow",  bar: "▓" },
-  ship:   { label: "SHIP",   fg: "magenta", bar: "█" },
+const STAGE_STYLE: Record<BeaconStage, { label: string; bar: string }> = {
+  seed:   { label: "SEED",   bar: "░" },
+  draft:  { label: "DRAFT",  bar: "▒" },
+  review: { label: "REVIEW", bar: "▓" },
+  ship:   { label: "SHIP",   bar: "█" },
 };
 
 let activeBeacon:
@@ -118,108 +121,48 @@ function openBeacon(host: MicroappHost, args?: RestoreArgs) {
     top: 6,
   });
 
-  const t = () => host.theme().body;
-
-  // ── Widgets ───────────────────────────────────────────────────────
-
-  const stageBar = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, height: 1,
-    tags: true,
-  });
-
-  const progressBar = blessed.box({
-    parent: win.body,
-    top: 1, left: 0, right: 0, height: 1,
-    tags: false,
-  });
-
-  const divider1 = blessed.box({
-    parent: win.body,
-    top: 2, left: 0, right: 0, height: 1,
-    tags: false,
-  });
-
-  const noteLabel = blessed.box({
-    parent: win.body,
-    top: 3, left: 0, right: 0, height: 1,
-    tags: true,
-  });
-
-  const noteBody = blessed.box({
-    parent: win.body,
-    top: 4, left: 0, right: 0, bottom: 3,
-    tags: false,
-  });
-
-  const divider2 = blessed.box({
-    parent: win.body,
-    left: 0, right: 0, bottom: 2, height: 1,
-    tags: false,
-  });
-
-  const statusLine = blessed.box({
-    parent: win.body,
-    left: 0, right: 0, bottom: 1, height: 1,
-    tags: true,
-  });
-
-  const keysLine = blessed.box({
-    parent: win.body,
-    left: 0, right: 0, bottom: 0, height: 1,
-    tags: true,
-  });
-
-  // ── Pulse dot ─────────────────────────────────────────────────────
   let pulse = false;
 
+  const header = createHeaderBar(win.body, { height: 2 });
+  const rule1 = createRule(win.body, { top: 2 });
+  const noteView = createTextViewer(win.body, {
+    content: "",
+    wrap: true,
+    bottomOffset: 2,
+  });
+  (noteView.element as any).top = 3;
+  const status = createStatusBar(win.body, { height: 2 });
+
   function render() {
-    const bg = t().bg ?? "black";
-    const fg = t().fg ?? "white";
     const s = STAGE_STYLE[state.stage];
     const idx = STAGES.indexOf(state.stage);
-    const w = Math.max(1, Number(win.body.width) || 48);
-
-    // Stage indicator line
     const dot = pulse ? "●" : "○";
     const pin = state.pinned ? " 📌" : "";
-    stageBar.style = { fg: s.fg, bg };
-    stageBar.setContent(`  ${dot}  ${s.label}${pin}`);
+    const w = Math.max(1, Number(win.body.width) || 48);
 
-    // Progress: filled segments per stage
     const segW = Math.floor((w - 4) / STAGES.length);
     const prog = STAGES.map((_, i) => {
       const ch = i <= idx ? s.bar : "·";
       return ch.repeat(segW);
     }).join(" ");
-    progressBar.style = { fg: s.fg, bg };
-    progressBar.setContent(`  ${prog}`);
 
-    // Dividers
-    const rule = "─".repeat(Math.max(0, w - 4));
-    divider1.style = { fg: "grey", bg };
-    divider1.setContent(`  ${rule}`);
-    divider2.style = { fg: "grey", bg };
-    divider2.setContent(`  ${rule}`);
+    header.update({
+      left: `  ${dot}  ${s.label}${pin}`,
+      right: `  ${prog}  `,
+    });
 
-    // Note
-    noteLabel.style = { fg, bg };
-    noteLabel.setContent(`  {bold}Note{/bold}`);
-    noteBody.style = { fg, bg };
-    noteBody.setContent(`  ${state.note}`);
+    noteView.update({
+      content: `  {bold}Note{/bold}\n  ${state.note}`,
+    });
 
-    // Status
-    statusLine.style = { fg: "grey", bg };
-    statusLine.setContent(`  ${state.updatedAt}`);
-
-    // Keys
-    keysLine.style = { fg: "grey", bg };
-    keysLine.setContent("  {bold}e{/bold} edit  {bold}s{/bold} stage  {bold}p{/bold} pin  {bold}q{/bold} close");
+    status.update({
+      left: `  ${state.updatedAt}`,
+      right: "e edit  s stage  p pin  q close ",
+    });
 
     host.screen.render();
   }
 
-  // Gentle pulse every second
   createTimer(() => {
     pulse = !pulse;
     render();
@@ -245,6 +188,8 @@ function openBeacon(host: MicroappHost, args?: RestoreArgs) {
   win.body.key(["p"], () => activeBeacon?.togglePinned());
   win.body.key(["q"], () => win.close());
 
+  win.setFocusTarget(noteView.element);
+
   win.describeState(() => ({
     summary: `Beacon · ${state.stage} · ${state.pinned ? "pinned" : "floating"}`,
     note: state.note,
@@ -256,17 +201,25 @@ function openBeacon(host: MicroappHost, args?: RestoreArgs) {
   win.captureText(() => [
     `Workspace Beacon`,
     `${STAGE_STYLE[state.stage].label}${state.pinned ? " 📌" : ""}`,
-    `${state.note}`,
-    `${state.updatedAt}`,
+    state.note,
+    state.updatedAt,
   ].join("\n"));
 
   win.onResize(render);
-  win.onRestyle(render);
+  win.onRestyle(() => {
+    header.update({});
+    status.update({});
+    noteView.update({});
+    render();
+  });
   win.onCleanup(() => {
     clearTimers(timers);
+    header.destroy();
+    rule1.destroy();
+    noteView.destroy();
+    status.destroy();
     if (activeBeacon) activeBeacon = undefined;
   });
 
   render();
-  win.focus();
 }
