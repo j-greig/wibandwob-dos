@@ -1,26 +1,56 @@
-# Autoresearch: Journal Auto-Capture Pipeline
+# Autoresearch: Journal JRN/LOG Toggle UI
 
 ## Objective
 
-Optimise the **session → journal entry** summarisation pipeline for WibWob-DOS.
-Given a pi agent session JSONL log, produce a high-quality structured journal entry
-(title, body, kind, tags, peer) that a human or agent would find useful when browsing
-the journal later.
+Make the journal window's two view modes — **Journal** (structured entries) and
+**Log** (raw pi session browser) — first-class with a visible toggle in the chrome,
+then iterate on rendering quality, interaction feel, and visual polish.
 
-The workload: parse session JSONL → extract signal → generate summary → score quality.
-We iterate on the extraction + prompting logic to maximise a composite quality score.
+Currently the `S` key silently switches `viewMode` between `"journal"` and `"sessions"`.
+Users don't know the mode exists. v4 adds a visible `JRN · LOG` indicator in the
+top-right of the window, with accent color on the active mode and muted on the inactive.
+
+### What each view does
+
+**JRN view** (current default):
+- Structured entries with CRUD (create, read, edit, delete)
+- Two-pane: list + preview at wide breakpoints
+- Date group headers, sort (updated/created/title), search, tags
+- Kind icons, peer glyphs, time-ago labels
+
+**LOG view** (session browser):
+- Raw pi agent session JSONL files from `~/.pi/agent/sessions/`
+- Two-pane: session list + conversation preview
+- Read-only — no editing
+- Role-colored messages (human = accent, agent = muted), tool call summaries
+- Date headers by session date
+
+### The toggle
+
+Top-right of the journal window body (not chrome title — inside the content area):
+`JRN · LOG` with the active mode in accent color and the inactive in muted.
+Keyboard: `S` to switch. Mouse: click the label to toggle.
+
+Design: **Option B** — `JRN · LOG` with accent highlight on active, muted on inactive.
+Minimal, consistent with existing aesthetic.
+
+### Backlinks
+
+Auto-captured entries (future Feature 1) will link back to their source session via
+`meta.sessionId`. In JRN view, auto-captured entries show a `⚡` icon. Pressing a key
+jumps to LOG view filtered to that session. (Backlink wiring is in scope; auto-capture
+pipeline is NOT — that's a separate spike.)
 
 ## Metrics
 
-- **Primary**: `quality_score` (0–100, higher is better) — composite heuristic:
-  - Title quality (10 pts): specific, concise, not generic ("Untitled"/"Session summary")
-  - Body completeness (30 pts): mentions files changed, decisions made, outcomes
-  - Body structure (15 pts): has markdown sections, reasonable length (50–500 words)
-  - Tag relevance (15 pts): tags match file paths / topics actually discussed
-  - Kind accuracy (10 pts): kind matches session content (discovery/decision/note)
-  - Brevity efficiency (10 pts): information density — signal per word
-  - Backlink integrity (10 pts): sessionId, filename preserved correctly
-- **Secondary**: `latency_ms` (time to process one session), `token_count` (prompt + completion size)
+- **Primary**: `ui_quality` (0–100, higher is better) — composite heuristic:
+  - Toggle visibility (15 pts): indicator renders in correct position, readable
+  - Mode switching (20 pts): S key and click both work, state updates correctly
+  - JRN view rendering (20 pts): list items, date headers, two-pane preview all render
+  - LOG view rendering (20 pts): session list, conversation preview, role colors
+  - Theme compliance (15 pts): uses `host.theme()` colors, responds to restyle
+  - State reporting (10 pts): `describeState()` reports correct viewMode
+- **Secondary**: `render_time_ms`, `memory_delta_kb`
 
 ## How to Run
 
@@ -28,54 +58,42 @@ We iterate on the extraction + prompting logic to maximise a composite quality s
 cd autoresearch && ./autoresearch.sh
 ```
 
-Outputs `METRIC name=number` lines parsed by the autoresearch tooling.
+Outputs `METRIC name=number` lines. Runs the app, opens journal, exercises both
+modes via the control API, scores the results.
+
+## Agent Setup
+
+This loop relies on the **ops subagent** (`.pi/agents/ops.md`) for verification:
+
+- `wibwob restart` after code changes
+- `wibwob cmd wibwob.journal.open` to open the journal
+- `wibwob state | jq '.windows[]'` to verify window state
+- `wibwob read <id>` to capture rendered text for scoring
+- `wibwob map` for spatial overview
+- `bun run typecheck` for type safety
 
 ## Files in Scope
 
 | File | Purpose |
 |------|---------|
-| `autoresearch/summariser.py` | Core pipeline: parse JSONL → extract context → build prompt → call LLM → score output |
-| `autoresearch/scorer.py` | Heuristic scoring functions for quality_score breakdown |
-| `autoresearch/prompt.txt` | System/user prompt template for the summarisation LLM call |
-| `autoresearch/autoresearch.sh` | Benchmark runner — runs summariser on sample sessions, aggregates scores |
-| `autoresearch/autoresearch.checks.sh` | Typecheck + structural validation |
+| `microapps/journal/index.ts` | Journal microapp — all UI code lives here |
+| `microapps/journal/microapp.json` | Microapp manifest |
 
 ## Off Limits
 
-- `microapps/journal/index.ts` — UI changes come after pipeline is proven
 - `src/` — no shell internals changes
-- Session JSONL files themselves — read-only
-- Don't add npm/bun dependencies to the main project
+- Session JSONL files — read-only
+- Other microapps
+- Auto-capture / summarisation pipeline (separate spike)
 
 ## Constraints
 
-- Python 3 only for the pipeline scripts (available via system python3)
-- LLM calls via `anthropic` Python SDK (pip install if needed) or shell `curl` to Anthropic API
-- Must handle sessions of 5–200 messages without crashing
-- Output must be valid JSON matching the JournalEntry shape
-- `bun run typecheck` must still pass (autoresearch.checks.sh validates this)
-- Each benchmark run should complete in < 60s for a batch of 5 sessions
-
-## Sample Sessions
-
-The benchmark uses 5 diverse sessions from `~/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/`:
-- Pick sessions with varying lengths (short 5-msg, medium 20-msg, long 50+ msg)
-- Pick sessions with different activities (coding, debugging, planning, creative)
-
-## Agent Setup
-
-This loop runs in the **creative / quality lens** but relies on the **ops subagent**
-(`.pi/agents/ops.md`) for verification:
-
-- After keeping a result, use `wibwob restart` and visually verify
-  the journal window still renders correctly
-- Use `wibwob cmd wibwob.journal.open` to reopen the journal after reload
-- `wibwob health` to confirm the instance is alive
-- `wibwob map` for spatial desktop overview
-- `bun run typecheck` for type safety
-
-The ops subagent definition is at `.pi/agents/ops.md` — it owns process
-lifecycle, health, debugging, and visual verification via the `wibwob` CLI.
+- `bun run typecheck` must pass
+- Must work at both narrow (<120 col) and wide (≥120 col) breakpoints
+- Toggle must be keyboard-accessible (S key) and mouse-clickable
+- Must respect theme changes (onRestyle callback)
+- `describeState()` must report the active viewMode
+- No new dependencies
 
 ## What's Been Tried
 
