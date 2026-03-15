@@ -443,7 +443,22 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     let fig = "";
     try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
     const figLines = fig.split("\n").filter((l: string) => l.trim());
-    const tagline = `{${muted}-fg}symbient logbook // ${entries.length} entries{/${muted}-fg}`;
+
+    // Dynamic mood based on entry kinds
+    const questions = entries.filter(e => e.kind === "question").length;
+    const decisions = entries.filter(e => e.kind === "decision").length;
+    const discoveries = entries.filter(e => e.kind === "discovery").length;
+    const moodWord = questions > decisions && questions > discoveries ? "curious"
+      : discoveries > decisions ? "exploring"
+      : decisions > 0 ? "decisive"
+      : entries.length > 20 ? "productive"
+      : entries.length > 0 ? "beginning"
+      : "empty";
+    const humans = entries.filter(e => e.peer === "human").length;
+    const agents = entries.filter(e => e.peer === "agent").length;
+    const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
+
+    const tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
     // Separator
@@ -473,11 +488,10 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const twoPane = w >= 120;
 
     if (twoPane) {
-      const listW = Math.floor(w * 0.40);
+      const listW = Math.floor(w * 0.38);
       listBox.width = listW;
       paneSep.left = listW;
       paneSep.show();
-      // Draw separator
       const sepH = (contentBox as any).height || 20;
       paneSep.setContent(("│\n").repeat(sepH).trim());
       detailBox.left = listW + 1;
@@ -503,8 +517,10 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (items.length === 0) {
       items.push(`  {${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
     }
+    rendering = true;
     listBox.setItems(items as any);
-    listBox.select(selectedIdx);
+    if (items.length > 0) listBox.select(Math.min(selectedIdx, items.length - 1));
+    rendering = false;
 
     // Preview pane (two-pane mode)
     if (twoPane && entries.length > 0) {
@@ -530,8 +546,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
     // Status + command bars
     const searchHint = searchQuery ? `  SEARCH:"${searchQuery}"` : "";
+    const hCount = entries.filter(e => e.peer === "human").length;
+    const aCount = entries.filter(e => e.peer === "agent").length;
+    const kindCounts = entries.reduce((acc, e) => { acc[e.kind] = (acc[e.kind] || 0) + 1; return acc; }, {} as Record<string, number>);
+    const kindStr = Object.entries(kindCounts).map(([k, v]) => `${KIND_ICON[k as EntryKind] || "░"}${v}`).join(" ");
     statusBar.setContent(
-      `{${muted}-fg} [LIST]  ${entries.length} entries${searchHint}{/${muted}-fg}`
+      `{${muted}-fg} [LIST]  ${entries.length} entries  ${kindStr}  ▸${hCount} ▹${aCount}${searchHint}{/${muted}-fg}`
     );
 
     if (deleteConfirm) {
@@ -692,9 +712,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   }
 
   // ── Key bindings: LIST mode ───────────────────────────────────
+  let rendering = false;
   listBox.on("select item", (_item: any, idx: number) => {
+    if (rendering) return; // avoid recursion from setItems
     selectedIdx = idx;
-    render(); // update preview
+    render();
   });
 
   // Mouse click to select list item

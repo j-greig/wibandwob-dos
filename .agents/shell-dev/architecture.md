@@ -149,7 +149,7 @@ Use `kill -9` only as fallback. If terminal is left dirty after a hard kill, run
 `printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m' && reset`
 in the tmux pane.
 
-Full launch/restart reference: `.pi/skills/tmux-launch/SKILL.md`
+Full launch/restart reference: `.agents/skills/ww-ops/SKILL.md`
 
 ## Dual-instance setup
 

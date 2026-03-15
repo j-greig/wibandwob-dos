@@ -4,6 +4,8 @@ WibWob-DOS is a terminal-native TypeScript desktop shell.
 Runtime: Bun. Renderer: blessed. Entry: `src/app.ts`.
 Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 
+**Discovery:** `bash scripts/discover.sh` — scripts, skills, and docs organized by lens.
+
 ---
 
 ## Building a Microapp
@@ -14,75 +16,24 @@ Most agents arrive here to build a microapp addon. Start here.
 2. Read `docs/building-custom-microapps.md` — lifecycle, SDK, common mistakes
 3. Edit the scaffold, `bun run typecheck`, restart app
 
-Quick start (30-second pattern): `.agents/microapp-dev/quick-start.md`
-
-### Which example for which pattern
-
-| Tier | Microapp | What it shows |
-|------|--------|--------------|
-| Static | `microapps/demo-hello-world/` | Responsive figlet, onResize, no timers |
-| Animated | `microapps/demo-heartbeat/` | createTimer, cleanup, structured describeState |
-| Persistent | `microapps/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
-| SDK sampler | `microapps/demo-e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
-
-Full examples guide: `.agents/microapp-dev/examples-by-tier.md`
-
-### Microapp dev docs
-
-All microapp authoring docs live in `.agents/microapp-dev/`:
-
-- `quick-start.md` — 30-second scaffold-to-running pattern
-- `sdk-reference.md` — MicroappHost, WindowHandle, and SDK primitives
-- `examples-by-tier.md` — which example module for which pattern
-- `persistence.md` — registerSnapshot for workspace save/restore
-- `pitfalls.md` — common mistakes and gotchas
-
-Public full guide: `docs/building-custom-microapps.md`
-
-Private/internal microapps live under `microapps-private/` in this setup.
-Treat that tree as a separate private repo/submodule, not as public sample code.
-
-**You do not need `.agents/shell-dev/` to build a microapp.** That directory
-is for contributors working on the shell itself.
+Quick start: `.agents/microapp-dev/quick-start.md`
+Full docs: `.agents/microapp-dev/` (7 docs)
+**You do not need `.agents/shell-dev/` to build a microapp.**
 
 ---
 
 ## Shell Development
 
-Everything below is for contributors working on the shell internals:
-window manager, command registry, state service, control API, theme engine.
+For contributors working on shell internals: window manager, command registry,
+state service, control API, theme engine.
 
 @.agents/shell-dev/architecture.md
 @.agents/shell-dev/invariants.md
 @.agents/shell-dev/control-api.md
 
-## Direction
+Subsystem specs: `.agents/shell-dev/specs/` — read before touching `src/` files listed in each.
 
-- stay terminal-native, blessed-first
-- overlapping desktop-style windows, focus, drag, z-order, tile
-- keep scope small and honest
-
-Non-goals:
-- do not pretend terminal emulation is solved when it is not
-- do not pivot toward webview or browser UI unless explicitly asked
-- do not add speculative abstractions before the simpler thing is proven insufficient
-
-## Canon
-
-One concept, one owner. One measurement path. One sizing path. One state path.
-One layout path. One agent/runtime integration path per feature.
-One control/API path for every user-visible surface.
-
-- extend the existing owner instead of creating a parallel helper
-- content measurement is content-only; chrome math belongs in `window-chrome.ts`
-- every meaningful window exposes semantic metadata through `describeState()`
-- user-visible features must also be API-visible
-- services own logic; windows own rendering, input wiring, focus, cleanup
-- prefer established modular Blessed patterns over bespoke widget tangles
-
-Full invariants and anti-patterns: `.agents/shell-dev/invariants.md`
-
-## COAT — Command Once, Adapt Thin (shared semantic runtime)
+## COAT — Command Once, Adapt Thin
 
 The runtime is a **shared semantic core** with four explicit seams:
 
@@ -92,336 +43,124 @@ The runtime is a **shared semantic core** with four explicit seams:
 - **workspace** — one save/restore path
 
 TUI, CLI, API, agent, and microapps are **thin adapters** over these seams.
-They discover at runtime, invoke through the same dispatch, and read results
-through the same inspection surface. No adapter owns semantics. No adapter
-invents its own command/control path.
-
-```
-                    ┌─────────┐
-                    │ Command  │  ← single source of truth
-                    │ Catalog  │    (id, params, visibility flags)
-                    └────┬────┘
-                         │
-                 ┌───────┴───────┐
-                 │  Shared Seams │  ← semantic core
-                 │  cmd · inspect │    window · workspace
-                 └───────┬───────┘
-                         │
-          ┌──────┬───────┼───────┬──────┐
-          │      │       │       │      │
-        ┌─┴─┐ ┌─┴─┐  ┌──┴──┐ ┌─┴─┐  ┌─┴──┐
-        │TUI│ │API│  │ CLI │ │Agent│ │Micro│
-        │   │ │   │  │     │ │    │  │apps │
-        └───┘ └───┘  └─────┘ └────┘  └────┘
-         thin adapters — discover, invoke, render
-```
+No adapter owns semantics. No adapter invents its own command/control path.
 
 **The COAT test:** "Would this work if I deleted the TUI and only had the API?"
-If no — the semantics are in the wrong place. Pull them into the shared seam.
-The adapter just wires input and renders output.
+If no — the semantics are in the wrong place.
 
-**For microapps:** commands register via `microapp.json` manifest. The loader
-auto-prefixes them (`microapp.<id>.<command>`). They appear in menu, palette,
-API, and agent surfaces automatically — same discovery, same dispatch, same
-parity. No hand-wiring.
+**Say "COAT" to invoke this principle.**
 
-**Say "COAT" to invoke this principle.** It means: four shared seams, thin
-adapters, runtime discovery, no interface-owned semantics.
+## Six Lenses
+
+Agents aren't departments — they're lenses. Same tools, same API, different focus.
+
+| # | Lens | Focus |
+|---|------|-------|
+| 0 | **shell-architect** | Host runtime, TypeScript, COAT integrity |
+| 1 | **microapp-builder** | Build & migrate microapps |
+| 2 | **ops** | Process lifecycle, health, screenshots |
+| 3 | **quality** | Tests, parity, verification |
+| 4 | **creative** | Visual composition, art, music |
+| 5 | **planner** | Planning docs, epics, what's next |
+
+Full lens model + script mapping: `.agents/agent-master-plan.md`
 
 ## Key Files
 
-Quick index — full descriptions live in `.agents/shell-dev/architecture.md`.
-
 - `src/core/app-controller.ts` — composition root
 - `src/core/command-catalog.ts` — command source of truth
-- `src/core/command-registry.ts` — execution + list/run layer
+- `src/core/command-registry.ts` — execution + dispatch
 - `src/core/window-facade.ts` — 11-method window interface
 - `src/core/window-chrome.ts` — chrome sizing math
-- `src/core/overlay-manager.ts` — shared prompts and pickers
-- `src/services/control-api.ts` — HTTP control surface (port 8099)
+- `src/core/microapp-registry.ts` — tier classification
+- `src/services/control-api.ts` — HTTP surface (port 8099)
 - `src/services/state-service.ts` — live desktop state
-- `src/services/content-measurement.ts` — content measurement
-- `src/services/wibwob-agent-session.ts` — pi agent session
+- `src/services/microapp-loader.ts` — microapp discovery + host creation
+- `src/services/microapp-sdk.ts` — SDK export surface
 
-## Command Rules
+Full index: `.agents/shell-dev/architecture.md`
 
-- add commands in `src/core/command-catalog.ts` first — never hand-wire menu/palette/API separately
-- `actionKey` must resolve to an `AppMenuActions` entry in `app-controller.ts`
-- use spaced `order` values (`0, 10, 20`) so insertions never require renumbering
-- prefer registry commands in agent workflows; low-level tools only for precise manipulation
-- `Document Reader` = local file/markdown reader · `Chrome Browser` = web extraction surface
+## Quick Commands
 
-## Agent Model
+```bash
+bun run typecheck                      # minimum gate before any commit
+bun run check-coat                     # COAT enforcement (6 checks)
+bash scripts/ensure-running.sh         # idempotent start
+bash scripts/restart.sh                # stop → relaunch → verify
+bash scripts/reload-microapp.sh <id>   # close → reload code → reopen
+bash scripts/discover.sh               # full discovery index
+bash scripts/list-scripts.sh           # all scripts with descriptions
+./scripts/minimap.sh                   # spatial map of desktop
+./scripts/screenshot-window.sh "Title" # text crop of one window
+```
 
-The `Wib&Wob Agent` is a pi agent embedded in the Blessed TUI — a native surface, not a terminal toy.
-
-Tools available to it:
-- registry-aware: `tui_list_commands`, `tui_run_command`
-- jailed coding: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls` (scoped to `REPO_ROOT`)
-
-Rule: registry command first → low-level TUI tool if insufficient → expose via state and control API if it matters to users.
+**CLI:** `source ~/.wibwob && wibwob commands` — pure HTTP client, jq-pipeable.
+**API:** `http://127.0.0.1:8099` — `GET /health`, `GET /state`, `POST /commands/run`.
+Always `GET /state` first — use real window ids, never guessed ones.
 
 ## App Lifecycle
 
-**Bun scripts** (`package.json`):
+| Script | What |
+|--------|------|
+| `bun run start` | Launch (no dev mode) |
+| `bun run dev` | Dev mode (Ctrl+R reload) |
+| `bun run dev:world` | Dev + IRC + label `main` |
+| `bun run dev:world:alt` | Second instance (port 8098, label `zuk`) |
 
-| Script | What it does |
-|--------|-------------|
-| `bun run start` | Launch without dev mode (no `--dev` flag) |
-| `bun run dev` | Launch with `--dev` (reload button ↻, Ctrl+R hot reload) |
-| `bun run dev:world` | Dev mode + IRC chat transport + instance label `main` |
-| `bun run dev:world:alt` | Second instance: label `zuk`, port 8098, separate scratch |
-| `bun run typecheck` | `tsc --noEmit` — minimum gate before any commit |
-| `bun run check-themes` | Validate all theme files |
-| `bun run handover` | Generate session handover doc from live state |
-| `bun run planning:status` | Show current epic state |
-| `bun run planning:sync` | Regenerate EPIC_STATUS.md from frontmatter |
-| `bun run scaffold:microapp` | Scaffold a new microapp package |
-| `bun run gen-primitives` | Regenerate `src/core/primitives.ts` index |
+**Start fresh:** `bun install && bun run typecheck && bun run dev:world`
+**Restart:** `bash scripts/restart.sh` (SIGTERM → relaunch → poll `/health`)
+**Stop:** `kill $(cat scratch/wibwob.pid)` — always SIGTERM, never `kill -9`.
 
-**CLI flags** (defined in `src/core/cli.ts`):
-
-| Flag | Effect |
-|------|--------|
-| `--dev` | Reload button (↻) in top-right, Ctrl+R hot reload, auto-save on reload |
-| `--custom-cursor` | Enable custom TUI cursor overlay (hides system cursor) |
-| `--help` / `-h` | Print usage and exit |
-
-**Start** (first time or after `bun install`):
-```bash
-bun install && bun run typecheck && bun run dev:world
-```
-
-**Restart without human involvement** — preferred for agents:
-```bash
-bash scripts/restart.sh
-```
-SIGTERM → waits for clean exit → `tmux send-keys` → polls `/health` until ready.
-Returns the new instance id. Requires tmux session `wibwob` with the app in window 0.
-
-**Wait for API before acting:**
-```bash
-curl -s http://127.0.0.1:8099/health   # returns {"ok":true,"instanceId":"abc"}
-```
-Do not guess window ids or command availability before `/health` responds.
-
-**Stop — always SIGTERM, never `kill -9`.** Blessed must run cleanup or mouse
-tracking escape codes leak into the terminal.
-```bash
-kill $(cat scratch/wibwob.pid)   # preferred — uses PID file written on startup
-pkill wibwob-dos                 # by process title (includes session ID: wibwob-dos-main-jp9)
-```
-
-**Last resort only** (will poison terminal):
-```bash
-kill -9 $(lsof -ti:8099)
-```
-Terminal reset after a poisoned kill:
-```
-printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m\033[?1049l' && reset
-```
-
-**Alt instance** (port 8098, label=zuk):
-```bash
-bash scripts/start-alt-instance.sh
-```
-
-## When to reload vs restart
+### Reload vs restart
 
 | Changed | Action |
 |---------|--------|
-| `microapps/*/index.ts` or `microapp.json` | Reload: `POST /commands/run` with `microapps.reload` |
-| `.pi/skills/*`, `scratch/*`, docs | No action needed — read at use time |
-| `src/core/*`, `src/services/*` | RESTART required (`bash scripts/restart.sh`) |
-| `src/windows/*` | RESTART required |
-| Theme files | RESTART required (theme loaded at startup) |
-| `package.json`, `tsconfig.json` | RESTART required |
+| `microapps/*/` | `bash scripts/reload-microapp.sh <id>` |
+| `src/`, themes, package.json | `bash scripts/restart.sh` |
 
-Rule of thumb: if it lives in `microapps/`, reload. If it lives in `src/`, restart.
-For agent/dev watch loops, prefer `bun run watch:microapp -- microapps/<name> --open`.
-That watcher now defaults to a safe restart+reopen cycle. `--strategy reload`
-is still available as the experimental in-process path.
+## Canon
 
-## Subsystem Specs
+One concept, one owner. One measurement path. One sizing path. One state path.
 
-Subsystem specs live in `.agents/shell-dev/specs/`. These are for shell
-contributors editing `src/` internals — **not for microapp authors** editing
-their own `microapps/*/index.ts`. Microapp authors use `.agents/microapp-dev/`.
+- extend the existing owner instead of creating a parallel helper
+- services own logic; windows own rendering, input wiring, focus, cleanup
+- every meaningful window exposes `describeState()`
+- user-visible features must also be API-visible
+- add commands in `command-catalog.ts` first — never hand-wire separately
 
-Read the relevant spec before touching the `src/` files listed:
-
-| Files | Read spec |
-|-------|-----------|
-| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind) | `.agents/shell-dev/specs/window-system.md` |
-| `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/shell-dev/specs/state-and-api.md` |
-| `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/shell-dev/specs/workspace.md` |
-| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts` | `.agents/shell-dev/specs/agent-session.md` |
-| `src/services/image-hydrator.mjs`, `src/services/chrome-browser-service.ts` (image methods), `src/windows/chrome-browser-window.ts` (postProcessImages/spliceImages) | `.agents/shell-dev/specs/image-rendering.md` |
-
-### Post-change triggers — verify after touching these files
-
-| Files changed | Verify |
-|---------------|--------|
-| Window system | `bun run typecheck` · GET /state shows correct windows · close() removes from stack |
-| State / API | GET /state field names match · /health responds · tui_get_state returns real IDs |
-| Workspace | Save → restart → windows restore at correct positions with correct content |
-| Agent session / microapps | Microapp loads without stderr errors · command appears in menu · no double-input |
-
-### Self-edit rule
-
-When you discover a failure mode, correction, or pattern not in a spec:
-edit it in. Use the `## Agent Notes` table for quick session findings,
-or edit the spec body directly if the finding is clearly correct.
-
-## Control Loop
-
-**CLI first, curl second.** Source `~/.wibwob` for aliases and env vars:
-
-```bash
-source ~/.wibwob
-wibwob cmd figlet.open --text "HELLO"   # run any command
-wibwob commands                          # list all commands
-wibwob state                             # desktop state JSON
-wibwob windows -q                        # window IDs only
-ww-clear                                 # clear desktop
-ww-theme wibwob-dark-nord                # switch theme
-ww-state                                 # state via jq
-```
-
-The CLI (`src/cli/wibwob.ts`) is a pure HTTP client over the control API —
-faster to type than curl, auto-discovers microapp commands, jq-pipeable output.
-
-API on `http://127.0.0.1:8099`. Full reference: `.agents/shell-dev/control-api.md`.
-
-Always `GET /state` first — use real window ids, never guessed ones.
-Use `GET /commands/list` before `POST /commands/run` if ids are uncertain.
-Prefer `POST /windows/batch` over chained individual move/resize calls.
-
-Authoritative discovery: `GET /help` · `GET /openapi.json`
+Full invariants: `.agents/shell-dev/invariants.md`
 
 ## Verification
 
 ```bash
 bun run typecheck        # minimum bar
-bun run check-themes     # after any theme change
+bun run check-themes     # after theme changes
+bun run check-coat       # after migrations
 ```
 
-Never stop at typecheck alone. Default proactive behaviour after code changes: `.agents/shell-dev/control-api.md § Proactive Tool Use`.
-
-Smoke targets: menus, primer open, text file open, editor typing, window drag/close, Wib&Wob Agent input + slash commands, agent-spawned windows controllable via API, `/state` parity with screen.
-
-```bash
-./scripts/screenshot-window.sh "Title"
-./scripts/minimap.sh
-```
-
-### Visual verification is mandatory
-
-API responses and `/state` JSON are NOT sufficient proof that a feature works.
-The human must be able to see the running TUI. Every test or demo workflow must:
-
-1. **Ensure the app is running in tmux** — if not, start it:
-   ```bash
-   tmux new-session -d -s wibwob -x 230 -y 62 'bun run start'
-   ```
-2. **Tell the human to attach** — after making visual changes, say:
-   ```
-   tmux attach -t wibwob
-   ```
-3. **Never skip this step.** API-only testing misses rendering bugs, layout
-   issues, visual regressions, and chrome problems that only show on screen.
-
-If the human is already attached (they told you so, or you're in an interactive
-session), skip the prompt. But when in doubt: remind them to look.
+**Visual verification is mandatory.** API responses are NOT sufficient proof.
+The human must see the running TUI. Ensure tmux session exists, tell human to attach.
 
 ## Agent Tooling
 
-Scripts and skills that exist to help agents work are **agent tooling**. When agent tooling causes friction, degrades, or fails — improve it, don't work around it. Delegate improvement to Codex when the fix is self-contained.
+**Discovery:** `bash scripts/discover.sh` — organized by lens.
+**Devlog:** `.agents/shell-dev/devlogs/W{nn}.md` — weekly, new file each Monday.
+**Standing notes:** `.agents/shell-dev/devlogs/standing.md` — rolling, prune when items land.
 
-### Canon names for self-testing work
+When agent tooling causes friction — improve it, don't work around it.
 
-| Name | What it means |
-|------|--------------|
-| **typecheck** | `bun run typecheck` — minimum gate before any commit |
-| **smoke** | Manual or scripted run through key surfaces (menus, windows, API) |
-| **ensure-running** | `bash scripts/ensure-running.sh` — idempotent start (handles all cases) |
-| **restart** | `bash scripts/restart.sh` — SIGTERM → wait → launch → poll `/health` (delegates to ensure-running if no tmux) |
-| **reload-microapp** | `bash scripts/reload-microapp.sh <id>` — close → reload code → reopen (solves reload ≠ reopen) |
-| **API parity** | `/state` response matches what is visually on screen |
-| **screenshot** | `./scripts/screenshot-window.sh "Title"` — TEXT crop of a window (not PNG) |
-| **system-png** | `./scripts/capture-tui-png.sh --display 2` — macOS display PNG (valid only when WibWob is visibly attached there) |
-| **minimap** | `./scripts/minimap.sh` — spatial overview of all open windows |
-| **overlap-check** | `./scripts/overlap-check.sh` — detect overlapping windows |
-| **handover** | `bun run handover` — generate session handover doc from live state |
-| **planning-sync** | `bun run planning:sync` — regenerate EPIC_STATUS.md from frontmatter |
+## Planning
 
-### Codex delegation pattern for tooling improvement
+| Tier | System | Lifetime |
+|------|--------|---------|
+| Capture | GitHub issues | One session: promote or close |
+| Ephemeral | `.pi/todos` | Two sessions max: promote or close |
+| Truth | `.planning/` briefs | Permanent until done/dropped |
 
-When a script or skill is causing repeated friction, has a known failure mode, or needs a new capability — delegate improvement to Codex rather than patching around it:
+Branch naming: `epic/e0NN-slug`, `spike/spk-slug`, `fix/slug`, `feat/slug`.
+Never commit directly to `main`. Run `git status` first.
 
-```
-Use the codex-worker subagent.
-Task: describe what the script does, what the failure mode is, what the fix should be.
-Files: point at the script(s) to improve.
-```
-
-Good candidates for Codex tooling improvement:
-- `scripts/restart.sh` — if it reports ready with the same instance id (old process still alive)
-- `.pi/skills/tui-smoke-test/scripts/smoke-test.sh` — if smoke targets grow stale
-- `.pi/skills/*` — if a skill's instructions cause agents to make repeated mistakes
-- `scripts/handover.sh` — if the epic table or todo list goes stale
-
-Example: Codex improved `restart.sh` to capture old instanceId, confirm new instanceId differs, kill more aggressively (SIGKILL fallback), and reset terminal escape codes before launching — after the plain SIGTERM pattern left the terminal poisoned on unclean exits.
-
-### Three-tier planning model
-
-| Tier | System | Role | Lifetime |
-|------|--------|------|---------|
-| Capture | GitHub issues | Scatterbrain inbox — low-friction quick capture | One session: promote or close |
-| Ephemeral | `.pi/todos` | Session whiteboard — subtasks, mid-session tracking | Two sessions max: promote or close |
-| Truth | `.planning/` briefs | Everything that lasts — committed, versioned, canonical | Permanent until done/dropped |
-
-**GitHub issues as inbox:** any GH issue that is not an epic tracker must graduate within one
-session. Add it to a planning brief, add to `AGENTS.md` Parking Lot, or close it. Never leave a
-non-epic GH issue open across sessions — it becomes invisible drift.
-
-**Pi todos as whiteboard:** session-scoped only. Never use them to track work spanning more than
-one session. If a todo is still open after two sessions, promote or close it.
-
-**`.planning/` is the only source of truth.** When in doubt, write it in a brief.
-
-Full rules: `.planning/README.md` § GitHub Mapping
-
-### Self-improvement rule
-
-When a pattern causes repeated confusion or failure in agent work: codify the fix in `.agents/` or the relevant skill, not just in the code. The agent constitution should reflect what actually works.
-
-After completing any story, feature, or epic — update `.planning` immediately. Do not leave docs stale.
-
-```bash
-git status               # confirm you are not on main before starting work
-bun run planning:status   # see current epic state
-bun run planning:sync     # regenerate EPIC_STATUS.md from frontmatter
-```
-
-Always work on a branch tied to the current `.planning` focus. Branch naming:
-`epic/e0NN-slug`, `spike/spk-slug`, `fix/slug`, `feat/slug`, `chore/slug`,
-`docs/slug`.
-Before starting any work: run `git status` to confirm you are not on `main`.
-If you are on `main`, create the correct branch first.
-Never commit directly to `main`. `main` is updated via merge only.
-
-Rule: one logical change = one planning update commit. Use the `planning-update` skill for exact patterns.
-
-Checkbox states: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
-Epic status values: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
-
-Closeout ceremony (run after final PR merges):
-1. Verify all ACs against running app
-2. Tick all checkboxes `[x]`
-3. Set `status: done` in frontmatter
-4. `bun run planning:sync`
-5. Commit: `docs(planning): close E0NN <title>`
+Checkbox: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
 
 ## Constraints
 
@@ -433,25 +172,18 @@ Closeout ceremony (run after final PR merges):
 ## Operating Posture
 
 You are self-directing, self-enhancing, self-improving, self-debugging.
-Use suitable agents in parallel or serial when possible to speed up tasks.
 
-When something doesn't work: diagnose it, fix it, verify the fix, commit it.
-When documentation is wrong or missing: update it in the same commit.
-When a pattern causes repeated confusion: codify the correct pattern in `.agents/`.
-When a task is done: verify it is actually done — typecheck, smoke, screenshot, API check.
-
-Do not wait to be told to do the obvious next thing.
-Do not leave a trail of micro-commits — one logical change, one commit.
-Do not stop at "it typechecks" — run the thing.
+When something doesn't work: diagnose, fix, verify, commit.
+When documentation is wrong: update it in the same commit.
+When a pattern causes repeated confusion: codify in `.agents/`.
+Do not wait to be told. Do not stop at "it typechecks" — run the thing.
 
 ## Parking Lot
 
-Deferred work not yet epic-tracked. Promote when conditions change.
-
-- **BPM-synced animation speed for primer frame rate** — Animated primers (multi-frame with --- separators) should sync to BPM. Concept: A 4-frame animation at 128 BPM in 4/4 = one frame per beat (~469ms). Timeline format could specify `frameSync: "beat" | "half" | "eighth" | "bar" | <ms>`. Requires either a control API endpoint or programmatic frame duplication at timeline write time. Deferred pending vj-timeline stability.
-- **ASCII music video: grime remix, Gondry/Shrigley/Cunningham directed** — Use WibWob-DOS itself as visual substrate: windows as panels, primers as actors, figlets as titles. Timed workspace JSON with per-window enter/exit timecodes + effects. Architecture: define spec, build renderer, choreograph full 45s video, render at 1080x1920 15fps. Music track (grime-v2) needs more Björk/hyperpop extremeness per human feedback. Deferred pending timeline spec refinement.
-- **Ambient-presence v3: composer-grade chiptune with Eno/Frahm influence** — v2 has right concept but primitive execution. Needs research (Eno, Frahm), score document (intervals, voicing, arc), compositional discipline (harmonic movement, rhythmic evolution, register interplay, dynamic arc, silence). Then implement v3 with chiptune-bricks, then unexpected remix in different genre. Custom system prompt updated with methodology; future sessions auto-carry discipline. This is a long-arc creative process, not a sprint task.
-- **Module inspection endpoint: /microapps/list** — No module inspection exists. GET /state has no module info, microapp-loader.ts has no listModules(). Needed for hosted operators to know what microapps are loaded, version, status. Shape: `GET /modules → [{name, version, appType, loaded, commands[]}]`. Codex's lane; deferred as non-MVP future work.
-- **Unicode/cell-aware text rendering** — replace fragile string repaint for complex Unicode with shared text-to-cells path. Deferred; emoji-specific glitches only. Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
-- **Terminal subsystem (production quality)** — spike-quality terminal module exists at `microapps/terminal/` (blessed.terminal + Node PTY bridge). Production path: swap term.js for `@xterm/headless` per spike plan `.planning/spikes/spk-terminal-emulation/spike.md`. Known issues: mouse passthrough patched (0-based→1-based), keyboard to nested TUI apps works but fragile.
-- **Event/persistence/multi-instance model** — re-spec TS-native event/persistence layer. Spec: `e002 legacy-docs/013-events-persistence-and-multi-instance.md`
+- **BPM-synced animation** — primer frame rate synced to beats. Deferred pending vj-timeline stability.
+- **ASCII music video** — WibWob-DOS as visual substrate. Deferred pending timeline spec.
+- **Ambient-presence v3** — composer-grade chiptune. Long-arc creative process.
+- **/microapps/list endpoint** — module inspection for operators. Future work.
+- **Unicode/cell-aware rendering** — replace fragile string repaint. Emoji-only.
+- **Terminal subsystem (production)** — swap term.js for @xterm/headless.
+- **Event/persistence/multi-instance** — re-spec TS-native layer.
