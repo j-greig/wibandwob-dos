@@ -164,8 +164,14 @@ The human must see the running TUI. Ensure tmux session exists, tell human to at
 ## Agent Tooling
 
 **Discovery:** `bash scripts/discover.sh` — organized by lens.
-**Devlog:** `.agents/shell-dev/devlogs/W{nn}.md` — weekly, new file each Monday.
-**Standing notes:** `.agents/shell-dev/devlogs/standing.md` — rolling, prune when items land.
+**Devlog:** `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/W{nn}.md` — weekly, new file each Monday.
+**Standing notes:** `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/standing.md` — rolling, prune when items land.
+
+**You are encouraged to write to the devlog during any session.** Don't wait to be asked.
+Good devlog entries: process friction you noticed, skills or scripts that could be better,
+patterns that caused confusion, things that worked surprisingly well, ideas for improving
+the dev loop. This is meta — observations about how we work, not just what we shipped.
+Find or create `W{nn}.md` for the current week (ISO week number, Monday start).
 
 When agent tooling causes friction — improve it, don't work around it.
 

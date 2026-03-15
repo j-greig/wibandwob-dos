@@ -1,5 +1,5 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import blessed from "blessed";
+import { createSimpleStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
 
 /**
  * Notepad — the simplest possible text editor.
@@ -49,56 +49,26 @@ export default function setup(host: MicroappHost) {
       height: 20,
     });
 
-    // ── Content viewer (scrollable, no wrap for piped content) ──
-    const viewer = blessed.box({
-      parent: win.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      keys: true,
-      mouse: true,
-      vi: true,
-      scrollable: true,
-      alwaysScroll: true,
-      wrap: false,
-      scrollbar: {
-        ch: "▐",
-        track: { bg: "default" },
-        style: { bg: "default", fg: "grey" },
-      },
-      style: {
-        fg: "white",
-        bg: "default",
-      },
+    // ── SDK composition helpers ──
+    const viewer = createTextViewer(win.body, {
       content: initialText,
+      wrap: false,
+      bottomOffset: 1,
     });
 
-    // ── Status bar at bottom ──
-    const statusBar = blessed.box({
-      parent: win.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      style: {
-        fg: "black",
-        bg: "white",
-      },
-      content: "",
-    });
+    const statusBar = createSimpleStatusBar(win.body);
 
     let buffer = initialText;
 
     function updateStatus() {
       const lines = buffer.split("\n").length;
       const chars = buffer.length;
-      statusBar.setContent(
-        ` ${title}  │  ${lines} lines  ${chars} chars`,
-      );
+      statusBar.update({
+        left: ` ${title}  │  ${lines} lines  ${chars} chars`,
+      });
     }
 
-    win.setFocusTarget(viewer);
+    win.setFocusTarget(viewer.element);
     win.captureText(() => buffer);
 
     win.describeState(() => ({
@@ -110,18 +80,21 @@ export default function setup(host: MicroappHost) {
     }));
 
     win.onRestyle(() => {
-      // leave styles as explicit fg/bg — safe for blessed
+      viewer.update({ content: buffer });
+      statusBar.update({});
     });
 
     writeHandlers.set(win.id, (newText: string) => {
       buffer = newText;
-      viewer.setContent(newText);
+      viewer.update({ content: newText });
       updateStatus();
       host.screen.render();
     });
 
     win.onCleanup(() => {
       writeHandlers.delete(win.id);
+      viewer.destroy();
+      statusBar.destroy();
     });
 
     updateStatus();

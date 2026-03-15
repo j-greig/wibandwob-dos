@@ -349,3 +349,29 @@ export { highlightCode, HIGHLIGHTED_LANGUAGES } from "./syntax-highlight.js";
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type { ThemeVariant } from "../core/theme/types.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SDK COMPOSITION HELPERS — themed UI primitives for microapp authors
+// ═══════════════════════════════════════════════════════════════════════════
+
+export {
+  createSimpleStatusBar,
+  createTextViewer,
+  createListPanel,
+  createSplitView,
+  createSimpleButtonBar,
+} from "../sdk/composition-helpers.js";
+
+export type {
+  StatusBarOptions,
+  StatusBarHandle,
+  TextViewerOptions,
+  TextViewerHandle,
+  ListPanelOptions,
+  ListPanelHandle,
+  SplitViewOptions,
+  SplitViewHandle,
+  ButtonBarButton,
+  ButtonBarOptions,
+  ButtonBarHandle,
+} from "../sdk/composition-helpers.js";
