@@ -1,7 +1,7 @@
 # F7: Self-Maintaining CLI Help
 
 **Epic:** E039 Instance Lifecycle
-**Status:** not-started
+**Status:** done
 **Depends on:** —
 **Origin:** ops review found `completions` already missing from help text
 
@@ -78,12 +78,12 @@ stay as static help text — they're dispatch patterns, not registered commands.
 
 ## Stories
 
-- [ ] S1: Define `CliCommand` interface and `CLI_COMMANDS` array
-- [ ] S2: Replace `switch` dispatch with `CMD_MAP.get()` lookup
-- [ ] S3: Replace hardcoded `usage()` with loop over `CLI_COMMANDS`
-- [ ] S4: Keep dot-syntax / noun-verb / window targeting in default block
-- [ ] S5: Add `completions` to the table (fixes existing drift)
-- [ ] S6: Verify: `wibwob help` output matches all switch cases
+- [x] S1: Define `CliCommand` interface and `CLI_COMMANDS` array
+- [x] S2: Replace `switch` dispatch with `CLI_CMD_MAP.get()` lookup
+- [x] S3: Replace hardcoded `usage()` with loop over `CLI_COMMANDS`
+- [x] S4: Keep dot-syntax / noun-verb / window targeting in fallthrough block
+- [x] S5: Add `completions` to the table (fixes existing drift)
+- [x] S6: Verify: `wibwob help` output matches all switch cases — 100/100 stable
 
 ## Why This Wins
 
