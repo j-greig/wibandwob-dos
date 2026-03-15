@@ -131,8 +131,7 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "window", label: "Window", key: "w", left: 22 },
   { category: "core", label: "Core Apps", key: "c", left: 31 },
   { category: "applications", label: "Applications", key: "a", left: 42 },
-  { category: "demos", label: "Demos", key: "d", left: 57 },
-  { category: "help", label: "Help", key: "h", left: 65 }
+  { category: "help", label: "Help", key: "h", left: 57 }
 ];
 
 /**
@@ -1122,6 +1121,7 @@ export function listAppCommands(): AppCommandDescriptor<keyof AppMenuActions>[] 
 /** Build runtime MenuConfig[] by projecting catalog commands into their menu placements. */
 export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   return MENU_DEFINITIONS.map((menu) => ({
+    category: menu.category,
     label: menu.label,
     key: menu.key,
     left: menu.left,

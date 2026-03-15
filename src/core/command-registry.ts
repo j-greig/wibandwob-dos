@@ -183,7 +183,7 @@ export class CommandRegistry {
     // Append dynamic commands to matching menu categories
     for (const dyn of this.dynamicCommands) {
       for (const placement of dyn.menuPlacements ?? []) {
-        const menu = menus.find((m) => m.label.toLowerCase() === placement.category);
+        const menu = menus.find((m) => m.category === placement.category);
         if (menu) {
           menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action() });
         }

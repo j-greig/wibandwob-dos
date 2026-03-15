@@ -349,6 +349,7 @@ export interface MenuItem {
 }
 
 export interface MenuConfig {
+  category: string;
   label: string;
   key: string;
   left: number;
