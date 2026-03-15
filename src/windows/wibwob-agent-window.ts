@@ -511,6 +511,17 @@ export function openWibWobAgentWindow(params: {
     };
   };
 
+  frame.captureText = () => {
+    const snapshot = params.agent.getSnapshot();
+    return snapshot.messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => {
+        const prefix = m.role === "user" ? "Human" : "Assistant";
+        return `${prefix}: ${m.text}`;
+      })
+      .join("\n\n");
+  };
+
   frame.cleanup = () => {
     unsubscribe();
     unsubscribePlayer();
