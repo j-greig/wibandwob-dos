@@ -23,7 +23,7 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/lib/runtime-env.sh"
 API="$(ww_api_base)"
 CLI="bun run $ROOT/src/cli/wibwob.ts"
