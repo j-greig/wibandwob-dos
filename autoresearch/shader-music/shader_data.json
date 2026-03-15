@@ -4,7 +4,7 @@
   "steps": 72,
   "genre": "cathedral",
   "shader": "cathedral.glsl",
-  "gpu_render_time": 0.3048,
+  "gpu_render_time": 0.0,
   "track_brightness": {
     "organ": [
       0.5606,

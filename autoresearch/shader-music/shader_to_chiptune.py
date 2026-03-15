@@ -706,15 +706,34 @@ def run_shader_to_music():
 
     for i, tc in enumerate(track_canvases):
         ent = int(entrance_times[i] * sr)
-        fade_len = int(1.5 * sr)
+        fade_len = int(2.0 * sr)
         if ent > 0:
             tc[:ent] *= 0.0
         end = min(ent + fade_len, n_samples)
         if end - ent > 0:
             tc[ent:end] *= np.linspace(0, 1, end - ent)
         t_arr = np.linspace(0, duration, n_samples)
-        swell = 0.4 + 0.6 * np.sin(2 * np.pi * t_arr / swell_periods[i])
-        tc *= np.clip(swell, 0.0, 1.0)
+        swell = 0.5 + 0.5 * np.sin(2 * np.pi * t_arr / swell_periods[i])
+        tc *= swell
+        
+        # Mid-piece breakdown: tracks 0 and 3 (organ + choir) dip for ~4 bars
+        # Creates a sparse section that contrasts with the full texture
+        mid = duration * 0.45  # breakdown at ~45% through
+        break_dur = 4 * (60.0 / genre_cfg["bpm"]) * 4  # 4 bars
+        if i in (0, 3):  # organ and choir drop
+            break_start = int(mid * sr)
+            break_end = int((mid + break_dur) * sr)
+            break_end = min(break_end, n_samples)
+            fade = int(1.5 * sr)
+            # Fade out into breakdown
+            fo_start = max(0, break_start - fade)
+            if break_start - fo_start > 0:
+                tc[fo_start:break_start] *= np.linspace(1, 0, break_start - fo_start)
+            tc[break_start:break_end] *= 0.05  # nearly silent, not dead
+            # Fade back in
+            fi_end = min(break_end + fade, n_samples)
+            if fi_end - break_end > 0:
+                tc[break_end:fi_end] *= np.linspace(0.05, 1, fi_end - break_end)
 
     # Mix
     print("[shader-music] Mixing...")
