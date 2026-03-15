@@ -333,6 +333,59 @@ async function cmdWrite(windowId?: string) {
   process.exit(1);
 }
 
+async function cmdStart(args: string[]) {
+  const { spawnSync } = await import("node:child_process");
+  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+
+  // Check if already running
+  try {
+    const res = await fetch(
+      IS_SOCKET ? "http://localhost/health" : `${BASE}/health`,
+      IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {},
+    );
+    if (res.ok) {
+      const health = await res.json() as Record<string, unknown>;
+      process.stderr.write(
+        `Already running — instance=${health.instanceLabel ?? "?"} pid=${health.pid} uptime=${health.uptime}s\n`,
+      );
+      process.exit(0);
+    }
+  } catch {
+    // Not running — proceed to start
+  }
+
+  // Pass through extra flags (--cmd, --port, etc.)
+  const passthrough = args.slice(1).filter(a => a !== "start");
+  process.stderr.write("Starting WibWob-DOS...\n");
+  const result = spawnSync("bash", [
+    path.join(repoRoot, "scripts/ensure-running.sh"),
+    ...passthrough,
+  ], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: "inherit",
+  });
+  process.exit(result.status ?? 1);
+}
+
+async function cmdRestart(args: string[]) {
+  const { spawnSync } = await import("node:child_process");
+  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+
+  // Pass through extra flags (--force, --cmd, etc.)
+  const passthrough = args.slice(1).filter(a => a !== "restart");
+  process.stderr.write("Restarting WibWob-DOS...\n");
+  const result = spawnSync("bash", [
+    path.join(repoRoot, "scripts/restart.sh"),
+    ...passthrough,
+  ], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: "inherit",
+  });
+  process.exit(result.status ?? 1);
+}
+
 async function cmdAttach() {
   const { spawnSync } = await import("node:child_process");
   const label = findFlag("--instance") || process.env.WIBWOB_INSTANCE || "main";
@@ -539,6 +592,8 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "minimap",     aliases: ["map"],        desc: "Spatial map of all windows",           fn: () => cmdMinimap() },
   { name: "screenshot",  aliases: ["read"], args: "[id]", desc: "Text screenshot (desktop or window)", fn: (a) => cmdScreenshot(a[1]) },
   { name: "write",       args: "<id>",           desc: "Write stdin text into a window (pipe in)", fn: (a) => cmdWrite(a[1]) },
+  { name: "start",       desc: "Start instance (idempotent if already running)",  fn: (a) => cmdStart(a) },
+  { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
   { name: "instances",   desc: "List running instances (via sockets)",             fn: () => cmdInstances() },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
   { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },
