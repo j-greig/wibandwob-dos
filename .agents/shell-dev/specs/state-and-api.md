@@ -99,6 +99,20 @@ Base URL: configured runtime API base URL (default `http://127.0.0.1:8099`)
   GET  /screenshot/text → clean readable text (default); ?id=N uses captureText
   GET  /screenshot/ansi → raw ANSI blessed dump; ?id=N crops to window rect
 
+### captureText chain
+
+`/screenshot/text?id=N` resolves through:
+
+1. `WindowRecord.captureText?: () => string` — optional, set per window
+2. Built-in windows set it directly: `frame.captureText = () => content`
+3. Microapps set it via SDK: `host.captureText(() => content)`
+4. API tries `captureText(id)` first → semantic text. Falls back to blessed screen crop (lossy).
+
+Three access tiers (simplest first):
+- `wibwob screenshot <id>` — CLI, no curl/python
+- `curl $API/screenshot/text?id=N` — raw API
+- `./scripts/screenshot-window.sh <id|title>` — title lookup + error hints
+
 Scramble endpoints:
   GET  /scramble/state  → { status, model, sleeping, lastMessage, messageCount }
   POST /scramble/say    → { text: string } → reply
