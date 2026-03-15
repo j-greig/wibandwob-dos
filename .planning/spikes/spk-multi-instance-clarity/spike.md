@@ -6,6 +6,11 @@ branch: spike/multi-instance-clarity
 
 # Spike: Multi-instance Clarity
 
+**Prior session review:** `scratch/devlog-2026-03-15-direct-mode-and-screenshot.md`
+— reviewed this spike's option D (hybrid registry file), concluded it's over-engineered.
+Recommends unix sockets (`Bun.serve({ unix })` works today) as the structural fix
++ `wibwob which` as the immediate 30-minute fix. See § Revised Recommendation below.
+
 ## One-liner
 
 Agents and humans routinely act on the wrong WibWob instance because nothing
@@ -188,10 +193,83 @@ Not in scope:
 - Remote/VPS multi-instance (different auth model)
 - Formal instance lifecycle management (systemd-style)
 
+## Revised Recommendation (post-review)
+
+Option D's registry file adds moving parts (register/deregister/prune) to solve
+a problem that unix sockets solve structurally. `Bun.serve({ unix })` works today.
+
+**Two-phase plan:**
+
+### Phase 1: Immediate (30 min, no architecture)
+- `wibwob which` command — prints label, port, instanceId, PID prominently
+- Agent preamble convention in ww-ops skill: "run `wibwob which` at session start"
+- Make `instanceLabel` primary in TUI status bar (currently shows id)
+
+### Phase 2: Unix sockets (structural fix)
+
+```
+scratch/instances/
+  main.sock              ← Bun.serve({ unix: path })
+  zuk.sock               ← second instance
+
+  wibwob -t main ...     ← connects via main.sock
+  wibwob instances       ← ls *.sock, try connect, show live ones
+```
+
+```
+  Agent                     Socket                    TUI
+    │                         │                         │
+    │  connect main.sock ────►│                         │
+    │  ◄── guaranteed this ───│── same process ────────►│
+    │      is "main"          │                         │
+    │                         │                         │
+    No port guessing. No registry. Dead socket = dead instance.
+```
+
+**Why sockets > registry:**
+- Port conflicts impossible — each instance has its own socket path
+- Discovery is `ls *.sock` — no health-check pruning needed
+- Dead sockets detected by failed connect → auto-clean
+- `wibwob -t main` resolves to `scratch/instances/main.sock` — no port lookup
+- HTTP stays available for remote/VPS (dual-listen: socket + port)
+
+**Why not sockets alone:**
+- Remote agents (VPS, Docker) still need HTTP ports
+- Both listeners in same Bun process — one `Bun.serve()` each
+
+### Architecture (phase 2)
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │  WibWob-DOS instance (label: "main", id: 2c6)       │
+  │                                                      │
+  │  Bun.serve({ unix: "scratch/instances/main.sock" })  │
+  │  Bun.serve({ port: 8099 })                          │
+  │                                                      │
+  │  blessed TUI ◄──── same process ────► API handlers   │
+  └──────────────────────────────────────────────────────┘
+        ▲                                    ▲
+        │                                    │
+   human sees                          agents connect
+   (Ghostty/tmux)                      (socket or HTTP)
+
+  ┌──────────────────────────────────────────────────────┐
+  │  WibWob-DOS instance (label: "zuk", id: x9f)        │
+  │                                                      │
+  │  Bun.serve({ unix: "scratch/instances/zuk.sock" })   │
+  │  Bun.serve({ port: 8098 })                          │
+  └──────────────────────────────────────────────────────┘
+```
+
 ## Files Likely Touched
 
-- `src/app.ts` — register in instances dir on startup, deregister on exit
-- `src/cli/wibwob.ts` — `instances` subcommand, `-t` flag
-- `scripts/lib/runtime-env.sh` — discover from registry instead of hardcoded port
-- `~/.wibwob` — aliases for `wibwob instances`, `wibwob which`
+### Phase 1
+- `src/cli/wibwob.ts` — `which` subcommand
 - `.agents/skills/ww-ops/SKILL.md` — agent preamble convention
+
+### Phase 2
+- `src/app.ts` — create socket in instances dir, clean up on exit
+- `src/runtime/runtime-node.ts` — dual-listen (socket + HTTP)
+- `src/cli/wibwob.ts` — `instances` subcommand, `-t` flag, socket-first connect
+- `scripts/lib/runtime-env.sh` — discover via socket before HTTP fallback
+- `~/.wibwob` — aliases
