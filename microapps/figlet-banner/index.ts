@@ -6,10 +6,13 @@ import {
   getFigletFontChoices,
   getFigletCatalogue,
   getFigletWindowContentSize,
+  createFilterableList,
 } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
 
 export default function setup(host: MicroappHost) {
+  // Track open windows for write command
+  const writeHandlers = new Map<number, (text: string) => void>();
   // ── "fonts" command — pure data, no window ──
   host.registerCommand({
     id: "fonts",
@@ -54,6 +57,27 @@ export default function setup(host: MicroappHost) {
     },
     palette: { order: 50, label: "Figlet Banner" },
     menu: [{ category: "applications", order: 70, label: "Figlet Banner" }],
+    direct: true,
+  });
+
+  // ── "write" command — update text on an existing window ──
+  host.registerCommand({
+    id: "write",
+    label: "Write to Figlet",
+    description:
+      "Update the text on an existing figlet banner window. Args: text (string, required), windowId (number, required).",
+    action: (args) => {
+      const text = args?.text as string | undefined;
+      const windowId = args?.windowId as number | undefined;
+      if (!text) return { error: "text is required" };
+      if (windowId === undefined) return { error: "windowId is required" };
+      const handler = writeHandlers.get(windowId);
+      if (!handler) return { error: `no figlet window with id ${windowId}` };
+      handler(text);
+      return { ok: true, windowId, text };
+    },
+    palette: false,
+    menu: false,
     direct: true,
   });
 
@@ -176,66 +200,71 @@ export default function setup(host: MicroappHost) {
     }
 
     function pickFont() {
-      // Build an inline font picker list inside the viewer area.
-      // NOTE: host.pickFromList() doesn't exist yet — this is a gap
-      // noted in 030-coat-enforcement-notes.md. For now, inline blessed list.
       const choices = getFigletFontChoices();
-      const fontList = blessed.list({
+      const idx = Math.max(0, choices.findIndex((c) => c.value === currentFont));
+
+      // Split: filterable list on left, live preview on right
+      const pickerContainer = blessed.box({
         parent: win.body,
         top: 1,
         left: 0,
         right: 0,
         bottom: 0,
-        mouse: true,
-        keys: true,
-        vi: true,
-        scrollable: true,
-        alwaysScroll: true,
-        scrollbar: {
-          ch: "▐",
-          track: { bg: "default" },
-          style: { bg: "default", fg: "grey" },
-        },
-        style: {
-          ...host.theme().body,
-          selected: host.theme().selected,
-        },
-        items: choices.map((c) => c.label),
       });
 
-      // Pre-select current font
-      const idx = Math.max(0, choices.findIndex((c) => c.value === currentFont));
-      fontList.select(idx);
-
-      // Preview on move
-      fontList.on("select item", (_item: unknown, index: number) => {
-        const choice = choices[index];
-        if (choice) {
-          const preview = renderFiglet(currentText || "WIB WOB", choice.value);
-          viewer.setContent(preview);
-          host.screen.render();
-        }
+      const preview = blessed.box({
+        parent: pickerContainer,
+        top: 0,
+        left: "40%",
+        right: 0,
+        bottom: 0,
+        scrollable: true,
+        alwaysScroll: true,
+        mouse: true,
+        style: host.theme().body,
       });
 
       function closePicker() {
-        fontList.detach();
+        fontPicker.destroy();
+        pickerContainer.detach();
+        textInput.show();
         viewer.show();
         viewer.focus();
         rerenderFiglet();
       }
 
-      fontList.on("select", (_item: unknown, index: number) => {
-        const choice = choices[index];
-        if (choice) {
-          currentFont = choice.value;
-        }
-        closePicker();
+      const fontPicker = createFilterableList({
+        items: choices,
+        initialIndex: idx,
+        placeholder: "Search fonts...",
+        onHighlight: (e) => {
+          preview.setContent(renderFiglet(currentText || "WIB WOB", e.value));
+          host.screen.render();
+        },
+        onSelect: (e) => {
+          currentFont = e.value;
+          closePicker();
+        },
+        onCancel: closePicker,
       });
 
-      fontList.key(["escape", "q"], closePicker);
+      pickerContainer.append(fontPicker.node);
 
+      // Layout the list on the left 40%
+      const containerW = Math.max(1, Number(pickerContainer.width) || 60);
+      const containerH = Math.max(1, Number(pickerContainer.height) || 20);
+      const listW = Math.floor(containerW * 0.4);
+      fontPicker.layout({ top: 0, left: 0, width: listW, height: containerH });
+
+      // Show initial preview
+      const initialChoice = choices[idx];
+      if (initialChoice) {
+        preview.setContent(renderFiglet(currentText || "WIB WOB", initialChoice.value));
+      }
+
+      textInput.hide();
       viewer.hide();
-      fontList.focus();
+      fontPicker.node.focus();
       host.screen.render();
     }
 
@@ -288,7 +317,14 @@ export default function setup(host: MicroappHost) {
     });
 
     win.onCleanup(() => {
-      // No timers to clean up
+      writeHandlers.delete(win.id);
+    });
+
+    // Register write handler for this window
+    writeHandlers.set(win.id, (newText: string) => {
+      currentText = newText;
+      textInput.setValue(newText);
+      rerenderFiglet();
     });
 
     win.setFocusTarget(viewer);

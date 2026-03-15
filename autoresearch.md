@@ -1,1 +1,1 @@
-autoresearch/instance-lifecycle/autoresearch.md
+autoresearch/write-pipe/autoresearch.md

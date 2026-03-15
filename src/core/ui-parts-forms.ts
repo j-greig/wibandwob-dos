@@ -492,6 +492,9 @@ export interface FilterableItem {
 export interface FilterableListOptions {
   items: FilterableItem[];
   onSelect?: (event: SelectEvent<string>) => void;
+  onHighlight?: (event: SelectEvent<string>) => void;
+  onCancel?: () => void;
+  initialIndex?: number;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -513,9 +516,9 @@ export type FilterableListHandle = LayoutPart<Partial<FilterableListOptions>> & 
  * });
  */
 export function createFilterableList(opts: FilterableListOptions): FilterableListHandle {
-  let { items, onSelect, placeholder = "Search...", disabled = false } = opts;
+  let { items, onSelect, onHighlight, onCancel, placeholder = "Search...", disabled = false } = opts;
   let query = "";
-  let focusIndex = 0;
+  let focusIndex = opts.initialIndex ?? 0;
   let filtered = items.slice();
   let lastHeight = 0;
 
@@ -558,6 +561,13 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
     node.setContent([searchLine, ...lines].join("\n"));
   }
 
+  function emitHighlight() {
+    if (filtered.length > 0 && focusIndex < filtered.length) {
+      const item = filtered[focusIndex]!;
+      onHighlight?.({ value: item.value, index: items.indexOf(item) });
+    }
+  }
+
   function applyVisuals() {
     node.style = getStyle();
     renderContent();
@@ -572,9 +582,11 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
     if (key.name === "up") {
       focusIndex = Math.max(0, focusIndex - 1);
       applyVisuals();
+      emitHighlight();
     } else if (key.name === "down") {
       focusIndex = Math.min(filtered.length - 1, focusIndex + 1);
       applyVisuals();
+      emitHighlight();
     } else if (key.name === "enter") {
       if (filtered.length > 0 && focusIndex < filtered.length) {
         const item = filtered[focusIndex]!;
@@ -585,11 +597,16 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
         query = query.slice(0, -1);
         refilter();
         applyVisuals();
+        emitHighlight();
       }
     } else if (key.name === "escape") {
-      query = "";
-      refilter();
-      applyVisuals();
+      if (query) {
+        query = "";
+        refilter();
+        applyVisuals();
+      } else {
+        onCancel?.();
+      }
     } else if (ch && ch.length === 1 && !key.ctrl && ch.charCodeAt(0) >= 32) {
       query += ch;
       refilter();
@@ -620,6 +637,8 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
         refilter();
       }
       if (props.onSelect !== undefined) onSelect = props.onSelect;
+      if (props.onHighlight !== undefined) onHighlight = props.onHighlight;
+      if (props.onCancel !== undefined) onCancel = props.onCancel;
       if (props.placeholder !== undefined) placeholder = props.placeholder;
       if (props.disabled !== undefined) {
         disabled = props.disabled;

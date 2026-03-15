@@ -1,1 +1,1 @@
-autoresearch/instance-lifecycle/autoresearch.checks.sh
+autoresearch/write-pipe/autoresearch.checks.sh

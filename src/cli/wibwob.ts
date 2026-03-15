@@ -266,6 +266,73 @@ async function cmdScreenshot(id?: string) {
   process.stdout.write(text);
 }
 
+async function cmdWrite(windowId?: string) {
+  if (!windowId) {
+    process.stderr.write("Usage: wibwob write <window-id>\nReads text from stdin, writes to the window.\n");
+    process.exit(1);
+  }
+  const id = Number(windowId);
+  if (isNaN(id)) {
+    process.stderr.write(`Invalid window ID: ${windowId}\n`);
+    process.exit(1);
+  }
+
+  // Read stdin
+  const text = await new Response(process.stdin as any).text();
+  const trimmed = text.trimEnd();
+  if (!trimmed) {
+    process.stderr.write("No input on stdin\n");
+    process.exit(1);
+  }
+
+  // Resolve appType from state
+  const state = (await api("/state")) as {
+    windows: Array<{ id: number; appType?: string }>;
+  };
+  const win = state.windows.find((w) => w.id === id);
+  if (!win) {
+    process.stderr.write(`No window with id ${id}\n`);
+    process.exit(1);
+  }
+  const appType = win.appType;
+  if (!appType) {
+    process.stderr.write(`Window ${id} has no appType\n`);
+    process.exit(1);
+  }
+
+  // Build the microapp command prefix
+  const prefix = `microapp.${appType}`;
+
+  // Try write → send → create fallback convention
+  const candidates = [
+    { cmd: `${prefix}.write`, args: { text: trimmed, windowId: id } },
+    { cmd: `${prefix}.send`, args: { message: trimmed } },
+    { cmd: `${prefix}.create`, args: { body: trimmed, title: trimmed.slice(0, 50) } },
+  ];
+
+  // Get available commands to find which one exists
+  const cmdList = (await api("/commands/list")) as {
+    commands: Array<{ id: string }>;
+  };
+  const available = new Set(cmdList.commands.map((c) => c.id));
+
+  for (const candidate of candidates) {
+    if (available.has(candidate.cmd)) {
+      const result = await api("/commands/run", "POST", {
+        id: candidate.cmd,
+        args: candidate.args,
+      });
+      out(result);
+      return;
+    }
+  }
+
+  process.stderr.write(
+    `App ${appType} does not support write (no ${prefix}.write, .send, or .create command)\n`,
+  );
+  process.exit(1);
+}
+
 async function cmdAttach() {
   const { spawnSync } = await import("node:child_process");
   const label = findFlag("--instance") || process.env.WIBWOB_INSTANCE || "main";
@@ -466,6 +533,8 @@ Usage:
   wibwob minimap                      Spatial map of all windows (alias: map)
   wibwob screenshot                   Text screenshot of desktop
   wibwob screenshot <id>              Text screenshot of a single window
+  wibwob read <id>                    Alias for screenshot (Plan 9 symmetry)
+  wibwob write <id>                   Write stdin text into a window (pipe in)
   wibwob instances                    List running instances (via sockets)
   wibwob attach                       Resurrect from orphan workspace (detect → kill stale → start → load)
   wibwob cmd <id> [--key val ...]     Run command by ID
@@ -525,7 +594,10 @@ async function main() {
     case "map":
       return cmdMinimap();
     case "screenshot":
+    case "read":
       return cmdScreenshot(cleanArgs[1]);
+    case "write":
+      return cmdWrite(cleanArgs[1]);
     case "instances":
       return cmdInstances();
     case "attach":
