@@ -133,8 +133,8 @@ export {
 // See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
 // ── ui-parts — layout primitives, directly importable ────────────────────────
 // These are also available on host.ui.* but can be imported directly for
-// cleaner module-level imports. host.ui.createButtonBar(...) and
-// import { createButtonBar } from "microapp-sdk" are equivalent.
+// cleaner module-level imports. host.ui.createLayoutButtonBar(...) and
+// import { createLayoutButtonBar } from "microapp-sdk" are equivalent.
 export {
   clamp,
   createStack,
@@ -144,14 +144,14 @@ export {
   pickBreakpoint,
   DEFAULT_BREAKPOINTS,
   createHeaderBar,
-  createStatusBar,
+  createLayoutStatusBar,
   createTextBlock,
   createInputLine,
   createMessageHistory,
   createRule,
   createFigletDisplay,
   createAnimatedPanel,
-  createButtonBar,
+  createLayoutButtonBar,
   createBorderedPanel,
   createCollapsibleBlock,
   createContentStack,
@@ -355,11 +355,11 @@ export type { ThemeVariant } from "../core/theme/types.js";
 // ═══════════════════════════════════════════════════════════════════════════
 
 export {
-  createSimpleStatusBar,
+  createStatusBar,
   createTextViewer,
   createListPanel,
   createSplitView,
-  createSimpleButtonBar,
+  createButtonBar,
 } from "../sdk/composition-helpers.js";
 
 export type {

@@ -4,11 +4,11 @@ Themed UI primitives for microapp authors. Import from `microapp-sdk.js`:
 
 ```typescript
 import {
-  createSimpleStatusBar,
+  createStatusBar,
   createTextViewer,
   createListPanel,
   createSplitView,
-  createSimpleButtonBar,
+  createButtonBar,
 } from "../../src/services/microapp-sdk.js";
 ```
 
@@ -16,12 +16,12 @@ All helpers are theme-aware — colours update via `.update()` on restyle.
 
 ---
 
-## `createSimpleStatusBar(parent, opts?)`
+## `createStatusBar(parent, opts?)`
 
 Bottom-pinned bar with left/right text slots.
 
 ```typescript
-const status = createSimpleStatusBar(win.body, {
+const status = createStatusBar(win.body, {
   left: " Notepad │ 42 lines",
   right: "UTF-8 ",
 });
@@ -116,12 +116,12 @@ split.update({ ratio: 0.5 });
 
 ---
 
-## `createSimpleButtonBar(parent, opts)`
+## `createButtonBar(parent, opts)`
 
 Bottom toolbar with labelled buttons and optional keyboard shortcuts.
 
 ```typescript
-const bar = createSimpleButtonBar(win.body, {
+const bar = createButtonBar(win.body, {
   buttons: [
     { label: "Save", key: "C-s", action: () => save() },
     { label: "Quit", key: "q", action: () => win.close() },
@@ -143,7 +143,7 @@ bar.update({
 
 ```typescript
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { createSimpleStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
+import { createStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -152,7 +152,7 @@ export default function setup(host: MicroappHost) {
     action: () => {
       const win = host.createWindow({ title: "Notepad", width: 60, height: 20 });
       const viewer = createTextViewer(win.body, { bottomOffset: 1, wrap: false });
-      const status = createSimpleStatusBar(win.body, { left: " Notepad" });
+      const status = createStatusBar(win.body, { left: " Notepad" });
 
       win.setFocusTarget(viewer.element);
       win.captureText(() => viewer.getContent());

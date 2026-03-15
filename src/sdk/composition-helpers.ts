@@ -4,7 +4,7 @@
  * Each helper creates a themed blessed widget with sensible defaults.
  * Returns a handle: { element, update(opts), destroy() }.
  *
- * Import via: import { createSimpleStatusBar, ... } from "../../src/services/microapp-sdk.js";
+ * Import via: import { createStatusBar, ... } from "../../src/services/microapp-sdk.js";
  */
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
@@ -108,7 +108,7 @@ export interface ButtonBarHandle {
  * Themed status bar pinned to the bottom of a parent element.
  * Shows left-aligned and right-aligned text.
  */
-export function createSimpleStatusBar(
+export function createStatusBar(
   parent: blessed.Widgets.BoxElement,
   opts: StatusBarOptions = {},
 ): StatusBarHandle {
@@ -344,7 +344,7 @@ export function createSplitView(
 /**
  * Themed button bar pinned to the bottom. Shows labelled buttons with optional key hints.
  */
-export function createSimpleButtonBar(
+export function createButtonBar(
   parent: blessed.Widgets.BoxElement,
   opts: ButtonBarOptions,
 ): ButtonBarHandle {

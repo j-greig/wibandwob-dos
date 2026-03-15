@@ -17,7 +17,7 @@ import * as path from "path";
 import { promisify } from "util";
 
 import { theme } from "../core/theme/resolver.js";
-import { createRestyleBundle, createButtonBar, clamp, type ButtonBarPart } from "../core/ui-parts.js";
+import { createRestyleBundle, createLayoutButtonBar, clamp, type ButtonBarPart } from "../core/ui-parts.js";
 import type { ThemeTokens } from "../core/theme/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -932,7 +932,7 @@ export function openMusicPlayerWindow(
   // ── Toolbar ───────────────────────────────────────────────────────────────
 
   type BtnId = "playpause" | "stop" | "prev" | "next" | "voldown" | "volup" | "viz" | "add";
-  const toolbar: ButtonBarPart<BtnId> = createButtonBar<BtnId>(
+  const toolbar: ButtonBarPart<BtnId> = createLayoutButtonBar<BtnId>(
     frame.body,
     [
       { id: "prev",      label: "\u23EE Prev" },

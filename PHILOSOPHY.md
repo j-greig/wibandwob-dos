@@ -184,8 +184,8 @@ When evaluating new SDK functionality, ask:
 
 ### Status: 🟡 In progress
 
-SDK composition helpers landed (B02): `createSimpleStatusBar`, `createTextViewer`,
-`createListPanel`, `createSplitView`, `createSimpleButtonBar`. Zero SDK gaps
+SDK composition helpers landed (B02): `createStatusBar`, `createTextViewer`,
+`createListPanel`, `createSplitView`, `createButtonBar`. Zero SDK gaps
 (no microapp imports directly from `src/core/` or `src/services/`). Handle API
 documented in `docs/sdk-primitives.md`. Design system layers documented in
 `docs/design-system.md`.

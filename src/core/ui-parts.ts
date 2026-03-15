@@ -8,3 +8,7 @@
  * @deprecated Import from "../ui/index.js" or "../../src/services/microapp-sdk.js" instead.
  */
 export * from "../ui/index.js";
+
+// Backward-compat aliases — old names still work, new code uses createLayout* or SDK Handle API
+export { createLayoutStatusBar as createStatusBar } from "../ui/chrome.js";
+export { createLayoutButtonBar as createButtonBar } from "../ui/chrome.js";

@@ -23,7 +23,7 @@ import {
   createRow,
   createNodePart,
   createHeaderBar,
-  createStatusBar,
+  createLayoutStatusBar,
   createTextBlock,
   createRule,
 } from "../core/ui-parts.js";
@@ -66,7 +66,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
 
   const header = createHeaderBar(frame.body);
   const divider = createRule(frame.body, { axis: "vertical" });
-  const statusBar = createStatusBar(frame.body);
+  const statusBar = createLayoutStatusBar(frame.body);
 
   let infoText = "";
 

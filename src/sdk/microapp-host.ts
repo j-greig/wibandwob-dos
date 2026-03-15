@@ -4,13 +4,13 @@ import type { DynamicCommandDefinition } from "../core/command-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
 import {
   createAnimatedPanel,
-  createButtonBar,
+  createLayoutButtonBar,
   createFigletDisplay,
   createHeaderBar,
   createRow,
   createRule,
   createStack,
-  createStatusBar,
+  createLayoutStatusBar,
   createTextBlock,
   applyRect,
 } from "../core/ui-parts.js";
@@ -65,12 +65,14 @@ export interface MicroappHost {
     createStack: typeof createStack;
     createRow: typeof createRow;
     createHeaderBar: typeof createHeaderBar;
-    createStatusBar: typeof createStatusBar;
+    createLayoutStatusBar: typeof createLayoutStatusBar;
+    createStatusBar: typeof createLayoutStatusBar;  // backward-compat alias
     createTextBlock: typeof createTextBlock;
     createRule: typeof createRule;
     createFigletDisplay: typeof createFigletDisplay;
     createAnimatedPanel: typeof createAnimatedPanel;
-    createButtonBar: typeof createButtonBar;
+    createLayoutButtonBar: typeof createLayoutButtonBar;
+    createButtonBar: typeof createLayoutButtonBar;  // backward-compat alias
     applyRect: typeof applyRect;
   };
 

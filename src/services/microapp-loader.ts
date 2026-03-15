@@ -34,9 +34,9 @@ import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-
 import type { MenuPlacement, PalettePlacement } from "../domain/command-definition.js";
 import {
   createStack, createRow,
-  createHeaderBar, createStatusBar, createTextBlock,
+  createHeaderBar, createLayoutStatusBar, createTextBlock,
   createRule, createFigletDisplay, createAnimatedPanel,
-  createButtonBar, applyRect,
+  createLayoutButtonBar, applyRect,
 } from "../core/ui-parts.js";
 import type {
   MicroappHost,
@@ -245,12 +245,14 @@ function createMicroappHost(
       createStack,
       createRow,
       createHeaderBar,
-      createStatusBar,
+      createLayoutStatusBar,
+      createStatusBar: createLayoutStatusBar,  // backward-compat alias
       createTextBlock,
       createRule,
       createFigletDisplay,
       createAnimatedPanel,
-      createButtonBar,
+      createLayoutButtonBar,
+      createButtonBar: createLayoutButtonBar,  // backward-compat alias
       applyRect,
     },
 

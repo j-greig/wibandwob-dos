@@ -37,10 +37,10 @@ src/ui/
 Self-positioning components that attach to a parent. Simpler, fewer concepts.
 
 ```typescript
-import { createSimpleStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
+import { createStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
 
 const viewer = createTextViewer(win.body, { content: "Hello", bottomOffset: 1 });
-const status = createSimpleStatusBar(win.body, { left: " Title" });
+const status = createStatusBar(win.body, { left: " Title" });
 
 viewer.update({ content: "New text" });
 status.update({ left: " Updated" });
@@ -53,8 +53,8 @@ viewer.destroy();
 - Options type: `<Component>Options`
 - Handle type: `<Component>Handle`
 
-**Available:** `createSimpleStatusBar`, `createTextViewer`, `createListPanel`,
-`createSplitView`, `createSimpleButtonBar`
+**Available:** `createStatusBar`, `createTextViewer`, `createListPanel`,
+`createSplitView`, `createButtonBar`
 
 ### LayoutPart API (internal — for shell/window code)
 
@@ -125,4 +125,4 @@ The LayoutPart API remains for internal layout engine use. Steps:
 3. ✅ Design system documented
 4. **Next:** Add `restyle()` to Handle API components
 5. **Next:** Create Handle versions of remaining LayoutPart components
-6. **Next:** Deprecate `createSimple*` prefix once old LayoutPart names are internal-only
+6. ✅ `createSimple*` prefix removed — Handle API uses clean `createStatusBar`/`createButtonBar` names

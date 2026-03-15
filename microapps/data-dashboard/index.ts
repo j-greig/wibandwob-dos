@@ -1,6 +1,6 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
-  createSimpleStatusBar,
+  createStatusBar,
   createSplitView,
   createTextViewer,
 } from "../../src/services/microapp-sdk.js";
@@ -8,7 +8,7 @@ import os from "node:os";
 
 /**
  * Data Dashboard — live-updating system info panels.
- * Teaches: createSplitView, createTextViewer, createSimpleStatusBar,
+ * Teaches: createSplitView, createTextViewer, createStatusBar,
  *          timers, describeState, captureText, onCleanup, onRestyle.
  */
 export default function setup(host: MicroappHost) {
@@ -37,7 +37,7 @@ export default function setup(host: MicroappHost) {
 
     const leftPanel = createTextViewer(split.first, { wrap: true, vi: false });
     const rightPanel = createTextViewer(split.second, { wrap: true, vi: false });
-    const status = createSimpleStatusBar(win.body);
+    const status = createStatusBar(win.body);
 
     let tick = 0;
     let lastSnapshot = { system: "", runtime: "" };

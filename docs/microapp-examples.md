@@ -7,11 +7,11 @@ Seven reference microapps ordered by complexity. Each teaches specific SDK patte
 | # | App | Lines | Teaches |
 |---|-----|-------|---------|
 | 1 | **hello-world** | ~30 | Minimum viable: `createWindow`, `describeState`, `captureText` |
-| 2 | **notepad** | ~100 | Read/write buffer, `captureText`, plumb, SDK helpers (`createTextViewer`, `createSimpleStatusBar`) |
+| 2 | **notepad** | ~100 | Read/write buffer, `captureText`, plumb, SDK helpers (`createTextViewer`, `createStatusBar`) |
 | 3 | **runtime-inspector** | ~425 | Live state polling, tree views, command introspection, `/runtime/inspection` API |
 | 4 | **figlet-banner** | ~450 | Multi-command registration, font picker, prompts, `writeHandlers` pattern |
 | 5 | **layout-stress-test** | ~460 | Responsive layout, breakpoints, contrib grid, animation loops |
-| 6 | **data-dashboard** | ~130 | `createSplitView`, `createTextViewer`, `createSimpleStatusBar`, timers, `os` module |
+| 6 | **data-dashboard** | ~130 | `createSplitView`, `createTextViewer`, `createStatusBar`, timers, `os` module |
 | 7 | **file-manager** | ~1600 | Full app: search, preview, sort, icon/list modes (currently `src/windows/`, migration pending) |
 
 ## Required Hooks
@@ -45,10 +45,10 @@ export default function setup(host: MicroappHost) {
 ## Pattern: SDK Helpers
 
 ```typescript
-import { createTextViewer, createSimpleStatusBar } from "../../src/services/microapp-sdk.js";
+import { createTextViewer, createStatusBar } from "../../src/services/microapp-sdk.js";
 
 const viewer = createTextViewer(win.body, { bottomOffset: 1, wrap: false });
-const status = createSimpleStatusBar(win.body, { left: " Title" });
+const status = createStatusBar(win.body, { left: " Title" });
 
 win.setFocusTarget(viewer.element);
 win.onRestyle(() => { viewer.update({}); status.update({}); });

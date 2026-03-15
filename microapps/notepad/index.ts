@@ -1,5 +1,5 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { createSimpleStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
+import { createStatusBar, createTextViewer } from "../../src/services/microapp-sdk.js";
 
 /**
  * Notepad — the simplest possible text editor.
@@ -56,7 +56,7 @@ export default function setup(host: MicroappHost) {
       bottomOffset: 1,
     });
 
-    const statusBar = createSimpleStatusBar(win.body);
+    const statusBar = createStatusBar(win.body);
 
     let buffer = initialText;
 

@@ -52,7 +52,7 @@ export function createHeaderBar(
 }
 
 /** @primitive */
-export function createStatusBar(
+export function createLayoutStatusBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
 ): LayoutPart<{ left?: string; right?: string }> {
@@ -399,7 +399,7 @@ export function createAnimatedPanel(
  * Active button is shown inverse. Suitable for mode switchers in microapps.
  *
  * @example
- * const bar = createButtonBar(win.body, buttons, (id) => { mode = id; render(); });
+ * const bar = createLayoutButtonBar(win.body, buttons, (id) => { mode = id; render(); });
  * // in render():
  * bar.update({ leftText: hintText, activeId: currentMode });
  */
@@ -409,7 +409,7 @@ export type ButtonBarPart<Id extends string> =
     updateLabel(id: Id, label: string): void;
   };
 
-export function createButtonBar<Id extends string>(
+export function createLayoutButtonBar<Id extends string>(
   parent: blessed.Widgets.Node,
   buttons: ReadonlyArray<{ id: Id; label: string }>,
   onSelect: (id: Id) => void,
