@@ -1,1 +1,2 @@
 {"type":"config","name":"Audio-Reactive Shader Evolution","metricName":"creative_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"ac5ef15","metric":2,"metrics":{"responsiveness":2,"readability":8,"band_coverage":2.8,"dynamic_range":10},"status":"keep","description":"Baseline: audio-reactive-overlay with 5 effects (bass pulse, mid wave, treble sparkle, freq tint, edge glow). Shader barely visible — effects too subtle, screenshot captured full desktop not Ghostty window. Need stronger effects + focused capture.","timestamp":1773586226731,"segment":0}
