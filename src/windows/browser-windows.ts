@@ -6,6 +6,7 @@
 
 import blessed from "blessed";
 import { execSync } from "node:child_process";
+import { copyToClipboard } from "../core/clipboard.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -1513,14 +1514,9 @@ export function openFileManagerWindow(params: {
   const copyPathToClipboard = (index?: number) => {
     const filePath = getEntryPath(index);
     if (!filePath) return;
-    try {
-      if (process.platform === "darwin") {
-        execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
-      } else {
-        execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
-      }
+    if (copyToClipboard(filePath)) {
       params.overlays.flash(`Copied: ${path.basename(filePath)}`);
-    } catch {
+    } else {
       params.overlays.flash("Clipboard not available");
     }
   };

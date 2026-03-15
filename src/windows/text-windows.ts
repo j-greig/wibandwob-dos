@@ -26,6 +26,7 @@ import {
   type FigletHeadingConfig,
 } from "../services/markdown-service.js";
 import { stripAnsi } from "../core/ansi-utils.js";
+import { copyToClipboard } from "../core/clipboard.js";
 
 export interface EditorWindowParams {
   windowManager: WindowManager;
@@ -220,12 +221,9 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
         const block = nearestCodeBlock(cachedLines, scrollTop);
         if (!block) { overlays.flash("No code block in view"); return; }
         const raw = block.map(stripAnsi).join("\n");
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
-          execSync(cmd, { input: raw });
+        if (copyToClipboard(raw)) {
           overlays.flash(`Copied ${block.length} lines`);
-        } catch {
+        } else {
           overlays.flash("Copy failed — pbcopy/xclip not available");
         }
       });
