@@ -53,8 +53,10 @@ viewer.destroy();
 - Options type: `<Component>Options`
 - Handle type: `<Component>Handle`
 
-**Available:** `createStatusBar`, `createTextViewer`, `createListPanel`,
-`createSplitView`, `createButtonBar`
+**Available (10 components):**
+`createStatusBar`, `createTextViewer`, `createListPanel`, `createSplitView`,
+`createButtonBar`, `createHeaderBar`, `createScrollView`, `createTabs`,
+`createRule`, `createInputLine`
 
 ### LayoutPart API (internal — for shell/window code)
 
