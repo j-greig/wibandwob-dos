@@ -708,8 +708,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         sessionIndexMap.push(-1);
       }
       const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
-      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 15);
-      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} ${preview}`);
+      const msgCount = `${s.messageCount}m`;
+      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 18);
+      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} {${accent}-fg}${msgCount}{/${accent}-fg} ${preview}`);
       sessionIndexMap.push(i);
     }
     if (items.length === 0) {
@@ -765,11 +766,13 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     }
 
     // Status + command bars for session mode
+    const selSession = sessions[sessionIdx];
+    const sessionInfo = selSession ? `  ${selSession.sessionId} · ${selSession.messageCount} msgs` : "";
     statusBar.setContent(
-      `{${muted}-fg} [SESSIONS]  ${sessions.length} sessions  ${PI_EXISTS ? "~/.pi found" : ""}{/${muted}-fg}`
+      `{${muted}-fg} [SESSIONS]  ${sessions.length} sessions${sessionInfo}{/${muted}-fg}`
     );
     commandBar.setContent(
-      `{${muted}-fg} ${sessionIdx + 1}/${sessions.length}  Enter view  S journal  j/k nav  g/G jump{/${muted}-fg}`
+      `{${muted}-fg} ${sessionIdx + 1}/${sessions.length}  Enter open  S journal  j/k nav  g/G jump{/${muted}-fg}`
     );
   }
 
