@@ -2,7 +2,7 @@ import blessed from "blessed";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { MicroappHost, WindowHandle } from "../../src/services/microapp-sdk.js";
-import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG, createButton } from "../../src/services/microapp-sdk.js";
+import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/microapp-sdk.js";
 
 // ── Types ───────────────────────────────────────────────────────
 type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
@@ -539,10 +539,24 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     render();
   }
 
-  const btnJrn = createButton({ label: "JRN", onPress: () => toggleToView("journal") });
-  const btnLog = createButton({ label: "LOG", onPress: () => toggleToView("sessions") });
-  win.body.append(btnJrn.node);
-  win.body.append(btnLog.node);
+  // Toggle indicators — plain boxes (not SDK buttons) to avoid focus stealing
+  const btnJrn = blessed.box({
+    parent: win.body,
+    top: 0, right: 11, width: 9, height: 1,
+    tags: false, mouse: true,
+    focusable: false,
+    style: t().body,
+  });
+  const btnLog = blessed.box({
+    parent: win.body,
+    top: 0, right: 1, width: 9, height: 1,
+    tags: false, mouse: true,
+    focusable: false,
+    style: t().body,
+  });
+
+  btnJrn.on("click", () => { toggleToView("journal"); listBox.focus(); });
+  btnLog.on("click", () => { toggleToView("sessions"); listBox.focus(); });
 
   const sepBox = blessed.box({
     parent: win.body,
@@ -702,31 +716,21 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
-    // Toggle buttons: active gets inverse (bright bg), inactive gets muted
+    // Toggle indicators: active gets inverse styling, inactive gets muted
     const th_ = t();
     const activeBg = th_.selected?.fg || accent;
     const activeFg = th_.body.bg || "#000";
     const inactiveFg = th_.muted?.fg || "#555";
     const inactiveBg = th_.body.bg || "#000";
 
-    btnJrn.node.style = viewMode === "journal"
+    btnJrn.style = viewMode === "journal"
       ? { fg: activeFg, bg: activeBg, bold: true }
       : { fg: inactiveFg, bg: inactiveBg };
-    btnLog.node.style = viewMode === "sessions"
+    btnLog.style = viewMode === "sessions"
       ? { fg: activeFg, bg: activeBg, bold: true }
       : { fg: inactiveFg, bg: inactiveBg };
-    btnJrn.node.setContent(viewMode === "journal" ? " [ JRN ] " : "   JRN   ");
-    btnLog.node.setContent(viewMode === "sessions" ? " [ LOG ] " : "   LOG   ");
-
-    // Position top-right
-    btnJrn.node.top = 0;
-    btnJrn.node.width = 9;
-    btnJrn.node.height = 1;
-    btnJrn.node.right = 11;
-    btnLog.node.top = 0;
-    btnLog.node.width = 9;
-    btnLog.node.height = 1;
-    btnLog.node.right = 1;
+    btnJrn.setContent(viewMode === "journal" ? " [ JRN ] " : "   JRN   ");
+    btnLog.setContent(viewMode === "sessions" ? " [ LOG ] " : "   LOG   ");
 
     // Separator
     const sepW = Math.max(0, w - 4);
@@ -1482,8 +1486,6 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onRestyle(() => {
     const th = t();
     headerBox.style = th.body;
-    btnJrn.restyle();
-    btnLog.restyle();
     sepBox.style = th.body;
     contentBox.style = th.body;
     listBox.style = { ...th.body, item: { fg: th.body.fg, bg: th.body.bg }, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" }, scrollbar: { fg: th.muted?.fg || "#555" } };
