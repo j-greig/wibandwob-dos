@@ -5,6 +5,8 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   MonsterCamService,
+  createCanvas,
+  createStatusBar,
   renderWebcamFrame,
   gridToBlessedContent,
 } from "../../src/services/microapp-sdk.js";
@@ -26,12 +28,8 @@ export default function setup(host: MicroappHost) {
       const theme = () => host.theme();
       const screen = host.screen;
 
-      const canvas = blessed.box({
-        parent: win.body,
-        top: 0, left: 0, right: 0, bottom: 1,
-        style: theme().body,
-        tags: true,
-      });
+      const canvasHandle = createCanvas(win.body, { bottomOffset: 1 });
+      const canvas = canvasHandle.element;
 
       const emotionOverlay = blessed.box({
         parent: canvas,
