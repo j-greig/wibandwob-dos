@@ -136,3 +136,12 @@ Full reference: `.agents/microapp-dev/sdk-reference.md`
 - describeState fixed from hardcoded "journal" to actual viewMode
 - Both views render with date headers, role colours, tool call summaries
 - Known issues: could be more polished, LOG preview is raw dump, code has some repetition
+
+### Experiment #1 (keep, 6.7): cleaner toggle, readable LOG, COAT commands
+- LOG preview: filter out toolResult noise, only human/assistant messages
+- COAT: added toggle-view and filter-model commands, modelFilter in describeState
+
+### Experiment #2 (keep, 7.2): view-specific figlet, model breakdown, empty state
+- JRNL figlet for journal, LOGS figlet for sessions — instant mode cue
+- Tagline model breakdown (opus-4-6:2) in LOG view
+- Box-drawn empty state card with kind icons
