@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
 # @name    capture-tui-png
-# @desc    Capture macOS display to PNG for visual proof
-# capture-tui-png.sh — capture a macOS display to PNG for WibWob visual proof.
+# @desc    Capture the Ghostty window to PNG (auto-detects via CGWindowList)
+# capture-tui-png.sh — capture WibWob-DOS to PNG for visual proof.
 #
-# IMPORTANT:
-# - This captures OS pixels via `screencapture` (not WibWob internals).
-# - It is only valid proof if the WibWob UI is visibly on that display
-#   (in any terminal: Ghostty, iTerm2, tmux, etc).
-# - For semantic capture, pair with text tools:
-#     /screenshot/text, scripts/screenshot-window.sh, /screenshot/ansi.
+# Default: auto-finds the Ghostty window via CGWindowList and captures
+# exactly that window — no display guessing, works on any monitor layout.
+#
+# Fallback: --display N captures an entire display (old behavior).
 #
 # Usage:
-#   ./scripts/capture-tui-png.sh
-#   ./scripts/capture-tui-png.sh scratch/captures/custom.png
-#   DISPLAY_NUM=2 ./scripts/capture-tui-png.sh
-#   ./scripts/capture-tui-png.sh --display 2 --out scratch/captures/custom.png
-#   ./scripts/capture-tui-png.sh --list-displays
+#   ./scripts/capture-tui-png.sh                              # auto-find Ghostty
+#   ./scripts/capture-tui-png.sh --out scratch/custom.png     # custom output path
+#   ./scripts/capture-tui-png.sh --display 2                  # explicit display
+#   ./scripts/capture-tui-png.sh --list-displays              # probe displays
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+HELPER="$ROOT_DIR/scripts/lib/find-ghostty-window"
 OUT_PATH=""
 DISPLAY="${DISPLAY_NUM:-}"
 LIST_DISPLAYS=0
@@ -29,10 +27,13 @@ usage() {
 Usage: $0 [options] [out-path]
 
 Options:
-  --display <N>       Capture explicit display index (same as DISPLAY_NUM)
+  --display <N>       Capture explicit display (bypasses auto-detect)
   --out <path>        Output PNG path
   --list-displays     Probe and print valid display indices
   -h, --help          Show this help
+
+Default (no --display): auto-detects the Ghostty window via CGWindowList
+and captures exactly that window using screencapture -l <windowID>.
 
 If out-path/--out is omitted:
   $ROOT_DIR/scratch/captures/tui-<timestamp>.png
@@ -55,32 +56,12 @@ fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --display)
-      DISPLAY="${2:-}"
-      shift 2
-      ;;
-    --out)
-      OUT_PATH="${2:-}"
-      shift 2
-      ;;
-    --list-displays)
-      LIST_DISPLAYS=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    -* )
-      echo "Unknown option: $1" >&2
-      usage
-      exit 1
-      ;;
-    *)
-      # positional out path for backward compatibility
-      OUT_PATH="$1"
-      shift
-      ;;
+    --display)  DISPLAY="${2:-}"; shift 2 ;;
+    --out)      OUT_PATH="${2:-}"; shift 2 ;;
+    --list-displays) LIST_DISPLAYS=1; shift ;;
+    -h|--help)  usage; exit 0 ;;
+    -*)         echo "Unknown option: $1" >&2; usage; exit 1 ;;
+    *)          OUT_PATH="$1"; shift ;;
   esac
 done
 
@@ -96,20 +77,33 @@ fi
 mkdir -p "$(dirname "$OUT_PATH")"
 
 if [[ -n "$DISPLAY" ]]; then
+  # Explicit display mode (old behavior)
   if ! [[ "$DISPLAY" =~ ^[0-9]+$ ]]; then
     echo "Invalid --display value: $DISPLAY (must be integer)." >&2
     exit 1
   fi
+  screencapture -x -D "$DISPLAY" "$OUT_PATH"
+else
+  # Auto-detect Ghostty window via CGWindowList
+  # Build the helper if needed
+  if [[ ! -x "$HELPER" ]]; then
+    echo "  building find-ghostty-window helper..."
+    cc -framework CoreGraphics -framework CoreFoundation \
+      "$HELPER.c" -o "$HELPER" 2>/dev/null || {
+      echo "Failed to build CGWindowList helper. Use --display N instead." >&2
+      exit 1
+    }
+  fi
 
-  if ! screencapture -x -D "$DISPLAY" /dev/null 2>/dev/null; then
-    echo "Display $DISPLAY is not valid on this machine." >&2
-    echo "Try: $0 --list-displays" >&2
+  WIN_ID=$("$HELPER" | head -1 | awk '{print $1}')
+
+  if [[ -z "$WIN_ID" ]]; then
+    echo "No Ghostty window found on screen. Is Ghostty running?" >&2
+    echo "Fallback: $0 --display N" >&2
     exit 1
   fi
 
-  screencapture -x -D "$DISPLAY" "$OUT_PATH"
-else
-  screencapture -x "$OUT_PATH"
+  screencapture -l "$WIN_ID" -x "$OUT_PATH"
 fi
 
 if [[ ! -s "$OUT_PATH" ]]; then

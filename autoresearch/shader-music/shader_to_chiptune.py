@@ -19,9 +19,24 @@ from bricks import *
 
 # ── Genre Selection ────────────────────────────────────────────
 # Change GENRE to switch shader + synth combo
-GENRE = os.environ.get("GENRE", "lofi_hiphop")
+GENRE = os.environ.get("GENRE", "starfield")
 
 GENRE_CONFIGS = {
+    "starfield": {
+        "shader": "starfield-superlite.glsl",
+        "bpm": 110,
+        "duration": 16,
+        "steps_per_beat": 2,
+        "tracks": [
+            {"name": "lead",    "vol": (0.05, 0.6)},
+            {"name": "harmony", "vol": (0.03, 0.45)},
+            {"name": "bass",    "vol": (0.05, 0.4)},
+            {"name": "perc",    "vol": (0.0,  0.2)},
+        ],
+        "time_offsets": [0.0, 3.7, 7.3, 11.1],
+        "entrance_times": [0.0, 1.5, 0.5, 2.0],
+        "swell_periods": [5.3, 7.1, 4.7, 3.3],
+    },
     "lofi_hiphop": {
         "shader": "ghostty-shaders/cineShader-Lava.glsl",
         "bpm": 78,
@@ -110,6 +125,12 @@ LOFI_SCALES = [
     ["Ab2", "Bb2", "C3", "Eb3", "F3", "Ab3", "Bb3", "C4"],     # Ab
     ["Bb2", "D3", "F3", "Ab3", "Bb3", "D4", "F4"],              # Bb7
 ]
+STARFIELD_CHORDS = [
+    ["C3", "E3", "G3", "B3", "C4", "E4", "G4", "B4", "C5"],
+    ["A2", "C3", "E3", "A3", "C4", "E4", "A4", "C5", "E5"],
+    ["F2", "A2", "C3", "F3", "A3", "C4", "F4", "A4", "C5"],
+    ["G2", "B2", "D3", "G3", "B3", "D4", "G4", "B4", "D5"],
+]
 SYNTHWAVE_SCALE = ["A2", "C3", "D3", "E3", "G3", "A3", "C4", "D4", "E4", "G4", "A4", "C5"]
 DNB_SCALE = ["E2", "G2", "A2", "B2", "D3", "E3", "G3", "A3", "B3", "D4", "E4"]
 AMBIENT_SCALE = ["D2", "A2", "D3", "E3", "F#3", "A3", "D4", "E4", "F#4", "A4", "D5"]
@@ -170,10 +191,11 @@ def extract_track_values(pixels):
     v2 = (np.mean(fp[:, :half_w, 2]) + np.mean(fp[:, half_w:, 0])) / 2.0
     v3 = np.mean(fp[:, :, 3])
     
-    v0 = np.clip((v0 - 0.03) * 1.6, 0.0, 1.0)
-    v1 = v1 ** 0.6
-    v2 = v2 ** 1.4
-    v3 = 3.0 * v3**2 - 2.0 * v3**3
+    # Transfer curves: amplify weak channels, add contrast to strong ones
+    v0 = np.clip(v0 * 2.0, 0.0, 1.0) ** 0.7       # lead: amplify + brighten
+    v1 = np.clip(v1 * 1.8, 0.0, 1.0) ** 0.6       # harmony: amplify + brighten
+    v2 = np.clip(v2 * 3.5, 0.0, 1.0)               # bass: strong amplify (weak signal)
+    v3 = np.clip(v3 * 3.0, 0.0, 1.0) ** 0.8        # perc: strong amplify + slight brighten
     
     return [float(v0), float(v1), float(v2), float(v3)]
 
@@ -397,7 +419,45 @@ def synth_italo(track_name, brightness, step_dur, step_num, bpm):
     return silence(step_dur)
 
 
+def synth_starfield(track_name, brightness, step_dur, step_num, bpm):
+    """Original starfield chiptune: square lead, triangle harmony, saw bass, noise perc."""
+    beat_dur = 60.0 / bpm
+    bar_dur = 4 * beat_dur
+    chord_idx = int((step_num * step_dur) / (2 * bar_dur)) % len(STARFIELD_CHORDS)
+    scale = STARFIELD_CHORDS[chord_idx]
+
+    if track_name == "lead":
+        note = brightness_to_note(brightness, scale)
+        freq = note_freq(note)
+        duty = 0.3 + brightness * 0.4
+        snd = square(freq, step_dur, duty=duty)
+        snd = env(snd, a=0.005, d=step_dur*0.3, s=0.4, r=step_dur*0.4)
+        snd = bitcrush(snd, depth=6)
+        return snd
+    elif track_name == "harmony":
+        note = brightness_to_note(brightness, scale)
+        freq = note_freq(note) * 0.5
+        snd = triangle(freq, step_dur)
+        snd = env(snd, a=0.05, d=step_dur*0.5, s=0.7, r=step_dur*0.3)
+        return snd
+    elif track_name == "bass":
+        note = brightness_to_note(brightness, scale[:4])
+        freq = note_freq(note) * 0.25
+        snd = sawtooth(freq, step_dur)
+        snd = env(snd, a=0.01, d=step_dur*0.6, s=0.5, r=step_dur*0.2)
+        snd = lowpass(snd, 600)
+        return snd
+    elif track_name == "perc":
+        snd = noise(step_dur)
+        snd = env(snd, a=0.001, d=step_dur*0.3, s=0.0, r=step_dur*0.2)
+        cutoff = 800 + brightness * 4000
+        snd = lowpass(snd, cutoff)
+        return snd
+    return silence(step_dur)
+
+
 SYNTH_DISPATCH = {
+    "starfield": synth_starfield,
     "lofi_hiphop": synth_lofi,
     "synthwave": synth_synthwave,
     "dnb": synth_dnb,
@@ -462,20 +522,42 @@ def run_shader_to_music():
 
     time_offsets = genre_cfg["time_offsets"]
     all_track_values = []
+    
+    # Check for cached shader data — reuse if shader hasn't changed
+    cache_path = os.path.join(SCRIPT_DIR, "shader_cache.json")
+    cache_key = f"{GENRE}:{genre_cfg['shader']}:{bpm}:{duration}:{steps_per_beat}:{time_offsets}"
+    cached = None
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path) as f:
+                cached = json.load(f)
+            if cached.get("cache_key") == cache_key:
+                all_track_values = cached["track_values"]
+                print(f"[shader-music] Using cached shader data ({len(all_track_values)} steps)")
+        except:
+            cached = None
+    
+    if not all_track_values:
+        t0 = time.time()
+        for step in range(total_steps):
+            base_t = step * step_dur
+            track_vals = []
+            for track_idx in range(4):
+                t = base_t + time_offsets[track_idx]
+                pixels = render_shader_frame(ctx, prog, fbo, vao, t)
+                all_vals = extract_track_values(pixels)
+                track_vals.append(all_vals[track_idx])
+            all_track_values.append(track_vals)
 
-    t0 = time.time()
-    for step in range(total_steps):
-        base_t = step * step_dur
-        track_vals = []
-        for track_idx in range(4):
-            t = base_t + time_offsets[track_idx]
-            pixels = render_shader_frame(ctx, prog, fbo, vao, t)
-            all_vals = extract_track_values(pixels)
-            track_vals.append(all_vals[track_idx])
-        all_track_values.append(track_vals)
-
-    gpu_time = time.time() - t0
-    print(f"[shader-music] GPU render: {gpu_time:.3f}s ({total_steps*4} frames)")
+        gpu_time = time.time() - t0
+        print(f"[shader-music] GPU render: {gpu_time:.3f}s ({total_steps*4} frames)")
+        
+        # Cache for reuse
+        with open(cache_path, 'w') as f:
+            json.dump({"cache_key": cache_key, "track_values": all_track_values}, f)
+        print(f"[shader-music] Cached shader data for reuse")
+    else:
+        gpu_time = 0.0
 
     # Log
     log_data = {
