@@ -5,7 +5,7 @@
  * Features: line-numbered gutter, cursor movement, selection, insert/delete,
  * undo/redo, find, clipboard, scroll, tab handling.
  */
-import blessed from "blessed";
+import type blessed from "blessed";
 
 export interface EditorTheme {
   fg: string;
