@@ -155,6 +155,65 @@ cleans up resources.
 - [ ] S6: Start via `wibwob start` (not shell alias, not script)
 - [ ] S7: Verify: kill terminal → `wibwob attach` → everything back
 
+### F5: `wibwob write` — Text Pipe Into Windows
+
+**Goal:** Push text content into a live window from stdin. The Unix write
+side to complement the existing read side (`wibwob screenshot <id>`).
+
+Inspired by Plan 9's Rio (window-as-a-file) and the Symbient Plumber concept.
+See GitHub #127 for full Plan 9 analysis.
+
+**Design (from ops lens):**
+- Target by **window ID**, not app type (session-scoped, same as screenshot)
+- New API endpoint: `POST /windows/<id>/write` with `{ text: "..." }`
+- New SDK hook: `host.registerWriteHandler((text: string) => void)`
+- CLI: `echo "HELLO" | wibwob write 3` — reads stdin, POSTs to endpoint
+- Apps that can't accept text simply don't register the handler
+- Write means "do the obvious thing" — set text (figlet), create entry
+  (journal), send message (chatroom), type into pty (terminal)
+
+**Failure modes:** 404 (no window), 405 (app has no handler), 500 (handler error).
+All distinguishable by exit code for agent branching.
+
+**Stories:**
+- [ ] S1: `registerWriteHandler(fn)` SDK hook in `microapp-host.ts`
+- [ ] S2: `POST /windows/<id>/write` endpoint in `control-api.ts`
+- [ ] S3: `wibwob write <id>` CLI subcommand — reads stdin, calls endpoint
+- [ ] S4: Figlet write handler — update live banner text (proof of concept)
+- [ ] S5: Journal write handler — create new entry with body from stdin
+- [ ] S6: Chatroom write handler — send message
+- [ ] S7: Terminal write handler — write to pty stdin
+- [ ] S8: Verify: `echo "HELLO" | wibwob write 3` updates figlet window
+
+**What write is NOT:**
+- Not a replacement for per-app commands (`journal.create`, `chatroom.send`)
+- Not an edit/replace/append API — it's "the obvious thing" per app
+- Not a way to write to output-only apps (contour, plasma, inspector)
+
+**Stretch goals (Plan 9 direction, future epic):**
+- `wibwob read <id>` alias for `wibwob screenshot <id>` (symmetry)
+- `wibwob plumb --from <id> --to <id>` — inter-window content routing
+- Per-app content-type declarations for smart plumb routing
+- `wibwob read 3 | wibwob write 7` as the canonical symbient pipe
+
+**Write suitability by microapp:**
+
+| App | Write? | Operation | Existing command? |
+|-----|--------|-----------|-------------------|
+| figlet-banner | ✅ | Set banner text | `figlet.open --text X` (creates new, no update) |
+| journal | ✅ | Create entry | `journal.create --body X` ✅ exists |
+| chatroom | ✅ | Send message | `chatroom.send --message X` ✅ exists |
+| terminal | ✅ | Type into pty | ❌ needs `terminal.send` |
+| text-editor | ✅ | Insert at cursor | ❌ needs `editor.insert` |
+| workspace-beacon | ✅ | Set note | `beacon.set-note --note X` ✅ exists |
+| wibwobworld | ✅ | Send chat | `world.chat --message X` ✅ exists |
+| contour-studio | ❌ | N/A — generative | Read only |
+| runtime-inspector | ❌ | N/A — read-only dashboard | Read only |
+| plasma | ❌ | N/A — generative | Read only |
+| command-lab | ❌ | N/A — command runner | Read only |
+| generative-art | ❌ | N/A — generative | Read only |
+| tr808 | ⚠️ | Pattern data? | Needs musical input, not text |
+
 ---
 
 ## Out of Scope
