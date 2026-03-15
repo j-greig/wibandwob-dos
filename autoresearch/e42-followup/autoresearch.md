@@ -133,7 +133,24 @@ Most remaining blessed usage falls into two categories the Handle API can't repl
 1. **Canvas rendering** — raw blessed.box used as a frame buffer for animations (plasma, contour, tr808). These need blessed.
 2. **Deep input handling** — blessed keypress events, inputOnFocus, cursor management. The SDK `createInputLine` covers simple cases but not chat-style multi-line input.
 
-**To move the metric further, the SDK needs:**
-- `createCanvas(parent, opts)` — a blessed.box wrapper for render-engine use (legitimises the pattern)
-- Enhanced `createInputLine` with multi-line support and keypress forwarding
+**createCanvas shipped** — legitimised blessed for render engines. Remaining 15 apps need
+blessed for interactive widgets (mouse/clickable/input). Further reduction needs:
+- SDK `createButton` with mouse/hover support
+- Enhanced `createInputLine` with multi-line support and keypress forwarding  
 - `createChatView(parent, opts)` — transcript + input combo for chat microapps
+
+### Disabled Low-Quality Apps
+- terrarium-life → .disabled (low quality)
+- demo-patchbay-lab → .disabled (moot)
+- demo-layout-stress-test-codex → .disabled (codex demo)
+
+### Host-Window-Registry Pattern
+Created `src/core/host-window-registry.ts` + planning doc at `.planning/ideas/host-window-registry.md`.
+Declarative registry to replace 30+ private openXxxWindow() methods in app-controller.
+Not yet wired — needs method-by-method migration.
+
+### Final Metrics (end of session)
+- blessed_microapp_count: 15 (from 31)
+- app_controller_lines: 2334 (unchanged — registry pattern ready but not wired)
+- as_any_count: 169 (unchanged — deferred to next session)
+- SDK Handle components: 11 (including createCanvas)
