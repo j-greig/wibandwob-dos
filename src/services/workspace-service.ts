@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { WindowSnapshot } from "../core/types.js";
+import { safeReadJSON, safeWriteFile } from "../core/safe-fs.js";
 
 /** Workspace file envelope. Backward-compatible: old files are bare arrays. */
 export interface WorkspaceFile {
@@ -29,15 +30,15 @@ export class WorkspaceService {
 
   save(snapshots: WindowSnapshot[], theme?: string): void {
     const file: WorkspaceFile = { version: 2, theme, windows: snapshots };
-    fs.mkdirSync(this.workspaceDir, { recursive: true });
-    fs.writeFileSync(this.path, JSON.stringify(file, null, 2), "utf8");
+    safeWriteFile(this.path, JSON.stringify(file, null, 2));
   }
 
   load(): { windows: WindowSnapshot[]; theme?: string } {
-    const raw = JSON.parse(fs.readFileSync(this.path, "utf8"));
+    const raw = safeReadJSON<WorkspaceFile | WindowSnapshot[]>(this.path);
+    if (!raw) return { windows: [] };
     // Backward compat: old files are bare WindowSnapshot[]
     if (Array.isArray(raw)) return { windows: raw };
-    return { windows: raw.windows ?? [], theme: raw.theme };
+    return { windows: (raw as WorkspaceFile).windows ?? [], theme: (raw as WorkspaceFile).theme };
   }
 
   exists(): boolean {

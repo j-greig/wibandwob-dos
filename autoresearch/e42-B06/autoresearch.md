@@ -10,8 +10,7 @@
 substantially complete). Your job: audit what they produced, assess what's still wrong
 or missing, and write + execute the next autoresearch brief yourself.
 
-Read the findings, metrics, and ideas files from B01–B05 before you begin. Then
-decide what matters most and loop on it.
+Read the findings, metrics, and ideas files from B01–B05 before you begin. You probably want to use Haiku/scout agents in parralel (or similar) to grok the `autoresearch.md` for each bucket and write up its `autoresearch.ideas.md` file as somehow this is usually forgotten. You'll then have a clearer picture of what was done / what wasn't / ideas that got parking-lotted. After reading up, decide what matters most and loop on it given the mandate below.
 
 ## Your Mandate
 
@@ -69,7 +68,7 @@ Things humans forget to ask for:
 
 2. **Audit the codebase.** Run the metrics scripts from B01–B05. Grep for patterns.
    Read key files. Use `wibwob` CLI to inspect the running app. Use `bash scripts/discover.sh`
-   for full index.
+   for full index. Think about best-practice tooling in the TS ecosystem that might offer signifcant help. 
 
 3. **Write your brief.** Update this file's "Chosen Focus" section below with:
    - What you're optimising

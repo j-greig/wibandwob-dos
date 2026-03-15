@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import os from "node:os";
 import path from "node:path";
 
@@ -210,19 +211,13 @@ export class ContentService {
   /** Measure a single entry on demand. Caches the result. */
   measureEntry(entry: BrowserEntry): BrowserEntry["metadata"] {
     if (entry.metadata) return entry.metadata;
-    try {
-      entry.metadata = measurePrimerContent(fs.readFileSync(entry.filePath, "utf8")).measurement;
-    } catch {
-      // leave undefined
-    }
+    const text = safeReadFile(entry.filePath);
+    if (text) entry.metadata = measurePrimerContent(text).measurement;
     return entry.metadata;
   }
 
   private readPrimerMetadata(filePath: string): BrowserEntry["metadata"] | undefined {
-    try {
-      return measurePrimerContent(fs.readFileSync(filePath, "utf8")).measurement;
-    } catch {
-      return undefined;
-    }
+    const text = safeReadFile(filePath);
+    return text ? measurePrimerContent(text).measurement : undefined;
   }
 }

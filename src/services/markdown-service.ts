@@ -17,7 +17,8 @@
  */
 
 import { marked, type Token } from "marked";
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import { visibleWidth, wrapTextWithAnsi, padToWidth } from "../core/ansi-utils.js";
 import { highlightCode } from "./syntax-highlight.js";
 import { isFigletAvailable, tryFiglet as tryFigletRaw } from "./figlet-service.js";
@@ -424,7 +425,8 @@ export function renderMarkdown(text: string, width: number, opts: RenderMarkdown
  * Render a markdown file to ANSI lines. Throws if file cannot be read.
  */
 export function renderMarkdownFile(filePath: string, width: number, opts: RenderMarkdownOptions = {}): string[] {
-  const text = readFileSync(filePath, "utf8");
+  const text = safeReadFile(filePath);
+  if (!text) throw new Error(`Cannot read markdown file: ${filePath}`);
   return renderMarkdown(text, width, opts);
 }
 

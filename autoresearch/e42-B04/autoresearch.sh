@@ -39,7 +39,7 @@ wrapper_count=0
 echo "METRIC wrapper_count=$wrapper_count"
 
 # Typecheck time
-tc_start=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
+tc_start=$(python3 -c 'import time; print(int(time.time()*1000))')
 bun run typecheck >/dev/null 2>&1
-tc_end=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
-echo "METRIC typecheck_seconds=$(echo "scale=2; $((tc_end - tc_start)) / 1000" | bc)"
+tc_end=$(python3 -c 'import time; print(int(time.time()*1000))')
+echo "METRIC typecheck_seconds=$(echo "scale=2; ($tc_end - $tc_start) / 1000" | bc)"
