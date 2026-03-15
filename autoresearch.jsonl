@@ -1,3 +1,4 @@
 {"type":"config","name":"F5 Write Pipe — wibwob write/read","metricName":"write_score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"0fa22aa","metric":20,"metrics":{},"status":"discard","description":"Baseline: CLI infra grep checks pass (20pts), no write commands exist yet","timestamp":1773578475965,"segment":0}
 {"run":2,"commit":"5840e20","metric":100,"metrics":{},"status":"keep","description":"F5 write pipe: figlet.write command, wibwob write/read CLI, fallback convention (write→send→create), pipe composition","timestamp":1773578785257,"segment":0}
+{"run":3,"commit":"3fc1d98","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100","timestamp":1773578810459,"segment":0}
