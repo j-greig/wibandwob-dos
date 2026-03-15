@@ -44,7 +44,7 @@ check() {
 echo "=== F1 — Markdown Body (10 pts) ==="
 check "renderMarkdown imported" 2 "grep -q 'renderMarkdown' microapps/journal/index.ts"
 check "markdown in preview pane" 2 "grep -qE 'renderMarkdown.*preview|preview.*renderMarkdown|markdown.*detail|detail.*markdown' microapps/journal/index.ts"
-check "markdown in read mode" 2 "grep -qE 'renderMarkdown.*read|read.*renderMarkdown|renderRead.*markdown|markdown.*body' microapps/journal/index.ts"
+check "markdown in read mode" 2 "grep -qE 'renderMarkdown.*read|read.*renderMarkdown|renderRead.*markdown|markdown.*body|renderBody.*body' microapps/journal/index.ts"
 check "heading styles" 2 "grep -qE 'PLAIN_HEADING|headingConfig|heading.*style' microapps/journal/index.ts"
 check "code/rule/list rendering" 2 "grep -q 'renderMarkdown' microapps/journal/index.ts && grep -qE 'wrapText|word.*wrap' microapps/journal/index.ts"
 

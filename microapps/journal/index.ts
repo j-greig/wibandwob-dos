@@ -120,6 +120,18 @@ const ANSI = {
   },
 };
 
+// Detect if text has markdown features worth rendering
+function hasMarkdown(text: string): boolean {
+  return /^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^```|^\s*>\s|^---$|^\*\*|^__/m.test(text);
+}
+
+function renderBody(text: string, width: number): string[] {
+  if (hasMarkdown(text)) {
+    return renderMarkdown(text, width, { headingConfig: PLAIN_HEADING_CONFIG, paddingX: 1 });
+  }
+  return wrapText(text, width - 2).map(l => `  ${l}`);
+}
+
 function wrapText(text: string, width: number): string[] {
   if (width < 5) width = 5;
   const lines: string[] = [];
@@ -683,7 +695,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
     // Build session list items
     const items: string[] = [];
-    const maxW = twoPane ? Math.floor(w * 0.38) - 8 : w - 8;
+    const maxW = twoPane ? Math.floor(w * 0.30) - 8 : w - 8;
     for (const s of sessions) {
       const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
       const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
@@ -702,7 +714,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (twoPane && sessions.length > 0) {
       const s = sessions[sessionIdx];
       if (s) {
-        const previewW = w - Math.floor(w * 0.40) - 6;
+        const previewW = w - Math.floor(w * 0.32) - 6;
         const dim = ANSI.fg(muted);
         const hi = ANSI.fg(accent);
 
@@ -763,7 +775,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (viewMode === "sessions") {
       const twoPane = w >= 120;
       if (twoPane) {
-        const listW = Math.floor(w * 0.38);
+        const listW = Math.floor(w * 0.30);
         listBox.width = listW;
         paneSep.left = listW;
         paneSep.show();
@@ -784,7 +796,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const twoPane = w >= 120;
 
     if (twoPane) {
-      const listW = Math.floor(w * 0.38);
+      const listW = Math.floor(w * 0.30);
       listBox.width = listW;
       paneSep.left = listW;
       paneSep.show();
@@ -802,7 +814,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     // Build list items with date group headers and index mapping
     const items: string[] = [];
     const entryIndexMap: number[] = []; // entryIndexMap[visualIdx] → entryIdx or -1 for headers
-    const maxTitleW = twoPane ? Math.floor(w * 0.38) - 16 : w - 20;
+    const maxTitleW = twoPane ? Math.floor(w * 0.30) - 12 : w - 14;
 
     function dateGroup(iso: string): string {
       const d = new Date(iso);
@@ -821,20 +833,19 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       const group = dateGroup(sortField);
       if (group !== lastGroup) {
         lastGroup = group;
-        items.push(`  {${muted}-fg}── ${group} ──{/${muted}-fg}`);
+        items.push(`{${muted}-fg}─ ${group} ─{/${muted}-fg}`);
         entryIndexMap.push(-1); // header
       }
       const icon = KIND_ICON[e.kind] || "░";
-      const glyph = PEER_GLYPH[e.peer] || "·";
       const fg = peerColor(e.peer, th);
       const age = timeAgo(e.updatedAt);
       const title = truncate(e.title, maxTitleW);
       const tagStr = e.tags.length > 0 ? ` {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "";
-      items.push(` {${fg}-fg}${glyph}{/${fg}-fg} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
+      items.push(`${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
       entryIndexMap.push(i);
     }
     if (items.length === 0) {
-      items.push(`  {${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
+      items.push(`{${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
       entryIndexMap.push(-1);
     }
 
@@ -859,15 +870,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     } else if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
-        const previewW = w - Math.floor(w * 0.40) - 6;
+        const previewW = w - Math.floor(w * 0.32) - 6;
         const ruleW = Math.max(10, previewW - 2);
         const dim = ANSI.fg(muted);
         const hi = ANSI.fg(accent);
         const icon = KIND_ICON[e.kind] || "░";
-        const markdownBody = renderMarkdown(e.body || "(empty)", previewW, {
-          headingConfig: PLAIN_HEADING_CONFIG,
-          paddingX: 2,
-        });
+        const bodyLines = renderBody(e.body || "(empty)", previewW);
         const header = [
           "",
           `  ${ANSI.bold}${icon} ${e.title}${ANSI.reset}`,
@@ -875,7 +883,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
           e.tags.length ? `  ${hi}${e.tags.map(t => `#${t}`).join(" ")}${ANSI.reset}` : null,
           `  ${dim}${"─".repeat(ruleW)}${ANSI.reset}`,
           "",
-          ...markdownBody,
+          ...bodyLines,
         ].filter((l): l is string => l !== null);
         detailBox.setContent(header.join("\n"));
         (detailBox as any).scrollTo(0);
@@ -919,10 +927,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const icon = KIND_ICON[e.kind] || "░";
     const dim = ANSI.fg(muted);
     const hi = ANSI.fg(accent);
-    const markdownBody = renderMarkdown(e.body || "(empty)", bodyW, {
-      headingConfig: PLAIN_HEADING_CONFIG,
-      paddingX: 2,
-    });
+    const bodyLines = renderBody(e.body || "(empty)", bodyW);
 
     const content = [
       "",
@@ -932,7 +937,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       e.tags.length ? `  ${hi}${e.tags.map(t => `#${t}`).join(" ")}${ANSI.reset}` : null,
       `  ${dim}${"─".repeat(ruleW)}${ANSI.reset}`,
       "",
-      ...markdownBody,
+      ...bodyLines,
     ].filter((l): l is string => l !== null);
 
     detailBox.setContent(content.join("\n"));
