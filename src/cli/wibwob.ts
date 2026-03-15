@@ -333,6 +333,82 @@ async function cmdWrite(windowId?: string) {
   process.exit(1);
 }
 
+async function cmdPlumb(args: string[]) {
+  const flags = parseFlags(args.slice(1));
+  const fromId = flags.from as number | undefined;
+  const toId = flags.to as number | undefined;
+
+  if (fromId === undefined || toId === undefined) {
+    process.stderr.write("Usage: wibwob plumb --from <window-id> --to <window-id>\n");
+    process.stderr.write("Routes text from source window to destination window.\n");
+    process.exit(1);
+  }
+
+  // 1. Get state to validate both windows
+  const state = (await api("/state")) as {
+    windows: Array<{ id: number; appType?: string }>;
+  };
+  const srcWin = state.windows.find((w) => w.id === fromId);
+  const dstWin = state.windows.find((w) => w.id === toId);
+
+  if (!srcWin) {
+    process.stderr.write(`No window with id ${fromId}\n`);
+    process.exit(1);
+  }
+  if (!dstWin) {
+    process.stderr.write(`No window with id ${toId}\n`);
+    process.exit(1);
+  }
+
+  // 2. Read source text via screenshot
+  const qs = `?id=${fromId}`;
+  const url = IS_SOCKET ? `http://localhost/screenshot/text${qs}` : `${BASE}/screenshot/text${qs}`;
+  const fetchOpts: RequestInit = IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {};
+  const res = await fetch(url, fetchOpts);
+  if (!res.ok) {
+    process.stderr.write(`Could not read window ${fromId}: ${res.status}\n`);
+    process.exit(1);
+  }
+  const text = (await res.text()).trimEnd();
+
+  // 3. Write to destination using the write fallback chain
+  const dstAppType = dstWin.appType;
+  if (!dstAppType) {
+    process.stderr.write(`Window ${toId} has no appType\n`);
+    process.exit(1);
+  }
+
+  const prefix = `microapp.${dstAppType}`;
+  const candidates = [
+    { cmd: `${prefix}.write`, args: { text, windowId: toId } },
+    { cmd: `${prefix}.send`, args: { message: text } },
+    { cmd: `${prefix}.create`, args: { body: text, title: text.slice(0, 50) } },
+  ];
+
+  const cmdList = (await api("/commands/list")) as {
+    commands: Array<{ id: string }>;
+  };
+  const available = new Set(cmdList.commands.map((c) => c.id));
+
+  for (const candidate of candidates) {
+    if (available.has(candidate.cmd)) {
+      const result = await api("/commands/run", "POST", {
+        id: candidate.cmd,
+        args: candidate.args,
+      });
+      if (!QUIET) {
+        out({ ok: true, from: fromId, to: toId, command: candidate.cmd, bytesRouted: text.length });
+      }
+      return;
+    }
+  }
+
+  process.stderr.write(
+    `Window ${toId} (${dstAppType}) does not support write\n`,
+  );
+  process.exit(1);
+}
+
 async function cmdStart(args: string[]) {
   const { spawnSync } = await import("node:child_process");
   const repoRoot = path.resolve(SCRATCH_BASE, "..");
@@ -592,6 +668,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "minimap",     aliases: ["map"],        desc: "Spatial map of all windows",           fn: () => cmdMinimap() },
   { name: "screenshot",  aliases: ["read"], args: "[id]", desc: "Text screenshot (desktop or window)", fn: (a) => cmdScreenshot(a[1]) },
   { name: "write",       args: "<id>",           desc: "Write stdin text into a window (pipe in)", fn: (a) => cmdWrite(a[1]) },
+  { name: "plumb",       args: "--from <id> --to <id>", desc: "Route text from one window to another", fn: (a) => cmdPlumb(a) },
   { name: "start",       desc: "Start instance (idempotent if already running)",  fn: (a) => cmdStart(a) },
   { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
   { name: "instances",   desc: "List running instances (via sockets)",             fn: () => cmdInstances() },

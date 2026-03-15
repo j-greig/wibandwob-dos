@@ -1,1 +1,1 @@
-autoresearch/cli-start-restart/autoresearch.checks.sh
+autoresearch/plumb/autoresearch.checks.sh
