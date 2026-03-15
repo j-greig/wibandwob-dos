@@ -154,6 +154,15 @@ function truncate(s: string, len: number): string {
   return s.length > len ? s.slice(0, len - 1) + "…" : s;
 }
 
+function dateGroup(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 function peerColor(peer: Peer, th: any): string {
   if (peer === "agent") return th.selected?.fg || "#b48ead";
   if (peer === "human") return th.body?.fg || "#d8dee9";
@@ -406,8 +415,8 @@ export default function setup(host: MicroappHost) {
       const state = window.describeState?.() ?? {};
       return { mode: state.mode, selectedId: state.selectedId, viewMode: state.viewMode };
     },
-    restore: (_snapshot, payload) => {
-      host.runCommand("open", payload);
+    restore: (snapshot, payload) => {
+      host.runCommand("open", { ...payload, viewMode: snapshot?.viewMode });
     },
   });
 }
@@ -523,7 +532,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   });
 
   let mode: Mode = "list";
-  let viewMode: ViewMode = "journal";
+  let viewMode: ViewMode = args?.viewMode === "sessions" ? "sessions" : "journal";
   let entries: JournalEntry[] = [];
   let selectedIdx = 0;
   let sessions: SessionSummary[] = [];
@@ -797,7 +806,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     for (let i = 0; i < filtered.length; i++) {
       const s = filtered[i]!;
       const realIdx = sessions.indexOf(s);
-      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
+      const dateStr = s.date ? dateGroup(s.date) : "?";
       if (dateStr !== lastDateGroup) {
         lastDateGroup = dateStr;
         items.push(`{${muted}-fg}─ ${dateStr} ─{/${muted}-fg}`);
@@ -948,16 +957,6 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const items: string[] = [];
     const entryIndexMap: number[] = []; // entryIndexMap[visualIdx] → entryIdx or -1 for headers
     const maxTitleW = twoPane ? Math.floor(w * 0.30) - 12 : w - 14;
-
-    function dateGroup(iso: string): string {
-      const d = new Date(iso);
-      const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffDays = Math.floor(diffMs / 86400000);
-      if (diffDays === 0) return "Today";
-      if (diffDays === 1) return "Yesterday";
-      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    }
 
     let lastGroup = "";
     for (let i = 0; i < entries.length; i++) {
@@ -1604,6 +1603,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onCleanup(() => { _liveRefresh = null; _viewToggle = null; _modelFilter = null; });
 
   // ── Init ──────────────────────────────────────────────────────
+  if (viewMode === "sessions" && PI_EXISTS) {
+    sessions = listSessions();
+  }
   refresh();
   render();
   win.setFocusTarget(listBox);
