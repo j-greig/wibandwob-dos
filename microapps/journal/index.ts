@@ -1,64 +1,76 @@
 import blessed from "blessed";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
+import { join } from "path";
+import type { MicroappHost, WindowHandle } from "../../src/services/microapp-sdk.js";
 import { renderFiglet } from "../../src/services/microapp-sdk.js";
-import { readFileSync, appendFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
 
-// ── Types ───────────────────────────────────────────────────────────
-
+// ── Types ───────────────────────────────────────────────────────
 type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
+type Peer = "human" | "agent" | "system";
+type Mode = "list" | "read" | "edit";
 
 interface JournalEntry {
-  peer: "human" | "agent" | "system";
-  text: string;
-  ts: string;
-  kind?: EntryKind;
-  tags?: string[];
-  actor?: string; // peer provenance — who specifically (e.g. "claude", "james", "cron")
-  referenceId?: number; // linked entry — index of referenced entry (0-based)
+  id: string;
+  title: string;
+  body: string;
+  peer: Peer;
+  kind: EntryKind;
+  tags: string[];
+  actor?: string;
+  createdAt: string;
+  updatedAt: string;
+  archived?: boolean;
+  referenceId?: string;
 }
 
-// ── Data ────────────────────────────────────────────────────────────
-
-function journalPath(host: MicroappHost): string {
-  return join(host.repoRoot, "scratch", "journal.jsonl");
-}
-
-function loadEntries(path: string): JournalEntry[] {
-  if (!existsSync(path)) return [];
-  const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
-  const entries: JournalEntry[] = [];
-  for (const line of lines) {
-    try { entries.push(JSON.parse(line)); } catch {}
-  }
-  return entries;
-}
-
-function appendEntry(path: string, entry: JournalEntry) {
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  appendFileSync(path, JSON.stringify(entry) + "\n");
-}
-
-// ── Formatting ──────────────────────────────────────────────────────
-
-const PEER_GLYPH = { human: "▸", agent: "▹", system: "·" } as const;
-const PEER_LABEL = { human: "HUMAN", agent: "AGENT", system: "SYS" } as const;
-const KIND_ICON: Record<string, string> = {
+// ── Constants ───────────────────────────────────────────────────
+const KIND_ICON: Record<EntryKind, string> = {
   note: "░", observation: "◊", decision: "■", discovery: "★", question: "?",
 };
+const PEER_GLYPH: Record<Peer, string> = { human: "▸", agent: "▹", system: "·" };
 
-function peerColor(peer: string, t: any): string {
-  if (peer === "human") return t.body.fg || "white";
-  if (peer === "agent") return t.selected?.fg || "#b48ead";
-  return t.muted?.fg || "#555";
+// ── Storage ─────────────────────────────────────────────────────
+function entriesDir(host: MicroappHost): string {
+  const dir = join(host.repoRoot, "scratch", "journal-v2", "entries");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
-function formatTime(ts: string): string {
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+function saveEntry(host: MicroappHost, entry: JournalEntry): void {
+  const dir = entriesDir(host);
+  writeFileSync(join(dir, `${entry.id}.json`), JSON.stringify(entry, null, 2));
 }
 
+function loadEntry(host: MicroappHost, id: string): JournalEntry | null {
+  const fp = join(entriesDir(host), `${id}.json`);
+  if (!existsSync(fp)) return null;
+  try { return JSON.parse(readFileSync(fp, "utf-8")); } catch { return null; }
+}
+
+function loadAllEntries(host: MicroappHost): JournalEntry[] {
+  const dir = entriesDir(host);
+  const files = readdirSync(dir).filter(f => f.endsWith(".json")).sort();
+  const entries: JournalEntry[] = [];
+  for (const f of files) {
+    try {
+      const e = JSON.parse(readFileSync(join(dir, f), "utf-8"));
+      if (e && e.id) entries.push(e);
+    } catch { /* skip corrupt */ }
+  }
+  return entries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function deleteEntryFile(host: MicroappHost, id: string): boolean {
+  const fp = join(entriesDir(host), `${id}.json`);
+  if (existsSync(fp)) { unlinkSync(fp); return true; }
+  return false;
+}
+
+function genId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
 function timeAgo(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
@@ -70,430 +82,317 @@ function timeAgo(ts: string): string {
   return `${days}d ago`;
 }
 
-function dayKey(ts: string): string {
-  return new Date(ts).toISOString().slice(0, 10);
-}
-
 function wrapText(text: string, width: number): string[] {
-  if (text.length <= width) return [text];
+  if (width < 5) width = 5;
   const lines: string[] = [];
-  let remaining = text;
-  while (remaining.length > width) {
-    let breakAt = remaining.lastIndexOf(" ", width);
-    if (breakAt <= 0) breakAt = width;
-    lines.push(remaining.slice(0, breakAt));
-    remaining = remaining.slice(breakAt).trimStart();
+  for (const raw of text.split("\n")) {
+    if (raw.length <= width) { lines.push(raw); continue; }
+    let remaining = raw;
+    while (remaining.length > width) {
+      let cut = remaining.lastIndexOf(" ", width);
+      if (cut < width * 0.3) cut = width;
+      lines.push(remaining.slice(0, cut));
+      remaining = remaining.slice(cut).trimStart();
+    }
+    if (remaining) lines.push(remaining);
   }
-  if (remaining) lines.push(remaining);
   return lines;
 }
 
-function formatDayDivider(dateStr: string, width: number, t: any): string {
-  const muted = t.muted?.fg || "#555";
-  const label = ` ${dateStr} `;
-  const remaining = Math.max(0, width - label.length);
-  const left = "━".repeat(Math.floor(remaining / 2));
-  const right = "━".repeat(Math.ceil(remaining / 2));
-  return `{${muted}-fg}${left}${label}${right}{/${muted}-fg}`;
+function truncate(s: string, len: number): string {
+  return s.length > len ? s.slice(0, len - 1) + "…" : s;
 }
 
-function formatEntryLines(e: JournalEntry, t: any, maxTextW: number): string[] {
-  const glyph = PEER_GLYPH[e.peer] || "·";
-  const peerTag = PEER_LABEL[e.peer] || "???";
-  const time = formatTime(e.ts);
-  const rel = timeAgo(e.ts);
-  const fg = peerColor(e.peer, t);
-  const muted = t.muted?.fg || "#555";
-  const accent = t.selected?.fg || "#b48ead";
-
-  const kindIcon = e.kind ? (KIND_ICON[e.kind] || "░") + " " : "";
-  const prefix = `  {${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time} ${peerTag.padEnd(5)} ${rel.padEnd(7)}{/${muted}-fg}  ${kindIcon}`;
-  // prefix visible length: ~25 + kind (2 if present)
-  const prefixLen = 25 + (e.kind ? 2 : 0);
-  const textW = Math.max(10, maxTextW - prefixLen);
-  const wrapped = wrapText(e.text, textW);
-  const indent = " ".repeat(prefixLen);
-
-  const tagStr = e.tags && e.tags.length > 0
-    ? `  {${accent}-fg}[${e.tags.map(tg => `#${tg}`).join(" ")}]{/${accent}-fg}`
-    : "";
-  const refStr = e.referenceId !== undefined
-    ? `  {${muted}-fg}→ #${e.referenceId}{/${muted}-fg}`
-    : "";
-
-  const result = wrapped.map((line, i) =>
-    i === 0 ? `${prefix}${line}` : `${indent}${line}`
-  );
-  // Tags and refs on their own line for visibility
-  if (tagStr || refStr) {
-    result.push(`${indent}${tagStr}${refStr}`);
-  }
-  return result;
+function peerColor(peer: Peer, th: any): string {
+  if (peer === "agent") return th.selected?.fg || "#b48ead";
+  if (peer === "human") return th.body?.fg || "#d8dee9";
+  return th.muted?.fg || "#555";
 }
 
-// ── Setup ───────────────────────────────────────────────────────────
-
+// ── Setup ───────────────────────────────────────────────────────
 export default function setup(host: MicroappHost) {
+
+  // ── Commands ──────────────────────────────────────────────────
   host.registerCommand({
     id: "open",
     label: "Journal",
-    description: "Open the Symbient Journal.",
+    description: "Open the Symbient Journal v2.",
     menu: [{ category: "demos", order: 155, label: "Journal" }],
     palette: { order: 155, label: "Open Journal" },
-    action: (args: any) => openJournal(host, args),
+    action: () => openJournal(host),
   });
 
-  host.registerSnapshot({
-    serialize: (window) => {
-      const state = window.describeState?.() ?? {};
-      return {
-        filterByPeer: state.filterByPeer ?? "all",
+  host.registerCommand({
+    id: "create",
+    label: "Create Journal Entry",
+    description: "Create a new journal entry. Args: { title, body?, peer?, kind?, tags? }",
+    direct: true,
+    action: (args: any) => {
+      if (!args?.title) return { ok: false, error: "title is required" };
+      const now = new Date().toISOString();
+      const entry: JournalEntry = {
+        id: genId(),
+        title: args.title,
+        body: args.body || "",
+        peer: ["human", "agent", "system"].includes(args?.peer) ? args.peer : "human",
+        kind: args?.kind || "note",
+        tags: Array.isArray(args?.tags) ? args.tags : [],
+        actor: args?.actor,
+        createdAt: now,
+        updatedAt: now,
       };
-    },
-    restore: (_snapshot, payload) => {
-      host.runCommand("open", {
-        filterByPeer: payload?.filterByPeer,
-      });
+      saveEntry(host, entry);
+      if (_liveRefresh) _liveRefresh();
+      return { ok: true, entry };
     },
   });
 
   host.registerCommand({
-    id: "append",
-    label: "Append to Journal",
-    description: "Append an entry to the journal. Args: { text, peer? }",
+    id: "read",
+    label: "Read Journal Entry",
+    description: "Read a journal entry by id. Args: { id }",
     direct: true,
     action: (args: any) => {
-      const text = args?.text;
-      if (!text || typeof text !== "string") {
-        return { ok: false, error: "text is required" };
-      }
-      const peer = (args?.peer === "agent" || args?.peer === "system") ? args.peer : "human";
-      const kind = args?.kind as EntryKind | undefined;
-      const tags = Array.isArray(args?.tags) ? args.tags.filter((t: any) => typeof t === "string") : undefined;
-      const actor = typeof args?.actor === "string" ? args.actor : undefined;
-      const referenceId = typeof args?.referenceId === "number" ? args.referenceId : undefined;
-      const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), kind, tags, actor, referenceId };
-      appendEntry(journalPath(host), entry);
+      if (!args?.id) return { ok: false, error: "id is required" };
+      const entry = loadEntry(host, args.id);
+      if (!entry) return { ok: false, error: "entry not found" };
       return { ok: true, entry };
+    },
+  });
+
+  host.registerCommand({
+    id: "update",
+    label: "Update Journal Entry",
+    description: "Update a journal entry. Args: { id, title?, body?, kind?, tags? }",
+    direct: true,
+    action: (args: any) => {
+      if (!args?.id) return { ok: false, error: "id is required" };
+      const entry = loadEntry(host, args.id);
+      if (!entry) return { ok: false, error: "entry not found" };
+      if (args.title) entry.title = args.title;
+      if (args.body !== undefined) entry.body = args.body;
+      if (args.kind) entry.kind = args.kind;
+      if (args.tags) entry.tags = args.tags;
+      entry.updatedAt = new Date().toISOString();
+      saveEntry(host, entry);
+      if (_liveRefresh) _liveRefresh();
+      return { ok: true, entry };
+    },
+  });
+
+  host.registerCommand({
+    id: "list",
+    label: "List Journal Entries",
+    description: "List journal entries. Args: { peer?, kind?, tag?, search?, limit? }",
+    direct: true,
+    action: (args: any) => {
+      let entries = loadAllEntries(host);
+      if (args?.peer) entries = entries.filter(e => e.peer === args.peer);
+      if (args?.kind) entries = entries.filter(e => e.kind === args.kind);
+      if (args?.tag) entries = entries.filter(e => e.tags?.includes(args.tag));
+      if (args?.search) {
+        const q = args.search.toLowerCase();
+        entries = entries.filter(e =>
+          e.title.toLowerCase().includes(q) || e.body.toLowerCase().includes(q)
+        );
+      }
+      const limit = args?.limit || 50;
+      return {
+        ok: true,
+        total: entries.length,
+        entries: entries.slice(0, limit).map(e => ({
+          id: e.id, title: e.title, peer: e.peer, kind: e.kind,
+          tags: e.tags, createdAt: e.createdAt, updatedAt: e.updatedAt,
+          preview: e.body.slice(0, 100),
+        })),
+      };
+    },
+  });
+
+  host.registerCommand({
+    id: "delete",
+    label: "Delete Journal Entry",
+    description: "Delete a journal entry. Args: { id }",
+    direct: true,
+    action: (args: any) => {
+      if (!args?.id) return { ok: false, error: "id is required" };
+      const ok = deleteEntryFile(host, args.id);
+      if (_liveRefresh) _liveRefresh();
+      return { ok, error: ok ? undefined : "entry not found" };
     },
   });
 
   host.registerCommand({
     id: "export-markdown",
     label: "Export Journal as Markdown",
-    description: "Export the current journal as a .md file. Args: { journalName? }",
+    description: "Export all entries as markdown file.",
     direct: true,
-    action: (args: any) => {
-      const jName = args?.journalName || "journal";
-      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
-      const entries = loadEntries(fp);
-      const mdLines = [`# Symbient Journal — ${jName}`, "", `> Exported ${new Date().toISOString()}`, ""];
-      let lastDay = "";
+    action: () => {
+      const entries = loadAllEntries(host);
+      const lines = ["# Symbient Journal Export", "", `> ${entries.length} entries`, ""];
       for (const e of entries) {
-        const day = dayKey(e.ts);
-        if (day !== lastDay) {
-          mdLines.push(`## ${day}`, "");
-          lastDay = day;
-        }
-        const time = formatTime(e.ts);
-        const tag = PEER_LABEL[e.peer] || "???";
-        mdLines.push(`- **${time}** \`${tag}\` ${e.text}`);
+        const icon = KIND_ICON[e.kind] || "░";
+        lines.push(`## ${icon} ${e.title}`);
+        lines.push(`*${e.peer}* · ${e.kind} · ${new Date(e.createdAt).toLocaleDateString()}`);
+        if (e.tags.length) lines.push(`Tags: ${e.tags.map(t => `#${t}`).join(" ")}`);
+        lines.push("");
+        lines.push(e.body || "(empty)");
+        lines.push("", "---", "");
       }
-      const exportMarkdown = mdLines.join("\n");
-      const outPath = join(host.repoRoot, "scratch", `${jName}-export.md`);
-      const dir = dirname(outPath);
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      writeFileSync(outPath, exportMarkdown);
-      return { ok: true, path: outPath, entries: entries.length };
+      const fp = join(host.repoRoot, "scratch", "journal-v2-export.md");
+      writeFileSync(fp, lines.join("\n"));
+      return { ok: true, path: fp, entries: entries.length };
     },
   });
 
   host.registerCommand({
-    id: "switch",
-    label: "Switch Journal",
-    description: "Switch to a different journal file. Args: { journalName }",
+    id: "import-legacy",
+    label: "Import v1 Journal Entries",
+    description: "Import entries from the v1 journal.jsonl format.",
     direct: true,
-    action: (args: any) => {
-      const name = args?.journalName;
-      if (!name || typeof name !== "string") {
-        return { ok: false, error: "journalName is required" };
-      }
-      // Store preference — next open will use this
-      return { ok: true, switchJournal: name, note: "Reopen journal to use new file" };
-    },
-  });
-
-  host.registerCommand({
-    id: "summarize",
-    label: "Summarize Journal",
-    description: "Return a summary of the current journal. Args: { journalName? }",
-    direct: true,
-    action: (args: any) => {
-      const jName = args?.journalName || "journal";
-      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
-      const all = loadEntries(fp);
-      const humans = all.filter(e => e.peer === "human").length;
-      const agents = all.filter(e => e.peer === "agent").length;
-      const days = new Set(all.map(e => dayKey(e.ts))).size;
-      const kinds: Record<string, number> = {};
-      for (const e of all) if (e.kind) kinds[e.kind] = (kinds[e.kind] || 0) + 1;
-      const allTags = new Set(all.flatMap(e => e.tags || []));
-      const last5 = all.slice(-5).map(e => ({ peer: e.peer, text: e.text, ts: e.ts }));
-      return {
-        ok: true,
-        journalName: jName,
-        totalEntries: all.length,
-        peerBreakdown: { human: humans, agent: agents, system: all.length - humans - agents },
-        days,
-        kinds,
-        tags: [...allTags],
-        recentEntries: last5,
-      };
-    },
-  });
-
-  host.registerCommand({
-    id: "import-devlog",
-    label: "Import Agentic Devlog",
-    description: "Parse .agents/shell-dev/agentic-devlog.md into journal entries. Args: { filePath?, journalName? }",
-    direct: true,
-    action: (args: any) => {
-      const filePath = args?.filePath || join(host.repoRoot, ".agents", "shell-dev", "agentic-devlog.md");
-      const jName = args?.journalName || "agent-devlog";
-      const outPath = join(host.repoRoot, "scratch", `${jName}.jsonl`);
-
-      if (!existsSync(filePath)) return { ok: false, error: `File not found: ${filePath}` };
-      const md = readFileSync(filePath, "utf-8");
-      const lines = md.split("\n");
-
-      const entries: JournalEntry[] = [];
-      let currentDate = "";
-      let currentSection = "";
-      let currentKind: EntryKind = "note";
-      let buffer: string[] = [];
-
-      function flushBuffer() {
-        // Strip markdown bold markers and backticks for cleaner display
-        const text = buffer.join(" ").trim()
-          .replace(/\*\*(.*?)\*\*/g, "$1")
-          .replace(/`(.*?)`/g, "$1");
-        if (text && text.length > 3) {
-          // Extract file references
-          const fileRefs = text.match(/(?:src\/|microapps\/|\.agents\/|\.planning\/)[^\s,)]+/g) || [];
-          const tags: string[] = [];
-          if (currentSection) tags.push(currentSection.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 30));
-          if (fileRefs.length > 0) tags.push("has-files");
-
-          entries.push({
-            peer: "agent",
-            text,
-            ts: currentDate ? new Date(currentDate + "T12:00:00Z").toISOString() : new Date().toISOString(),
-            kind: currentKind,
-            tags: tags.length > 0 ? tags : undefined,
-            actor: "devlog-import",
-          });
-        }
-        buffer = [];
-      }
-
-      let inFrontmatter = false;
+    action: () => {
+      const fp = join(host.repoRoot, "scratch", "journal.jsonl");
+      if (!existsSync(fp)) return { ok: false, error: "No v1 journal found" };
+      const lines = readFileSync(fp, "utf-8").trim().split("\n");
+      let imported = 0;
       for (const line of lines) {
-        // Skip YAML frontmatter
-        if (line.trim() === "---") { inFrontmatter = !inFrontmatter; continue; }
-        if (inFrontmatter) continue;
-
-        // Date headers: ## 2026-03-13: Title  or  ## 2026-03-09 — Title
-        const dateMatch = line.match(/^## (\d{4}-\d{2}-\d{2})[:\s—–-]+\s*(.*)/);
-        if (dateMatch) {
-          flushBuffer();
-          currentDate = dateMatch[1]!;
-          currentSection = dateMatch[2]!.trim();
-          currentKind = "observation";
-          continue;
-        }
-
-        // Sub-headers: ### What worked / What failed / Lesson
-        const subMatch = line.match(/^### (.*)/);
-        if (subMatch) {
-          flushBuffer();
-          const sub = subMatch[1]!.toLowerCase();
-          if (sub.includes("decision") || sub.includes("what worked")) currentKind = "decision";
-          else if (sub.includes("lesson") || sub.includes("rule")) currentKind = "discovery";
-          else if (sub.includes("question") || sub.includes("open")) currentKind = "question";
-          else if (sub.includes("fail") || sub.includes("pain") || sub.includes("friction")) currentKind = "observation";
-          else currentKind = "note";
-          currentSection = subMatch[1]!.trim();
-          continue;
-        }
-
-        // Skip frontmatter, empty lines between sections
-        if (line.startsWith("---") || line.startsWith("# ") || line.startsWith("```")) {
-          if (buffer.length > 0) flushBuffer();
-          continue;
-        }
-
-        // Content lines
-        const trimmed = line.trim();
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          flushBuffer();
-          buffer.push(trimmed.slice(2));
-        } else if (trimmed) {
-          buffer.push(trimmed);
-        } else if (buffer.length > 0) {
-          flushBuffer();
-        }
+        try {
+          const old = JSON.parse(line);
+          const now = old.ts || new Date().toISOString();
+          const entry: JournalEntry = {
+            id: genId(),
+            title: (old.text || "").slice(0, 80) || "Untitled",
+            body: old.text || "",
+            peer: old.peer || "human",
+            kind: old.kind || "note",
+            tags: old.tags || [],
+            actor: old.actor,
+            createdAt: now,
+            updatedAt: now,
+            referenceId: old.referenceId !== undefined ? String(old.referenceId) : undefined,
+          };
+          saveEntry(host, entry);
+          imported++;
+        } catch { /* skip */ }
       }
-      flushBuffer();
-
-      // Write entries
-      const dir = dirname(outPath);
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const content = entries.map(e => JSON.stringify(e)).join("\n") + "\n";
-      writeFileSync(outPath, content);
-
-      return {
-        ok: true,
-        journalName: jName,
-        path: outPath,
-        entriesImported: entries.length,
-        dateRange: entries.length > 0
-          ? { from: entries[0]!.ts.slice(0, 10), to: entries[entries.length - 1]!.ts.slice(0, 10) }
-          : null,
-      };
+      if (_liveRefresh) _liveRefresh();
+      return { ok: true, imported };
     },
   });
 
-  host.registerCommand({
-    id: "query",
-    label: "Query Journal Entries",
-    description: "Search entries by peer, kind, tag, or text. Args: { peer?, kind?, tag?, text?, limit?, journalName? }",
-    direct: true,
-    action: (args: any) => {
-      const jName = args?.journalName || "journal";
-      const fp = join(host.repoRoot, "scratch", `${jName}.jsonl`);
-      let results = loadEntries(fp);
-      if (args?.peer) results = results.filter(e => e.peer === args.peer);
-      if (args?.kind) results = results.filter(e => e.kind === args.kind);
-      if (args?.tag) results = results.filter(e => e.tags?.includes(args.tag));
-      if (args?.text) {
-        const q = args.text.toLowerCase();
-        results = results.filter(e => e.text.toLowerCase().includes(q));
-      }
-      const limit = args?.limit || 20;
-      return {
-        ok: true,
-        total: results.length,
-        entries: results.slice(-limit),
-      };
+  host.registerSnapshot({
+    serialize: (window) => {
+      const state = window.describeState?.() ?? {};
+      return { mode: state.mode, selectedId: state.selectedId };
+    },
+    restore: (_snapshot, payload) => {
+      host.runCommand("open", payload);
     },
   });
-
-  host.registerCommand({
-    id: "ambient",
-    label: "Journal Ambient",
-    description: "Open a compact ambient view showing the last 3 entries.",
-    action: () => openAmbient(host),
-  });
 }
 
-function openAmbient(host: MicroappHost) {
-  const fp = join(host.repoRoot, "scratch", "journal.jsonl");
-  const win = host.createWindow({ title: "Journal ·", width: 50, height: 6 });
-  const t = () => host.theme();
+// ── Live refresh callback ───────────────────────────────────────
+let _liveRefresh: (() => void) | null = null;
 
-  const box = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 0,
-    tags: true,
-    style: t().body,
-  });
-
-  function render() {
-    const entries = loadEntries(fp);
-    const last3 = entries.slice(-3);
-    const th = t();
-    const muted = th.muted?.fg || "#555";
-    const lines = last3.map(e => {
-      const glyph = PEER_GLYPH[e.peer] || "·";
-      const fg = peerColor(e.peer, th);
-      const time = formatTime(e.ts);
-      return `{${fg}-fg}${glyph}{/${fg}-fg} {${muted}-fg}${time}{/${muted}-fg} ${e.text}`;
-    });
-    if (lines.length === 0) lines.push(`{${muted}-fg}empty journal{/${muted}-fg}`);
-    box.setContent(lines.join("\n"));
-    host.screen.render();
-  }
-
-  render();
-  // Refresh every 5s
-  const timer = setInterval(render, 5000);
-
-  win.describeState(() => ({ summary: "Journal ambient — last 3" }));
-  win.captureText(() => box.getContent());
-  win.onRestyle(() => { box.style = t().body; render(); });
-  win.onCleanup(() => clearInterval(timer));
-  win.focus();
-}
-
+// ── Window ──────────────────────────────────────────────────────
 function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
-  const geo = host.geometry;
-  const winW = Math.max(80, Math.floor(geo.width * 0.95));
-  const winH = Math.max(20, Math.floor(geo.height * 0.90));
-  const winL = Math.max(0, Math.floor((geo.width - winW) / 2));
-  const winT = Math.max(1, Math.floor((geo.height - winH) / 2));
-
-  const journalName = (args?.journalName as string) || "journal";
-  const fp = join(host.repoRoot, "scratch", `${journalName}.jsonl`);
-
+  const t = () => host.theme();
+  const sw = (host.screen as any).width || 169;
+  const sh = (host.screen as any).height || 44;
   const win = host.createWindow({
-    title: journalName === "journal" ? "Journal" : `Journal: ${journalName}`,
-    width: winW, height: winH, left: winL, top: winT,
+    title: "Journal",
+    width: Math.floor(sw * 0.95),
+    height: Math.floor(sh * 0.95),
   });
 
-  const t = () => host.theme();
-  let entries = loadEntries(fp);
-  let filterByPeer: "all" | "human" | "agent" | "system" = "all";
-  let filterText = "";
+  let mode: Mode = "list";
+  let entries: JournalEntry[] = [];
+  let selectedIdx = 0;
+  let selectedEntry: JournalEntry | null = null;
+  let editTitle = "";
+  let editBody = "";
+  let editKind: EntryKind = "note";
+  let editTags: string[] = [];
+  let editingId: string | null = null; // null = new entry
+  let searchQuery = "";
+  let deleteConfirm = false;
 
-  function filterEntries(): JournalEntry[] {
-    return entries.filter(e => {
-      if (filterByPeer !== "all" && e.peer !== filterByPeer) return false;
-      if (filterText && !e.text.toLowerCase().includes(filterText.toLowerCase())) return false;
-      return true;
-    });
-  }
-
-  // ── Header: figlet + tagline ──────────────────────────────────
+  // ── UI Elements ───────────────────────────────────────────────
   const headerBox = blessed.box({
     parent: win.body,
-    top: 0, left: 1, right: 0, height: 7,
-    tags: true,
-    style: t().body,
+    top: 0, left: 0, right: 0, height: 7,
+    tags: true, style: t().body,
   });
 
-  // ── Separator ─────────────────────────────────────────────────
   const sepBox = blessed.box({
     parent: win.body,
     top: 7, left: 0, right: 0, height: 1,
-    tags: true,
-    style: t().body,
+    tags: true, style: t().body,
   });
 
-  // ── Log ───────────────────────────────────────────────────────
-  const logBox = blessed.box({
+  const contentBox = blessed.box({
     parent: win.body,
     top: 8, left: 0, right: 0, bottom: 2,
-    tags: true,
-    scrollable: true,
-    alwaysScroll: true,
-    mouse: true,
-    keys: true,
-    vi: true,
-    scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
-    style: t().body,
+    tags: true, style: t().body,
   });
 
-  // ── Status bar ────────────────────────────────────────────────
+  // List pane (left or full width)
+  const listBox = blessed.list({
+    parent: contentBox,
+    top: 0, left: 0, bottom: 0,
+    width: "100%",
+    tags: true,
+    mouse: true,
+    keys: false, // we handle keys ourselves
+    scrollable: true,
+    scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
+    style: {
+      ...t().body,
+      selected: { bg: t().selected?.bg || "#333", fg: t().selected?.fg || "#fff" },
+    },
+  } as any);
+
+  // Detail/body pane (right or full width, used in read and edit modes)
+  const detailBox = blessed.box({
+    parent: contentBox,
+    top: 0, left: 0, right: 0, bottom: 0,
+    tags: true,
+    scrollable: true,
+    mouse: true,
+    scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
+    style: t().body,
+    hidden: true,
+  });
+
+  // Edit area (textarea for body editing)
+  const editArea = blessed.textarea({
+    parent: contentBox,
+    top: 3, left: 1, right: 1, bottom: 0,
+    inputOnFocus: false,
+    keys: true,
+    mouse: true,
+    style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+    hidden: true,
+  } as any);
+
+  // Title input for editing
+  const titleInput = blessed.textbox({
+    parent: contentBox,
+    top: 0, left: 1, right: 1, height: 1,
+    inputOnFocus: false,
+    style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+    hidden: true,
+  } as any);
+
+  // Kind selector label
+  const kindLabel = blessed.box({
+    parent: contentBox,
+    top: 1, left: 1, right: 1, height: 1,
+    tags: true,
+    style: t().body,
+    hidden: true,
+  });
+
   const statusBar = blessed.box({
     parent: win.body,
     bottom: 1, left: 0, right: 0, height: 1,
@@ -501,252 +400,456 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     style: { fg: t().muted?.fg || "#666", bg: t().body.bg },
   });
 
-  // ── Input ─────────────────────────────────────────────────────
-  const inputBox = blessed.textbox({
+  const commandBar = blessed.box({
     parent: win.body,
-    bottom: 0, left: 7, right: 0, height: 1,
-    inputOnFocus: true,
-    style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
-  });
-
-  const inputPrompt = blessed.box({
-    parent: win.body,
-    bottom: 0, left: 0, width: 7, height: 1,
+    bottom: 0, left: 0, right: 0, height: 1,
     tags: true,
-    content: " {bold}▸{/bold} ",
     style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
   });
 
-  // ── Keyboard nav ──────────────────────────────────────────────
-  logBox.key(["j", "down"], () => { logBox.scroll(1); host.screen.render(); });
-  logBox.key(["k", "up"], () => { logBox.scroll(-1); host.screen.render(); });
-  logBox.key(["g"], () => { (logBox as any).scrollTo(0); host.screen.render(); });
-  logBox.key(["S-g"], () => { logBox.setScrollPerc(100); host.screen.render(); });
-
-  // ── Filter keys ───────────────────────────────────────────────
-  // / = cycle peer filter: all → human → agent → system → all
-  logBox.key(["/"], () => {
-    const cycle: Array<typeof filterByPeer> = ["all", "human", "agent", "system"];
-    const idx = cycle.indexOf(filterByPeer);
-    filterByPeer = cycle[(idx + 1) % cycle.length]!;
-    filterText = "";
-    render();
-  });
+  // ── Refresh entries ───────────────────────────────────────────
+  function refresh() {
+    let all = loadAllEntries(host);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      all = all.filter(e =>
+        e.title.toLowerCase().includes(q) || e.body.toLowerCase().includes(q) ||
+        e.tags.some(tag => tag.toLowerCase().includes(q))
+      );
+    }
+    entries = all;
+    if (selectedIdx >= entries.length) selectedIdx = Math.max(0, entries.length - 1);
+  }
 
   // ── Render ────────────────────────────────────────────────────
   function render() {
-    const w = Math.max(1, Number(win.body.width) || 0);
     const th = t();
     const muted = th.muted?.fg || "#555";
     const accent = th.selected?.fg || "#b48ead";
+    const w = (win.body as any).width || 80;
 
-    // Header — bigger font at large breakpoints
+    // Header
     const font = w >= 80 ? "slant" : "small";
     let fig = "";
     try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
-    const figLines = fig.split("\n").filter(l => l.trim());
-
-    // Mood indicator based on entry composition
-    const qs = entries.filter(e => e.kind === "question").length;
-    const ds = entries.filter(e => e.kind === "decision").length;
-    const disc = entries.filter(e => e.kind === "discovery").length;
-    const moodWord = qs > ds && qs > disc ? "curious"
-      : disc > ds ? "exploring"
-      : ds > 0 ? "decisive"
-      : entries.length > 20 ? "productive"
-      : entries.length > 0 ? "beginning"
-      : "empty";
-    const hCount = entries.filter(e => e.peer === "human").length;
-    const aCount = entries.filter(e => e.peer === "agent").length;
-    const ratio = hCount > 0 && aCount > 0 ? "symbient" : hCount > 0 ? "human-led" : aCount > 0 ? "agent-led" : "quiet";
-
-    const tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord}{/${muted}-fg}`;
+    const figLines = fig.split("\n").filter((l: string) => l.trim());
+    const tagline = `{${muted}-fg}symbient logbook // ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
     // Separator
-    sepBox.setContent(`{${muted}-fg}${"━".repeat(w)}{/${muted}-fg}`);
+    const sepW = Math.max(0, w - 4);
+    sepBox.setContent(`{${muted}-fg}${"━".repeat(sepW)}{/${muted}-fg}`);
 
-    // Log
-    const logW = Math.max(10, w - 2);
-    const visible = filterEntries();
-    const lines: string[] = [];
-
-    // Filter indicator
-    if (filterByPeer !== "all" || filterText) {
-      const parts: string[] = [];
-      if (filterByPeer !== "all") parts.push(`peer:${filterByPeer}`);
-      if (filterText) parts.push(`"${filterText}"`);
-      lines.push(`  {${accent}-fg}FILTER: ${parts.join(" + ")}{/${accent}-fg}  {${muted}-fg}(${visible.length}/${entries.length} shown, / to clear){/${muted}-fg}`);
-      lines.push("");
-    }
-
-    let lastDay = "";
-    let entryIdx = 0;
-    for (const e of visible) {
-      const day = dayKey(e.ts);
-      if (day !== lastDay) {
-        if (lastDay) lines.push("");
-        lines.push(formatDayDivider(day, logW, th));
-        lines.push("");
-        lastDay = day;
-      }
-      const entryLines = formatEntryLines(e, th, logW);
-      // Add muted line number gutter to first line
-      const num = String(entryIdx).padStart(3);
-      if (entryLines.length > 0) {
-        entryLines[0] = `{${muted}-fg}${num}{/${muted}-fg}` + entryLines[0]!.slice(2); // replace leading 2 spaces
-      }
-      lines.push(...entryLines);
-      entryIdx++;
-    }
-    if (lines.length === 0) {
-      lines.push(`  {${muted}-fg}no entries yet. type below.{/${muted}-fg}`);
-    }
-    logBox.setContent(lines.join("\n"));
-    logBox.setScrollPerc(100);
-
-    // Status bar
-    const humans = entries.filter(e => e.peer === "human").length;
-    const agents = entries.filter(e => e.peer === "agent").length;
-    const days = new Set(entries.map(e => dayKey(e.ts))).size;
-    const filterHint = filterByPeer !== "all" ? `  FILTER:${filterByPeer}` : "";
-    const focusHint = focusedPanel === "log" ? "LOG" : "WRITE";
-    const keyHints = focusedPanel === "log"
-      ? "j/k↕ scroll  g/G jump  / filter  Esc clear  i write  Tab switch"
-      : "Enter submit  Tab→log";
-    statusBar.setContent(
-      `{${muted}-fg} [${focusHint}]  ▸${humans} ▹${agents} · ${entries.length}  ${days}d  │  ${keyHints}${filterHint}{/${muted}-fg}`
-    );
-
-    // Update input prompt based on focus
-    if (focusedPanel === "input") {
-      inputPrompt.setContent(` {bold}▸{/bold} `);
-      inputPrompt.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
-    } else {
-      inputPrompt.setContent(` {${muted}-fg}▸{/${muted}-fg} `);
-      inputPrompt.style = { fg: th.muted?.fg || "#555", bg: th.body.bg };
+    if (mode === "list") {
+      renderListMode(th, muted, accent, w);
+    } else if (mode === "read") {
+      renderReadMode(th, muted, accent, w);
+    } else if (mode === "edit") {
+      renderEditMode(th, muted, accent, w);
     }
 
     host.screen.render();
   }
 
-  function addEntry(text: string, peer: "human" | "agent" | "system" = "human", opts?: { kind?: EntryKind; tags?: string[]; actor?: string }) {
-    const entry: JournalEntry = { peer, text, ts: new Date().toISOString(), ...opts };
-    entries.push(entry);
-    appendEntry(fp, entry);
+  function renderListMode(th: any, muted: string, accent: string, w: number) {
+    // Show list, hide detail/edit
+    listBox.show();
+    detailBox.hide();
+    editArea.hide();
+    titleInput.hide();
+    kindLabel.hide();
+
+    // Determine layout: two-pane if wide enough
+    const twoPane = w >= 120;
+
+    if (twoPane) {
+      const listW = Math.floor(w * 0.35);
+      listBox.width = listW;
+      detailBox.left = listW + 1;
+      detailBox.width = w - listW - 1;
+      detailBox.show();
+    } else {
+      listBox.width = "100%" as any;
+      detailBox.hide();
+    }
+
+    // Build list items
+    const items: string[] = [];
+    for (const e of entries) {
+      const icon = KIND_ICON[e.kind] || "░";
+      const glyph = PEER_GLYPH[e.peer] || "·";
+      const age = timeAgo(e.updatedAt);
+      const title = truncate(e.title, twoPane ? 30 : w - 20);
+      const tagStr = e.tags.length > 0 ? ` {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "";
+      items.push(` ${glyph} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
+    }
+    if (items.length === 0) {
+      items.push(`  {${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
+    }
+    listBox.setItems(items as any);
+    listBox.select(selectedIdx);
+
+    // Preview pane (two-pane mode)
+    if (twoPane && entries.length > 0) {
+      const e = entries[selectedIdx];
+      if (e) {
+        const previewW = w - Math.floor(w * 0.35) - 4;
+        const bodyLines = wrapText(e.body || "(empty)", previewW);
+        const header = [
+          `{bold}${e.title}{/bold}`,
+          `{${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}{/${muted}-fg}`,
+          e.tags.length ? `{${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
+          "",
+          ...bodyLines,
+        ].filter(l => l !== undefined);
+        detailBox.setContent(header.join("\n"));
+      }
+    }
+
+    // Status + command bars
+    const searchHint = searchQuery ? `  SEARCH:"${searchQuery}"` : "";
+    statusBar.setContent(
+      `{${muted}-fg} [LIST]  ${entries.length} entries${searchHint}{/${muted}-fg}`
+    );
+
+    if (deleteConfirm) {
+      commandBar.setContent(` {red-fg}Delete "${entries[selectedIdx]?.title}"? y/n{/red-fg}`);
+    } else {
+      commandBar.setContent(
+        `{${muted}-fg} Enter open  n new  e edit  d delete  / search  Esc clear{/${muted}-fg}`
+      );
+    }
+  }
+
+  function renderReadMode(th: any, muted: string, accent: string, w: number) {
+    listBox.hide();
+    detailBox.show();
+    editArea.hide();
+    titleInput.hide();
+    kindLabel.hide();
+    detailBox.left = 0;
+    detailBox.width = "100%" as any;
+
+    if (!selectedEntry) { setMode("list"); return; }
+    const e = selectedEntry;
+    const bodyW = Math.max(20, w - 6);
+    const bodyLines = wrapText(e.body || "(empty)", bodyW);
+
+    const content = [
+      `{bold}${e.title}{/bold}`,
+      "",
+      `{${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · created ${timeAgo(e.createdAt)} · updated ${timeAgo(e.updatedAt)}{/${muted}-fg}`,
+      e.tags.length ? `{${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
+      "",
+      ...bodyLines,
+    ].filter(l => l !== undefined);
+
+    detailBox.setContent(content.join("\n"));
+    (detailBox as any).scrollTo(0);
+
+    statusBar.setContent(`{${muted}-fg} [READ]  ${e.title}{/${muted}-fg}`);
+    commandBar.setContent(`{${muted}-fg} Esc/q back  e edit  d delete{/${muted}-fg}`);
+  }
+
+  function renderEditMode(th: any, muted: string, accent: string, w: number) {
+    listBox.hide();
+    detailBox.hide();
+    titleInput.show();
+    kindLabel.show();
+    editArea.show();
+
+    titleInput.left = 1;
+    titleInput.right = 1;
+    titleInput.top = 0;
+    kindLabel.left = 1;
+    kindLabel.right = 1;
+    kindLabel.top = 1;
+    editArea.left = 1;
+    editArea.right = 1;
+    editArea.top = 3;
+
+    kindLabel.setContent(
+      `{${muted}-fg}Kind: ${editKind}  Tags: ${editTags.length ? editTags.map(t => `#${t}`).join(" ") : "(none)"}{/${muted}-fg}`
+    );
+
+    statusBar.setContent(`{${muted}-fg} [${editingId ? "EDIT" : "NEW"}]  ${editTitle || "untitled"}{/${muted}-fg}`);
+    commandBar.setContent(`{${muted}-fg} Ctrl-S save  Esc cancel{/${muted}-fg}`);
+  }
+
+  // ── Mode transitions ─────────────────────────────────────────
+  function setMode(newMode: Mode) {
+    mode = newMode;
+    deleteConfirm = false;
     render();
   }
 
-  // ── Input handling ────────────────────────────────────────────
-  inputBox.on("submit", (value: string) => {
-    const trimmed = (value || "").trim();
-    if (trimmed) addEntry(trimmed, "human");
-    inputBox.clearValue();
-    inputBox.focus();
+  function openEntry(idx: number) {
+    if (idx < 0 || idx >= entries.length) return;
+    selectedEntry = entries[idx];
+    setMode("read");
+    detailBox.focus();
+  }
+
+  function startEdit(entry?: JournalEntry) {
+    if (entry) {
+      editingId = entry.id;
+      editTitle = entry.title;
+      editBody = entry.body;
+      editKind = entry.kind;
+      editTags = [...entry.tags];
+    } else {
+      editingId = null;
+      editTitle = "";
+      editBody = "";
+      editKind = "note";
+      editTags = [];
+    }
+    setMode("edit");
+    // Set values and start editing title first
+    titleInput.setValue(editTitle);
+    editArea.setValue(editBody);
+    titleInput.readInput();
+  }
+
+  function saveEdit() {
+    editTitle = titleInput.getValue().trim() || "Untitled";
+    editBody = editArea.getValue();
+    const now = new Date().toISOString();
+
+    if (editingId) {
+      // Update existing
+      const entry = loadEntry(host, editingId);
+      if (entry) {
+        entry.title = editTitle;
+        entry.body = editBody;
+        entry.kind = editKind;
+        entry.tags = editTags;
+        entry.updatedAt = now;
+        saveEntry(host, entry);
+      }
+    } else {
+      // Create new
+      const entry: JournalEntry = {
+        id: genId(),
+        title: editTitle,
+        body: editBody,
+        peer: "human",
+        kind: editKind,
+        tags: editTags,
+        createdAt: now,
+        updatedAt: now,
+      };
+      saveEntry(host, entry);
+    }
+    refresh();
+    setMode("list");
+    listBox.focus();
+  }
+
+  function doDelete() {
+    if (mode === "list" && entries[selectedIdx]) {
+      deleteEntryFile(host, entries[selectedIdx].id);
+      refresh();
+      render();
+    } else if (mode === "read" && selectedEntry) {
+      deleteEntryFile(host, selectedEntry.id);
+      refresh();
+      setMode("list");
+    }
+    deleteConfirm = false;
+    listBox.focus();
+  }
+
+  // ── Key bindings: LIST mode ───────────────────────────────────
+  listBox.on("select item", (_item: any, idx: number) => {
+    selectedIdx = idx;
+    render(); // update preview
   });
 
-  if (entries.length === 0) {
-    addEntry("journal initialised", "system");
-  }
-  // Skip "session resumed" noise — the session start is implicit from timestamps
+  listBox.key(["j", "down"], () => {
+    if (mode !== "list") return;
+    selectedIdx = Math.min(selectedIdx + 1, entries.length - 1);
+    listBox.select(selectedIdx);
+    render();
+  });
 
-  // Focus management: Tab toggles between input and log
-  let focusedPanel: "input" | "log" = "input";
+  listBox.key(["k", "up"], () => {
+    if (mode !== "list") return;
+    selectedIdx = Math.max(selectedIdx - 1, 0);
+    listBox.select(selectedIdx);
+    render();
+  });
 
-  function focusInput() {
-    focusedPanel = "input";
-    win.setFocusTarget(inputBox);
-    inputBox.focus();
-    render(); // update focus indicator
-  }
+  listBox.key(["enter"], () => {
+    if (mode !== "list") return;
+    if (deleteConfirm) return;
+    openEntry(selectedIdx);
+  });
 
-  function focusLog() {
-    focusedPanel = "log";
-    win.setFocusTarget(logBox);
-    logBox.focus();
-    render(); // update focus indicator
-  }
+  listBox.key(["n"], () => {
+    if (mode !== "list") return;
+    if (deleteConfirm) { deleteConfirm = false; render(); return; }
+    startEdit();
+  });
 
-  // Tab cycles focus
-  inputBox.key(["tab"], () => focusLog());
-  logBox.key(["tab"], () => focusInput());
-  logBox.key(["escape"], () => {
-    if (filterByPeer !== "all") {
-      filterByPeer = "all";
-      filterText = "";
+  listBox.key(["e"], () => {
+    if (mode !== "list") return;
+    if (deleteConfirm) { deleteConfirm = false; render(); return; }
+    if (entries[selectedIdx]) startEdit(entries[selectedIdx]);
+  });
+
+  listBox.key(["d"], () => {
+    if (mode !== "list") return;
+    if (deleteConfirm) {
+      deleteConfirm = false;
       render();
-    } else {
-      focusInput();
+      return;
+    }
+    if (entries[selectedIdx]) {
+      deleteConfirm = true;
+      render();
     }
   });
-  // i key in log returns to input (vim-like)
-  logBox.key(["i"], () => focusInput());
 
-  // Mouse click to switch panels
-  logBox.on("click", () => { if (focusedPanel !== "log") focusLog(); });
-  inputBox.on("click", () => { if (focusedPanel !== "input") focusInput(); });
-  inputPrompt.on("click", () => { if (focusedPanel !== "input") focusInput(); });
+  listBox.key(["y"], () => {
+    if (deleteConfirm) doDelete();
+  });
 
-  focusInput();
+  listBox.key(["/"], () => {
+    if (mode !== "list") return;
+    // Simple inline search — prompt via command bar
+    commandBar.setContent(" Search: ");
+    const searchInput = blessed.textbox({
+      parent: win.body,
+      bottom: 0, left: 9, right: 0, height: 1,
+      inputOnFocus: true,
+      style: { fg: t().body.fg, bg: t().selected?.bg || "#333" },
+    } as any);
+    searchInput.focus();
+    searchInput.readInput();
+    searchInput.on("submit", (val: string) => {
+      searchQuery = (val || "").trim();
+      searchInput.destroy();
+      refresh();
+      render();
+      listBox.focus();
+    });
+    searchInput.key(["escape"], () => {
+      searchInput.destroy();
+      render();
+      listBox.focus();
+    });
+  });
+
+  listBox.key(["escape"], () => {
+    if (deleteConfirm) { deleteConfirm = false; render(); return; }
+    if (searchQuery) { searchQuery = ""; refresh(); render(); return; }
+  });
+
+  // ── Key bindings: READ mode ───────────────────────────────────
+  detailBox.key(["escape", "q"], () => {
+    if (mode !== "read") return;
+    setMode("list");
+    listBox.focus();
+  });
+
+  detailBox.key(["e"], () => {
+    if (mode !== "read" || !selectedEntry) return;
+    startEdit(selectedEntry);
+  });
+
+  detailBox.key(["d"], () => {
+    if (mode !== "read") return;
+    deleteConfirm = true;
+    render();
+  });
+
+  detailBox.key(["y"], () => {
+    if (mode === "read" && deleteConfirm) doDelete();
+  });
+
+  detailBox.key(["n"], () => {
+    if (mode === "read" && deleteConfirm) { deleteConfirm = false; render(); return; }
+  });
+
+  detailBox.key(["j", "down"], () => { detailBox.scroll(1); host.screen.render(); });
+  detailBox.key(["k", "up"], () => { detailBox.scroll(-1); host.screen.render(); });
+
+  // ── Key bindings: EDIT mode ───────────────────────────────────
+  titleInput.on("submit", () => {
+    editTitle = titleInput.getValue();
+    editArea.focus();
+    editArea.readInput();
+  });
+
+  titleInput.key(["escape"], () => {
+    setMode(editingId ? "read" : "list");
+    if (mode === "list") listBox.focus();
+    else detailBox.focus();
+  });
+
+  editArea.key(["C-s"], () => {
+    saveEdit();
+  });
+
+  editArea.key(["escape"], () => {
+    setMode(editingId ? "read" : "list");
+    if (mode === "list") listBox.focus();
+    else detailBox.focus();
+  });
 
   // ── Lifecycle ─────────────────────────────────────────────────
   win.describeState(() => {
-    const all = loadEntries(fp);
-    const humans = all.filter(e => e.peer === "human").length;
-    const agents = all.filter(e => e.peer === "agent").length;
-    const systems = all.filter(e => e.peer === "system").length;
-    const last = all.length > 0 ? all[all.length - 1]! : null;
-    const peerBreakdown = { human: humans, agent: agents, system: systems };
-    const questions = all.filter(e => e.kind === "question").length;
-    const decisions = all.filter(e => e.kind === "decision").length;
-    const mood = questions > decisions ? "curious" : decisions > 0 ? "decisive" : "observing";
-    const kinds: Record<string, number> = {};
-    for (const e of all) { const k = e.kind || "note"; kinds[k] = (kinds[k] || 0) + 1; }
-    const allTags = [...new Set(all.flatMap(e => e.tags || []))];
-    // Last 5 entries for agent visibility
-    const recentEntries = all.slice(-5).map(e => ({
-      peer: e.peer, text: e.text, kind: e.kind || "note",
-      ts: e.ts, tags: e.tags,
-    }));
+    const all = loadAllEntries(host);
+    const peerBreakdown: Record<string, number> = {};
+    const kindBreakdown: Record<string, number> = {};
+    for (const e of all) {
+      peerBreakdown[e.peer] = (peerBreakdown[e.peer] || 0) + 1;
+      kindBreakdown[e.kind] = (kindBreakdown[e.kind] || 0) + 1;
+    }
+    const allTags = [...new Set(all.flatMap(e => e.tags))];
     return {
-      summary: `Journal "${journalName}" — ${all.length} entries, mood: ${mood}`,
-      journalName,
-      focusMode: focusedPanel,
-      filter: filterByPeer,
+      summary: `Journal — ${all.length} entries, mode: ${mode}`,
+      mode,
       entryCount: all.length,
+      selectedId: selectedEntry?.id ?? entries[selectedIdx]?.id ?? null,
+      selectedTitle: selectedEntry?.title ?? entries[selectedIdx]?.title ?? null,
+      searchQuery: searchQuery || null,
       peerBreakdown,
-      mood,
-      kinds,
+      kindBreakdown,
       tags: allTags,
-      lastEntry: last ? { peer: last.peer, text: last.text, kind: last.kind } : null,
-      recentEntries,
+      recentEntries: all.slice(0, 5).map(e => ({
+        id: e.id, title: e.title, peer: e.peer, kind: e.kind,
+        tags: e.tags, updatedAt: e.updatedAt,
+      })),
       availableCommands: [
-        "journal.open", "journal.append", "journal.query",
-        "journal.summarize", "journal.export-markdown",
-        "journal.switch", "journal.import-devlog", "journal.ambient",
+        "journal.open", "journal.create", "journal.read",
+        "journal.update", "journal.list", "journal.delete",
+        "journal.export-markdown", "journal.import-legacy",
       ],
     };
   });
-
-  win.captureText(() => entries.map(e => {
-    const glyph = PEER_GLYPH[e.peer] || "·";
-    return `${glyph} ${formatTime(e.ts)}  ${e.text}`;
-  }).join("\n"));
 
   win.onRestyle(() => {
     const th = t();
     headerBox.style = th.body;
     sepBox.style = th.body;
-    logBox.style = th.body;
+    contentBox.style = th.body;
+    listBox.style = { ...th.body, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" } };
+    detailBox.style = th.body;
     statusBar.style = { fg: th.muted?.fg || "#666", bg: th.body.bg };
-    inputBox.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
-    inputPrompt.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
+    commandBar.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
     render();
   });
 
   win.onResize(() => render());
-  win.onCleanup(() => {});
 
+  _liveRefresh = () => { refresh(); render(); };
+  win.onCleanup(() => { _liveRefresh = null; });
+
+  // ── Init ──────────────────────────────────────────────────────
+  refresh();
   render();
+  listBox.focus();
   win.focus();
 }

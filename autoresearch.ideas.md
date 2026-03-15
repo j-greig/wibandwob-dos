@@ -1,37 +1,39 @@
-# Autoresearch Ideas — Symbient Journal
+# Autoresearch Ideas — Journal v2
 
-## DONE ✓
-- Figlet header JRNL (slant/small responsive)
-- Muted timestamps, bright entry text
-- Peer-colored prefix: human=▸, agent=▹, system=·
-- Day dividers ━━━ 2026-03-14 ━━━
-- Status bar with entry count, peer breakdown, key hints
-- Kind icons: ◊ observation, ░ note, ★ discovery, ■ decision, ? question
-- Line numbers in muted gutter
-- Dynamic mood indicator (curious/exploring/decisive/productive)
-- Symbient/human-led/agent-led ratio in tagline
-- Import-devlog command (parses agentic-devlog.md → 578 entries)
-- Removed session-resumed noise
-- Tab switching input↔log, mouse click, focus indicator [WRITE]/[LOG]
-- Query command (peer/kind/tag/text search, structured JSON)
-- Summarize command (stats, breakdowns, recent entries)
+## Architecture
+- Each entry is a JSON file in `scratch/journal-v2/entries/<id>.json`
+- Index file `scratch/journal-v2/index.json` for fast list loading
+- Modes: LIST, READ, EDIT, NEW — single state machine
+- Two-pane at ≥120 cols, single-pane push/pop at narrow
 
-## USABILITY 5→6 (remaining 1 point)
-- Mouse scroll in logBox (blessed scrollable + mouse:true)
-- Arrow keys up/down as alternative to j/k in log mode
-- Enter in log mode → no-op or expand entry (don't submit empty)
-- Status bar key hints update per focus mode (WRITE hints vs LOG hints)
+## MVP Must-Haves
+- blessed.list for entry list (selectable, scrollable)
+- blessed.box for entry body (read mode)
+- blessed.textarea for edit mode (multi-line)
+- Mode transitions: LIST→READ→EDIT, LIST→NEW→LIST
 
-## AGENT_XP 6→7 (remaining 1 point)
-- describeState: include available commands list so agent knows what it can do
-- describeState: include current filter state, focus mode, scroll position
-- describeState: list visible entries (not just stats) so agent can read the journal
-- Add `journal.list-commands` or expose via describeState.commands[]
+## UX Ideas
+- Vim-like: j/k nav in list, Enter to open, Esc to go back, e to edit, n for new
+- Status bar shows mode + key hints (context-aware like v1)
+- Preview pane shows first ~5 lines of selected entry
+- Ctrl-S to save in edit mode (blessed textarea submit)
 
-## DEFERRED / FUTURE
-- Agent Devlog pivot: file path detection + clickable refs → editor.open
-- Section grouping from devlog headings (collapsible groups)
-- Color-code entries by kind (subtle bg tint per kind)
-- Animated cursor/pulse on input line
-- Empty state: ASCII art + "start writing" message
-- Responsive breakpoint: narrow mode collapses metadata columns
+## Agent Integration Ideas  
+- journal.create returns { ok, entry } with id
+- journal.read returns full entry by id
+- journal.update patches title/body/tags
+- journal.list returns summaries with filters
+- describeState shows: mode, selectedEntry, entryCount, searchQuery
+
+## Visual Carries from v1
+- Figlet JRNL header (slant/small responsive)
+- Kind icons: ◊ observation, ░ note, ★ discovery, ■ decision, ? question  
+- Peer glyphs: ▸ human, ▹ agent, · system
+- Mood indicator in tagline
+- Theme tokens only, muted timestamps
+
+## Deferred
+- Markdown-lite rendering (##, **, `, -, code blocks)
+- Entry templates
+- Tag autocomplete
+- Entry history / undo
