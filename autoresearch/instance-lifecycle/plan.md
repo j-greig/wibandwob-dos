@@ -1,5 +1,11 @@
 # E039 Instance Lifecycle — Autoresearch Plan
 
+> **Rule:** prefer `wibwob <command>` over `curl $API/...` everywhere.
+> If you find yourself writing `curl -X POST $API/commands/run -d '{"id":"..."}' `,
+> stop — use `wibwob <id> --arg val` instead. If the CLI subcommand doesn't
+> exist yet (e.g. `workspace.save`), add it to `src/cli/wibwob.ts` first,
+> then use it. The CLI handles sockets, JSON, errors. Raw curl is for debugging.
+
 ## How This Differs from Microapp Autoresearch
 
 | Microapp experiments | This experiment |
@@ -72,6 +78,67 @@ sleep 2
 # resurrect
 wibwob attach
 wibwob map  # everything back
+```
+
+## API → wibwob CLI mapping
+
+Every `curl` call in the test harness can be a `wibwob` command instead.
+Prefer CLI — it handles socket targeting, JSON parsing, and error codes.
+
+| Test step | curl (current) | wibwob (preferred) |
+|-----------|---------------|-------------------|
+| Health check | `curl $API/health` | `wibwob health` |
+| Open figlet | `curl -X POST $API/commands/run -d '{...}'` | `wibwob microapp.wibwob.figlet.open --text TEST --font doom` |
+| Open inspector | `curl -X POST $API/commands/run -d '{...}'` | `wibwob microapp.wibwob.runtime-inspector.open` |
+| Open contour | `curl -X POST $API/commands/run -d '{...}'` | `wibwob microapp.wibwob.contour.open` |
+| Save workspace | `curl -X POST $API/workspace/save -d '{...}'` | `wibwob workspace.save --name test` ⚠️ needs adding |
+| Load workspace | `curl -X POST $API/workspace/load -d '{...}'` | `wibwob workspace.load --name test` ⚠️ needs adding |
+| Clear desktop | `curl -X POST $API/commands/run -d '{...}'` | `wibwob desktop.clear-all` |
+| Get state | `curl $API/state` | `wibwob state` |
+| Count windows | `curl $API/state \| python3 ...` | `wibwob windows -q \| wc -l` |
+| Check window type | `curl $API/state \| python3 ...` | `wibwob state \| jq '.windows[].appType'` |
+| Get PID | `curl $API/health \| python3 ...` | `wibwob health \| jq .pid` |
+| Spatial check | `curl $API/state \| python3 ...` | `wibwob map` |
+| Per-window text | `curl $API/screenshot/text?id=N` | `wibwob screenshot N` |
+| Target instance | `curl --unix-socket ...` | `wibwob --instance main ...` |
+| List instances | `ls scratch/instances/*.sock` | `wibwob instances` |
+
+### Commands we need to add
+
+| Command | What it does | Why |
+|---------|-------------|-----|
+| `wibwob workspace.save --name X` | Save workspace via command dispatch | Avoid raw curl for save |
+| `wibwob workspace.load --name X` | Load workspace via command dispatch | Avoid raw curl for load |
+| `wibwob attach` | Detect orphan → start → load → clean up | Core F4 deliverable |
+
+### Test recipe rewritten with wibwob CLI
+
+```bash
+# Phase 1: snapshot parity
+wibwob microapp.wibwob.figlet.open --text LIFECYCLE --font doom
+wibwob microapp.wibwob.runtime-inspector.open
+wibwob microapp.wibwob.contour.open
+wibwob map                                    # verify 3+ windows
+wibwob workspace.save --name lifecycle-test
+bash scripts/restart.sh
+wibwob workspace.load --name lifecycle-test
+wibwob map                                    # should show same windows
+
+# Phase 2: clean death
+PID=$(wibwob health | jq -r .pid)
+kill -HUP $PID
+sleep 2
+wibwob instances                              # should be empty
+ls scratch/workspaces/orphan-main.json        # should exist
+
+# Phase 3: boot workspace
+WIBWOB_WORKSPACE=orphan-main bash scripts/ensure-running.sh
+wibwob map                                    # should show restored windows
+
+# Phase 4: attach
+kill -HUP $(wibwob health | jq -r .pid)
+wibwob attach                                 # one command does it all
+wibwob map                                    # everything back
 ```
 
 ## Key Decisions to Make Before Starting
