@@ -36,7 +36,12 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 ### Windows
 
 - `src/windows/wibwob-agent-window.ts` — native agent window factory; themed tool display using wibwob-tv colour palette; reports appType `wibwob-agent`
-- `src/windows/content-windows.ts` — primer viewer, text viewer, browser, gallery, file manager, backrooms TV, figlet
+- `src/windows/file-manager-window.ts` — Finder-style file manager (1627 lines)
+- `src/windows/primer-gallery-window.ts` — tabbed primer gallery with search
+- `src/windows/text-viewer-window.ts` — primer/reader content viewer
+- `src/windows/primer-browser-window.ts` — simple primer list browser
+- `src/windows/browser-reader-window.ts` — thin file→viewer facade
+- `src/windows/browser-utils.ts` — shared viewport/label utilities
 - `src/windows/backrooms-windows.ts` — Backrooms TV window and log browser
 
 ## Adding a New Window Type

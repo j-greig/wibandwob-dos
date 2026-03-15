@@ -79,6 +79,11 @@ Read-only inspection scripts (fine as scripts, not command-surface):
 - `src/cli/wibwob.ts` — CLI client (command surface)
 - `src/core/snapshot-registry.ts` — workspace save/restore handlers
 - `src/core/command-catalog.ts` — command source of truth
+- `src/windows/file-manager-window.ts` — Finder-style file manager
+- `src/windows/primer-gallery-window.ts` — tabbed primer gallery
+- `src/windows/text-viewer-window.ts` — primer/reader content viewer
+- `src/windows/primer-browser-window.ts` — simple primer list
+- `src/windows/browser-utils.ts` — shared viewport utilities
 
 ## Verification discipline
 
