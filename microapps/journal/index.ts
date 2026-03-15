@@ -8,6 +8,23 @@ import { renderFiglet, renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/se
 type EntryKind = "note" | "observation" | "decision" | "discovery" | "question";
 type Peer = "human" | "agent" | "system";
 type Mode = "list" | "read" | "edit";
+type ViewMode = "journal" | "sessions";
+
+// ── Session log types ───────────────────────────────────────────
+interface SessionSummary {
+  filename: string;
+  date: string;         // ISO
+  sessionId: string;    // UUID prefix
+  messageCount: number;
+  firstUserMsg: string; // preview
+}
+
+interface SessionMessage {
+  role: string;         // user | assistant
+  text: string;         // first text block content
+  toolCalls: string[];  // tool names
+  toolResults: string[]; // one-line summaries
+}
 
 interface JournalEntry {
   id: string;
@@ -301,15 +318,151 @@ export default function setup(host: MicroappHost) {
     },
   });
 
+  // Session commands (only if ~/.pi exists)
+  if (PI_EXISTS) {
+    host.registerCommand({
+      id: "sessions",
+      label: "List Pi Sessions",
+      description: "List recent pi agent sessions for this repo.",
+      direct: true,
+      action: (args) => {
+        const limit = (args?.limit as number) || 20;
+        const sessions = listSessions(limit);
+        return {
+          ok: true,
+          count: sessions.length,
+          sessions: sessions.map(s => ({
+            filename: s.filename,
+            date: s.date,
+            sessionId: s.sessionId,
+            messageCount: s.messageCount,
+            firstUserMsg: s.firstUserMsg,
+          })),
+        };
+      },
+    });
+
+    host.registerCommand({
+      id: "session.read",
+      label: "Read Pi Session",
+      description: "Read a specific pi agent session by filename.",
+      direct: true,
+      action: (args) => {
+        const filename = args?.filename as string;
+        if (!filename) return { ok: false, error: "filename required" };
+        const messages = readSession(filename);
+        return {
+          ok: true,
+          messageCount: messages.length,
+          messages: messages.map(m => ({
+            role: m.role,
+            text: m.text?.slice(0, 500),
+            toolCalls: m.toolCalls,
+          })),
+        };
+      },
+    });
+  }
+
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
-      return { mode: state.mode, selectedId: state.selectedId };
+      return { mode: state.mode, selectedId: state.selectedId, viewMode: state.viewMode };
     },
     restore: (_snapshot, payload) => {
       host.runCommand("open", payload);
     },
   });
+}
+
+// ── Session log helpers ──────────────────────────────────────────
+const PI_DIR = join(process.env.HOME || "", ".pi");
+const PI_EXISTS = existsSync(PI_DIR);
+
+function sessionsDir(): string {
+  const cwd = process.cwd();
+  const encoded = "--" + cwd.replace(/^\//, "").replace(/\//g, "-") + "--";
+  return join(PI_DIR, "agent", "sessions", encoded);
+}
+
+function listSessions(limit = 50): SessionSummary[] {
+  const dir = sessionsDir();
+  if (!existsSync(dir)) return [];
+  const files = readdirSync(dir)
+    .filter(f => f.endsWith(".jsonl"))
+    .sort()
+    .reverse()
+    .slice(0, limit);
+
+  return files.map(f => {
+    const match = f.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-\d+Z_([a-f0-9-]+)\.jsonl$/);
+    const date = match ? `${match[1]}T${match[2]}:${match[3]}:${match[4]}Z` : "";
+    const sessionId = match ? match[5]!.slice(0, 8) : f.slice(0, 8);
+
+    // Count messages and get first user message (lazy — read line by line)
+    let msgCount = 0;
+    let firstUserMsg = "";
+    try {
+      const content = readFileSync(join(dir, f), "utf-8");
+      for (const line of content.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const d = JSON.parse(line);
+          if (d.type === "message") {
+            msgCount++;
+            if (!firstUserMsg) {
+              const msg = d.message || {};
+              if (msg.role === "user") {
+                const blocks = Array.isArray(msg.content) ? msg.content : [];
+                const textBlock = blocks.find((b: any) => b.type === "text");
+                if (textBlock) firstUserMsg = textBlock.text?.slice(0, 80) || "";
+              }
+            }
+          }
+        } catch { /* skip bad line */ }
+      }
+    } catch { /* skip unreadable file */ }
+
+    return { filename: f, date, sessionId, messageCount: msgCount, firstUserMsg };
+  });
+}
+
+function readSession(filename: string): SessionMessage[] {
+  const fp = join(sessionsDir(), filename);
+  if (!existsSync(fp)) return [];
+  const messages: SessionMessage[] = [];
+  try {
+    const content = readFileSync(fp, "utf-8");
+    for (const line of content.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const d = JSON.parse(line);
+        if (d.type !== "message") continue;
+        const msg = d.message || {};
+        const role = msg.role || "unknown";
+        const blocks = Array.isArray(msg.content) ? msg.content : [];
+
+        let text = "";
+        const toolCalls: string[] = [];
+        const toolResults: string[] = [];
+
+        for (const b of blocks) {
+          if (b.type === "text" && !text) text = b.text || "";
+          if (b.type === "toolCall") toolCalls.push(b.name || b.toolName || "tool");
+          if (b.type === "toolResult") {
+            const preview = (b.text || b.content?.[0]?.text || "").slice(0, 60);
+            toolResults.push(preview);
+          }
+        }
+
+        // Skip empty tool results with no visible content
+        if (role === "toolResult" && !text && toolResults.length === 0) continue;
+
+        messages.push({ role, text, toolCalls, toolResults });
+      } catch { /* skip */ }
+    }
+  } catch { /* skip */ }
+  return messages;
 }
 
 // ── Live refresh callback ───────────────────────────────────────
@@ -327,8 +480,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   });
 
   let mode: Mode = "list";
+  let viewMode: ViewMode = "journal";
   let entries: JournalEntry[] = [];
   let selectedIdx = 0;
+  let sessions: SessionSummary[] = [];
+  let sessionIdx = 0;
+  let sessionMessages: SessionMessage[] = [];
   let selectedEntry: JournalEntry | null = null;
   let editTitle = "";
   let editBody = "";
@@ -501,7 +658,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const agents = entries.filter(e => e.peer === "agent").length;
     const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
 
-    const tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
+    const tagline = viewMode === "sessions"
+      ? `{${muted}-fg}session archaeology // ${sessions.length} pi sessions · ${PI_EXISTS ? "~/.pi" : "no pi"}{/${muted}-fg}`
+      : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
     // Separator
@@ -519,6 +678,78 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     host.screen.render();
   }
 
+  function renderSessionList(muted: string, accent: string, w: number) {
+    const twoPane = w >= 120;
+
+    // Build session list items
+    const items: string[] = [];
+    const maxW = twoPane ? Math.floor(w * 0.38) - 8 : w - 8;
+    for (const s of sessions) {
+      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
+      const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
+      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 25);
+      items.push(` {${muted}-fg}${dateStr} ${timeStr}{/${muted}-fg} {${accent}-fg}${s.sessionId}{/${accent}-fg} ${preview}`);
+    }
+    if (items.length === 0) {
+      items.push(`  {${muted}-fg}no pi sessions found{/${muted}-fg}`);
+    }
+    rendering = true;
+    listBox.setItems(items as any);
+    if (items.length > 0) listBox.select(Math.min(sessionIdx, items.length - 1));
+    rendering = false;
+
+    // Preview: show session detail if two-pane
+    if (twoPane && sessions.length > 0) {
+      const s = sessions[sessionIdx];
+      if (s) {
+        const previewW = w - Math.floor(w * 0.40) - 6;
+        const dim = ANSI.fg(muted);
+        const hi = ANSI.fg(accent);
+
+        // Lazy-load messages for selected session
+        if (sessionMessages.length === 0 || true) {
+          sessionMessages = readSession(s.filename);
+        }
+
+        const lines: string[] = [
+          "",
+          `  ${ANSI.bold}Session ${s.sessionId}${ANSI.reset}`,
+          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"} · ${s.messageCount} messages${ANSI.reset}`,
+          `  ${dim}${"─".repeat(Math.max(10, previewW - 4))}${ANSI.reset}`,
+          "",
+        ];
+
+        for (const msg of sessionMessages.slice(0, 30)) {
+          const roleColor = msg.role === "user" ? hi : msg.role === "assistant" ? ANSI.fg(muted) : dim;
+          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+          if (msg.text) {
+            lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
+            const wrapped = renderMarkdown(msg.text.slice(0, 500), previewW - 4, {
+              headingConfig: PLAIN_HEADING_CONFIG,
+              paddingX: 4,
+            });
+            lines.push(...wrapped);
+            lines.push("");
+          }
+          if (msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+          }
+        }
+
+        detailBox.setContent(lines.join("\n"));
+        (detailBox as any).scrollTo(0);
+      }
+    }
+
+    // Status + command bars for session mode
+    statusBar.setContent(
+      `{${muted}-fg} [SESSIONS]  ${sessions.length} sessions  ${PI_EXISTS ? "~/.pi found" : ""}{/${muted}-fg}`
+    );
+    commandBar.setContent(
+      `{${muted}-fg} ${sessionIdx + 1}/${sessions.length}  Enter view  S journal  j/k nav  g/G jump{/${muted}-fg}`
+    );
+  }
+
   function renderListMode(th: any, muted: string, accent: string, w: number) {
     // Show list, hide detail/edit
     listBox.show();
@@ -527,6 +758,27 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     titleInput.hide();
     titleLabelBox.hide();
     kindLabel.hide();
+
+    // Session view mode
+    if (viewMode === "sessions") {
+      const twoPane = w >= 120;
+      if (twoPane) {
+        const listW = Math.floor(w * 0.38);
+        listBox.width = listW;
+        paneSep.left = listW;
+        paneSep.show();
+        const sepH = (contentBox as any).height || 20;
+        paneSep.setContent(("│\n").repeat(sepH).trim());
+        detailBox.left = listW + 1;
+        detailBox.width = w - listW - 2;
+        detailBox.show();
+      } else {
+        listBox.width = "100%" as any;
+        paneSep.hide();
+      }
+      renderSessionList(muted, accent, w);
+      return;
+    }
 
     // Determine layout: two-pane if wide enough
     const twoPane = w >= 120;
@@ -780,7 +1032,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   let rendering = false;
   listBox.on("select item", (_item: any, idx: number) => {
     if (rendering) return; // avoid recursion from setItems
-    selectedIdx = idx;
+    if (viewMode === "sessions") {
+      sessionIdx = idx;
+      sessionMessages = [];
+    } else {
+      selectedIdx = idx;
+    }
     render();
   });
 
@@ -833,8 +1090,24 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
   listBox.key(["s"], () => {
     if (mode !== "list") return;
+    if (viewMode === "sessions") return; // s only sorts in journal mode
     const idx = SORT_CYCLE.indexOf(sortBy);
     sortBy = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]!;
+    refresh();
+    render();
+  });
+
+  listBox.key(["S-s"], () => {
+    if (mode !== "list") return;
+    if (!PI_EXISTS) return;
+    if (viewMode === "journal") {
+      viewMode = "sessions";
+      sessions = listSessions();
+      sessionIdx = 0;
+      sessionMessages = [];
+    } else {
+      viewMode = "journal";
+    }
     refresh();
     render();
   });
@@ -842,6 +1115,52 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   listBox.key(["enter"], () => {
     if (mode !== "list") return;
     if (deleteConfirm) return;
+    if (viewMode === "sessions") {
+      // In session mode, Enter opens the session in read mode (full conversation)
+      const s = sessions[sessionIdx];
+      if (s) {
+        sessionMessages = readSession(s.filename);
+        setMode("read");
+        // Render session detail in read mode
+        const w = (contentBox as any).width || 160;
+        const muted = host.theme().muted?.fg || "#555";
+        const accent = host.theme().selected?.fg || "#b48ead";
+        const dim = ANSI.fg(muted);
+        const hi = ANSI.fg(accent);
+        const bodyW = Math.max(20, w - 8);
+
+        const lines: string[] = [
+          "",
+          `  ${ANSI.bold}Session ${s.sessionId}${ANSI.reset}`,
+          `  ${dim}${s.date ? new Date(s.date).toLocaleString() : "?"} · ${s.messageCount} messages${ANSI.reset}`,
+          `  ${dim}${"─".repeat(Math.max(10, bodyW - 4))}${ANSI.reset}`,
+          "",
+        ];
+
+        for (const msg of sessionMessages) {
+          const roleColor = msg.role === "user" ? hi : dim;
+          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+          if (msg.text) {
+            lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
+            const wrapped = renderMarkdown(msg.text.slice(0, 2000), bodyW - 4, {
+              headingConfig: PLAIN_HEADING_CONFIG,
+              paddingX: 4,
+            });
+            lines.push(...wrapped);
+            lines.push("");
+          }
+          if (msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+          }
+        }
+
+        detailBox.setContent(lines.join("\n"));
+        (detailBox as any).scrollTo(0);
+        statusBar.setContent(`{${muted}-fg} [SESSION]  ${s.sessionId} · ${s.messageCount} msgs{/${muted}-fg}`);
+        commandBar.setContent(`{${muted}-fg} Esc/q back  j/k scroll{/${muted}-fg}`);
+      }
+      return;
+    }
     openEntry(selectedIdx);
   });
 
