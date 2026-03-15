@@ -103,7 +103,7 @@ export async function listLocalSessions(repoRoot: string): Promise<LocalSessionI
     }));
 }
 
-export async function loadSessionMessages(path: string): Promise<AgentMessage[]> {
+async function loadSessionMessages(path: string): Promise<AgentMessage[]> {
   return SessionManager.open(path)
     .getBranch()
     .filter((entry): entry is typeof entry & { type: "message"; message: AgentMessage } => entry.type === "message")
