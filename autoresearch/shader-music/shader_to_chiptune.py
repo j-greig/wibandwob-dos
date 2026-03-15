@@ -19,9 +19,24 @@ from bricks import *
 
 # ── Genre Selection ────────────────────────────────────────────
 # Change GENRE to switch shader + synth combo
-GENRE = os.environ.get("GENRE", "starfield")
+GENRE = os.environ.get("GENRE", "cathedral")
 
 GENRE_CONFIGS = {
+    "cathedral": {
+        "shader": "cathedral.glsl",
+        "bpm": 72,
+        "duration": 30,
+        "steps_per_beat": 2,
+        "tracks": [
+            {"name": "organ",   "vol": (0.04, 0.38)},
+            {"name": "bells",   "vol": (0.03, 0.32)},
+            {"name": "glass",   "vol": (0.02, 0.25)},
+            {"name": "choir",   "vol": (0.04, 0.35)},
+        ],
+        "time_offsets": [0.0, 7.3, 14.9, 22.1],
+        "entrance_times": [0.0, 4.0, 8.0, 2.0],
+        "swell_periods": [18.0, 11.0, 7.3, 22.0],
+    },
     "starfield": {
         "shader": "starfield-superlite.glsl",
         "bpm": 110,
@@ -125,6 +140,17 @@ LOFI_SCALES = [
     ["Ab2", "Bb2", "C3", "Eb3", "F3", "Ab3", "Bb3", "C4"],     # Ab
     ["Bb2", "D3", "F3", "Ab3", "Bb3", "D4", "F4"],              # Bb7
 ]
+# Cathedral — Db Lydian, modal movement through luminous territory
+# Each chord is a voicing spanning 3 octaves for the 4 voices
+CATHEDRAL_CHORDS = [
+    ["Db2", "Ab2", "Db3", "F3", "Ab3", "C4", "Db4", "F4", "Ab4"],   # Db Lydian
+    ["Ab2", "Eb3", "Ab3", "C4", "Eb4", "G4", "Ab4"],                 # Ab (dominant feel)
+    ["Gb2", "Db3", "Gb3", "Bb3", "Db4", "F4", "Gb4"],               # Gb (warm subdominant)
+    ["Eb2", "Bb2", "Eb3", "G3", "Bb3", "Db4", "Eb4", "G4"],         # Ebm7 (the turn)
+    ["F2", "C3", "F3", "A3", "C4", "Eb4", "F4"],                     # Fm7 (tension)
+    ["Db2", "Ab2", "Db3", "F3", "Ab3", "Db4", "F4", "Ab4", "Db5"],  # Db (home, expanded)
+]
+
 STARFIELD_CHORDS = [
     ["C3", "E3", "G3", "B3", "C4", "E4", "G4", "B4", "C5"],
     ["A2", "C3", "E3", "A3", "C4", "E4", "A4", "C5", "E5"],
@@ -456,7 +482,92 @@ def synth_starfield(track_name, brightness, step_dur, step_num, bpm):
     return silence(step_dur)
 
 
+def synth_cathedral(track_name, brightness, step_dur, step_num, bpm):
+    """Cathedral minimalism: Reich + Pärt + Eno + Sigur Rós.
+    
+    Four voices that interlock like architecture — each one simple,
+    together they build something that fills a space.
+    """
+    beat_dur = 60.0 / bpm
+    bar_dur = 4 * beat_dur
+    # Slow chord changes — 4 bars per chord, cycling through 6 chords
+    chord_idx = int((step_num * step_dur) / (4 * bar_dur)) % len(CATHEDRAL_CHORDS)
+    chord = CATHEDRAL_CHORDS[chord_idx]
+    sr = 22050
+
+    if track_name == "organ":
+        # Pipe organ — rich saw harmonics, slow attack, the foundation
+        # Like a cathedral organ holding a chord that fills the room
+        note = brightness_to_note(brightness, chord[:5])  # lower voicing
+        freq = note_freq(note)
+        # Organ = fundamental + octave + 5th + 2nd octave (classic organ stops)
+        t = np.linspace(0, step_dur, int(sr * step_dur), endpoint=False)
+        snd = (np.sin(2*np.pi*freq*t) * 0.35 +          # fundamental (8')
+               np.sin(2*np.pi*freq*2*t) * 0.25 +         # octave (4')
+               np.sin(2*np.pi*freq*3*t) * 0.15 +         # 5th (2 2/3')
+               np.sin(2*np.pi*freq*4*t) * 0.15 +         # 2nd octave (2')
+               np.sin(2*np.pi*freq*6*t) * 0.10)          # mixture
+        snd = env(snd, a=0.15, d=step_dur*0.2, s=0.85, r=step_dur*0.4)
+        snd = lowpass(snd, 1200 + brightness * 1500)
+        snd = reverb(snd, decay=0.5)
+        return snd
+
+    elif track_name == "bells":
+        # Tintinnabuli bells — FM synthesis, bright attacks, long decay
+        # Arvo Pärt: one note rings while another moves stepwise
+        note = brightness_to_note(brightness, chord[3:])  # upper voicing
+        freq = note_freq(note)
+        t = np.linspace(0, step_dur, int(sr * step_dur), endpoint=False)
+        # FM bell: carrier with inharmonic modulator
+        mod_ratio = 3.51  # slightly inharmonic = bell character
+        mod_depth = freq * (1.5 + brightness * 3.0)  # brighter = more harmonics
+        mod = np.sin(2*np.pi*freq*mod_ratio*t) * mod_depth
+        snd = np.sin(2*np.pi*freq*t + mod)
+        # Bell envelope: instant attack, long exponential decay
+        decay_env = np.exp(-t * (3.0 - brightness * 2.0))  # bright notes ring longer
+        snd = snd * decay_env
+        snd = reverb(snd, decay=0.6)
+        return snd
+
+    elif track_name == "glass":
+        # Glass harmonics — crystalline arpeggiated patterns
+        # Steve Reich: Music for 18 Musicians territory
+        # Multiple rapid tiny notes that phase against each other
+        note = brightness_to_note(brightness, chord[4:])  # highest voicing
+        freq = note_freq(note)
+        t = np.linspace(0, step_dur, int(sr * step_dur), endpoint=False)
+        # Pure sine + gentle 2nd harmonic = glass tone
+        snd = np.sin(2*np.pi*freq*t) * 0.7 + np.sin(2*np.pi*freq*2.003*t) * 0.3
+        # Short, precise attack — like a mallet on glass
+        snd = env(snd, a=0.003, d=step_dur*0.4, s=0.15, r=step_dur*0.3)
+        # Tremolo at a slightly different rate per brightness — creates phasing
+        snd = tremolo(snd, rate=5.0 + brightness * 3.0, depth=0.2)
+        snd = reverb(snd, decay=0.45)
+        return snd
+
+    elif track_name == "choir":
+        # Ethereal choir — stacked detuned voices, the Sigur Rós wall
+        # Many slightly detuned voices creating a shimmering mass
+        note = brightness_to_note(brightness, chord)  # full range
+        freq = note_freq(note)
+        # 5 detuned voices — the choir effect
+        detunes = [0.994, 0.997, 1.0, 1.003, 1.006]
+        snd = silence(step_dur)
+        for d in detunes:
+            voice = triangle(freq * d, step_dur)
+            snd = snd + voice * 0.2
+        # Very slow attack — voices emerge from nothing
+        snd = env(snd, a=0.2, d=step_dur*0.2, s=0.75, r=step_dur*0.5)
+        # Warm filter — never harsh
+        snd = lowpass(snd, 2000 + brightness * 1000)
+        snd = reverb(snd, decay=0.55)
+        return snd
+
+    return silence(step_dur)
+
+
 SYNTH_DISPATCH = {
+    "cathedral": synth_cathedral,
     "starfield": synth_starfield,
     "lofi_hiphop": synth_lofi,
     "synthwave": synth_synthwave,
