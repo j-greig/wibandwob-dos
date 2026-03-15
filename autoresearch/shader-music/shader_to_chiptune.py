@@ -37,8 +37,15 @@ TEX_SIZE = 16             # render texture dimensions
 SHADER_PATH = os.path.join(os.path.dirname(__file__), "starfield-superlite.glsl")
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "output.wav")
 
-# Musical scale for mapping brightness → pitch
-SCALE_NOTES_LIST = ["C3", "D3", "E3", "G3", "A3", "C4", "D4", "E4", "G4", "A4", "C5", "D5"]
+# Musical scales — rotate through chord changes over time
+# Each scale covers 2+ octaves for wide pitch variety
+CHORD_SCALES = [
+    ["C3", "E3", "G3", "B3", "C4", "E4", "G4", "B4", "C5"],      # Cmaj7
+    ["A2", "C3", "E3", "A3", "C4", "E4", "A4", "C5", "E5"],      # Am
+    ["F2", "A2", "C3", "F3", "A3", "C4", "F4", "A4", "C5"],      # F
+    ["G2", "B2", "D3", "G3", "B3", "D4", "G4", "B4", "D5"],      # G
+]
+BARS_PER_CHORD = 2  # each chord lasts 2 bars
 
 # Track configs: waveform, octave offset, volume range
 TRACK_CONFIG = [
@@ -113,6 +120,17 @@ def extract_track_values(pixels):
     return [float(v0), float(v1), float(v2), float(v3)]
 
 
+def get_scale_for_step(step, step_dur):
+    """Get the current chord's scale based on time position."""
+    beats_per_bar = 4
+    beat_dur = 60.0 / BPM
+    bar_dur = beats_per_bar * beat_dur
+    chord_dur = BARS_PER_CHORD * bar_dur
+    t = step * step_dur
+    chord_idx = int(t / chord_dur) % len(CHORD_SCALES)
+    return CHORD_SCALES[chord_idx]
+
+
 def brightness_to_note(brightness, scale_notes):
     """Map 0-1 brightness to a note from the scale."""
     idx = int(brightness * (len(scale_notes) - 1))
@@ -120,7 +138,7 @@ def brightness_to_note(brightness, scale_notes):
     return scale_notes[idx]
 
 
-def synthesize_step(track_idx, brightness, step_dur):
+def synthesize_step(track_idx, brightness, step_dur, step_num):
     """Synthesize one step of audio for a track based on shader brightness."""
     cfg = TRACK_CONFIG[track_idx]
     vol_min, vol_max = cfg["vol"]
@@ -130,6 +148,8 @@ def synthesize_step(track_idx, brightness, step_dur):
     if brightness < 0.05:
         return silence(step_dur) * 0.0
 
+    current_scale = get_scale_for_step(step_num, step_dur)
+
     if cfg["name"] == "perc":
         # Noise track — brightness controls volume and filter
         snd = noise(step_dur)
@@ -138,7 +158,7 @@ def synthesize_step(track_idx, brightness, step_dur):
         snd = lowpass(snd, cutoff)
         return snd * volume
     else:
-        note_name = brightness_to_note(brightness, SCALE_NOTES_LIST)
+        note_name = brightness_to_note(brightness, current_scale)
         freq = note_freq(note_name)
 
         # Apply octave offset
@@ -257,7 +277,7 @@ def run_shader_to_music():
         track_audio = make(DURATION_SECS)
         for step in range(total_steps):
             brightness = all_track_values[step][track_idx]
-            step_audio = synthesize_step(track_idx, brightness, step_dur)
+            step_audio = synthesize_step(track_idx, brightness, step_dur, step)
 
             offset_secs = step * step_dur
             track_audio = place(track_audio, step_audio, offset_secs)
