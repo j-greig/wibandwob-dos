@@ -73,10 +73,26 @@ function deactivateGhosttyShader() {
 activateGhosttyShader();
 
 const removePid = () => { try { fs.unlinkSync(runtimeNode.pidPath); } catch {} };
-process.once("exit", () => { removePid(); deactivateGhosttyShader(); });
-process.once("SIGTERM", () => { removePid(); deactivateGhosttyShader(); process.exit(0); });
-process.once("SIGINT",  () => { removePid(); deactivateGhosttyShader(); process.exit(0); });
+const removeSocket = () => {
+  try { fs.unlinkSync(path.join(runtimeNode.scratchBase, "instances", `${runtimeNode.instanceLabel}.sock`)); } catch {}
+};
+const cleanup = () => { removePid(); removeSocket(); deactivateGhosttyShader(); };
+
+process.once("exit", cleanup);
+process.once("SIGTERM", () => { cleanup(); process.exit(0); });
+process.once("SIGINT",  () => { cleanup(); process.exit(0); });
 
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 
-await new TsTuiMvpApp({ runtimeNode }).run();
+const app = new TsTuiMvpApp({ runtimeNode });
+
+// SIGHUP = terminal died. Save workspace as orphan, then clean exit.
+process.once("SIGHUP", () => {
+  try {
+    app.saveWorkspaceNamed(`orphan-${runtimeNode.instanceLabel}`);
+  } catch {}
+  cleanup();
+  process.exit(0);
+});
+
+await app.run();
