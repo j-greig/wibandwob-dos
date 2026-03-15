@@ -7,7 +7,7 @@ that composed it runs live in Ghostty's GPU compositor — audio and visuals
 from one source, displayed simultaneously. The shader IS the score, and
 you see the score while hearing it.
 
-**Links:** [Ghostty shader API discussion #2353](https://github.com/ghostty-org/ghostty/discussions/2353) · [Community shader switcher PR #61](https://github.com/0xhckr/ghostty-shaders/pull/61) · [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) · [Files & refs ↓](#files-referenced)
+**Links:** [Shader API #2353](https://github.com/ghostty-org/ghostty/discussions/2353) · [Audio-reactive shaders #10201](https://github.com/ghostty-org/ghostty/discussions/10201) · [Shader switcher PR #61](https://github.com/0xhckr/ghostty-shaders/pull/61) · [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) · [Files & refs ↓](#files-referenced)
 
 ---
 
@@ -259,6 +259,7 @@ Each genre gets a desktop "mood":
 | Resource | Why It Matters |
 |----------|----------------|
 | [ghostty-org/ghostty#2353](https://github.com/ghostty-org/ghostty/discussions/2353) | Shader API discussion — custom uniforms, reload behaviour, `iTime` semantics |
+| [ghostty-org/ghostty#10201](https://github.com/ghostty-org/ghostty/discussions/10201) | Audio-reactive shaders discussion — FFT uniforms, external audio input |
 | [0xhckr/ghostty-shaders#61](https://github.com/0xhckr/ghostty-shaders/pull/61) | Community multi-shader switcher PR (fzf picker, pipeline support) |
 | [shader.sh source](https://github.com/JefStat/ghostty-shaders/blob/a34744b95940216398e92865796739edb6c087f0/shader.sh) | Local copy in this dir — config rewrite + fuzzy resolution patterns |
 
