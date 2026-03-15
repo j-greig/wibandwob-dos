@@ -575,7 +575,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     } else {
       const pos = entries.length > 0 ? `${selectedIdx + 1}/${entries.length}` : "—";
       commandBar.setContent(
-        `{${muted}-fg} ${pos}  Enter open  n new  e edit  d delete  / search  Esc clear{/${muted}-fg}`
+        `{${muted}-fg} ${pos}  Enter open  n new  e edit  d del  / search  g/G jump{/${muted}-fg}`
       );
     }
   }
@@ -769,6 +769,20 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   listBox.key(["k", "up"], () => {
     if (mode !== "list") return;
     selectedIdx = Math.max(selectedIdx - 1, 0);
+    listBox.select(selectedIdx);
+    render();
+  });
+
+  listBox.key(["g", "home"], () => {
+    if (mode !== "list") return;
+    selectedIdx = 0;
+    listBox.select(selectedIdx);
+    render();
+  });
+
+  listBox.key(["S-g", "end"], () => {
+    if (mode !== "list") return;
+    selectedIdx = Math.max(0, entries.length - 1);
     listBox.select(selectedIdx);
     render();
   });

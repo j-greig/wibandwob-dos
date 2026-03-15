@@ -535,11 +535,28 @@ def run_shader_to_music():
     synth_time = time.time() - t0
     save_wav(mixed, OUTPUT_PATH)
 
-    # Also save to shots directory with genre name
-    shot_idx = len([f for f in os.listdir(os.path.join(SCRIPT_DIR, "shots")) if f.endswith('.wav')]) + 1
-    shot_path = os.path.join(SCRIPT_DIR, "shots", f"{shot_idx:03d}-{GENRE}.wav")
+    # Save to shots directory with genre name + append manifest
+    shots_dir = os.path.join(SCRIPT_DIR, "shots")
+    shot_idx = len([f for f in os.listdir(shots_dir) if f.endswith('.wav')]) + 1
+    shot_name = f"{shot_idx:03d}-{GENRE}.wav"
+    shot_path = os.path.join(shots_dir, shot_name)
     save_wav(mixed, shot_path)
     print(f"[shader-music] Archived: {shot_path}")
+
+    # Append to manifest
+    manifest_entry = {
+        "id": f"{shot_idx:03d}", "file": shot_name,
+        "shader": genre_cfg["shader"], "genre": GENRE,
+        "bpm": bpm, "dur": duration, "spb": steps_per_beat, "tex": TEX_SIZE,
+        "time_offsets": time_offsets,
+        "entrances": genre_cfg["entrance_times"],
+        "swells": genre_cfg["swell_periods"],
+        "tracks": [{"name": t["name"], "vol": list(t["vol"])} for t in genre_cfg["tracks"]],
+    }
+    manifest_path = os.path.join(shots_dir, "manifest.jsonl")
+    with open(manifest_path, 'a') as f:
+        f.write(json.dumps(manifest_entry) + '\n')
+    print(f"[shader-music] Manifest appended: {manifest_path}")
 
     total_time = gpu_time + synth_time
     print(f"\n[shader-music] === RESULTS ===")
