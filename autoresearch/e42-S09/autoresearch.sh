@@ -3,10 +3,11 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 # Count export lines vs annotated lines in microapp-sdk.ts
-total_exports=$(grep -cE "^export " src/services/microapp-sdk.ts 2>/dev/null || echo 0)
-annotated=$(grep -cE "@public|@beta|@internal" src/services/microapp-sdk.ts 2>/dev/null || echo 0)
+total_exports=$(grep -cE "^export " src/services/microapp-sdk.ts 2>/dev/null || true)
+total_exports=${total_exports:-0}
+annotated=$(grep -cE "@public|@beta|@internal" src/services/microapp-sdk.ts 2>/dev/null || true)
+annotated=${annotated:-0}
 unannotated=$((total_exports - annotated))
-# Clamp to 0 (annotations may exceed export count due to type+value pairs)
 [ "$unannotated" -lt 0 ] && unannotated=0
 
 echo "METRIC unannotated_exports=$unannotated"

@@ -53,10 +53,12 @@ import type {
   MicroappWindowHandle,
 } from "../sdk/microapp-host.js";
 
+/** @public */
 export {
   createAnimationClock,
   createLayoutReporter,
 } from "../sdk/runtime-helpers.js";
+/** @public */
 export {
   fetchRuntimeCommands,
   fetchRuntimeHealth,
@@ -64,6 +66,7 @@ export {
   getRuntimeControlApiBaseUrl,
 } from "../sdk/runtime-client.js";
 
+/** @public */
 export type {
   AnimationClock,
   LayoutRegionRect,
@@ -71,6 +74,7 @@ export type {
   LayoutReport,
   LayoutReporter,
 } from "../sdk/runtime-helpers.js";
+/** @public */
 export type {
   RuntimeCommandsEnvelope,
   RuntimeHealthEnvelope,
@@ -79,6 +83,7 @@ export type {
 
 // Canonical type-only import surface for microapp authors.
 // Runtime capabilities still flow through the host object itself.
+/** @public */
 export type {
   MicroappHost,
   MicroappSnapshotWindow,
@@ -104,12 +109,14 @@ export type {
   GalleryTab,
 };
 
+/** @public */
 export type AnimatedPanelPlayer = LazyMountedPlayer & {
   attachTarget?(target: blessed.Widgets.BoxElement): void;
 };
 
 // Shared runtime helpers that microapp authors should import from the SDK surface
 // rather than reaching directly into core/service paths.
+/** @public */
 export {
   applyRect,
   createNodePart,
@@ -135,6 +142,7 @@ export {
 // These are also available on host.ui.* but can be imported directly for
 // cleaner module-level imports. host.ui.createLayoutButtonBar(...) and
 // import { createLayoutButtonBar } from "microapp-sdk" are equivalent.
+/** @internal */
 export {
   clamp,
   createStack,
@@ -184,6 +192,7 @@ export {
   hslToRgb,
   ansiGradientLine,
 } from "../core/ui-parts.js";
+/** @internal */
 export type {
   InputLineProps,
   MessageHistoryEntry,
@@ -227,13 +236,17 @@ export type {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Timers — use instead of raw setInterval for proper cleanup
+/** @internal */
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 
 // Scroll helpers — use with scrollable blessed boxes
+/** @internal */
 export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
 // Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
+/** @internal */
 export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
+/** @internal */
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
   RadioOption, RadioGroupOptions, RadioGroupHandle,
@@ -245,7 +258,9 @@ export type {
 } from "../core/ui-parts-forms.js";
 
 // Feedback components — progress bars, spinners, toasts
+/** @internal */
 export { createProgressBar, createSpinner, createToast } from "../core/ui-parts-feedback.js";
+/** @internal */
 export type {
   ProgressBarOptions, ProgressBarHandle,
   SpinnerOptions, SpinnerHandle,
@@ -253,7 +268,9 @@ export type {
 } from "../core/ui-parts-feedback.js";
 
 // Data display components — key-value panels, log views, data tables
+/** @internal */
 export { createKeyValuePanel, createLogView, createDataTable } from "../core/ui-parts-data.js";
+/** @internal */
 export type {
   KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
   LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
@@ -261,47 +278,65 @@ export type {
 } from "../core/ui-parts-data.js";
 
 // Motion / tween — animate values, window position and size smoothly
+/** @internal */
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
+/** @internal */
 export type { EasingFn, TweenOpts } from "./motion-service.js";
 
 // Render monitoring — track frame rate and render pressure
+/** @internal */
 export { createRenderMonitor } from "../core/render-monitor.js";
+/** @internal */
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
 
 // Tree widget — hierarchical nav/explorer for sidebars
+/** @internal */
 export { createTreeWidget } from "../core/tree-widget.js";
+/** @internal */
 export type { TreeNode, TreeWidgetHandle } from "../core/tree-widget.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ANIMATION — for microapps with live/animated content
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @beta */
 export type { AnimatedSurfaceTarget } from "./animation-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GRID CANVAS + ASCII COMPOSITION — for microapps that draw ASCII art
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @beta */
 export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
+/** @beta */
 export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js";
+/** @beta */
 export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TEXT RENDERING — markdown and figlet
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @beta */
 export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG, DEFAULT_FIGLET_HEADING_CONFIG } from "./markdown-service.js";
+/** @beta */
 export type { RenderMarkdownOptions, FigletHeadingConfig } from "./markdown-service.js";
+/** @beta */
 export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize } from "./figlet-service.js";
+/** @beta */
 export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @beta */
 export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
+/** @beta */
 export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
+/** @beta */
 export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef, CEPanelDef, PanelType } from "../core/canvas-types.js";
+/** @beta */
 export type { ZineSourceType } from "../core/canvas-types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -312,6 +347,7 @@ export type { ZineSourceType } from "../core/canvas-types.js";
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Empty state placeholders (used by primer-browser, file-manager, etc)
+/** @beta */
 export {
   EMPTY_PRIMER_SELECTED,
   EMPTY_FILE_SELECTED,
@@ -321,39 +357,52 @@ export {
 } from "../core/empty-states.js";
 
 // Monster Cam / webcam
+/** @beta */
 export { MonsterCamService } from "./monster-cam-service.js";
+/** @beta */
 export type { MonsterCamFrame } from "./monster-cam-service.js";
+/** @beta */
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
+/** @beta */
 export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
 
 // Skeleton / pose rendering (GlitchBox)
+/** @beta */
 export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
+/** @beta */
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Plasma engine
+/** @beta */
 export { createPlasmaPlayer, moodNames, RENDER_MODES, extractMoodFromText, getMood } from "./plasma-engine.js";
+/** @beta */
 export type { PlasmaModifiers, PlasmaRenderMode, PlasmaPlayer, PlasmaMood, MoodAnalysis } from "./plasma-engine.js";
 
 // Contour / terrain engine
+/** @beta */
 export { renderContourFromHills } from "./contour-engine.js";
+/** @beta */
 export type { ContourMode, ContourPlayer } from "./contour-engine.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYNTAX HIGHLIGHTING — for code-editing microapps
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @public */
 export { highlightCode, HIGHLIGHTED_LANGUAGES } from "./syntax-highlight.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THEME TYPES — for modules that register custom themes
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @public */
 export type { ThemeVariant } from "../core/theme/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SDK COMPOSITION HELPERS — themed UI primitives for microapp authors
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @public */
 export {
   createStatusBar,
   createTextViewer,
@@ -367,6 +416,7 @@ export {
   createInputLine,
 } from "../sdk/composition-helpers.js";
 
+/** @public */
 export type {
   StatusBarOptions,
   StatusBarHandle,

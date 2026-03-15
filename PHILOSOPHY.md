@@ -190,9 +190,11 @@ SDK composition helpers landed (B02): `createStatusBar`, `createTextViewer`,
 documented in `docs/sdk-primitives.md`. Design system layers documented in
 `docs/design-system.md`.
 
-**Remaining:** Converge naming (drop `Simple` prefix), add `restyle()` to all
-Handle components, create Handle versions of remaining LayoutPart components,
-enforce `@public`/`@beta`/`@internal` annotations.
+**Remaining:** Add `restyle()` to all Handle components. Migrate remaining
+LayoutPart-only components to Handle API as needed.
+
+**Completed (S07–S09):** `Simple` prefix dropped. 10 Handle components.
+`@public`/`@beta`/`@internal` annotations on all SDK exports.
 
 ---
 
