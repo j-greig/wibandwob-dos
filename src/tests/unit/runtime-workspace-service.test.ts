@@ -6,9 +6,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 
 import {
   createRuntimeWorkspaceService,
-} from "../application/runtime-workspace-service.js";
-import type { WindowSnapshot } from "../core/types.js";
-import { WorkspaceService } from "../services/workspace-service.js";
+} from "../../application/runtime-workspace-service.js";
+import type { WindowSnapshot } from "../../core/types.js";
+import { WorkspaceService } from "../../services/workspace-service.js";
 
 const tempDirs: string[] = [];
 

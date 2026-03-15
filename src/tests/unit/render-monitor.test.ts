@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRenderMonitor, formatRenderReading } from "../core/render-monitor.js";
+import { createRenderMonitor, formatRenderReading } from "../../core/render-monitor.js";
 
 describe("render monitor", () => {
   test("tracks render count and exposes snapshots", async () => {

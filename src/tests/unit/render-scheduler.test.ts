@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRenderScheduler } from "../../src/core/render-scheduler.js";
+import { createRenderScheduler } from "../../core/render-scheduler.js";
 
 describe("render scheduler", () => {
   test("batches repeated render requests into one flush", () => {

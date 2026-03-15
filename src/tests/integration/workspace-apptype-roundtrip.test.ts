@@ -7,9 +7,9 @@
  * Ref: https://github.com/j-greig/wibandwob-dos/issues/108
  */
 import { describe, test, expect, afterAll } from "bun:test";
-import { snapshotRegistry, registryRestore } from "../core/snapshot-registry.js";
-import type { SnapshotRestoreActions } from "../core/snapshot-registry.js";
-import type { PersistableAppType } from "../core/types.js";
+import { snapshotRegistry, registryRestore } from "../../core/snapshot-registry.js";
+import type { SnapshotRestoreActions } from "../../core/snapshot-registry.js";
+import type { PersistableAppType } from "../../core/types.js";
 import path from "node:path";
 
 const API = process.env.API_URL ?? "http://localhost:8099";

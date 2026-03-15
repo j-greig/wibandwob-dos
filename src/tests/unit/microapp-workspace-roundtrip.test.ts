@@ -12,9 +12,9 @@ import {
   registrySerialize,
   registryRestore,
   isPersistable,
-} from "../../src/core/snapshot-registry.js";
-import type { WindowRecord, WindowSnapshot } from "../../src/core/types.js";
-import type { SnapshotRestoreActions } from "../../src/core/snapshot-registry.js";
+} from "../../core/snapshot-registry.js";
+import type { WindowRecord, WindowSnapshot } from "../../core/types.js";
+import type { SnapshotRestoreActions } from "../../core/snapshot-registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

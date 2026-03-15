@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { allVariants } from "../core/theme/resolver.js";
+import { allVariants } from "../../core/theme/resolver.js";
 
 const API = process.env.API_URL ?? "http://localhost:8099";
 

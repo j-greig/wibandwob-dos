@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { composeAsciiLayers, renderAsciiTextBlock } from "../services/ascii-composition.js";
+import { composeAsciiLayers, renderAsciiTextBlock } from "../../services/ascii-composition.js";
 
 describe("ascii composition", () => {
   test("overwrite mode prefers later non-space glyphs", () => {

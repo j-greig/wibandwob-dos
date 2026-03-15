@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { resolveSidebarWidth } from "../../src/core/ui-parts.js";
+import { resolveSidebarWidth } from "../../core/ui-parts.js";
 
 describe("resolveSidebarWidth", () => {
   // ── Fixed width ─────────────────────────────────────────────────────────

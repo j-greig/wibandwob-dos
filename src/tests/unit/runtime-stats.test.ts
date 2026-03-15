@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { RuntimeStatsController } from "../../src/core/runtime-stats.js";
+import { RuntimeStatsController } from "../../core/runtime-stats.js";
 
 describe("runtime stats controller", () => {
   test("snapshot reports render, memory, and agent signals", () => {

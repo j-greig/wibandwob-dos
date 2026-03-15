@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createEmbeddedLivePlayer } from "../services/animation-service.js";
+import { createEmbeddedLivePlayer } from "../../services/animation-service.js";
 
 describe("animation service", () => {
   test("embedded live player mounts, emits frames, and clears on destroy", async () => {
