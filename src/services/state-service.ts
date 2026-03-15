@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 
 import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
@@ -80,7 +81,7 @@ export class StateService {
     // Don't persist corrupt state from headless/piped runs — min sane terminal is 20×6
     if (nextState.screen.width >= 20 && nextState.screen.height >= 6) {
       fs.mkdirSync(path.dirname(this.options.runtimeNode.statePath), { recursive: true });
-      fs.writeFileSync(this.options.runtimeNode.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+      safeWriteFile(this.options.runtimeNode.statePath, `${JSON.stringify(nextState, null, 2)}\n`);
     }
     for (const listener of this.listeners) {
       listener(nextState);

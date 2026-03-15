@@ -12,6 +12,7 @@ import type { BrowserEntry, List } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { PREVIEW_SPLIT_RATIO, cleanLabel, setViewportContent } from "./browser-utils.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 export function openPrimerGalleryWindow(params: {
   screen: blessed.Widgets.Screen;
@@ -94,7 +95,7 @@ export function openPrimerGalleryWindow(params: {
       return;
     }
     try {
-      const content = fs.readFileSync(entry.filePath, "utf8");
+      const content = safeReadFile(entry.filePath) ?? "";
       const lineCount = content.split("\n").length;
       const cleanName = cleanLabel(entry.label);
       previewHeader.setContent(` ${cleanName}  (${lineCount} lines)`);

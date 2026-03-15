@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 export function openBrowserReaderWindow(params: {
   filePath: string;
@@ -11,7 +12,7 @@ export function openBrowserReaderWindow(params: {
   onError: (message: string) => void;
 }): void {
   try {
-    const content = fs.readFileSync(params.filePath, "utf8");
+    const content = safeReadFile(params.filePath) ?? "";
     params.onOpenTextViewer(
       `Browser: ${path.basename(params.filePath)}`,
       `Location: ${params.filePath}\n\n${content}`,

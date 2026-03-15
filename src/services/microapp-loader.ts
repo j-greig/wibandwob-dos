@@ -16,6 +16,7 @@
 
 import blessed from "blessed";
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { APP_ROOT } from "../core/config.js";
@@ -311,7 +312,8 @@ function discoverMicroapps(): DiscoveredMicroapp[] {
       if (!fs.existsSync(manifestPath)) continue;
 
       try {
-        const raw = fs.readFileSync(manifestPath, "utf8");
+        const raw = safeReadFile(manifestPath);
+        if (!raw) continue;
         const manifest = JSON.parse(raw) as MicroappManifest;
 
         if (!manifest.name || !manifest.type) {

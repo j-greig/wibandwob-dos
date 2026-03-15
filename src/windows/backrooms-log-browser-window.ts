@@ -9,6 +9,7 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme/resolver.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WindowRecord } from "../core/types.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 interface LogEntry {
   name: string;
@@ -173,7 +174,7 @@ export function openBackroomsLogBrowserWindow(params: {
     pathBar.setContent(` ${entry.path}`);
     currentPath = entry.path;
     try {
-      previewContent = fs.readFileSync(entry.path, "utf8");
+      previewContent = safeReadFile(entry.path) ?? "";
     } catch {
       previewContent = "(could not read file)";
     }

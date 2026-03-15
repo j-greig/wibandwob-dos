@@ -13,6 +13,7 @@ import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
 import { openBackroomsLogBrowserWindow as openBackroomsLogBrowser } from "./backrooms-log-browser-window.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 export interface BackroomsWindowContext {
   screen: blessed.Widgets.Screen;
@@ -134,7 +135,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       return;
     }
     try {
-      const content = fs.readFileSync(entry.filePath, "utf8");
+      const content = safeReadFile(entry.filePath) ?? "";
       preview.setContent(`${entry.label}\n${entry.filePath}\n\n${content}`);
     } catch (error) {
       preview.setContent(`Cannot preview primer.\n\n${error instanceof Error ? error.message : String(error)}`);

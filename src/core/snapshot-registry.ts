@@ -10,6 +10,7 @@
  */
 
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import { getDefaultFigletFont } from "../services/figlet-service.js";
 import type { PersistableAppType, WindowRecord, WindowSnapshot, BackroomsChannel } from "./types.js";
 import type { WindowFacade } from "./window-facade.js";
@@ -112,9 +113,7 @@ export const snapshotRegistry = {
         snapshot.title,
         typeof payload.content === "string"
           ? payload.content
-          : snapshot.filePath && fs.existsSync(snapshot.filePath)
-            ? fs.readFileSync(snapshot.filePath, "utf8")
-            : "",
+          : (snapshot.filePath ? safeReadFile(snapshot.filePath) : undefined) ?? "",
         {
           cursor: typeof payload.cursor === "number" ? payload.cursor : undefined,
           viewMode,
