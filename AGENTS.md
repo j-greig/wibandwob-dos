@@ -94,27 +94,7 @@ bash scripts/list-scripts.sh           # all scripts with descriptions
 ./scripts/screenshot-window.sh "Title" # text crop of one window
 ```
 
-**CLI:** `wibwob` is the single command surface. No `ww-*` aliases, no raw `curl`.
-
-```bash
-wibwob health                          # instance identity
-wibwob state                           # full desktop state JSON
-wibwob map                             # spatial desktop HUD
-wibwob commands -q                     # list all command IDs
-wibwob cmd <id> [--key val]            # run any command
-wibwob read <id>                       # text out of a window
-wibwob write <id>                      # pipe text into a window (stdin)
-wibwob plumb --from <id> --to <id>     # route text between windows
-wibwob start                           # idempotent launch
-wibwob restart                         # clean restart
-wibwob instances                       # list running instances
-wibwob attach                          # resurrect from orphan workspace
-```
-
-**Plumb** reads text from source (`captureText`), writes to dest via fallback
-chain: `<appType>.write` → `.send` → `.create`. Works across microapps and
-host windows. No new endpoints — just `/screenshot/text` + `/commands/run`.
-
+**CLI:** `wibwob` is the single command surface. `wibwob help` for full usage.
 **API:** `http://127.0.0.1:8099` — `GET /health`, `GET /state`, `POST /commands/run`.
 Always `GET /state` first — use real window ids, never guessed ones.
 
