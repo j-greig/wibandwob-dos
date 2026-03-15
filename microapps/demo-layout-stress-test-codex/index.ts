@@ -189,6 +189,7 @@ export default function setup(host: MicroappHost) {
         },
         style: host.theme().body,
       });
+      const viewportPart = createNodePart(viewport);
       const content = blessed.box({
         parent: viewport,
         top: 0,
@@ -197,6 +198,7 @@ export default function setup(host: MicroappHost) {
         height: 0,
         style: host.theme().body,
       });
+      const contentPart = createNodePart(content);
 
       const panelA = createFramedPanel(content, "A: CONTRIB GRID INSIDE FLEX");
       const panelB = createFramedPanel(content, "B: RESPONSIVE FIGLET WRAP");

@@ -1,4 +1,4 @@
-import blessed from "blessed";
+import blessed from "blessed"; // blessed required: LayoutPart widget creation
 import type { LayoutReport, MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createGrid,

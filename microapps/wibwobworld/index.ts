@@ -1,4 +1,4 @@
-import blessed from "blessed";
+import type blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -13,6 +13,7 @@ import {
   type TerrainMap,
   type TerrainPoint,
   type TerrainRenderMode,
+  createCanvas,
 } from "../../src/services/microapp-sdk.js";
 import { debugWibWobWorld, debugWibWobWorldError } from "./debug.js";
 import type {
@@ -209,46 +210,20 @@ export default function setup(host: MicroappHost) {
     });
 
     const headerBar = host.ui.createHeaderBar(win.body, { leftInset: 1 });
-    const bodyNode = blessed.box({
-      parent: win.body,
-      top: 0,
-      left: 0,
-      width: 0,
-      height: 0,
-      style: host.theme().body,
-    });
+    const bodyNode = createCanvas(win.body, { tags: true }).element;
+    bodyNode.style = host.theme().body;
     const infoBlock = host.ui.createTextBlock(bodyNode, { paddingLeft: 1, paddingTop: 0 });
 
-    const mapBox = blessed.box({
-      parent: bodyNode,
-      top: 0,
-      left: 0,
-      width: 0,
-      height: 0,
-      tags: true,
-      scrollable: true,
-      alwaysScroll: true,
-      style: host.theme().body,
-    });
+    const mapBox = createCanvas(bodyNode, { tags: true }).element;
+    mapBox.style = host.theme().body;
 
     const mapPart = createNodePart(mapBox, { restyle: () => { mapBox.style = host.theme().body; } });
 
-    const fpBox = blessed.box({
-      parent: bodyNode,
-      top: 0, left: 0, width: 0, height: 0,
-      tags: true,
-      style: host.theme().body,
-    });
+    const fpBox = createCanvas(bodyNode, { tags: true }).element;
+    fpBox.style = host.theme().body;
     const fpPart = createNodePart(fpBox, { restyle: () => { fpBox.style = host.theme().body; } });
-    const isoBox = blessed.box({
-      parent: bodyNode,
-      top: 0,
-      left: 0,
-      width: 0,
-      height: 0,
-      tags: true,
-      style: host.theme().body,
-    });
+    const isoBox = createCanvas(bodyNode, { tags: true }).element;
+    isoBox.style = host.theme().body;
     const isoPart = createNodePart(isoBox, { restyle: () => { isoBox.style = host.theme().body; } });
     const modeBarPart = host.ui.createButtonBar(
       win.body,

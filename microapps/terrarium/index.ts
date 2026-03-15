@@ -23,6 +23,7 @@ import {
   createHeaderBar,
   createStatusBar,
   createLogView,
+  createCanvas,
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -976,41 +977,27 @@ function openAntopolis(host: MicroappHost) {
   const districtIds: DistrictId[] = ["industrial", "residential", "plaza", "mines"];
 
   for (const id of districtIds) {
-    districtBoxes[id] = blessed.box({
-      parent: win.body,
-      top: 0, left: 0, width: 0, height: 0,
-      border: "line",
-      tags: true,
-      label: ` ${DISTRICTS[id].label} `,
-      style: { ...t.body, border: { fg: DISTRICTS[id].borderFg } },
-    });
+    const canvas = createCanvas(win.body, { tags: true });
+    const box = canvas.element;
+    (box as any).options.border = "line";
+    (box as any).setLabel(` ${DISTRICTS[id].label} `);
+    box.style = { ...t.body, border: { fg: DISTRICTS[id].borderFg } };
+    districtBoxes[id] = box;
   }
 
   // Figlet header
-  const figletBox = blessed.box({
-    parent: win.body, top: 0, left: 0, width: 0, height: 0,
-    tags: false,
-    style: t.header,
-  });
+  const figletBox = createCanvas(win.body, { tags: false }).element;
+  figletBox.style = t.header;
 
-  const subtitleBox = blessed.box({
-    parent: win.body, top: 0, left: 0, width: 0, height: 1,
-    tags: false,
-    style: { ...t.body, fg: t.muted.fg },
-  });
+  const subtitleBox = createCanvas(win.body, { tags: false }).element;
+  subtitleBox.style = { ...t.body, fg: t.muted.fg };
 
-  const resourceBox = blessed.box({
-    parent: win.body, top: 0, left: 0, width: 0, height: 1,
-    tags: true,
-    style: t.body,
-  });
+  const resourceBox = createCanvas(win.body, { tags: true }).element;
+  resourceBox.style = t.body;
 
   // Status bar with theme colours
-  const statusBox = blessed.box({
-    parent: win.body, top: 0, left: 0, width: 0, height: 1,
-    tags: false,
-    style: t.header,
-  });
+  const statusBox = createCanvas(win.body, { tags: false }).element;
+  statusBox.style = t.header;
 
   const logBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 0,

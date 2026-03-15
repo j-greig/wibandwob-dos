@@ -28,7 +28,7 @@ import {
   type BorderedPanelHandle,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";
-import { createTreeWidget, type TreeNode, createTimer, clearTimers, tweenWindowPosition, tweenWindowSize } from "../../src/services/microapp-sdk.js";
+import { createTreeWidget, type TreeNode, createTimer, clearTimers, tweenWindowPosition, tweenWindowSize, createNodePart } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
 
 // ── Sample tree ───────────────────────────────────────────────────────────────
@@ -205,6 +205,7 @@ function openDemo(host: MicroappHost) {
     parent: p2.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
   });
+  const counterBoxPart = createNodePart(counterBox);
 
   createTimer(() => {
     ticks++;
@@ -223,7 +224,7 @@ function openDemo(host: MicroappHost) {
 
   // ── BOTTOM-LEFT panel: Motion cheatsheet (F07) ────────────────────────────
 
-  blessed.box({
+  const motionBox = blessed.box({
     parent: p3.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
     content:
@@ -236,6 +237,7 @@ function openDemo(host: MicroappHost) {
       `  16ms setInterval tick\n\n` +
       `  keys: t  r  z`,
   });
+  const motionBoxPart = createNodePart(motionBox);
 
   // ── BOTTOM-RIGHT panel: RenderMonitor ─────────────────────────────────────
 
@@ -243,6 +245,7 @@ function openDemo(host: MicroappHost) {
     parent: p4.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
   });
+  const fpsBoxPart = createNodePart(fpsBox);
 
   function fpsBar(fps: number): string {
     const max = 24;
