@@ -125,7 +125,7 @@ Key entry points for audit:
 concerns in one file: layout primitives, chrome components, scroll containers, sidebar/tabs,
 and pattern generators. This directly violates invariant #1 (single source of truth per
 concern) and makes it impossible for an agent to understand one component without reading
-2,400 lines.
+2,400 lines. [Human: YES THIS NEEDS MAJOR WORK - THINK DESIGN COMPONENT SYSTEM LIKE NERDY BRAND DESIGNES WOULD MAKE IN FIGMA EXCEPT ITS FOR THE TERMINAL]
 
 The other god files (app-controller 2,334; file-manager 1,623) are harder to split safely —
 app-controller is a composition root, file-manager is a single window. `ui-parts.ts` has
