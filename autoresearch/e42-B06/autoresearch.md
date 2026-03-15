@@ -190,3 +190,27 @@ canonical SDK surface.
 ### Step 1: Extract patterns ✅
 Moved pattern generators, data sim helpers, colour helpers to `ui-parts-patterns.ts` (227 lines).
 ui-parts.ts: 2379 → 2168 lines.
+
+### Step 2: Establish src/ui/ design system ✅
+Created `src/ui/` with 8 modules (types, layout, chrome, containers, data, feedback, forms,
+patterns) + barrel index.ts. Total: 4037 lines properly organized.
+
+- `src/core/ui-parts.ts` → 10-line shim re-exporting from `src/ui/`
+- `src/core/ui-parts-{types,data,feedback,forms,patterns}.ts` → 1-line shims each
+- All existing imports continue to work via barrel
+- 0 circular deps, COAT clean, tests pass, health green
+
+### Step 3: Design system documentation ✅
+Wrote `docs/design-system.md` covering:
+- Directory structure and component layers (tokens/atoms/molecules/organisms/layouts/patterns)
+- Two API families (Handle for microapps, LayoutPart for internals)
+- Naming rules table
+- Theme token reference
+- Migration path for converging APIs
+
+### Nomenclature: assessed but not renamed
+The `createSimple*` prefix on B02 helpers is a collision workaround — the old LayoutPart
+`createStatusBar`/`createButtonBar` are used in 10+ internal files. Renaming them would be
+a large-scale refactor. The design-system doc explains when to use which API. The long-term
+plan: deprecate `Simple` prefix once old LayoutPart names are made internal-only (requires
+all shell windows to migrate to Handle API or use LayoutPart explicitly from `src/ui/`).
