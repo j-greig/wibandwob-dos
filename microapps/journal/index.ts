@@ -542,6 +542,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     scrollbar: { ch: "│", style: { fg: t().muted?.fg || "#555" } },
     style: {
       ...t().body,
+      item: { fg: t().body.fg, bg: t().body.bg },
       selected: { bg: t().selected?.bg || "#333", fg: t().selected?.fg || "#fff" },
     },
   } as any);
@@ -1389,8 +1390,8 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     headerBox.style = th.body;
     sepBox.style = th.body;
     contentBox.style = th.body;
-    listBox.style = { ...th.body, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" } };
-    detailBox.style = th.body;
+    listBox.style = { ...th.body, item: { fg: th.body.fg, bg: th.body.bg }, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" }, scrollbar: { fg: th.muted?.fg || "#555" } };
+    detailBox.style = { ...th.body, scrollbar: { fg: th.muted?.fg || "#555" } };
     statusBar.style = { fg: th.muted?.fg || "#666", bg: th.body.bg };
     commandBar.style = { fg: th.body.fg, bg: th.selected?.bg || "#333" };
     render();
