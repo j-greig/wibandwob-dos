@@ -507,8 +507,10 @@ def synth_cathedral(track_name, brightness, step_dur, step_num, bpm):
                np.sin(2*np.pi*freq*3*t) * 0.15 +         # 5th (2 2/3')
                np.sin(2*np.pi*freq*4*t) * 0.15 +         # 2nd octave (2')
                np.sin(2*np.pi*freq*6*t) * 0.10)          # mixture
-        snd = env(snd, a=0.15, d=step_dur*0.2, s=0.85, r=step_dur*0.4)
-        snd = lowpass(snd, 1200 + brightness * 1500)
+        # Attack varies: soft notes breathe in slowly, bright notes speak
+        attack = 0.2 - brightness * 0.15  # 0.2s at low, 0.05s at high
+        snd = env(snd, a=attack, d=step_dur*0.2, s=0.8, r=step_dur*0.4)
+        snd = lowpass(snd, 800 + brightness * 2000)  # wider filter range
         snd = reverb(snd, decay=0.5)
         return snd
 
@@ -539,10 +541,12 @@ def synth_cathedral(track_name, brightness, step_dur, step_num, bpm):
         # Pure sine + gentle 2nd harmonic = glass tone
         snd = np.sin(2*np.pi*freq*t) * 0.7 + np.sin(2*np.pi*freq*2.003*t) * 0.3
         # Short, precise attack — like a mallet on glass
-        snd = env(snd, a=0.003, d=step_dur*0.4, s=0.15, r=step_dur*0.3)
-        # Tremolo at a slightly different rate per brightness — creates phasing
-        snd = tremolo(snd, rate=5.0 + brightness * 3.0, depth=0.2)
-        snd = reverb(snd, decay=0.45)
+        # Envelope varies with brightness — low=short ping, high=sustained ring
+        decay_t = step_dur * (0.2 + brightness * 0.4)
+        snd = env(snd, a=0.002, d=decay_t, s=0.1 * brightness, r=step_dur*0.2)
+        # Tremolo phasing — varies more with brightness for rhythmic interest
+        snd = tremolo(snd, rate=4.0 + brightness * 5.0, depth=0.15 + brightness * 0.2)
+        snd = reverb(snd, decay=0.4)
         return snd
 
     elif track_name == "choir":
