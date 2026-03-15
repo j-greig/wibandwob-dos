@@ -252,7 +252,7 @@ export interface WindowRecord {
   /** If set, Ctrl-S calls this instead of writing to disk. */
   onSave?: (content: string) => void;
 
-  // Finder-specific (set by browser-windows.ts)
+  // Finder-specific (set by file-manager-window.ts)
   finder?: FinderController;
 
   // Microapp-specific (set by microapp-loader.ts via MicroappHost)

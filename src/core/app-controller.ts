@@ -98,13 +98,10 @@ import {
   promptForBackroomsRunOptions as promptForBackroomsRunOptionsWindow,
   promptForBackroomsTv as promptForBackroomsTvWindow,
 } from "../windows/backrooms-windows.js";
-import {
-  openFileManagerWindow as openFarjsFileManagerWindow,
-  type FileManagerRestore,
-  openPrimerGalleryWindow as openPrimerGalleryListWindow,
-  openTextViewerWindow as openContentViewerWindow,
-} from "../windows/browser-windows.js";
+import { openFileManagerWindow as openFarjsFileManagerWindow, type FileManagerRestore } from "../windows/file-manager-window.js";
 import { openPrimerBrowserWindow as openPrimerBrowserListWindow } from "../windows/primer-browser-window.js";
+import { openPrimerGalleryWindow as openPrimerGalleryListWindow } from "../windows/primer-gallery-window.js";
+import { openTextViewerWindow as openContentViewerWindow } from "../windows/text-viewer-window.js";
 import { openBrowserReaderWindow as openBrowserReaderContentWindow } from "../windows/browser-reader-window.js";
 import {
   openCommandPaletteWindow as openPaletteWindow,
