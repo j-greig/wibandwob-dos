@@ -84,3 +84,15 @@ Standing notes are rolling — prune when items land or die.
 - `describeState` includes recentEntries with previews + currentEntry in read mode
 - `_liveRefresh` callback pattern: module-level ref, set in openJournal, cleared onCleanup
 - blessed.list `setItems` triggers `select item` event → use `rendering` guard to prevent recursion
+
+### blessed.list style.item crash on theme switch
+- blessed internally accesses `self.style.item[name]` and `this.style.scrollbar.fg`
+- When `restyleAll` sets `listBox.style = { ...th.body, selected: {...} }` without `item` or `scrollbar`, blessed crashes
+- Fix: always include `item: { fg, bg }` and `scrollbar: { fg }` in list style AND in onRestyle handler
+- Same applies to any scrollable blessed.box — needs `scrollbar` in style during restyle
+
+### renderMarkdown vs plain text body
+- `renderMarkdown()` treats each line as a paragraph → adds blank lines between them
+- ASCII art bodies (ZILLA) rendered with inter-line gaps
+- Fix: `hasMarkdown()` regex detects `##`, `- `, ``` etc — only use renderMarkdown for actual markdown
+- `renderBody()` dispatches: markdown→renderMarkdown, plain→wrapText
