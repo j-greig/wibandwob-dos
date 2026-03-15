@@ -180,6 +180,41 @@ Rules:
 - value: you can import and use it without adding a new dependency — but it can disappear if the package that brings it in drops it or changes version
 - rule of thumb: if you rely on a transitive dep heavily, promote it to a direct dep in package.json so it's pinned and intentional
 
+## PROCESS & LIFECYCLE TERMS
+
+**SIGHUP (terminal hangup)**
+- the Unix signal fired when the controlling terminal closes or disconnects
+- if the app doesn't catch it, the OS kills the process — but blessed's cleanup may not run, leaving escape codes leaked
+- value: catching SIGHUP lets the app save workspace and die cleanly, or transition to headless mode
+
+**orphan instance**
+- a WibWob-DOS process that outlives its terminal — no TUI visible, but socket/port still bound, memory consumed
+- happens when the terminal crashes, tmux session dies, or blessed loses its TTY without clean SIGTERM
+- the human thinks the app is gone; `wibwob health` still responds
+
+**headless mode**
+- an instance running without a visible TUI — API and socket still work, blessed has nowhere to render
+- useful for agent-only operation, but confusing when accidental (orphan)
+
+**reattach**
+- connecting a new terminal/TUI to an existing running instance, like `tmux attach`
+- pragmatic version: orphan auto-saves workspace on disconnect → new instance loads it → orphan killed after handoff
+- true version: blessed detaches from dead TTY, reattaches to new one (architecturally hard — blessed assumes one TTY for life)
+
+**dual-mode lifecycle**
+- the model where WibWob-DOS is always a server (socket + HTTP), and the TUI is just another client that renders blessed
+- start = start server + attach TUI. Terminal dies = TUI detaches, server keeps running. `wibwob attach` = new TUI connects
+- this is what tmux does at the application layer — tmux server owns PTYs, tmux client renders to your terminal
+
+**socket as continuity anchor**
+- the unix socket survives terminal death — a new process can connect, query `/state`, and reconstruct
+- the socket is already the identity; making it the persistence anchor means the instance outlives its terminal intentionally
+
+**state completeness (for reattach)**
+- whether `WindowSnapshot[]` alone can reconstruct the full visual state
+- some windows have ephemeral state (scroll position, animation frame, cursor position) that snapshots don't capture
+- value: knowing the gap tells you what reattach will lose vs preserve
+
 ## DEV TERMS
 
 **smoke test**
