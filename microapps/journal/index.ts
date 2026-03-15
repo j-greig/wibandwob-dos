@@ -352,6 +352,16 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     },
   } as any);
 
+  // Vertical separator between panes
+  const paneSep = blessed.box({
+    parent: contentBox,
+    top: 0, bottom: 0, width: 1,
+    left: 0, // positioned dynamically
+    tags: true,
+    style: { fg: t().muted?.fg || "#555", bg: t().body.bg },
+    hidden: true,
+  });
+
   // Detail/body pane (right or full width, used in read and edit modes)
   const detailBox = blessed.box({
     parent: contentBox,
@@ -463,13 +473,19 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const twoPane = w >= 120;
 
     if (twoPane) {
-      const listW = Math.floor(w * 0.35);
+      const listW = Math.floor(w * 0.40);
       listBox.width = listW;
+      paneSep.left = listW;
+      paneSep.show();
+      // Draw separator
+      const sepH = (contentBox as any).height || 20;
+      paneSep.setContent(("│\n").repeat(sepH).trim());
       detailBox.left = listW + 1;
-      detailBox.width = w - listW - 1;
+      detailBox.width = w - listW - 2;
       detailBox.show();
     } else {
       listBox.width = "100%" as any;
+      paneSep.hide();
       detailBox.hide();
     }
 
@@ -493,16 +509,17 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
-        const previewW = w - Math.floor(w * 0.35) - 4;
+        const previewW = w - Math.floor(w * 0.40) - 6;
         const bodyLines = wrapText(e.body || "(empty)", previewW);
         const header = [
-          `{bold}${e.title}{/bold}`,
-          `{${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}{/${muted}-fg}`,
-          e.tags.length ? `{${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
+          `  {bold}${e.title}{/bold}`,
+          `  {${muted}-fg}${PEER_GLYPH[e.peer]} ${e.peer} · ${e.kind} · ${timeAgo(e.createdAt)}{/${muted}-fg}`,
+          e.tags.length ? `  {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "",
           "",
-          ...bodyLines,
+          ...bodyLines.map(l => `  ${l}`),
         ].filter(l => l !== undefined);
         detailBox.setContent(header.join("\n"));
+        (detailBox as any).scrollTo(0);
       }
     }
 
