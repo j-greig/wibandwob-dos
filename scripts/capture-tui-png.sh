@@ -21,7 +21,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_PATH=""
-DISPLAY="${DISPLAY_NUM:-${WIBWOB_DISPLAY:-}}"
+DISPLAY="${DISPLAY_NUM:-}"
 LIST_DISPLAYS=0
 
 usage() {
