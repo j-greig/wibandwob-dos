@@ -241,12 +241,50 @@ Each genre gets a desktop "mood":
 
 ---
 
+## Confirmed: AppleScript Works (Ghostty 1.3.1)
+
+Tested live. All commands functional:
+
+```applescript
+-- Open new window at repo dir
+tell application "Ghostty"
+    set cfg to new surface configuration
+    set initial working directory of cfg to "/Users/james/Repos/wibandwob-dos"
+    set win to new window with configuration cfg
+end tell
+
+-- Reload config (shader swap) — returns true on success
+tell application "Ghostty"
+    set t to terminal 1 of selected tab of front window
+    perform action "reload_config" on t
+end tell
+
+-- Send text input to terminal
+tell application "Ghostty"
+    set t to terminal 1 of selected tab of front window
+    input text "echo hello" & return to t
+end tell
+```
+
+**SDEF location:** `/Applications/Ghostty.app/Contents/Resources/Ghostty.sdef`
+
+Full API surface: `perform action` (any Ghostty action string), `new window`,
+`new tab`, `split`, `focus`, `close`, `input text`, `send key` (with modifiers),
+`send mouse button/position/scroll`. `surface configuration` record supports
+`font size`, `initial working directory`, `command`, `initial input`,
+`wait after command`, `environment variables`.
+
+**Shader hot-swap recipe (confirmed working):**
+1. Rewrite `custom-shader` lines in Ghostty config file
+2. `perform action "reload_config" on <terminal>` → returns `true`
+3. Shader swaps instantly — no keystroke simulation needed
+
 ## Open Questions
 
-- **Ghostty shader reload latency**: 300ms measured via osascript keystroke.
-  With 1.3 AppleScript `perform action "config_reload"` ([#11208](https://github.com/ghostty-org/ghostty/pull/11208))
-  latency may be lower — needs benchmarking. Acceptable for scene transitions,
-  not for beat-synced swaps at >120bpm.
+- **Ghostty shader reload latency**: `perform action "reload_config"` returns
+  instantly — actual shader recompile latency needs benchmarking but expected
+  sub-100ms. Acceptable for scene transitions, possibly even beat-synced at
+  moderate BPM.
 - **iTime sync**: Ghostty's `iTime` counts from shader load, not from audio
   start. For perfect sync, shader needs a `uniform float audioTime` — not
   currently possible without Ghostty source modification. Workaround: accept

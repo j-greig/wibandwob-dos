@@ -45,5 +45,23 @@ echo "$STATE" | grep -q "wibwob.journal" || {
 }
 echo "PASS: journal in /state"
 
+echo "=== v2 features still work ==="
+# Verify CRUD cycle
+RESULT=$(curl -sf -X POST "$API/commands/run" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"microapp.wibwob.journal.create","args":{"title":"checks-test","body":"autoresearch check","peer":"agent","kind":"note","tags":["test"]}}' 2>/dev/null || echo "{}")
+ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('entry',{}).get('id',''))" 2>/dev/null || echo "")
+if [ -z "$ID" ]; then
+  echo "ERROR: journal.create failed"
+  exit 1
+fi
+echo "PASS: journal.create works (id=$ID)"
+
+# Delete the test entry
+curl -sf -X POST "$API/commands/run" \
+  -H 'Content-Type: application/json' \
+  -d "{\"id\":\"microapp.wibwob.journal.delete\",\"args\":{\"id\":\"$ID\"}}" > /dev/null 2>&1
+echo "PASS: journal.delete works"
+
 echo ""
 echo "All checks passed."

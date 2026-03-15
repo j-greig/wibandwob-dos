@@ -1,38 +1,35 @@
-# Journal v2 — Autoresearch Brief
+# Journal v3 — Markdown, Sort, Sessions
 
 ## Objective
 
-Rebuild the Symbient Journal as a proper entry-based journal app with list,
-read, edit, and create modes. Two-pane layout at wide breakpoints.
+Extend the Symbient Journal with markdown body rendering, sort/date controls,
+and a pi session log viewer mode. All features COAT-compliant and SDK-aware.
 
 ## Primary Metric
 
-`journal_score = feature_score (0–60) + ui_score (0–40)`
+`journal_score = feature_score (0–40) + ui_score (0–60)`
 
 Higher is better.
 
-### Feature score (60 pts max)
+### Feature score (40 pts max)
 
 | Version | Points | Features |
 |---------|--------|----------|
-| MVP — List + Read | 10 | entry list, detail view, create entry, nav, persistence |
-| v1 — Edit + Delete | 12 | edit entry, delete, metadata display, search, keyboard shortcuts |
-| v2 — Rich List | 12 | two-pane layout, responsive, sort, stats, relative timestamps |
-| v3 — Agent Integration | 10 | create/read/update/list/delete commands (direct:true), describeState |
-| v4 — Polish | 8 | tags, kind icons, figlet, word wrap, markdown-lite rendering |
-| v5 — Power Features | 8 | export, import from v1, linked entries, templates, workspace persist |
+| F1 — Markdown Body | 10 | renderMarkdown in preview pane, renderMarkdown in read mode, heading styles, code blocks, horizontal rules, bullet lists |
+| F2 — Sort & Date | 10 | sort toggle key (s), cycle updatedAt/createdAt/title, sort indicator in status bar, date group headers in list, index mapping for headers |
+| F3 — Session Viewer | 14 | detect ~/.pi, session list view, session detail view, mode toggle key, session message rendering, role-colored blocks, tool call summaries |
+| F4 — Integration | 6 | journal.sessions command, journal.session.read command, describeState includes view mode, Core Apps menu (done) |
 
-### UI + UX score (40 pts max)
+### UI + UX score (60 pts max)
 
 | Axis | Max | What it measures |
 |------|-----|-----------------|
-| LAYOUT | 6 | Two-pane balance, responsive breakpoints, no dead zones |
-| READABILITY | 6 | Entry list scannable, body text legible, clear hierarchy |
-| AESTHETIC | 5 | Theme coherence, visual interest, deliberate design |
-| COHERENCE | 5 | Consistent across all modes (list/read/edit/new) |
-| CHARACTER | 5 | Personality, WibWob-ness, not generic |
-| USABILITY | 6 | Keyboard flow, mode transitions, input feels natural, mouse support |
-| AGENT_XP | 7 | CRUD commands return structured data, describeState useful, fully operable without TUI |
+| MD_RENDER | 10 | Headings visually distinct, code blocks bordered, lists indented, rules visible, body text legible |
+| LIST_UX | 10 | Date headers scannable, sort state clear, no dead zones, index mapping correct (selection skips headers) |
+| SESSION_UX | 10 | Session list readable (date, id, preview), detail view clear (user/assistant blocks), tool calls summarised not dumped |
+| COHERENCE | 10 | Consistent across journal mode and session mode, same chrome, same key patterns |
+| LAYOUT | 10 | Two-pane works in both modes, responsive breakpoints maintained, no overflow |
+| POLISH | 10 | Theme tokens throughout, no hardcoded colors, mode indicator clear, transitions smooth |
 
 ## How to Run
 
@@ -42,21 +39,21 @@ bash autoresearch.sh
 
 ## Scoring Discipline
 
-- Score UI against rubric, not expectations
-- 4 = competent default, below 3 = bad, above 6 = genuinely good
-- Feature checks are binary
+- Score against rubric, not expectations
+- Feature checks are binary (grep + API verification)
+- UI axes: 0-3 bad, 4-6 competent, 7-8 good, 9-10 excellent
 - Don't inflate scores to hit targets
+- Don't overfit to benchmarks or cheat
 
 ## Files in Scope
 
 - `microapps/journal/microapp.json`
-- `microapps/journal/index.ts` (rewrite)
-- `scratch/journal-v2/entries/*.json` (entry storage)
-- `scratch/journal-v2/index.json` (entry index)
+- `microapps/journal/index.ts`
+- `scratch/journal-v2/entries/*.json`
 
 ## Off Limits
 
-- `src/` — shell internals
+- `src/` — shell internals (except reading SDK exports)
 - Other `microapps/` directories
 - Theme files, SDK source
 
@@ -66,14 +63,15 @@ bash autoresearch.sh
 - No new npm dependencies
 - All imports from `../../src/services/microapp-sdk.js`
 - Use `host.theme()` tokens only
-- Old v1 `scratch/journal.jsonl` data must still exist (v1 import feature reads it)
 - `scripts/restart.sh` required for TS changes (not microapps.reload)
+- Session viewer only appears if `~/.pi` exists
+- Session JSONL files can be large — lazy load, don't slurp all content upfront
 
 ## Iteration Order
 
-1. MVP: entry list + detail view + create
-2. Edit + delete + search
-3. Two-pane responsive layout
-4. Agent CRUD commands
-5. Visual polish (figlet, icons, tags, markdown rendering)
-6. Power features (export, import, templates, workspace)
+1. Markdown body rendering (preview pane + read mode)
+2. Sort toggle + status bar indicator
+3. Date group headers with index mapping
+4. Pi session list view
+5. Pi session detail view
+6. Session API commands + describeState

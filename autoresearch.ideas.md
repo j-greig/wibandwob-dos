@@ -1,15 +1,44 @@
-# Autoresearch Ideas — Journal v2
+# Autoresearch Ideas — Journal v3
 
-## COMPLETE — 100/100 🎯
-- feature_score: 60/60, ui_score: 40/40
-- All 7 UI axes maxed
-- Full vim-style keyboard nav (j/k/g/G/Enter/n/e/d/Tab/Ctrl-S/Esc)
-- CRUD API verified end-to-end
-- Two-pane layout, colored glyphs, kind icons, tags, timestamps
-- Export/import, workspace persistence, 13+ entries
+## v2 COMPLETE — 100/100 ✅
+Preserved in git history. All 60 feature pts + 40 UI pts.
 
-## FUTURE / DEFERRED (not needed for 100/100)
-- Markdown-lite rendering in body (##, **, -, code blocks)
-- Date group headers in list
-- Sort toggle (created/updated/title)
+## v3 IN PROGRESS
+
+### F1 — Markdown Body Rendering
+- SDK has `renderMarkdown(text, width, opts)` — returns ANSI string[]
+- `PLAIN_HEADING_CONFIG` for non-figlet headings in body
+- Replace `wrapText()` in preview pane + read mode
+- Gotcha: ANSI vs blessed tags conflict — test both paths
+- Study: `src/services/markdown-service.ts`, Document Reader usage
+
+### F2 — Sort & Date
+- `s` key cycles sort: updatedAt → createdAt → title
+- Sort indicator in status bar: `↓updated` / `↓created` / `↓title`
+- Date group headers: "Today", "Yesterday", "12 Mar", "3 Mar"
+- Index mapping: `indexMap[visualIdx] → entryIdx | -1` for headers
+- Selection skips headers (intercept up/down)
+- Study: file manager list in `src/windows/browser-windows.ts:1599`
+
+### F3 — Pi Session Log Viewer
+- Second mode: `S` (shift-s) in list mode toggles journal↔sessions
+- Only if `~/.pi` exists
+- Session dir: `~/.pi/agent/sessions/--{encoded-cwd}--/`
+- Derive from `process.cwd()` with same encoding pi uses
+- JSONL format: `type: session|message|model_change|thinking_level_change`
+- Messages: `{ message: { role, content: [{type, text}] } }`
+- List view: date, session id prefix, message count, first user msg
+- Detail view: scrollable conversation, role-colored blocks
+- Tool calls: show name only, collapse result to one-line summary
+- Lazy load: count lines + first msg for list, full parse on open
+
+### F4 — Integration
+- `journal.sessions` command (list sessions)
+- `journal.session.read` command (read specific session)
+- `describeState` includes `viewMode: "journal" | "sessions"`
+
+## DEFERRED
 - Entry templates, tag autocomplete
+- Markdown rendering in edit mode preview
+- Session search/filter
+- Cross-reference: link journal entries to sessions that created them

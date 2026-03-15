@@ -15,17 +15,72 @@
  *   wibwob help                         # show usage
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
+import { SCRATCH_BASE } from "../core/config.js";
 
-const BASE = process.env.WW_API ?? process.env.WIBWOB_API ?? buildLocalControlApiBaseUrl();
+// ── Instance targeting ───────────────────────────────────
+// --instance <label> connects via unix socket: scratch/instances/<label>.sock
+// Falls back to env vars, then default HTTP port.
+
+function findFlag(flag: string): string | undefined {
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === flag && process.argv[i + 1]) return process.argv[i + 1];
+    if (process.argv[i].startsWith(`${flag}=`)) return process.argv[i].slice(flag.length + 1);
+  }
+  return undefined;
+}
+
+function resolveBase(): string {
+  // --instance flag: highest priority (explicit targeting)
+  const label = findFlag("--instance");
+  if (label) {
+    const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
+    if (fs.existsSync(sockPath)) {
+      return `unix://${sockPath}`;
+    }
+    process.stderr.write(`No socket for instance "${label}" at ${sockPath}\n`);
+    process.exit(1);
+  }
+
+  // Explicit env override
+  if (process.env.WW_API) return process.env.WW_API;
+  if (process.env.WIBWOB_API) return process.env.WIBWOB_API;
+
+  // $WIBWOB_INSTANCE env var
+  if (process.env.WIBWOB_INSTANCE) {
+    const sockPath = path.join(SCRATCH_BASE, "instances", `${process.env.WIBWOB_INSTANCE}.sock`);
+    if (fs.existsSync(sockPath)) {
+      return `unix://${sockPath}`;
+    }
+  }
+
+  // Default: HTTP
+  return buildLocalControlApiBaseUrl();
+}
+
+const BASE = resolveBase();
+const IS_SOCKET = BASE.startsWith("unix://");
 const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 
 // ── Helpers ──────────────────────────────────────────────
 
-async function api(path: string, method = "GET", body?: unknown): Promise<unknown> {
+async function api(apiPath: string, method = "GET", body?: unknown): Promise<unknown> {
   const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(`${BASE}${path}`, opts);
+
+  let url: string;
+  if (IS_SOCKET) {
+    // Bun supports fetch() over unix sockets with the unix option
+    const sockPath = BASE.slice("unix://".length);
+    (opts as any).unix = sockPath;
+    url = `http://localhost${apiPath}`;
+  } else {
+    url = `${BASE}${apiPath}`;
+  }
+
+  const res = await fetch(url, opts);
   if (!res.ok) {
     const text = await res.text();
     let parsed: unknown;
@@ -143,13 +198,55 @@ async function cmdRun(id: string, flags: Record<string, unknown>) {
 
 async function cmdScreenshot(id?: string) {
   const qs = id ? `?id=${id}` : "";
-  const res = await fetch(`${BASE}/screenshot/text${qs}`);
+  const url = IS_SOCKET ? `http://localhost/screenshot/text${qs}` : `${BASE}/screenshot/text${qs}`;
+  const opts: RequestInit = IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {};
+  const res = await fetch(url, opts);
   if (!res.ok) {
     process.stderr.write(`Error: ${res.status}${res.status === 404 ? " — window not found" : ""}\n`);
     process.exit(1);
   }
   const text = await res.text();
   process.stdout.write(text);
+}
+
+async function cmdInstances() {
+  const instancesDir = path.join(SCRATCH_BASE, "instances");
+  if (!fs.existsSync(instancesDir)) {
+    process.stderr.write("No instances directory found\n");
+    process.exit(1);
+  }
+  const socks = fs.readdirSync(instancesDir).filter((f: string) => f.endsWith(".sock"));
+  if (socks.length === 0) {
+    process.stderr.write("No instances running (no .sock files)\n");
+    process.exit(1);
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const sock of socks) {
+    const sockPath = path.join(instancesDir, sock);
+    const label = sock.replace(/\.sock$/, "");
+    try {
+      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      if (res.ok) {
+        const health = await res.json() as Record<string, unknown>;
+        results.push({ label, socket: sockPath, ...health });
+      } else {
+        results.push({ label, socket: sockPath, ok: false, error: `HTTP ${res.status}` });
+      }
+    } catch {
+      // Dead socket — clean it up
+      try { fs.unlinkSync(sockPath); } catch {}
+      results.push({ label, socket: sockPath, ok: false, error: "dead (cleaned)" });
+    }
+  }
+
+  if (QUIET) {
+    for (const r of results) {
+      if (r.ok) process.stdout.write(`${r.label}\n`);
+    }
+  } else {
+    out(results);
+  }
 }
 
 async function cmdCompletions() {
@@ -215,6 +312,7 @@ Usage:
   wibwob health                       API health check
   wibwob screenshot                   Text screenshot of desktop
   wibwob screenshot <id>              Text screenshot of a single window
+  wibwob instances                    List running instances (via sockets)
   wibwob cmd <id> [--key val ...]     Run command by ID
   wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
   wibwob <domain> <verb> [--flags]    Run command (noun verb)
@@ -222,11 +320,13 @@ Usage:
   wibwob help                         This message
 
 Flags:
-  -q, --quiet    Output IDs only, one per line (for piping)
+  --instance <label>  Target instance by label (connects via unix socket)
+  -q, --quiet         Output IDs only, one per line (for piping)
 
 Environment:
-  WW_API        Base URL (default: configured local control API)
-  WIBWOB_API    Alias for WW_API
+  WIBWOB_INSTANCE  Target instance label (same as --instance)
+  WW_API           Base URL override (default: socket or port 8099)
+  WIBWOB_API       Alias for WW_API
 
 Output: JSON to stdout, errors to stderr. Pipe to jq.
 `);
@@ -243,8 +343,15 @@ async function main() {
 
   const sub = args[0];
 
-  // Strip -q/--quiet from args for dispatch (already captured globally)
-  const cleanArgs = args.filter(a => a !== "-q" && a !== "--quiet");
+  // Strip -q/--quiet and --instance <label> from args for dispatch (already captured)
+  const filteredArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-q" || args[i] === "--quiet") continue;
+    if (args[i] === "--instance") { i++; continue; }
+    if (args[i].startsWith("--instance=")) continue;
+    filteredArgs.push(args[i]);
+  }
+  const cleanArgs = filteredArgs;
   const cleanSub = cleanArgs[0];
   if (!cleanSub) { usage(); return; }
 
@@ -261,6 +368,8 @@ async function main() {
       return cmdHealth();
     case "screenshot":
       return cmdScreenshot(cleanArgs[1]);
+    case "instances":
+      return cmdInstances();
     case "completions":
       return cmdCompletions();
     case "cmd": {

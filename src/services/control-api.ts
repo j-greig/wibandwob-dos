@@ -67,7 +67,8 @@ type RuntimeControlApiIdentity = Pick<
 const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/",                              description: "Service info + endpoint list (this response)" },
   { method: "GET",  path: "/help",                          description: "Alias for /" },
-  { method: "GET",  path: "/health",                        description: "Health check" },
+  { method: "GET",  path: "/health",                        description: "Instance identity: id, label, pid, uptime, port, socketPath" },
+  { method: "GET",  path: "/config",                        description: "Instance config: paths (scratch, captures, workspaces, state)" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
@@ -172,7 +173,10 @@ function buildOpenApiSpec(port: number) {
 
 export class ControlApiService {
   private server?: { stop: (closeActiveConnections?: boolean) => void };
+  private socketServer?: { stop: (closeActiveConnections?: boolean) => void };
   private actualPort?: number;
+  private socketPath?: string;
+  private readonly startedAt = Date.now();
   private enabled = false;
 
   constructor(
@@ -187,7 +191,8 @@ export class ControlApiService {
         Bun?: {
           serve: (options: {
             hostname?: string;
-            port: number;
+            port?: number;
+            unix?: string;
             fetch: (request: Request) => Promise<Response> | Response;
           }) => { stop: (closeActiveConnections?: boolean) => void };
         };
@@ -198,6 +203,8 @@ export class ControlApiService {
       this.actualPort = undefined;
       return;
     }
+
+    // ── HTTP listener (port) ──
     const ports = [
       this.port,
       this.port + 1,
@@ -215,24 +222,54 @@ export class ControlApiService {
         this.actualPort = port;
         this.enabled = true;
         log.app(`control API listening on port ${port}`);
-        return;
+        break;
       } catch {
         continue;
       }
     }
-    this.server = undefined;
-    this.actualPort = undefined;
-    this.enabled = false;
+
+    if (!this.enabled) {
+      this.server = undefined;
+      this.actualPort = undefined;
+      return;
+    }
+
+    // ── Unix socket listener (local discovery + targeting) ──
+    if (!this.identity.scratchBase) return;
+    const label = this.identity.instanceLabel || this.identity.instanceId;
+    const instancesDir = path.join(this.identity.scratchBase, "instances");
+    const sockPath = path.join(instancesDir, `${label}.sock`);
+    try {
+      fs.mkdirSync(instancesDir, { recursive: true });
+      // Clean stale socket from previous run
+      try { fs.unlinkSync(sockPath); } catch {}
+      this.socketServer = bunRuntime.serve({
+        unix: sockPath,
+        fetch: async (request) => this.handleRequest(request),
+      });
+      this.socketPath = sockPath;
+      log.app(`control API socket at ${sockPath}`);
+    } catch (err) {
+      log.err(`control API socket failed: ${err}`);
+      // HTTP still works — socket is best-effort
+    }
   }
 
   stop(): void {
     this.server?.stop(true);
     this.server = undefined;
+    this.socketServer?.stop(true);
+    this.socketServer = undefined;
+    // Clean up socket file
+    if (this.socketPath) {
+      try { fs.unlinkSync(this.socketPath); } catch {}
+      this.socketPath = undefined;
+    }
     this.actualPort = undefined;
     this.enabled = false;
   }
 
-  getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string } {
+  getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string; socketPath?: string } {
     const host = "127.0.0.1";
     const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
@@ -240,6 +277,7 @@ export class ControlApiService {
       port: this.actualPort,
       host: this.enabled ? host : undefined,
       baseUrl,
+      socketPath: this.socketPath,
     };
   }
 
@@ -283,13 +321,28 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
+      const uptimeMs = Date.now() - this.startedAt;
+      const uptimeSec = Math.floor(uptimeMs / 1000);
+      const h = Math.floor(uptimeSec / 3600);
+      const m = Math.floor((uptimeSec % 3600) / 60);
+      const uptime = h > 0 ? `${h}h ${m}m` : `${m}m`;
       return Response.json({
         ok: true,
-        port: this.actualPort,
-        requestedPort: this.identity.apiPort,
-        host: this.identity.host,
-        instanceLabel: this.identity.instanceLabel,
         instanceId: this.identity.instanceId,
+        instanceLabel: this.identity.instanceLabel ?? null,
+        pid: process.pid,
+        startedAt: new Date(this.startedAt).toISOString(),
+        uptime,
+        port: this.actualPort,
+        host: this.identity.host,
+        socketPath: this.socketPath ?? null,
+      });
+    }
+
+    if (request.method === "GET" && url.pathname === "/config") {
+      return Response.json({
+        instanceId: this.identity.instanceId,
+        requestedPort: this.identity.apiPort,
         scratchBase: this.identity.scratchBase,
         capturesDir: this.identity.capturesDir,
         workspacesDir: this.identity.workspacesDir,
