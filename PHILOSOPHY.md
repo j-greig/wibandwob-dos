@@ -341,12 +341,16 @@ attach are future work. See parking lot in `AGENTS.md`.
 
 - 6 circular deps → 0
 - `src/ui/` design system (8 modules, 4037 lines properly organized)
-- 5 SDK composition helpers with Handle API
+- 11 SDK composition helpers with Handle API (added `createCanvas`)
 - `src/core/safe-fs.ts` filesystem wrapper (22 files migrated)
 - 36 unit tests, `bun run health` composite gate
 - 7 hero microapps (6 complete)
 - `knip.json` configured
 - `docs/design-system.md`, `docs/sdk-primitives.md`, `docs/microapp-examples.md`
+- `host-window-registry` pattern created for window lifecycle management
+- `sdk-showcase` microapp built as reference for SDK composition
+- Blessed microapp count reduced from 31 → ~19 (consolidation in progress)
+- File-manager UX improved (title display + close hint)
 
 ### 🟡 In Progress
 

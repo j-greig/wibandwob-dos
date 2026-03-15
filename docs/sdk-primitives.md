@@ -255,3 +255,40 @@ input.focus();
 
 **Options**: `placeholder?`, `bottom?`
 **Returns**: `{ element, getValue(), setValue(text), focus(), onSubmit(cb), destroy() }`
+
+---
+
+## `createCanvas(parent, opts?)`
+
+Free-form drawing surface for graphics, animations, or generative art.
+Provides a pixel-aware element with direct character-cell access.
+Useful for real-time visualizations, waveforms, animations, or ASCII graphics.
+
+```typescript
+const canvas = createCanvas(win.body, {
+  width: 40,
+  height: 20,
+  bottomOffset: 1,
+});
+
+// Draw characters to the canvas:
+canvas.setChar(5, 5, "█", { fg: "green", bg: undefined });
+canvas.setChar(6, 5, "▓");
+
+// Clear and redraw:
+canvas.clear();
+canvas.update({ width: 50, height: 25 });
+
+// Cleanup:
+canvas.destroy();
+```
+
+**Options**: `width?`, `height?`, `topOffset?`, `bottomOffset?`
+**Returns**: `{ element, setChar(x, y, char, style?), clear(), update(opts), destroy() }`
+
+Common use cases:
+- Live data visualization (stock tickers, charts)
+- Real-time animation (scrollers, spinners)
+- ASCII art generation or procedural drawing
+- Waveform or spectrum displays
+- Game-like graphics in terminal
