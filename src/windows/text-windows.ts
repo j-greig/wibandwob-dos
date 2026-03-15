@@ -26,6 +26,7 @@ import {
   type FigletHeadingConfig,
 } from "../services/markdown-service.js";
 import { stripAnsi } from "../core/ansi-utils.js";
+import { render as renderEditorWidget } from "../services/editor-service.js";
 
 export interface EditorWindowParams {
   windowManager: WindowManager;
@@ -273,9 +274,24 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
   // ── writeInput (API / agent control) ──────────────────────────────────────
 
   frame.writeInput = (input: string) => {
-    if (input === "h" && isMd) { figletEnabled = !figletEnabled; if (currentMode === "view") renderView(true); }
-    if (input === "e" && isMd) applyMode("edit");
-    if (input === "v" && isMd) applyMode("view");
+    // Single-char mode shortcuts
+    if (input.length === 1) {
+      if (input === "h" && isMd) { figletEnabled = !figletEnabled; if (currentMode === "view") renderView(true); }
+      if (input === "e" && isMd) applyMode("edit");
+      if (input === "v" && isMd) applyMode("view");
+      return;
+    }
+    // Multi-char: replace editor content (plumb/write target)
+    if (frame.editor) {
+      frame.editor.value = input;
+      frame.editor.cursor = input.length;
+      renderEditorWidget(frame.editor);
+      if (currentMode === "view" && isMd) {
+        cachedLines = input.split("\n");
+        scrollBox?.setContent(cachedLines.join("\n"));
+      }
+      screen.render();
+    }
   };
 
   // ── onRestyle ─────────────────────────────────────────────────────────────

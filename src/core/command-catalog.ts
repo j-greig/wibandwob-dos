@@ -42,6 +42,7 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   agentSend: (args?: Record<string, unknown>) => void;
+  editorWrite: (args?: Record<string, unknown>) => void;
   reloadAgentPrompt: () => void;
   reloadMicroapps: () => unknown;
   quit: () => void;
@@ -463,6 +464,15 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     menuPlacements: [{ category: "file", order: 60, appTypes: ["text-editor"] }],
     palettePlacement: { order: 60 },
     contextMenu: { windowKinds: ["editor"], order: 20 }
+  },
+  {
+    id: "editor.write",
+    label: "Write to Editor",
+    description: "Replace the content of the focused editor window. Args: text (string, required).",
+    group: "edit",
+    actionKey: "editorWrite",
+    api: true,
+    agent: true
   },
   {
     id: "workspace.save_as",

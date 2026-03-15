@@ -1891,6 +1891,15 @@ export class TsTuiMvpApp {
         }
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
+      editorWrite: (args?: Record<string, unknown>) => {
+        const text = typeof args?.text === "string" ? args.text : "";
+        const focused = this.windowManager.getFocusedWindow();
+        if (focused?.writeInput) {
+          focused.writeInput(text);
+        } else {
+          this.overlays.flash("No editor window focused");
+        }
+      },
       agentSend: (args?: Record<string, unknown>) => {
         const text = typeof args?.text === "string" ? args.text : typeof args?.message === "string" ? args.message : "";
         if (!text.trim()) return;
