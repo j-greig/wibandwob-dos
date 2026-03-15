@@ -5,9 +5,10 @@
 #
 # IMPORTANT:
 # - This captures OS pixels via `screencapture` (not WibWob internals).
-# - It is only valid proof if the tmux-attached WibWob UI is visibly on that display.
+# - It is only valid proof if the WibWob UI is visibly on that display
+#   (in any terminal: Ghostty, iTerm2, tmux, etc).
 # - For semantic capture, pair with text tools:
-#     /screenshot/text, scripts/screenshot-window.sh, tmux capture-pane.
+#     /screenshot/text, scripts/screenshot-window.sh, /screenshot/ansi.
 #
 # Usage:
 #   ./scripts/capture-tui-png.sh
