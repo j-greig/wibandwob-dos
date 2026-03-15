@@ -518,6 +518,30 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     tags: true, style: t().body,
   });
 
+  // JRN · LOG toggle indicator (top-right of header)
+  const toggleBox = blessed.box({
+    parent: win.body,
+    top: 0, right: 1, width: 11, height: 1,
+    tags: true,
+    mouse: true,
+    style: t().body,
+  });
+
+  toggleBox.on("click", () => {
+    if (mode !== "list") return;
+    if (!PI_EXISTS) return;
+    if (viewMode === "journal") {
+      viewMode = "sessions";
+      sessions = listSessions();
+      sessionIdx = 0;
+      sessionMessages = [];
+    } else {
+      viewMode = "journal";
+    }
+    refresh();
+    render();
+  });
+
   const sepBox = blessed.box({
     parent: win.body,
     top: 7, left: 0, right: 0, height: 1,
@@ -675,6 +699,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       ? `{${muted}-fg}session archaeology // ${sessions.length} pi sessions · ${PI_EXISTS ? "~/.pi" : "no pi"}{/${muted}-fg}`
       : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
     headerBox.setContent([...figLines, "", tagline].join("\n"));
+
+    // Toggle indicator: active mode in accent, inactive in muted
+    const jrnColor = viewMode === "journal" ? accent : muted;
+    const logColor = viewMode === "sessions" ? accent : muted;
+    toggleBox.setContent(`{${jrnColor}-fg}JRN{/${jrnColor}-fg} {${muted}-fg}·{/${muted}-fg} {${logColor}-fg}LOG{/${logColor}-fg}`);
 
     // Separator
     const sepW = Math.max(0, w - 4);
@@ -1371,9 +1400,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     }
     const allTags = [...new Set(all.flatMap(e => e.tags))];
     return {
-      summary: `Journal — ${all.length} entries, mode: ${mode}, view: journal`,
+      summary: `Journal — ${all.length} entries, mode: ${mode}, view: ${viewMode}`,
       mode,
-      viewMode: "journal" as const,
+      viewMode,
       sortBy,
       entryCount: all.length,
       selectedId: selectedEntry?.id ?? entries[selectedIdx]?.id ?? null,
@@ -1393,6 +1422,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         body: selectedEntry.body, peer: selectedEntry.peer,
         kind: selectedEntry.kind, tags: selectedEntry.tags,
       } : null,
+      // Session info when in LOG mode
+      sessionCount: viewMode === "sessions" ? sessions.length : undefined,
+      selectedSessionId: viewMode === "sessions" ? sessions[sessionIdx]?.sessionId ?? null : undefined,
       availableCommands: [
         "journal.open", "journal.create", "journal.read",
         "journal.update", "journal.list", "journal.delete",
@@ -1404,6 +1436,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onRestyle(() => {
     const th = t();
     headerBox.style = th.body;
+    toggleBox.style = th.body;
     sepBox.style = th.body;
     contentBox.style = th.body;
     listBox.style = { ...th.body, item: { fg: th.body.fg, bg: th.body.bg }, selected: { bg: th.selected?.bg || "#333", fg: th.selected?.fg || "#fff" }, scrollbar: { fg: th.muted?.fg || "#555" } };
