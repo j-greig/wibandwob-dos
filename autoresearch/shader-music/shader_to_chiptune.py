@@ -83,14 +83,34 @@ def render_shader_frame(ctx, prog, fbo, vao, t):
 
 
 def extract_track_values(pixels):
-    """Reduce 16x16 RGBA texture to 4 track control values (0-1)."""
-    # Each RGBA channel = one track's brightness, averaged across all pixels
-    values = []
-    for ch in range(4):
-        channel = pixels[:, :, ch].astype(np.float64) / 255.0
-        avg = np.mean(channel)
-        values.append(avg)
-    return values
+    """Reduce 16x16 RGBA texture to 4 track control values (0-1).
+    
+    Each track reads a different spatial region crossed with a different 
+    channel combination, then applies a unique transfer curve.
+    """
+    h, w = pixels.shape[:2]
+    half_h, half_w = h // 2, w // 2
+    fp = pixels.astype(np.float64) / 255.0
+    
+    # Track 0 (lead): top-left R + bottom-right G — diagonal cross
+    v0 = (np.mean(fp[:half_h, :half_w, 0]) + np.mean(fp[half_h:, half_w:, 1])) / 2.0
+    
+    # Track 1 (harmony): top-right B + bottom-left R — other diagonal  
+    v1 = (np.mean(fp[:half_h, half_w:, 2]) + np.mean(fp[half_h:, :half_w, 0])) / 2.0
+    
+    # Track 2 (bass): left half G + right half B — vertical split
+    v2 = (np.mean(fp[:, :half_w, 1]) + np.mean(fp[:, half_w:, 2])) / 2.0
+    
+    # Track 3 (perc): top R + bottom G — horizontal split
+    v3 = (np.mean(fp[:half_h, :, 0]) + np.mean(fp[half_h:, :, 1])) / 2.0
+    
+    # Different transfer curves for further decorrelation
+    v0 = v0 ** 0.7                              # lead: boost low values
+    v1 = 3.0 * v1**2 - 2.0 * v1**3             # harmony: S-curve
+    v2 = np.clip((v2 - 0.03) * 1.8, 0.0, 1.0)  # bass: threshold + amplify
+    v3 = v3 ** 1.4                               # perc: compress dynamics
+    
+    return [float(v0), float(v1), float(v2), float(v3)]
 
 
 def brightness_to_note(brightness, scale_notes):
