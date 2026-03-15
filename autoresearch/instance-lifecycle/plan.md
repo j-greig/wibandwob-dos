@@ -29,20 +29,16 @@
 Add `registerSnapshot()` to figlet, runtime-inspector, contour.
 Each is self-contained in its own `index.ts`. No `src/` changes needed.
 
-**Test:** save workspace → restart → load → verify windows present via API.
+**Test:** save workspace → restart → load → verify windows present.
 
 ```bash
 wibwob microapp.wibwob.figlet.open --text TEST --font doom
 wibwob microapp.wibwob.runtime-inspector.open
 wibwob microapp.wibwob.contour.open
-# save
-curl -X POST $API/workspace/save -d '{"name":"test"}'
-# restart
-bash scripts/restart.sh
-# load
-curl -X POST $API/workspace/load -d '{"name":"test"}'
-# verify
-wibwob map  # should show 3+ windows
+wibwob workspace.save --name test      # ⚠️ add subcommand first
+wibwob restart                         # ⚠️ add subcommand first
+wibwob workspace.load --name test      # ⚠️ add subcommand first
+wibwob map                             # should show 3+ windows
 ```
 
 ### Phase 2: Clean Death (F1) — signal handlers

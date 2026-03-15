@@ -1,8 +1,12 @@
 #!/bin/bash
 # E039 Instance Lifecycle — behaviour test harness
+#
+# Canon: `wibwob` is the command surface. No ww-* aliases, no raw curl
+# unless wibwob subcommand doesn't exist yet. When a test needs a missing
+# subcommand, that's a signal to add it to src/cli/wibwob.ts first.
 set -euo pipefail
 
-API="http://127.0.0.1:8099"
+WIBWOB="./src/cli/wibwob.ts"
 SCORE=0
 TOTAL=0
 
@@ -22,66 +26,63 @@ check() {
 # ── 0. Ensure app is running ──────────────────────────────────
 bash scripts/ensure-running.sh > /dev/null 2>&1 || true
 for i in $(seq 1 15); do
-  curl -sf "$API/health" > /dev/null 2>&1 && break
+  $WIBWOB health > /dev/null 2>&1 && break
   sleep 1
 done
-curl -sf "$API/health" > /dev/null 2>&1 || {
-  echo "ERROR: API not reachable"
+$WIBWOB health > /dev/null 2>&1 || {
+  echo "ERROR: wibwob health failed — API not reachable"
   exit 1
 }
 
-INSTANCE_ID=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('instanceId','?'))")
-INSTANCE_LABEL=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('instanceLabel','?'))")
-echo "Instance: $INSTANCE_LABEL · $INSTANCE_ID"
+INSTANCE_LABEL=$($WIBWOB health | jq -r '.instanceLabel // "?"')
+INSTANCE_PID=$($WIBWOB health | jq -r '.pid')
+echo "Instance: $INSTANCE_LABEL (pid $INSTANCE_PID)"
 echo ""
 
 # ── F2: Microapp Snapshot Parity (30 pts) ─────────────────────
 echo "=== F2: Microapp Snapshots (30 pts) ==="
 
-# Open test windows
-curl -sf -X POST "$API/commands/run" -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.figlet.open","args":{"text":"LIFECYCLE","font":"doom"}}' > /dev/null 2>&1
-curl -sf -X POST "$API/commands/run" -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.runtime-inspector.open"}' > /dev/null 2>&1
-curl -sf -X POST "$API/commands/run" -H 'Content-Type: application/json' \
-  -d '{"id":"microapp.wibwob.contour.open"}' > /dev/null 2>&1
+# Open test windows via wibwob command surface
+$WIBWOB cmd microapp.wibwob.figlet.open --text LIFECYCLE --font doom > /dev/null 2>&1
+$WIBWOB cmd microapp.wibwob.runtime-inspector.open > /dev/null 2>&1
+$WIBWOB cmd microapp.wibwob.contour.open > /dev/null 2>&1
 sleep 2
 
 # Count windows before save
-BEFORE=$(curl -sf "$API/state" | python3 -c "
-import sys,json
-ws = json.load(sys.stdin)['windows']
-types = [w.get('appType','') for w in ws]
-print(f'{len(ws)} windows: {\" \".join(types)}')
-")
-echo "  before: $BEFORE"
+BEFORE=$($WIBWOB windows -q | wc -l | tr -d ' ')
+TYPES=$($WIBWOB state | jq -r '[.windows[].appType] | join(" ")')
+echo "  before: $BEFORE windows: $TYPES"
 
 # Save workspace
-curl -sf -X POST "$API/workspace/save" -H 'Content-Type: application/json' \
+# TODO: replace with `wibwob workspace.save --name lifecycle-test` once added
+curl -sf -X POST "http://127.0.0.1:8099/workspace/save" \
+  -H 'Content-Type: application/json' \
   -d '{"name":"lifecycle-test"}' > /dev/null 2>&1
 
 # Restart (clears all windows)
 bash scripts/restart.sh > /dev/null 2>&1
 for i in $(seq 1 15); do
-  curl -sf "$API/health" > /dev/null 2>&1 && break
+  $WIBWOB health > /dev/null 2>&1 && break
   sleep 1
 done
 sleep 2
 
 # Load workspace
-curl -sf -X POST "$API/workspace/load" -H 'Content-Type: application/json' \
+# TODO: replace with `wibwob workspace.load --name lifecycle-test` once added
+curl -sf -X POST "http://127.0.0.1:8099/workspace/load" \
+  -H 'Content-Type: application/json' \
   -d '{"name":"lifecycle-test"}' > /dev/null 2>&1
 sleep 3
 
 # Check what survived
 check "figlet restored" 10 \
-  "curl -sf '$API/state' | python3 -c \"import sys,json; ws=json.load(sys.stdin)['windows']; assert any(w.get('appType')=='wibwob.figlet' for w in ws)\""
+  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.figlet\")] | length > 0'"
 
 check "runtime-inspector restored" 10 \
-  "curl -sf '$API/state' | python3 -c \"import sys,json; ws=json.load(sys.stdin)['windows']; assert any(w.get('appType')=='wibwob.runtime-inspector' for w in ws)\""
+  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.runtime-inspector\")] | length > 0'"
 
 check "contour restored" 10 \
-  "curl -sf '$API/state' | python3 -c \"import sys,json; ws=json.load(sys.stdin)['windows']; assert any(w.get('appType')=='wibwob.contour' for w in ws)\""
+  "$WIBWOB state | jq -e '[.windows[] | select(.appType==\"wibwob.contour\")] | length > 0'"
 
 # ── F1: Clean Death (30 pts) ──────────────────────────────────
 echo ""
@@ -90,8 +91,8 @@ echo "=== F1: Clean Death (30 pts) ==="
 SOCK_PATH="scratch/instances/${INSTANCE_LABEL:-main}.sock"
 PID_FILE="scratch/wibwob.pid"
 
-# Get current PID
-CURRENT_PID=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin)['pid'])")
+# Get current PID via wibwob
+CURRENT_PID=$($WIBWOB health | jq -r '.pid')
 
 check "socket exists before kill" 5 "[ -S '$SOCK_PATH' ]"
 
@@ -108,24 +109,25 @@ check "orphan workspace saved" 10 "[ -f 'scratch/workspaces/orphan-${INSTANCE_LA
 echo ""
 echo "=== F3: Boot Workspace (20 pts) ==="
 
-# Start with --workspace flag (if implemented)
+# Check --workspace flag implemented in app startup
 check "--workspace flag exists" 10 \
-  "grep -q 'workspace' src/core/cli.ts 2>/dev/null || grep -q 'WIBWOB_WORKSPACE' src/app.ts 2>/dev/null"
+  "grep -q 'workspace' src/app.ts 2>/dev/null || grep -q 'WIBWOB_WORKSPACE' src/app.ts 2>/dev/null"
 
-# Restart normally, check if orphan workspace auto-detected
+# Restart and check if orphan workspace auto-detected
 bash scripts/ensure-running.sh > /dev/null 2>&1 || true
 for i in $(seq 1 15); do
-  curl -sf "$API/health" > /dev/null 2>&1 && break
+  $WIBWOB health > /dev/null 2>&1 && break
   sleep 1
 done
 
 check "orphan workspace auto-loaded" 10 \
-  "curl -sf '$API/state' | python3 -c \"import sys,json; assert len(json.load(sys.stdin)['windows']) > 1\""
+  "[ \$($WIBWOB windows -q | wc -l | tr -d ' ') -gt 1 ]"
 
 # ── F4: wibwob attach (20 pts) ────────────────────────────────
 echo ""
 echo "=== F4: wibwob attach (20 pts) ==="
 
+# These check that the subcommand exists and handles the flow
 check "attach subcommand exists" 5 "grep -q 'attach' src/cli/wibwob.ts"
 check "detects orphan workspace" 5 "grep -q 'orphan' src/cli/wibwob.ts"
 check "kills stale process" 5 "grep -q 'kill\|SIGTERM\|stale' src/cli/wibwob.ts"

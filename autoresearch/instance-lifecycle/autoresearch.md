@@ -35,7 +35,9 @@ Each check follows the pattern:
 2. Trigger event (SIGHUP, SIGTERM, restart, attach)
 3. Verify outcome (socket gone? workspace file exists? windows restored?)
 
-All verification via `wibwob` CLI — no tmux, no screenshots needed.
+All verification via `wibwob` CLI — no tmux, no curl, no ww-* aliases, no screenshots.
+`wibwob` is the canon command surface. If a `wibwob` subcommand is missing,
+add it to `src/cli/wibwob.ts` before writing the test.
 
 ```
   start instance
