@@ -520,40 +520,74 @@ async function cmdCompletions() {
   process.exit(0);
 }
 
+// ── CLI Command Table (single source of truth) ──────────
+
+interface CliCommand {
+  name: string;
+  aliases?: string[];
+  args?: string;
+  desc: string;
+  fn: (args: string[]) => Promise<void> | void;
+}
+
+const CLI_COMMANDS: CliCommand[] = [
+  { name: "state",       desc: "Full desktop state (JSON)",                       fn: () => cmdState() },
+  { name: "inspection",  desc: "Full runtime inspection snapshot (JSON)",          fn: () => cmdInspection() },
+  { name: "windows",     args: "[-q]",           desc: "List windows (JSON, -q for IDs only)", fn: () => cmdWindows() },
+  { name: "commands",    args: "[-q] [--surface S]", desc: "List available commands",           fn: () => cmdCommands() },
+  { name: "health",      desc: "API health check",                                fn: () => cmdHealth() },
+  { name: "minimap",     aliases: ["map"],        desc: "Spatial map of all windows",           fn: () => cmdMinimap() },
+  { name: "screenshot",  aliases: ["read"], args: "[id]", desc: "Text screenshot (desktop or window)", fn: (a) => cmdScreenshot(a[1]) },
+  { name: "write",       args: "<id>",           desc: "Write stdin text into a window (pipe in)", fn: (a) => cmdWrite(a[1]) },
+  { name: "instances",   desc: "List running instances (via sockets)",             fn: () => cmdInstances() },
+  { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
+  { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },
+  { name: "cmd",         args: "<id> [--key val]", desc: "Run command by ID",                   fn: (a) => {
+    const id = a[1];
+    if (!id) { process.stderr.write("Usage: wibwob cmd <command-id> [--flags]\n"); process.exit(1); }
+    return cmdRun(id, parseFlags(a.slice(2)));
+  }},
+];
+
+// Build lookup map (name + aliases → command)
+const CLI_CMD_MAP = new Map<string, CliCommand>();
+for (const cmd of CLI_COMMANDS) {
+  CLI_CMD_MAP.set(cmd.name, cmd);
+  for (const alias of cmd.aliases ?? []) CLI_CMD_MAP.set(alias, cmd);
+}
+
 function usage() {
-  process.stderr.write(`wibwob — Unix CLI for WibWob-DOS
+  const lines = [
+    "wibwob — Unix CLI for WibWob-DOS",
+    "",
+    "Usage:",
+  ];
 
-Usage:
-  wibwob state                        Full desktop state (JSON)
-  wibwob inspection                   Full runtime inspection snapshot (JSON)
-  wibwob windows [-q]                 List windows (JSON, -q for IDs only)
-  wibwob commands [-q] [--surface agent|api|menu|palette] [--includeUnavailable]
-                                      List available commands
-  wibwob health                       API health check
-  wibwob minimap                      Spatial map of all windows (alias: map)
-  wibwob screenshot                   Text screenshot of desktop
-  wibwob screenshot <id>              Text screenshot of a single window
-  wibwob read <id>                    Alias for screenshot (Plan 9 symmetry)
-  wibwob write <id>                   Write stdin text into a window (pipe in)
-  wibwob instances                    List running instances (via sockets)
-  wibwob attach                       Resurrect from orphan workspace (detect → kill stale → start → load)
-  wibwob cmd <id> [--key val ...]     Run command by ID
-  wibwob <domain>.<verb> [--flags]    Run command (dot syntax)
-  wibwob <domain> <verb> [--flags]    Run command (noun verb)
-  wibwob window <id> <verb> [--flags] Target window then act
-  wibwob help                         This message
+  for (const cmd of CLI_COMMANDS) {
+    const names = cmd.aliases ? `${cmd.name}|${cmd.aliases.join("|")}` : cmd.name;
+    const sig = `  wibwob ${names}${cmd.args ? " " + cmd.args : ""}`;
+    lines.push(`${sig.padEnd(42)}${cmd.desc}`);
+  }
 
-Flags:
-  --instance <label>  Target instance by label (connects via unix socket)
-  -q, --quiet         Output IDs only, one per line (for piping)
+  // Dynamic dispatch patterns (not in the table — they're fallthrough logic)
+  lines.push(`${"  wibwob <domain>.<verb> [--flags]".padEnd(42)}Run catalog command (dot syntax)`);
+  lines.push(`${"  wibwob <domain> <verb> [--flags]".padEnd(42)}Run catalog command (noun verb)`);
+  lines.push(`${"  wibwob window <id> <verb> [--flags]".padEnd(42)}Target window then act`);
+  lines.push(`${"  wibwob help".padEnd(42)}This message`);
 
-Environment:
-  WIBWOB_INSTANCE  Target instance label (same as --instance)
-  WW_API           Base URL override (default: socket or port 8099)
-  WIBWOB_API       Alias for WW_API
+  lines.push("");
+  lines.push("Flags:");
+  lines.push("  --instance <label>  Target instance by label (connects via unix socket)");
+  lines.push("  -q, --quiet         Output IDs only, one per line (for piping)");
+  lines.push("");
+  lines.push("Environment:");
+  lines.push("  WIBWOB_INSTANCE  Target instance label (same as --instance)");
+  lines.push("  WW_API           Base URL override (default: socket or port 8099)");
+  lines.push("  WIBWOB_API       Alias for WW_API");
+  lines.push("");
+  lines.push("Output: JSON to stdout, errors to stderr. Pipe to jq.");
 
-Output: JSON to stdout, errors to stderr. Pipe to jq.
-`);
+  process.stderr.write(lines.join("\n") + "\n");
   process.exit(0);
 }
 
@@ -579,61 +613,36 @@ async function main() {
   const cleanSub = cleanArgs[0];
   if (!cleanSub) { usage(); return; }
 
-  switch (cleanSub) {
-    case "state":
-      return cmdState();
-    case "inspection":
-      return cmdInspection();
-    case "windows":
-      return cmdWindows();
-    case "commands":
-      return cmdCommands();
-    case "health":
-      return cmdHealth();
-    case "minimap":
-    case "map":
-      return cmdMinimap();
-    case "screenshot":
-    case "read":
-      return cmdScreenshot(cleanArgs[1]);
-    case "write":
-      return cmdWrite(cleanArgs[1]);
-    case "instances":
-      return cmdInstances();
-    case "attach":
-      return cmdAttach();
-    case "completions":
-      return cmdCompletions();
-    case "cmd": {
-      const id = cleanArgs[1];
-      if (!id) { process.stderr.write("Usage: wibwob cmd <command-id> [--flags]\n"); process.exit(1); }
-      return cmdRun(id, parseFlags(cleanArgs.slice(2)));
-    }
-    default: {
-      // Treat as command ID: wibwob theme.set --name dark
-      if (cleanSub.includes(".")) {
-        return cmdRun(cleanSub, parseFlags(cleanArgs.slice(1)));
-      }
-      // Try: wibwob window <id> <verb> --flags → window.<verb> --id <id>
-      // e.g. wibwob window 3 close → window.close --id 3
-      if (cleanArgs.length >= 3 && !isNaN(Number(cleanArgs[1])) && !cleanArgs[2].startsWith("--")) {
-        const noun = cleanSub;
-        const target = Number(cleanArgs[1]);
-        const verb = cleanArgs[2];
-        const flags = parseFlags(cleanArgs.slice(3));
-        flags.id = target;
-        return cmdRun(`${noun}.${verb}`, flags);
-      }
-      // Try noun + verb: wibwob window close --id 3 → window.close
-      if (cleanArgs.length >= 2 && !cleanArgs[1].startsWith("--")) {
-        const id = `${cleanSub}.${cleanArgs[1]}`;
-        return cmdRun(id, parseFlags(cleanArgs.slice(2)));
-      }
-      // Unknown
-      process.stderr.write(`Unknown command: ${cleanSub}\nRun 'wibwob help' for usage.\n`);
-      process.exit(1);
-    }
+  // ── Table-driven dispatch ──
+  const matched = CLI_CMD_MAP.get(cleanSub);
+  if (matched) {
+    return matched.fn(cleanArgs);
   }
+
+  // ── Fallthrough: dynamic dispatch patterns ──
+
+  // Treat as command ID: wibwob theme.set --name dark
+  if (cleanSub.includes(".")) {
+    return cmdRun(cleanSub, parseFlags(cleanArgs.slice(1)));
+  }
+  // Try: wibwob window <id> <verb> --flags → window.<verb> --id <id>
+  // e.g. wibwob window 3 close → window.close --id 3
+  if (cleanArgs.length >= 3 && !isNaN(Number(cleanArgs[1])) && !cleanArgs[2].startsWith("--")) {
+    const noun = cleanSub;
+    const target = Number(cleanArgs[1]);
+    const verb = cleanArgs[2];
+    const flags = parseFlags(cleanArgs.slice(3));
+    flags.id = target;
+    return cmdRun(`${noun}.${verb}`, flags);
+  }
+  // Try noun + verb: wibwob window close --id 3 → window.close
+  if (cleanArgs.length >= 2 && !cleanArgs[1].startsWith("--")) {
+    const id = `${cleanSub}.${cleanArgs[1]}`;
+    return cmdRun(id, parseFlags(cleanArgs.slice(2)));
+  }
+  // Unknown
+  process.stderr.write(`Unknown command: ${cleanSub}\nRun 'wibwob help' for usage.\n`);
+  process.exit(1);
 }
 
 main().catch((err: Error) => {

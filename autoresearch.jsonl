@@ -1,7 +1,1 @@
-{"type":"config","name":"F5 Write Pipe — wibwob write/read","metricName":"write_score","metricUnit":"","bestDirection":"higher"}
-{"run":1,"commit":"0fa22aa","metric":20,"metrics":{},"status":"discard","description":"Baseline: CLI infra grep checks pass (20pts), no write commands exist yet","timestamp":1773578475965,"segment":0}
-{"run":2,"commit":"5840e20","metric":100,"metrics":{},"status":"keep","description":"F5 write pipe: figlet.write command, wibwob write/read CLI, fallback convention (write→send→create), pipe composition","timestamp":1773578785257,"segment":0}
-{"run":3,"commit":"3fc1d98","metric":100,"metrics":{},"status":"keep","description":"Stability run 1: 100/100","timestamp":1773578810459,"segment":0}
-{"run":4,"commit":"4418ab8","metric":100,"metrics":{},"status":"keep","description":"Stability run 2: 100/100","timestamp":1773578832929,"segment":0}
-{"run":5,"commit":"a4f855c","metric":100,"metrics":{},"status":"keep","description":"Stability run 3: 100/100 — F5 stable","timestamp":1773578855162,"segment":0}
-{"run":6,"commit":"0b70b70","metric":100,"metrics":{},"status":"keep","description":"F5 terminal.write: send text to pty stdin, expanded harness to 100pts with terminal section","timestamp":1773579003987,"segment":0}
+{"type":"config","name":"F7 Self-Maintaining CLI Help","metricName":"help_score","metricUnit":"","bestDirection":"higher"}

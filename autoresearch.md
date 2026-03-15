@@ -1,1 +1,1 @@
-autoresearch/write-pipe/autoresearch.md
+autoresearch/cli-help/autoresearch.md

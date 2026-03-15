@@ -1,1 +1,1 @@
-autoresearch/write-pipe/autoresearch.checks.sh
+autoresearch/cli-help/autoresearch.checks.sh

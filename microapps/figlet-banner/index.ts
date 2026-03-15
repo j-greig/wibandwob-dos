@@ -6,7 +6,6 @@ import {
   getFigletFontChoices,
   getFigletCatalogue,
   getFigletWindowContentSize,
-  createFilterableList,
 } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
 
@@ -200,18 +199,68 @@ export default function setup(host: MicroappHost) {
     }
 
     function pickFont() {
-      const choices = getFigletFontChoices();
-      const idx = Math.max(0, choices.findIndex((c) => c.value === currentFont));
+      const allChoices = getFigletFontChoices();
+      let filtered = allChoices;
+      let query = "";
+      const idx = Math.max(0, allChoices.findIndex((c) => c.value === currentFont));
 
-      // Split: filterable list on left, live preview on right
       const pickerContainer = blessed.box({
         parent: win.body,
         top: 1,
         left: 0,
         right: 0,
         bottom: 0,
+        style: host.theme().body,
       });
 
+      // ── Left pane: search + scrollable list ──
+      const leftPane = blessed.box({
+        parent: pickerContainer,
+        top: 0,
+        left: 0,
+        width: "40%",
+        bottom: 0,
+        border: "line",
+        style: {
+          ...host.theme().body,
+          border: { fg: host.theme().accent.fg },
+        },
+      });
+
+      const searchLabel = blessed.box({
+        parent: leftPane,
+        top: 0,
+        left: 1,
+        right: 1,
+        height: 1,
+        style: host.theme().header,
+        content: " Search: ",
+      });
+
+      const fontList = blessed.list({
+        parent: leftPane,
+        top: 1,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        mouse: true,
+        keys: true,
+        vi: true,
+        scrollable: true,
+        alwaysScroll: true,
+        scrollbar: {
+          ch: "▐",
+          track: { bg: "default" },
+          style: { bg: "default", fg: "grey" },
+        },
+        style: {
+          ...host.theme().body,
+          selected: host.theme().selected,
+        },
+        items: allChoices.map((c) => c.label),
+      });
+
+      // ── Right pane: live preview ──
       const preview = blessed.box({
         parent: pickerContainer,
         top: 0,
@@ -221,11 +270,49 @@ export default function setup(host: MicroappHost) {
         scrollable: true,
         alwaysScroll: true,
         mouse: true,
-        style: host.theme().body,
+        border: "line",
+        label: " Preview ",
+        style: {
+          ...host.theme().body,
+          border: { fg: host.theme().muted.fg },
+        },
+      });
+
+      fontList.select(idx);
+
+      // Show initial preview
+      const initialChoice = filtered[idx];
+      if (initialChoice) {
+        preview.setContent(renderFiglet(currentText || "WIB WOB", initialChoice.value));
+      }
+
+      function updatePreview() {
+        const selIdx = (fontList as unknown as { selected: number }).selected ?? 0;
+        const choice = filtered[selIdx];
+        if (choice) {
+          preview.setContent(renderFiglet(currentText || "WIB WOB", choice.value));
+        }
+      }
+
+      function refilter() {
+        const q = query.toLowerCase();
+        filtered = q
+          ? allChoices.filter((c) => c.label.toLowerCase().includes(q))
+          : allChoices;
+        fontList.setItems(filtered.map((c) => c.label) as unknown as blessed.Widgets.BlessedElement[]);
+        fontList.select(0);
+        updatePreview();
+        searchLabel.setContent(query ? ` Search: ${query}_ ` : " Search: (type to filter) ");
+        host.screen.render();
+      }
+
+      // Preview on move
+      fontList.on("select item", () => {
+        updatePreview();
+        host.screen.render();
       });
 
       function closePicker() {
-        fontPicker.destroy();
         pickerContainer.detach();
         textInput.show();
         viewer.show();
@@ -233,38 +320,47 @@ export default function setup(host: MicroappHost) {
         rerenderFiglet();
       }
 
-      const fontPicker = createFilterableList({
-        items: choices,
-        initialIndex: idx,
-        placeholder: "Search fonts...",
-        onHighlight: (e) => {
-          preview.setContent(renderFiglet(currentText || "WIB WOB", e.value));
-          host.screen.render();
-        },
-        onSelect: (e) => {
-          currentFont = e.value;
-          closePicker();
-        },
-        onCancel: closePicker,
+      // Enter = confirm selection
+      fontList.on("select", (_item: unknown, index: number) => {
+        const choice = filtered[index];
+        if (choice) {
+          currentFont = choice.value;
+        }
+        closePicker();
       });
 
-      pickerContainer.append(fontPicker.node);
+      // Escape = close (clear search first if active)
+      fontList.key(["escape"], () => {
+        if (query) {
+          query = "";
+          refilter();
+        } else {
+          closePicker();
+        }
+      });
 
-      // Layout the list on the left 40%
-      const containerW = Math.max(1, Number(pickerContainer.width) || 60);
-      const containerH = Math.max(1, Number(pickerContainer.height) || 20);
-      const listW = Math.floor(containerW * 0.4);
-      fontPicker.layout({ top: 0, left: 0, width: listW, height: containerH });
-
-      // Show initial preview
-      const initialChoice = choices[idx];
-      if (initialChoice) {
-        preview.setContent(renderFiglet(currentText || "WIB WOB", initialChoice.value));
-      }
+      // Type-to-filter: capture printable chars and backspace
+      fontList.on("keypress", (ch: string, key: { name: string; ctrl?: boolean }) => {
+        if (!key) return;
+        if (key.name === "backspace") {
+          if (query.length > 0) {
+            query = query.slice(0, -1);
+            refilter();
+          }
+          return;
+        }
+        if (ch && ch.length === 1 && !key.ctrl && ch.charCodeAt(0) >= 32
+          && key.name !== "enter" && key.name !== "return"
+          && key.name !== "up" && key.name !== "down"
+          && key.name !== "escape") {
+          query += ch;
+          refilter();
+        }
+      });
 
       textInput.hide();
       viewer.hide();
-      fontPicker.node.focus();
+      fontList.focus();
       host.screen.render();
     }
 
