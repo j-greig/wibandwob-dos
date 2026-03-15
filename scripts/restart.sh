@@ -25,7 +25,6 @@ ww_parse_mode "$@"
 for arg in "${WW_REMAINING_ARGS[@]}"; do
   case "$arg" in
     --force) FORCE=1 ;;
-    --cmd)   ;; # handled below
   esac
 done
 # Extract --cmd with value
