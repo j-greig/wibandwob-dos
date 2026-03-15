@@ -12,7 +12,7 @@ import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../core/empty-states.js";
 import { createScrollbar } from "../core/ui-primitives.js";
-import { clipToVisibleWidth, padToWidth } from "../core/ansi-utils.js";
+
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
 import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../services/syntax-highlight.js";
@@ -21,104 +21,8 @@ import { createPreRenderedPlayer, type FramePlayer } from "../services/animation
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 
-/** Percent of window width given to the list/left pane; preview gets the rest. */
-const PREVIEW_SPLIT_RATIO = 42;
-/** Strip .txt/.md extension for display */
-const cleanLabel = (label: string) => label.replace(/\.(txt|md)$/i, "");
 import type { WindowManager } from "../core/window-manager.js";
-
-/** Truncate a line by visible width and pad to a fixed viewport width. */
-function fitLineToWidth(line: string, width: number): string {
-  if (width <= 0) {
-    return "";
-  }
-  return padToWidth(clipToVisibleWidth(line, width), width);
-}
-
-/** Convert raw text into viewport-safe lines, accounting for inner width and scrollbar, then setContent. */
-function setViewportContent(viewport: Box, raw: string): void {
-  const outer = Math.max(1, Number(viewport.width) || 1);
-  const iw = Number((viewport as any).iwidth ?? 0);
-  const sb = (viewport as any).scrollbar ? 1 : 0;
-  const width = Math.max(1, outer - iw - sb);
-  // Guard: blessed word-wrap infinite-loops on scrollable widgets with width ≤ 0
-  if (width <= 0) return;
-  const minRows = Math.max(1, Number(viewport.height) || 1);
-  // When tags are enabled, blessed processes {tag} markup internally.
-  // clipToVisibleWidth only understands ANSI escapes and would corrupt
-  // blessed tags by clipping mid-tag, causing blessed's word-wrap to hang.
-  // Skip per-line fitting when tags are active — blessed handles wrapping.
-  const hasTags = !!(viewport as any).parseTags;
-  const rows = raw.replace(/\r\n/g, "\n").split("\n").map((line) =>
-    hasTags ? line : fitLineToWidth(line, width)
-  );
-  while (rows.length < minRows) {
-    rows.push(" ".repeat(width));
-  }
-  viewport.setContent(rows.join("\n"));
-}
-
-/** Open the simple primer list browser. Restores selection index from workspace state. */
-export function openPrimerBrowserWindow(params: {
-  windowManager: WindowManager;
-  overlays: OverlayManager;
-  entries: BrowserEntry[];
-  onOpenPrimer: (filePath: string) => void;
-  restore?: { selectedIndex?: number };
-  onStateChanged?: () => void;
-}): void {
-  const { entries } = params;
-  if (entries.length === 0) {
-    params.overlays.flash("No primer files found in modules, modules-private, or docs.");
-    return;
-  }
-  const frame = params.windowManager.createFrame("Primer Browser", "browser");
-  const header = blessed.box({
-    parent: frame.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    content: " Enter opens file  j/k scroll  Esc closes menu ",
-    style: theme().header
-  });
-  const listHandle = createSelectableList({
-    parent: frame.body,
-    top: 1,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    items: entries.map((entry) => entry.label),
-    style: { ...theme().body, selected: theme().selected },
-  });
-  const list = listHandle.node;
-  const initialSelectedIndex = Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, entries.length - 1));
-  const openSelected = (index?: number) => {
-    const itemIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
-    const entry = entries[itemIndex];
-    if (entry) {
-      params.onOpenPrimer(entry.filePath);
-    }
-  };
-  list.on("select item", () => params.onStateChanged?.());
-  list.on("select", (_, index) => openSelected(index));
-  frame.kind = "browser";
-  frame.describeState = () => ({
-    appType: "primer-browser",
-    summary: `Primer browser listing ${entries.length} entries.`,
-    selectedIndex: (list as List & { selected: number }).selected ?? 0,
-    selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
-    entryCount: entries.length
-  });
-  frame.setFocusTarget(list);
-  frame.onRestyle = createRestyleBundle([
-    [header, () => theme().header],
-    [list, () => ({ ...theme().body, selected: theme().selected })],
-  ]).restyle;
-  params.windowManager.registerWindow(frame);
-  list.select(initialSelectedIndex);
-  frame.focus();
-}
+import { PREVIEW_SPLIT_RATIO, cleanLabel, setViewportContent } from "./browser-utils.js";
 
 /** Open the tabbed primer gallery with search/filter, preview pane, and restorable tab/selection state. */
 export function openPrimerGalleryWindow(params: {
@@ -2087,15 +1991,4 @@ export function openFileManagerWindow(params: {
  * Simple browser reader — reads a local file and opens it as a text viewer.
  * Relocated from figlet-windows.ts during host→microapp migration.
  */
-export function openBrowserReaderWindow(params: {
-  filePath: string;
-  onOpenTextViewer: (title: string, content: string, kind: "reader", filePath?: string) => void;
-  onError: (message: string) => void;
-}): void {
-  try {
-    const content = fs.readFileSync(params.filePath, "utf8");
-    params.onOpenTextViewer(`Browser: ${path.basename(params.filePath)}`, `Location: ${params.filePath}\n\n${content}`, "reader", params.filePath);
-  } catch (error) {
-    params.onError(`Cannot open browser reader: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
+

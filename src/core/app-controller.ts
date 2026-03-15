@@ -101,11 +101,11 @@ import {
 import {
   openFileManagerWindow as openFarjsFileManagerWindow,
   type FileManagerRestore,
-  openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow,
-  openBrowserReaderWindow as openBrowserReaderContentWindow,
 } from "../windows/browser-windows.js";
+import { openPrimerBrowserWindow as openPrimerBrowserListWindow } from "../windows/primer-browser-window.js";
+import { openBrowserReaderWindow as openBrowserReaderContentWindow } from "../windows/browser-reader-window.js";
 import {
   openCommandPaletteWindow as openPaletteWindow,
   openStateInspectorWindow as openInspectorWindow,

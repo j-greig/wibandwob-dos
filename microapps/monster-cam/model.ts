@@ -1,5 +1,5 @@
-import { renderFiglet } from "../services/figlet-service.js";
-import type { MonsterCamFrame } from "../services/monster-cam-service.js";
+import { renderFiglet } from "../../src/services/figlet-service.js";
+import type { MonsterCamFrame } from "../../src/services/monster-cam-service.js";
 
 export type MonsterCamPhase = "starting" | "ready" | "error";
 

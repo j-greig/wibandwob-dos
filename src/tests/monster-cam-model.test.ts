@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createMonsterCamModel,
   updateMonsterCamModel,
-} from "../../src/windows/monster-cam-model.js";
+} from "../../microapps/monster-cam/model.js";
 import type { MonsterCamFrame } from "../../src/services/monster-cam-service.js";
 
 function makeFrame(overrides: Partial<MonsterCamFrame> = {}): MonsterCamFrame {

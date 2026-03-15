@@ -1,9 +1,24 @@
 {
-  "id": "wibwob.monster-cam",
-  "name": "Monster Cam",
+  "name": "monster-cam",
   "version": "1.0.0",
+  "description": "Live ASCII webcam with face/hand detection overlays.",
+  "type": "microapp",
   "entry": "index.ts",
-  "menu": [{ "category": "applications", "order": 80 }],
-  "palette": true,
-  "commands": ["open"]
+  "dev": {
+    "watch": ["index.ts", "model.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.monster-cam.open"
+  },
+  "microapp": {
+    "id": "wibwob.monster-cam",
+    "title": "Monster Cam",
+    "description": "Live ASCII webcam with face/hand detection and monster overlays.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 80, "label": "Monster Cam" }
+    ],
+    "palette": { "order": 80, "label": "Open Monster Cam" },
+    "agent": true,
+    "api": true
+  }
 }
