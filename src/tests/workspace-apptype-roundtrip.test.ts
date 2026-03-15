@@ -66,7 +66,7 @@ function makeRestoreActions(overrides?: Partial<SnapshotRestoreActions>): Snapsh
     openBackroomsPrimerPickerWindow: () => undefined,
     openChromeBrowserWindow: () => undefined,
     openCompanionWindow: () => undefined,
-    openMonsterCamWindow: () => undefined,
+
     openWibWobAgentWindow: () => undefined,
     windows: {} as any,  // not used by restore handlers directly
     ...overrides,
@@ -82,7 +82,6 @@ const TESTABLE_TYPES: PersistableAppType[] = [
   "text-editor",
   "companion-widget",
   "wibwob-agent",
-  "monster-cam",
   "primer-gallery",
   "primer-browser",
   "file-manager",
@@ -106,7 +105,7 @@ async function openWindowForAppType(appType: PersistableAppType): Promise<boolea
     "text-editor": () => post("/commands/run", { id: "editor.new" }),
     "companion-widget": () => post("/commands/run", { id: "companion.open" }),
     "wibwob-agent": () => post("/commands/run", { id: "agent.open" }),
-    "monster-cam": () => post("/commands/run", { id: "monster-cam.open" }),
+
     "primer-gallery": () => post("/commands/run", { id: "primer-gallery.open" }),
     "primer-browser": () => post("/commands/run", { id: "primer.browse" }),
     "file-manager": () => post("/commands/run", { id: "finder.open" }),

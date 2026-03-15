@@ -98,7 +98,7 @@ export interface AppMenuActions {
   openMarkdownPicker: () => unknown;
   toggleMarkdownFiglet: () => void;
   // ── Monster Cam ───────────────────────────────────────
-  openMonsterCam: () => void;
+
   // ── Window control (by id — agent/API use) ────────────
   closeWindowById: (args?: Record<string, unknown>) => void;
   setWindowChrome: (args?: Record<string, unknown>) => void;
@@ -567,18 +567,7 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     agent: true,
     returns: "json",
   },
-  {
-    id: "monster-cam.open",
-    label: "Monster Cam",
-    description: "Open the Monster Cam window.",
-    group: "open",
-    actionKey: "openMonsterCam",
-    requires: ["path.monster_cam.venv"],
-    menuPlacements: [{ category: "applications", order: 150, label: "Monster Cam" }],
-    palettePlacement: { order: 145 },
-    api: true,
-    agent: true
-  },
+  // monster-cam.open → migrated to microapps/monster-cam/
   {
     id: "theme.cycle",
     label: "Cycle Theme",

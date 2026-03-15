@@ -1,0 +1,9 @@
+{
+  "id": "wibwob.monster-cam",
+  "name": "Monster Cam",
+  "version": "1.0.0",
+  "entry": "index.ts",
+  "menu": [{ "category": "applications", "order": 80 }],
+  "palette": true,
+  "commands": ["open"]
+}

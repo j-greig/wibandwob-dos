@@ -26,7 +26,7 @@ interface Deps {
 export function openMonsterCamWindow(deps: Deps): void {
   const { screen, windowManager } = deps;
 
-  const frame = windowManager.createFrame("Monster Cam", "monster-cam");
+  const frame = windowManager.createFrame("Monster Cam", "microapp");
 
   const canvas = blessed.box({
     parent: frame.body,

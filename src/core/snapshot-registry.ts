@@ -51,7 +51,7 @@ export interface SnapshotRestoreActions {
   openBackroomsPrimerPickerWindow: () => MaybeWindow;
   openChromeBrowserWindow: (restore?: { url?: string }) => MaybeWindow;
   openCompanionWindow: (restore?: { tick?: number; displayMode?: string }) => MaybeWindow;
-  openMonsterCamWindow: () => MaybeWindow;
+
   openWibWobAgentWindow: () => MaybeWindow;
   windows: WindowFacade;
 }
@@ -272,13 +272,7 @@ export const snapshotRegistry = {
 
   // --- kind: "art" --- (migrated to microapp.wibwob.generative)
 
-  // --- kind: "monster-cam" ---
-  "monster-cam": {
-    serialize: (_window) => undefined,
-    restore: (_snapshot, _payload, actions) => {
-      return actions.openMonsterCamWindow();
-    },
-  },
+  // monster-cam — migrated to microapps/monster-cam/ (restore via microapp loader)
 
   // --- kind: "chat" (wibwob-agent) ---
   "wibwob-agent": {
@@ -365,6 +359,7 @@ const legacyAppTypeRemap: Record<string, string> = {
   // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
   "world-chatroom": "wibwob.chatroom",
   "wibwobworld": "wibwob.world",
+  "monster-cam": "wibwob.monster-cam",
   "patchbay.lab": "wibwob.patchbay",
   "touchlab.mvp": "wibwob.touchlab",
   "example.hello-world": "wibwob.example.hello",

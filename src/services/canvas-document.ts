@@ -188,8 +188,6 @@ function restoreWindowEntry(
     case "companion":
       return actions.openCompanionWindow();
 
-    case "monster-cam":
-      return actions.openMonsterCamWindow();
 
     default:
       return undefined;

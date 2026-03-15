@@ -127,7 +127,7 @@ import { ChromeBrowserService } from "../services/chrome-browser-service.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
-import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
+
 import { worldChatService } from "../services/world-chat-service.js";
 import {
   createRuntimeCommandService,
@@ -1269,15 +1269,7 @@ export class TsTuiMvpApp {
 
   // openArtWindow — removed, migrated to microapp.wibwob.generative.art
 
-  private openMonsterCam(): WindowRecord | undefined {
-    return this.focusOrCreate("monster-cam", () => {
-      openMonsterCamWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
-  }
+  // openMonsterCam — removed, migrated to microapps/monster-cam/
 
   private copyFocusedWindowText(): void {
     const focused = this.windowManager.getFocusedWindow();
@@ -1492,7 +1484,7 @@ export class TsTuiMvpApp {
       openChromeBrowserWindow: (restore) =>
         this.openChromeBrowserWindow(restore?.url),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
-      openMonsterCamWindow: () => this.openMonsterCam(),
+
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
       windows: this.windowManager,
     };
@@ -2238,8 +2230,7 @@ export class TsTuiMvpApp {
             : "name";
         finder.sortBy(field);
       },
-      // ── Monster Cam ─────────────────────────────────────
-      openMonsterCam: () => this.openMonsterCam(),
+
       // ── Canvas documents ─────────────────────────────────
       loadCanvas: (args) => {
         const filePath = typeof args?.filePath === "string" ? args.filePath : "";

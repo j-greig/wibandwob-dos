@@ -55,7 +55,7 @@ function makeActions(): SnapshotRestoreActions & { calls: string[] } {
     openBackroomsTV: () => { calls.push("openBackroomsTV"); },
     openCompanion: () => { calls.push("openCompanion"); },
     openWibwobAgent: () => { calls.push("openWibwobAgent"); },
-    openMonsterCam: () => { calls.push("openMonsterCam"); },
+
   } as unknown as SnapshotRestoreActions & { calls: string[] };
 }
 

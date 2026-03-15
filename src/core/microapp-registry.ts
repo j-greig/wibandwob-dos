@@ -51,6 +51,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.touchlab":           "beta",
   "wibwob.journal":            "core",
   "wibwob.notepad":            "core",
+  "wibwob.monster-cam":        "beta",
 
   // ── Internal: dev/demo/test only ───────────────────────────────────
   "wibwob.layout-probe":                   "internal",

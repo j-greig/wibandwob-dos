@@ -24,7 +24,6 @@ export type WindowKind =
   | "workspace"
   | "palette"
   | "inspector"
-  | "monster-cam"
   | "microapp";
 
 export interface EditorState {
@@ -117,7 +116,6 @@ export type PersistableAppType =
   | "text-editor"
   | "companion-widget"
   | "backrooms-tv"
-  | "monster-cam"
   | "wibwob-agent"
   | "primer-viewer"
   | "reader-viewer";
