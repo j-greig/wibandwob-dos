@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { BackroomsService } from "./backrooms-service.js";
-import { findChromeExecutablePath } from "./chrome-browser-service.js";
+import { findChromeExecutablePath } from "./chrome-path.js";
 
 export type CapabilityKey =
   | "bin.figlet"
