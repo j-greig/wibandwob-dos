@@ -41,18 +41,29 @@ curl -s --unix-socket "$SOCK" -X POST http://localhost/commands/run \
 
 sleep 2
 
-# ── 4. Capture screenshot ────────────────────────────────────────────
-mkdir -p "$(dirname "$SCREENSHOT_PATH")"
-./scripts/capture-tui-png.sh --tmux journal --out "$SCREENSHOT_PATH"
+# ── 4. Capture screenshot via macOS screencapture ────────────────────
+mkdir -p "$(dirname "$SCREENSHOT_PATH")" scratch/autoresearch-shots
+
+# Use tmux capture-pane as text fallback, plus try screencapture
+# Find the terminal window ID for the journal tmux session
+WINID=$(osascript -e '
+tell application "System Events"
+  set termWins to every window of every process whose name contains "Ghostty" or name contains "Terminal" or name contains "iTerm"
+end tell
+' 2>/dev/null || echo "")
+
+# Simple: just use screencapture on the whole screen and crop later
+screencapture -x -C "$SCREENSHOT_PATH" 2>/dev/null || {
+  # Fallback: capture tmux text
+  tmux capture-pane -t journal -p > "${SCREENSHOT_PATH%.png}.txt"
+  echo "WARNING: screencapture failed, text fallback at ${SCREENSHOT_PATH%.png}.txt"
+}
 
 # ── 5. Archive ───────────────────────────────────────────────────────
 SHOTS_DIR="scratch/autoresearch-shots"
-mkdir -p "$SHOTS_DIR"
 NEXT_NUM=$(printf "%03d" "$(( $(ls "$SHOTS_DIR"/*.png 2>/dev/null | wc -l) + 1 ))")
 STAMP=$(date +%H%M%S)
-ARCHIVE_PATH="$SHOTS_DIR/${NEXT_NUM}-${STAMP}.png"
-cp "$SCREENSHOT_PATH" "$ARCHIVE_PATH"
+cp "$SCREENSHOT_PATH" "$SHOTS_DIR/${NEXT_NUM}-${STAMP}.png" 2>/dev/null || true
 
 echo "Screenshot saved to $SCREENSHOT_PATH"
-echo "Archived to $ARCHIVE_PATH"
 echo "Agent should Read this file and score against the rubric."
