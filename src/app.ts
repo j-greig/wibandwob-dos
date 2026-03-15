@@ -1,5 +1,6 @@
 import os from "node:os";
 import fs from "node:fs";
+import { safeWriteFile } from "./core/safe-fs.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -41,7 +42,7 @@ process.title = [
 // Write PID file so agents can kill cleanly: kill $(cat scratch/wibwob.pid)
 // Respects SCRATCH_DIR for dual-instance isolation.
 fs.mkdirSync(runtimeNode.scratchBase, { recursive: true });
-fs.writeFileSync(runtimeNode.pidPath, String(process.pid), "utf8");
+safeWriteFile(runtimeNode.pidPath, String(process.pid));
 
 // ─── Ghostty shader lifecycle ────────────────────────────────
 // Activate configured shader on start, deactivate on exit.

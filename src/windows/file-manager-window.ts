@@ -7,6 +7,7 @@ import blessed from "blessed";
 import { execSync } from "node:child_process";
 import { copyToClipboard } from "../core/clipboard.js";
 import fs from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import path from "node:path";
 
 import { theme } from "../core/theme/resolver.js";
@@ -716,7 +717,7 @@ export function openFileManagerWindow(params: {
     if (ext === ".json") {
       const escapeBraces = (s: string) => s.replace(/\{/g, "\\{");
       try {
-        const raw = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const raw = (safeReadFile(entry.fullPath) ?? "").slice(0, 8000);
         const parsed = JSON.parse(raw);
         const pretty = JSON.stringify(parsed, null, 2);
         const lines = pretty.split("\n");
@@ -730,7 +731,7 @@ export function openFileManagerWindow(params: {
         }).join("\n");
         previewRawContent = coloured;
       } catch {
-        const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const content = (safeReadFile(entry.fullPath) ?? "").slice(0, 8000);
         const lines = content.split("\n");
         const numbered = lines.map((ln: string, i: number) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBraces(ln)}`).join("\n");
         setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
@@ -744,7 +745,7 @@ export function openFileManagerWindow(params: {
     // Default: raw text with line numbers + file metadata header
     // Use syntax highlighting for supported languages
     try {
-      const content = fs.readFileSync(entry.fullPath, "utf8");
+      const content = safeReadFile(entry.fullPath) ?? "";
       const rawLines = content.slice(0, 8000).split("\n");
       const stat = fs.statSync(entry.fullPath);
       const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
@@ -780,7 +781,7 @@ export function openFileManagerWindow(params: {
 
   const updatePreviewForSearchResult = (result: { file: string; line: number; text: string }) => {
     try {
-      const content = fs.readFileSync(result.file, "utf8");
+      const content = safeReadFile(result.file) ?? "";
       const lines = content.split("\n");
       const startLine = Math.max(0, result.line - 5);
       const endLine = Math.min(lines.length, result.line + 20);

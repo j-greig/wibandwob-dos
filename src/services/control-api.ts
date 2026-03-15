@@ -28,6 +28,7 @@
 // -------------------------------------------------------------------
 
 import fs from "node:fs";
+import { safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import type { BackroomsChannel } from "../core/types.js";
 import type { CommandSurface } from "../core/command-registry.js";
@@ -778,7 +779,7 @@ export class ControlApiService {
       const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
       const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
       const filePath = path.join(capturesDir, fileName);
-      fs.writeFileSync(filePath, `${text}\n`, "utf8");
+      safeWriteFile(filePath, `${text}\n`);
       return Response.json({ ok: true, path: filePath });
     }
     // ── Backrooms + workspace — also dispatch through command registry ──

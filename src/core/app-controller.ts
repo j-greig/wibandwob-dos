@@ -8,6 +8,7 @@
 import blessed from "blessed";
 import { patchBlessedUnicode } from "./unicode-patch.js";
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -998,7 +999,7 @@ export class TsTuiMvpApp {
           this.editor.openFile(filePath);
         },
         onViewFile: (filePath) => {
-          const content = fs.readFileSync(filePath, "utf8");
+          const content = safeReadFile(filePath) ?? "";
           this.openTextViewerWindow(
             path.basename(filePath),
             content,
@@ -1321,7 +1322,7 @@ export class TsTuiMvpApp {
       .slice(0, 40);
     const fileName = `${slug}_${Date.now()}.txt`;
     const filePath = path.join(capturesDir, fileName);
-    fs.writeFileSync(filePath, text, "utf8");
+    safeWriteFile(filePath, text);
     this.overlays.flash(`Exported to ${fileName}`);
   }
 
@@ -1710,7 +1711,7 @@ export class TsTuiMvpApp {
     }
 
     const title = path.basename(outputPath);
-    const rawContent = fs.readFileSync(outputPath, "utf8");
+    const rawContent = safeReadFile(outputPath) ?? "";
     const opened = outputKind === "primer"
       ? this.openTextViewerWindow(
           title,
@@ -2251,8 +2252,7 @@ export class TsTuiMvpApp {
         try {
           const windows = this.windowManager.getWindows();
           const yaml = exportCanvasDocument(windows, this.windowManager, title);
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, yaml, "utf8");
+          safeWriteFile(filePath, yaml);
           this.overlays.flash(`Canvas exported: ${filePath}`);
         } catch (e) {
           this.overlays.flash(`Canvas export failed: ${e}`);
