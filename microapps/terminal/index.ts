@@ -10,7 +10,7 @@
  * native addon event callbacks.
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import type blessed from "blessed";
+import blessed from "blessed";
 import fs from "node:fs";
 import { spawn, type ChildProcess } from "child_process";
 import path from "path";
