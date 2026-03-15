@@ -523,7 +523,11 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     rendering = false;
 
     // Preview pane (two-pane mode)
-    if (twoPane && entries.length > 0) {
+    if (twoPane && entries.length === 0) {
+      detailBox.setContent(
+        `\n\n\n  {${muted}-fg}no entries yet\n\n  press n to create your first entry{/${muted}-fg}`
+      );
+    } else if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
         const previewW = w - Math.floor(w * 0.40) - 6;
@@ -905,7 +909,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       recentEntries: all.slice(0, 5).map(e => ({
         id: e.id, title: e.title, peer: e.peer, kind: e.kind,
         tags: e.tags, updatedAt: e.updatedAt,
+        preview: e.body.slice(0, 120),
       })),
+      // When reading an entry, include its full content for agent visibility
+      currentEntry: (mode === "read" && selectedEntry) ? {
+        id: selectedEntry.id, title: selectedEntry.title,
+        body: selectedEntry.body, peer: selectedEntry.peer,
+        kind: selectedEntry.kind, tags: selectedEntry.tags,
+      } : null,
       availableCommands: [
         "journal.open", "journal.create", "journal.read",
         "journal.update", "journal.list", "journal.delete",
