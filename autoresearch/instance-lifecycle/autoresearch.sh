@@ -42,6 +42,10 @@ echo ""
 # ── F2: Microapp Snapshot Parity (30 pts) ─────────────────────
 echo "=== F2: Microapp Snapshots (30 pts) ==="
 
+# Clear desktop to prevent accumulation from prior runs
+wibwob cmd desktop.clear-all > /dev/null 2>&1
+sleep 1
+
 # Open test windows via wibwob command surface
 wibwob cmd microapp.wibwob.figlet.open --text LIFECYCLE --font doom > /dev/null 2>&1
 wibwob cmd microapp.wibwob.runtime-inspector.open > /dev/null 2>&1
