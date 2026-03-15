@@ -15,7 +15,8 @@
 #   ww_send_reset                # reset terminal escape codes
 #   ww_get_dimensions            # prints COLSxROWS
 
-set -euo pipefail
+# No set -e (kill/tmux fail gracefully). No set -u (empty arrays).
+set -o pipefail
 
 # ── Defaults ────────────────────────────────────────────────────────
 WW_ROOT="${WW_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
