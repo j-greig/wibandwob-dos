@@ -53,7 +53,7 @@ GENRE_CONFIGS = {
         "swell_periods": [7.3, 5.1, 4.0, 10.0],
     },
     "dnb": {
-        "shader": "automata-dnb.glsl",
+        "shader": "ghostty-shaders/sin-interference.glsl",
         "bpm": 170,
         "duration": 18,
         "steps_per_beat": 2,
@@ -68,7 +68,7 @@ GENRE_CONFIGS = {
         "swell_periods": [6.0, 4.3, 3.0, 9.5],
     },
     "ambient": {
-        "shader": "ripple-ambient.glsl",
+        "shader": "ghostty-shaders/underwater.glsl",
         "bpm": 60,
         "duration": 24,
         "steps_per_beat": 1,
@@ -83,7 +83,7 @@ GENRE_CONFIGS = {
         "swell_periods": [12.0, 8.3, 6.1, 15.0],
     },
     "italo": {
-        "shader": "julia-italo.glsl",
+        "shader": "ghostty-shaders/fireworks.glsl",
         "bpm": 124,
         "duration": 20,
         "steps_per_beat": 2,

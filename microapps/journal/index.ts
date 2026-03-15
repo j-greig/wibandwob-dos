@@ -619,11 +619,13 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     listBox.hide();
     detailBox.hide();
     paneSep.hide();
+    titleLabelBox.show();
+    titleLabelBox.setContent(`{${muted}-fg}Title:{/${muted}-fg}`);
     titleInput.show();
     kindLabel.show();
     editArea.show();
 
-    titleInput.left = 2;
+    titleInput.left = 10;
     titleInput.right = 2;
     titleInput.top = 0;
     kindLabel.left = 2;

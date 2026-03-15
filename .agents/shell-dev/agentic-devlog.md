@@ -26,11 +26,23 @@ Standing notes are rolling — prune when items land or die.
 - Workspace restore triggers render on startup — if the journal was open when workspace saved, any crash in render blocks app startup entirely
 - Fix: `rm -f scratch/workspace.json` before restart when debugging render crashes
 
-### Process manager refactor (other agent)
+### Process manager refactor — --direct default, --tmux optional
 - `scripts/lib/process-manager.sh` — new shared abstraction for direct/tmux dual-mode
-- `scripts/restart.sh` now defaults to `--direct` mode (no tmux)
-- Direct mode runs app in background PTY — `screencapture` can't capture it
-- Autoresearch needs `--tmux` mode for screenshot-based scoring: `bash scripts/restart.sh --tmux`
+- All OPS scripts (`ensure-running`, `restart`, `attach`, `start-alt-instance`) refactored
+- `--direct` (default): PTY via `script -q /dev/null`, background process, log file
+- `--tmux`: legacy behavior preserved with full parity
+- `~/.wibwob` updated with `ww-start`, `ww-restart`, `ww-attach`, `ww-alt` aliases
+- `wibwob-record.sh` now gets dimensions from `/state` API (screen.width/height), tmux fallback
+- No `set -e` in process-manager — kill/tmux ops fail gracefully
+- No `set -u` — empty `WW_REMAINING_ARGS` arrays break bash strict mode
+
+### Screenshot painpoints (multi-display)
+- `capture-tui-png.sh` uses macOS `screencapture` — works without tmux, fully cross-platform
+- **Pain: agents can't tell which display WibWob is on.** `--list-displays` shows indices (1, 2) but no way to know which one has Ghostty/WibWob without trial-and-error PNG capture
+- First attempt always gets the wrong screen (Zed editor on display 1 instead of Ghostty on display 2)
+- **Idea:** auto-detect the right display by querying Ghostty AppleScript for window position, or checking which display has a window titled "tmux attach" / "Ghostty", or just caching `DISPLAY_NUM=2` in `~/.wibwob`
+- **Quick fix for now:** add `export WIBWOB_DISPLAY=2` to `~/.wibwob` so agents stop guessing
+- Long-term: `/screenshot/png` endpoint rendering ANSI→SVG→PNG server-side would bypass the display problem entirely
 
 ### Journal v2 architecture
 - Each entry = individual JSON file in `scratch/journal-v2/entries/<id>.json`

@@ -1,39 +1,19 @@
 # Autoresearch Ideas — Journal v2
 
-## Architecture
-- Each entry is a JSON file in `scratch/journal-v2/entries/<id>.json`
-- Index file `scratch/journal-v2/index.json` for fast list loading
-- Modes: LIST, READ, EDIT, NEW — single state machine
-- Two-pane at ≥120 cols, single-pane push/pop at narrow
+## DONE ✓
+- Two-pane layout, colored glyphs, kind icons, tags, timestamps
+- CRUD commands, describeState with currentEntry + recentEntries
+- Dynamic mood/ratio tagline, kind breakdown in status bar
+- Focus routing, mouse click, Tab cycling, mode-aware hints
+- Export/import, workspace persistence, 13 seed entries
+- Title: label in edit mode, fixed TDZ crash
 
-## MVP Must-Haves
-- blessed.list for entry list (selectable, scrollable)
-- blessed.box for entry body (read mode)
-- blessed.textarea for edit mode (multi-line)
-- Mode transitions: LIST→READ→EDIT, LIST→NEW→LIST
+## REMAINING (USABILITY 5→6)
+- Human-verify: n/e/d keyboard flows actually work in TUI
+- Human-verify: Ctrl-S saves, Esc cancels in edit mode
 
-## UX Ideas
-- Vim-like: j/k nav in list, Enter to open, Esc to go back, e to edit, n for new
-- Status bar shows mode + key hints (context-aware like v1)
-- Preview pane shows first ~5 lines of selected entry
-- Ctrl-S to save in edit mode (blessed textarea submit)
-
-## Agent Integration Ideas  
-- journal.create returns { ok, entry } with id
-- journal.read returns full entry by id
-- journal.update patches title/body/tags
-- journal.list returns summaries with filters
-- describeState shows: mode, selectedEntry, entryCount, searchQuery
-
-## Visual Carries from v1
-- Figlet JRNL header (slant/small responsive)
-- Kind icons: ◊ observation, ░ note, ★ discovery, ■ decision, ? question  
-- Peer glyphs: ▸ human, ▹ agent, · system
-- Mood indicator in tagline
-- Theme tokens only, muted timestamps
-
-## Deferred
-- Markdown-lite rendering (##, **, `, -, code blocks)
-- Entry templates
-- Tag autocomplete
-- Entry history / undo
+## FUTURE / DEFERRED
+- Markdown-lite rendering in body (##, **, -, code blocks)
+- Date group headers in list
+- Sort toggle (created/updated/title)
+- Entry templates, tag autocomplete
