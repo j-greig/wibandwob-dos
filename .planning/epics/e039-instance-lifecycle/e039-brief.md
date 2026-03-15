@@ -61,6 +61,35 @@ spike (`spk-multi-instance-clarity`):
 
 ---
 
+## Canon: `wibwob` is the command surface
+
+`wibwob` is the single CLI — the COAT command seam exposed to shell.
+Shell aliases (`ww-start`, `ww-clear`, etc. in `~/.wibwob`) are
+**anti-pattern** — they fragment the command surface across two places
+and hide semantics in dotfiles agents can't discover.
+
+**Rule:** if an operation is worth doing from shell, it's worth being
+a `wibwob` subcommand. Scripts (`scripts/*.sh`) are for multi-step
+orchestration only — not thin wrappers around one API call.
+
+| Anti-pattern | Fix |
+|-------------|-----|
+| `ww-start` (alias → `ensure-running.sh`) | `wibwob start` |
+| `ww-restart` (alias → `restart.sh`) | `wibwob restart` |
+| `ww-attach` (alias → `attach.sh`) | `wibwob attach` |
+| `ww-clear` (alias → `wibwob cmd desktop.clear-all`) | already `wibwob desktop.clear-all` |
+| `ww-state` (alias → `wibwob state \| jq`) | already `wibwob state` |
+| `ww-shot` (alias → `wibwob screenshot`) | already `wibwob screenshot` |
+
+F4 (`wibwob attach`) is a CLI subcommand, not a script alias.
+F3 (`--workspace`) is a CLI flag, not an env var hack.
+
+**Cleanup story:** Remove `ww-*` aliases from `~/.wibwob` once the
+`wibwob` subcommands they wrap exist. Keep `~/.wibwob` for env vars
+and `source`-able config only.
+
+---
+
 ## What shipped in the spike (already committed)
 
 | What | Status | Commit |
@@ -123,7 +152,7 @@ cleans up resources.
 - [ ] S4: Start new instance with `--workspace orphan-<label>`
 - [ ] S5: Clean up orphan artifacts (socket, PID, workspace file renamed
       to default)
-- [ ] S6: Open in tmux or direct mode (respect `$WW_MODE`)
+- [ ] S6: Start via `wibwob start` (not shell alias, not script)
 - [ ] S7: Verify: kill terminal → `wibwob attach` → everything back
 
 ---

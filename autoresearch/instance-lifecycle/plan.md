@@ -1,10 +1,16 @@
 # E039 Instance Lifecycle — Autoresearch Plan
 
-> **Rule:** prefer `wibwob <command>` over `curl $API/...` everywhere.
+> **Rule 1:** prefer `wibwob <command>` over `curl $API/...` everywhere.
 > If you find yourself writing `curl -X POST $API/commands/run -d '{"id":"..."}' `,
 > stop — use `wibwob <id> --arg val` instead. If the CLI subcommand doesn't
 > exist yet (e.g. `workspace.save`), add it to `src/cli/wibwob.ts` first,
 > then use it. The CLI handles sockets, JSON, errors. Raw curl is for debugging.
+>
+> **Rule 2:** `wibwob` is the command surface, not shell aliases.
+> Do NOT add `ww-*` aliases to `~/.wibwob`. If an operation is worth doing
+> from shell, make it a `wibwob` subcommand. Shell aliases fragment the
+> command surface and hide semantics in dotfiles agents can't discover.
+> Scripts (`scripts/*.sh`) are for multi-step orchestration only.
 
 ## How This Differs from Microapp Autoresearch
 
