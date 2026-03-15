@@ -717,29 +717,37 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const accent = th.selected?.fg || "#b48ead";
     const w = (win.body as any).width || 80;
 
-    // Header
+    // Header — different figlet per view mode
     const font = w >= 80 ? "slant" : "small";
+    const headerWord = viewMode === "sessions" ? "LOGS" : "JRNL";
     let fig = "";
-    try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
+    try { fig = renderFiglet(headerWord, font); } catch { fig = headerWord; }
     const figLines = fig.split("\n").filter((l: string) => l.trim());
 
-    // Dynamic mood based on entry kinds
-    const questions = entries.filter(e => e.kind === "question").length;
-    const decisions = entries.filter(e => e.kind === "decision").length;
-    const discoveries = entries.filter(e => e.kind === "discovery").length;
-    const moodWord = questions > decisions && questions > discoveries ? "curious"
-      : discoveries > decisions ? "exploring"
-      : decisions > 0 ? "decisive"
-      : entries.length > 20 ? "productive"
-      : entries.length > 0 ? "beginning"
-      : "empty";
-    const humans = entries.filter(e => e.peer === "human").length;
-    const agents = entries.filter(e => e.peer === "agent").length;
-    const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
-
-    const tagline = viewMode === "sessions"
-      ? `{${muted}-fg}session archaeology // ${sessions.length} pi sessions · ${PI_EXISTS ? "~/.pi" : "no pi"}{/${muted}-fg}`
-      : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
+    // Dynamic tagline per view
+    let tagline: string;
+    if (viewMode === "sessions") {
+      const modelCounts = sessions.reduce((acc, s) => {
+        const m = s.model ? s.model.replace(/^claude-/, "") : "unknown";
+        acc[m] = (acc[m] || 0) + 1; return acc;
+      }, {} as Record<string, number>);
+      const modelStr = Object.entries(modelCounts).map(([m, n]) => `${m}:${n}`).join(" · ");
+      tagline = `{${muted}-fg}session archaeology // ${sessions.length} sessions · ${modelStr}{/${muted}-fg}`;
+    } else {
+      const questions = entries.filter(e => e.kind === "question").length;
+      const decisions = entries.filter(e => e.kind === "decision").length;
+      const discoveries = entries.filter(e => e.kind === "discovery").length;
+      const moodWord = questions > decisions && questions > discoveries ? "curious"
+        : discoveries > decisions ? "exploring"
+        : decisions > 0 ? "decisive"
+        : entries.length > 20 ? "productive"
+        : entries.length > 0 ? "beginning"
+        : "empty";
+      const humans = entries.filter(e => e.peer === "human").length;
+      const agents = entries.filter(e => e.peer === "agent").length;
+      const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
+      tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
+    }
     headerBox.setContent([...figLines, "", tagline].join("\n"));
 
     // Toggle indicators: active gets inverse styling, inactive gets muted
@@ -989,9 +997,21 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     // Preview pane (two-pane mode)
     if (twoPane && entries.length === 0) {
       const dim = ANSI.fg(muted);
-      detailBox.setContent(
-        `\n\n\n  ${dim}no entries yet\n\n  press n to create your first entry${ANSI.reset}`
-      );
+      const hi = ANSI.fg(accent);
+      detailBox.setContent([
+        "",
+        `  ${dim}┌─────────────────────────────┐${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   the journal is empty.     │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   press ${hi}n${ANSI.reset}${dim} to begin.        │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   ░ notes · ◊ observations  │${ANSI.reset}`,
+        `  ${dim}│   ■ decisions · ★ discovers │${ANSI.reset}`,
+        `  ${dim}│   ? questions               │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}└─────────────────────────────┘${ANSI.reset}`,
+      ].join("\n"));
     } else if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
