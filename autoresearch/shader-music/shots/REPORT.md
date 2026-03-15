@@ -9,6 +9,45 @@ the audio. The shader IS the score — the visual pattern IS the music.
 
 ---
 
+## How It Works
+
+### GPU Render Stage
+
+`moderngl` (Python OpenGL binding) creates a headless GL context — no window, no display server. A framebuffer-attached texture (16×16 RGBA, `f4` float format) receives fragment shader output. Shader source follows Shadertoy convention: `mainImage(out vec4 fragColor, in vec2 fragCoord)` with uniforms `iTime`, `iResolution`, `iFrame`. Ghostty-sourced shaders (from `ghostty-org/ghostty` repo, `src/config/ghostty_shaders/`) get an auto-generated `mainImage` wrapper + dummy `iChannel0` sampler2D when they use terminal-specific texture inputs.
+
+Per beat step, shader renders at 4 different `iTime` values (one per track, offsets like `[0.0, 3.7, 7.3, 11.1]`s). This decorrelates track data — same shader, different temporal slice. Each render produces a 16×16 RGBA image; pixel values are read back via `fbo.read(components=4, dtype='f4')`, reshaped to numpy array.
+
+### Brightness Extraction
+
+Each track samples from a different spatial quadrant of its rendered frame (top-left, top-right, bottom-left, bottom-right). Per-channel brightness = mean of quadrant pixels for that RGBA channel. Transfer curves amplify weak channels: `brightness = min(1.0, (raw * amplification_factor) ** power_curve)`. Extracted values cached to `shader_cache.json` keyed by `genre+shader+params` hash for deterministic re-runs (GPU float non-determinism on macOS Metal otherwise causes ±15pt score variance).
+
+### Synthesis Stage
+
+`bricks` toolkit (local, at `.pi/skills/chiptune-studio/scripts/bricks/`) provides numpy-native audio primitives:
+
+- **Oscillators**: `sine`, `square(duty)`, `triangle`, `sawtooth`, `noise` — all return `np.ndarray` at SR=22050
+- **Envelopes**: `env(snd, a, d, s, r)` — ADSR applied as amplitude multiplier
+- **FX**: `bitcrush(depth)`, `tremolo(rate, depth)`, `reverb(decay, delay_ms)`, `lowpass(cutoff)`, `highpass(cutoff)`, `delay(delay_ms, feedback, repeats)`
+- **Helpers**: `note_freq(name)`, `scale_notes(root, mode)`, `make(dur)`, `normalize`, `save_wav`
+
+Genre config dict maps each genre to: shader file, BPM, duration, steps/beat, 4 track definitions (name + volume range), time offsets, entrance times, swell periods. A `SYNTH_DISPATCH` dict maps genre name → synth function.
+
+Synth functions receive `(track_name, brightness, step_dur, step_num, bpm)` per step. Brightness drives note selection (`brightness_to_note` indexes into genre-specific scale/chord arrays), filter cutoff, envelope attack time, FX depth, duty cycle. Each track synthesizes its step into a numpy array, concatenated into a full track canvas.
+
+### Structural Dynamics
+
+Post-synthesis, track canvases get: staggered fade-in entrances (per-track delay), sinusoidal volume swells (different periods per track for phasing), and genre-specific breakdowns (e.g., cathedral drops organ+choir at 50% for 4 bars while bells+glass continue, inverse dip at 20%).
+
+### Scoring
+
+`score_music.py` loads output WAV via `scipy.io.wavfile`, segments into 0.5s windows, computes 8 metrics via numpy/scipy: pitch variety (spectral centroid variance), rhythmic variety (RMS envelope autocorrelation), dynamic range (peak-to-RMS ratio), track independence (cross-correlation of isolated track regions), spectral variety (bandwidth variance), silence usage (sub-threshold frame ratio), audio dynamics (RMS coefficient of variation), headroom (peak < 0.95). Weighted sum → single score.
+
+### Manifest
+
+Every render appends a JSON line to `shots/manifest.jsonl`: genre, shader, BPM, duration, scales, chords, track configs, FX params, score. Reproducible — same cache + same code = same WAV.
+
+---
+
 ## Scoreboard (Agent)
 
 Scored by automated variety metric (0–100): pitch range, rhythmic
