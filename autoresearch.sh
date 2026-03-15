@@ -1,1 +1,1 @@
-autoresearch/unix-control-v3/autoresearch.sh
+autoresearch/instance-lifecycle/autoresearch.sh
