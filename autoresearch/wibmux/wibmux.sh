@@ -461,21 +461,325 @@ cmd_shader_list() {
   done
 }
 
+# ─── Status Bar (proto TUI) ──────────────────────────
+# Like tmux's bottom bar — uses ANSI scroll region to reserve last row
+
+cmd_bar() {
+  local action="${1:-on}"
+  case "$action" in
+    on)  _bar_enable ;;
+    off) _bar_disable ;;
+    update) _bar_paint ;;
+    *)   die "bar: on|off|update" ;;
+  esac
+}
+
+_bar_gather_status() {
+  # Count Ghostty windows (fast, cached for 2s)
+  local cache="$STATE_DIR/.bar-cache"
+  local now
+  now=$(date +%s)
+  if [[ -f "$cache" ]] && (( now - $(stat -f%m "$cache" 2>/dev/null || echo 0) < 2 )); then
+    cat "$cache"
+    return
+  fi
+
+  local win_count shader_name api_status
+  win_count=$(osascript -e 'tell application "Ghostty" to count windows' 2>/dev/null || echo "?")
+  if [[ -f "$ACTIVE_SHADER_CONFIG" ]]; then
+    shader_name=$(grep "^custom-shader" "$ACTIVE_SHADER_CONFIG" 2>/dev/null | sed 's|.*/||;s|\.glsl||' || echo "none")
+  else
+    shader_name="none"
+  fi
+  if curl -sf "http://127.0.0.1:$WIBWOB_PORT/health" >/dev/null 2>&1; then
+    api_status="●"
+  else
+    api_status="○"
+  fi
+
+  local status="wibmux │ win:${win_count} │ shader:${shader_name} │ api${api_status}:${WIBWOB_PORT}"
+  echo "$status" > "$cache"
+  echo "$status"
+}
+
+_bar_paint() {
+  local rows cols status pad
+  rows=$(tput lines 2>/dev/null || echo 24)
+  cols=$(tput cols 2>/dev/null || echo 80)
+  status=$(_bar_gather_status)
+
+  # Calculate padding
+  local slen=${#status}
+  (( slen > cols )) && status="${status:0:$cols}"
+  pad=$(( cols - ${#status} ))
+  (( pad < 0 )) && pad=0
+
+  # Save cursor, jump to last row, paint, restore
+  printf '\033[s'
+  printf "\033[${rows};1H"
+  printf '\033[0;30;46m'  # black on cyan (tmux-like)
+  printf ' %s' "$status"
+  printf "%${pad}s" ""
+  printf '\033[0m'
+  printf '\033[u'
+}
+
+_bar_enable() {
+  local rows
+  rows=$(tput lines 2>/dev/null || echo 24)
+
+  # Set scroll region to all-but-last-row
+  printf "\033[1;$((rows-1))r"
+
+  # Paint initial bar
+  _bar_paint
+
+  # Write PID file for the refresh loop
+  local pid_file="$STATE_DIR/.bar.pid"
+
+  # Kill any existing bar loop
+  [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" 2>/dev/null || true
+
+  # Background refresh loop (updates every 3s)
+  (
+    trap 'exit 0' TERM INT
+    while true; do
+      sleep 3
+      _bar_paint
+    done
+  ) &
+  echo $! > "$pid_file"
+  disown
+
+  echo "Status bar enabled (PID $(cat "$pid_file"))"
+}
+
+_bar_disable() {
+  local pid_file="$STATE_DIR/.bar.pid"
+  [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" 2>/dev/null || true
+  rm -f "$pid_file" "$STATE_DIR/.bar-cache"
+
+  # Restore full scroll region
+  local rows
+  rows=$(tput lines 2>/dev/null || echo 24)
+  printf "\033[1;${rows}r"
+  # Clear the last row
+  printf "\033[${rows};1H\033[2K"
+  printf '\033[u'
+
+  echo "Status bar disabled"
+}
+
+# ─── GUI Automation (System Events) ─────────────────
+# Navigate Ghostty's menus, click items, simulate human interaction
+
+cmd_menu() {
+  local action="${1:-list}"
+  shift || true
+  case "$action" in
+    list)  _menu_list "$@" ;;
+    click) _menu_click "$@" ;;
+    *)     die "menu: list|click" ;;
+  esac
+}
+
+_menu_list() {
+  # List all menu bar items and their sub-items
+  local menu_name="${1:-}"
+
+  if [[ -z "$menu_name" ]]; then
+    # List top-level menu bar items
+    osascript <<'AS'
+tell application "Ghostty" to activate
+delay 0.2
+tell application "System Events"
+  tell process "Ghostty"
+    set menuNames to {}
+    repeat with m in menu bar items of menu bar 1
+      set end of menuNames to name of m
+    end repeat
+    return menuNames
+  end tell
+end tell
+AS
+  else
+    # List items in a specific menu
+    osascript <<AS
+tell application "Ghostty" to activate
+delay 0.2
+tell application "System Events"
+  tell process "Ghostty"
+    set itemNames to {}
+    try
+      set targetMenu to menu 1 of menu bar item "$menu_name" of menu bar 1
+      repeat with mi in menu items of targetMenu
+        set itemName to name of mi
+        if itemName is not missing value then
+          set end of itemNames to itemName
+        end if
+      end repeat
+    end try
+    return itemNames
+  end tell
+end tell
+AS
+  fi
+}
+
+_menu_click() {
+  # Click a menu item: wibmux menu click "File" "New Window"
+  local menu_bar_item="${1:-}" menu_item="${2:-}"
+  [[ -z "$menu_bar_item" ]] && die "Usage: wibmux menu click <menu> <item>"
+  [[ -z "$menu_item" ]] && die "Usage: wibmux menu click <menu> <item>"
+
+  osascript <<AS
+tell application "Ghostty" to activate
+delay 0.2
+tell application "System Events"
+  tell process "Ghostty"
+    try
+      click menu item "$menu_item" of menu 1 of menu bar item "$menu_bar_item" of menu bar 1
+      return true
+    on error errMsg
+      return "ERROR: " & errMsg
+    end try
+  end tell
+end tell
+AS
+}
+
+# Navigate nested submenus: wibmux menu deep "View" "Tab Overview"
+cmd_click() {
+  # Convenience alias: wibmux click <x> <y> (click at screen coordinates)
+  local x="${1:-}" y="${2:-}"
+  [[ -z "$x" || -z "$y" ]] && die "Usage: wibmux click <x> <y>"
+
+  osascript <<AS
+tell application "Ghostty" to activate
+delay 0.2
+tell application "System Events"
+  click at {$x, $y}
+end tell
+AS
+}
+
+# Keystroke simulation — send arbitrary keyboard shortcuts
+cmd_key() {
+  # wibmux key "n" "command"        → Cmd+N
+  # wibmux key "t" "command"        → Cmd+T (new tab)
+  # wibmux key "," "command,shift"  → Cmd+Shift+, (reload config)
+  local key="${1:-}" mods="${2:-}"
+  [[ -z "$key" ]] && die "Usage: wibmux key <key> [modifiers]"
+
+  local mod_clause=""
+  if [[ -n "$mods" ]]; then
+    # Convert "command,shift" → "command down, shift down"
+    local mod_list=""
+    IFS=',' read -ra mod_arr <<< "$mods"
+    for m in "${mod_arr[@]}"; do
+      m=$(echo "$m" | xargs)  # trim
+      [[ -n "$mod_list" ]] && mod_list="$mod_list, "
+      mod_list="${mod_list}${m} down"
+    done
+    mod_clause=" using {${mod_list}}"
+  fi
+
+  osascript <<AS
+tell application "Ghostty" to activate
+delay 0.2
+tell application "System Events"
+  tell process "Ghostty"
+    keystroke "$key"$mod_clause
+  end tell
+end tell
+AS
+}
+
+# ─── Window Inspector ────────────────────────────────
+# Detailed info about Ghostty windows (tabs, terminals, working dirs)
+
+cmd_inspect() {
+  local win_id="${1:-}"
+  if [[ -z "$win_id" ]]; then
+    # Inspect all windows
+    osascript <<'AS'
+tell application "Ghostty"
+  set output to ""
+  repeat with w in windows
+    set output to output & "window: " & (id of w) & "  title: " & (name of w) & linefeed
+    repeat with tb in tabs of w
+      set output to output & "  tab: " & (id of tb) & "  title: " & (name of tb) & "  selected: " & (selected of tb) & linefeed
+      repeat with t in terminals of tb
+        set tdir to ""
+        try
+          set tdir to working directory of t
+        end try
+        set output to output & "    terminal: " & (id of t) & "  title: " & (name of t) & "  cwd: " & tdir & linefeed
+      end repeat
+    end repeat
+  end repeat
+  return output
+end tell
+AS
+  else
+    # Inspect specific window
+    osascript <<AS
+tell application "Ghostty"
+  repeat with w in windows
+    if id of w is "$win_id" then
+      set output to "window: " & (id of w) & "  title: " & (name of w) & linefeed
+      repeat with tb in tabs of w
+        set output to output & "  tab: " & (id of tb) & "  title: " & (name of tb) & "  selected: " & (selected of tb) & linefeed
+        repeat with t in terminals of tb
+          set tdir to ""
+          try
+            set tdir to working directory of t
+          end try
+          set output to output & "    terminal: " & (id of t) & "  title: " & (name of t) & "  cwd: " & tdir & linefeed
+        end repeat
+      end repeat
+      return output
+    end if
+  end repeat
+end tell
+AS
+  fi
+}
+
 cmd_help() {
   cat <<EOF
 wibmux — Ghostty-native tmux replacement for WibWob-DOS
 
-COMMANDS:
+SESSION:
   create   [--label NAME] [--cmd CMD]     Open a new Ghostty window
   list                                     List Ghostty windows
   focus    --label NAME | --id ID          Focus a window
   attach   [--label NAME]                  Reconnect to a WibWob instance
   close    --label NAME | --id ID          Close a window
+  inspect  [window-id]                     Deep inspect windows/tabs/terminals
+
+INPUT:
   send     --label NAME --text TEXT        Send text to a terminal
   read     [endpoint]                      Read via WibWob API
+
+LAYOUT:
   layout   --file FILE | --tabs SPECS      Apply a project layout
+
+SHADERS:
   shader   --name NAME|none                Hot-swap Ghostty shader
   shader-list                              List available shaders
+
+STATUS BAR:
+  bar on                                   Enable tmux-style status bar
+  bar off                                  Disable status bar
+  bar update                               Force refresh status bar
+
+GUI AUTOMATION:
+  menu list [menu-name]                    List menu bar items (or submenu)
+  menu click <menu> <item>                 Click a menu item
+  key <key> [modifiers]                    Send keystroke (e.g. key n command)
+  click <x> <y>                            Click at screen coordinates
+
   help                                     Show this help
 EOF
 }
@@ -493,6 +797,11 @@ case "${1:-help}" in
   layout)      shift; cmd_layout "$@" ;;
   shader)      shift; cmd_shader "$@" ;;
   shader-list) cmd_shader_list ;;
+  bar)         shift; cmd_bar "$@" ;;
+  menu)        shift; cmd_menu "$@" ;;
+  key)         shift; cmd_key "$@" ;;
+  click)       shift; cmd_click "$@" ;;
+  inspect)     shift; cmd_inspect "$@" ;;
   help|--help|-h) cmd_help ;;
   *)           die "Unknown command: $1. Run 'wibmux help' for usage." ;;
 esac
