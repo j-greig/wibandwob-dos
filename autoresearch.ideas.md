@@ -42,3 +42,13 @@ Preserved in git history. All 60 feature pts + 40 UI pts.
 - Markdown rendering in edit mode preview
 - Session search/filter
 - Cross-reference: link journal entries to sessions that created them
+
+## KILLER FEATURE — Auto-journal from agent sessions
+The journal has session logs (read-only) and entries (structured). Bridge them:
+when a pi session ends, auto-create a journal entry summarizing what the agent
+did — decisions, files changed, blockers, outcomes — with a `sessionId` backlink
+to the raw log. The journal becomes institutional memory that grows automatically.
+Implementation: watch `~/.pi/agent/sessions/` for new JSONL files, parse on close,
+use LLM to summarize into a structured entry (title, body, tags, kind=discovery).
+Could also trigger on `describeState` or a `journal.auto-capture` command.
+This is the bridge between passive logs and active knowledge.
