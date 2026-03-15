@@ -80,7 +80,6 @@ const ALL_REGISTRY_TYPES = Object.keys(snapshotRegistry) as PersistableAppType[]
 const TESTABLE_TYPES: PersistableAppType[] = [
   "primer-viewer",
   "text-editor",
-  "figlet-banner",
   "companion-widget",
   "wibwob-agent",
   "monster-cam",
@@ -105,7 +104,6 @@ async function openWindowForAppType(appType: PersistableAppType): Promise<boolea
   const openers: Partial<Record<PersistableAppType, () => Promise<any>>> = {
     "primer-viewer": () => post("/view/primer/open", { filePath: primerPath }),
     "text-editor": () => post("/commands/run", { id: "editor.new" }),
-    "figlet-banner": () => post("/commands/run", { id: "microapp.wibwob.figlet.open", args: { text: "TEST" } }),
     "companion-widget": () => post("/commands/run", { id: "companion.open" }),
     "wibwob-agent": () => post("/commands/run", { id: "agent.open" }),
     "monster-cam": () => post("/commands/run", { id: "monster-cam.open" }),

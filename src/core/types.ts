@@ -114,7 +114,6 @@ export type PersistableAppType =
   | "web-reader"
   | "backrooms-primer-picker"
   | "primer-gallery"
-  | "figlet-banner"
   | "text-editor"
   | "companion-widget"
   | "backrooms-tv"
@@ -130,7 +129,6 @@ export type TransientAppType =
   | "command-palette"
   | "workspace-manager"
   | "state-inspector"
-  | "contour-studio"
   | "terrain-lab"
   | "music-player";
 

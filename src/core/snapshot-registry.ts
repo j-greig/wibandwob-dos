@@ -133,22 +133,7 @@ export const snapshotRegistry = {
     },
   },
 
-  // --- kind: "figlet" ---
-  "figlet-banner": {
-    serialize: (window) => {
-      const d = getDetails(window);
-      return {
-        inputText: detailString(d, "inputText") ?? window.title.replace(/^Banner:\s*/, ""),
-        font: detailString(d, "font") ?? getDefaultFigletFont(),
-      };
-    },
-    restore: (_snapshot, payload, actions) => {
-      return actions.openFigletWindow(
-        typeof payload.inputText === "string" ? payload.inputText : "WibWob",
-        typeof payload.font === "string" ? payload.font : getDefaultFigletFont()
-      );
-    },
-  },
+  // --- kind: "figlet" --- (E039: migrated to microapp, legacy remap handles old files)
 
   // --- kind: "pattern" --- (migrated to microapp.wibwob.generative)
 
@@ -374,6 +359,9 @@ const legacyAppTypeRemap: Record<string, string> = {
   "markdown-viewer": "reader",
   // E032 S02 — "reader" appType (old markdown-viewer) merged into "text-editor"
   "reader": "text-editor",
+  // E039 — microapp owns its own snapshot now
+  "figlet-banner": "wibwob.figlet",
+  "contour-studio": "wibwob.contour",
   // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
   "world-chatroom": "wibwob.chatroom",
   "wibwobworld": "wibwob.world",
@@ -389,7 +377,7 @@ const kindFallbackMap: Partial<Record<string, PersistableAppType | string>> = {
   primer: "primer-viewer",
   editor: "text-editor",
   reader: "reader-viewer",
-  figlet: "figlet-banner",
+  figlet: "wibwob.figlet",
   pattern: "pattern-animation",
   gallery: "primer-gallery",
   browser: "primer-browser",
