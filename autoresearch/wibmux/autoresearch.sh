@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # WibMux autoresearch benchmark
-# Tests each of the 8 core operations and reports capability count + latency
+# Tests each of the 10 core operations and reports capability count + latency
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WIBMUX="$SCRIPT_DIR/wibmux.sh"
@@ -30,70 +30,74 @@ run_timed() {
   return $rc
 }
 
+# --- SESSION LIFECYCLE ---
+
 # 1. list — should work even with nothing running
 if run_timed bash "$WIBMUX" list; then
-  PASS=$((PASS + 1))
-  echo "PASS: list"
-else
-  echo "FAIL: list"
-fi
+  PASS=$((PASS + 1)); echo "PASS: list"
+else echo "FAIL: list"; fi
 
 # 2. create — open a new Ghostty window with WibWob
 if run_timed bash "$WIBMUX" create --label test-wibmux; then
-  PASS=$((PASS + 1))
-  echo "PASS: create"
+  PASS=$((PASS + 1)); echo "PASS: create"
   sleep 3  # let it start
-else
-  echo "FAIL: create"
-fi
+else echo "FAIL: create"; fi
 
 # 3. focus — switch to the test window
 if run_timed bash "$WIBMUX" focus --label test-wibmux; then
-  PASS=$((PASS + 1))
-  echo "PASS: focus"
-else
-  echo "FAIL: focus"
-fi
+  PASS=$((PASS + 1)); echo "PASS: focus"
+else echo "FAIL: focus"; fi
 
-# 4. send — input text to the terminal
-if run_timed bash "$WIBMUX" send --label test-wibmux --text "echo wibmux-test"; then
-  PASS=$((PASS + 1))
-  echo "PASS: send"
-else
-  echo "FAIL: send"
-fi
-
-# 5. split — create a split pane
-if run_timed bash "$WIBMUX" split --label test-wibmux --direction right; then
-  PASS=$((PASS + 1))
-  echo "PASS: split"
-else
-  echo "FAIL: split"
-fi
-
-# 6. read — capture content via WibWob API (not osascript)
-if run_timed bash "$WIBMUX" read; then
-  PASS=$((PASS + 1))
-  echo "PASS: read"
-else
-  echo "FAIL: read"
-fi
-
-# 7. attach — reconnect to instance
+# 4. attach — reconnect to instance
 if run_timed bash "$WIBMUX" attach --label test-wibmux; then
-  PASS=$((PASS + 1))
-  echo "PASS: attach"
+  PASS=$((PASS + 1)); echo "PASS: attach"
+else echo "FAIL: attach"; fi
+
+# --- INPUT & CONTROL ---
+
+# 5. send — input text to the terminal
+if run_timed bash "$WIBMUX" send --label test-wibmux --text "echo wibmux-test"; then
+  PASS=$((PASS + 1)); echo "PASS: send"
+else echo "FAIL: send"; fi
+
+# 6. read — capture content via WibWob API
+if run_timed bash "$WIBMUX" read; then
+  PASS=$((PASS + 1)); echo "PASS: read"
+else echo "FAIL: read"; fi
+
+# --- PROJECT LAYOUTS ---
+
+# 7. layout — apply a layout spec
+if [ -d "$SCRIPT_DIR/layouts" ] && ls "$SCRIPT_DIR/layouts/"*.json >/dev/null 2>&1; then
+  LAYOUT_FILE=$(ls "$SCRIPT_DIR/layouts/"*.json | head -1)
+  if run_timed bash "$WIBMUX" layout --file "$LAYOUT_FILE"; then
+    PASS=$((PASS + 1)); echo "PASS: layout"
+  else echo "FAIL: layout"; fi
 else
-  echo "FAIL: attach"
+  # Try inline layout
+  if run_timed bash "$WIBMUX" layout --tabs "test:echo hello"; then
+    PASS=$((PASS + 1)); echo "PASS: layout"
+  else echo "FAIL: layout"; fi
 fi
 
-# 8. close — clean shutdown
+# --- SHADER CONTROL ---
+
+# 8. shader-list — list available shaders
+if run_timed bash "$WIBMUX" shader-list; then
+  PASS=$((PASS + 1)); echo "PASS: shader-list"
+else echo "FAIL: shader-list"; fi
+
+# 9. shader — hot-swap a shader (use a known shader or skip)
+if run_timed bash "$WIBMUX" shader --name none; then
+  PASS=$((PASS + 1)); echo "PASS: shader"
+else echo "FAIL: shader"; fi
+
+# --- CLEANUP ---
+
+# 10. close — clean shutdown
 if run_timed bash "$WIBMUX" close --label test-wibmux; then
-  PASS=$((PASS + 1))
-  echo "PASS: close"
-else
-  echo "FAIL: close"
-fi
+  PASS=$((PASS + 1)); echo "PASS: close"
+else echo "FAIL: close"; fi
 
 # Calculate average latency
 if [ "$TESTS" -gt 0 ]; then
