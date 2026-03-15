@@ -385,6 +385,16 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     hidden: true,
   } as any);
 
+  // Title label for edit mode
+  const titleLabelBox = blessed.box({
+    parent: contentBox,
+    top: 0, left: 2, width: 8, height: 1,
+    tags: true,
+    content: `Title:`,
+    style: { fg: t().muted?.fg || "#555", bg: t().body.bg },
+    hidden: true,
+  });
+
   // Title input for editing
   const titleInput = blessed.textbox({
     parent: contentBox,
@@ -482,6 +492,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     detailBox.hide();
     editArea.hide();
     titleInput.hide();
+    titleLabelBox.hide();
     kindLabel.hide();
 
     // Determine layout: two-pane if wide enough
@@ -574,6 +585,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     detailBox.show();
     editArea.hide();
     titleInput.hide();
+    titleLabelBox.hide();
     kindLabel.hide();
     detailBox.left = 0;
     detailBox.width = "100%" as any;
