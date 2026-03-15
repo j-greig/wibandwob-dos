@@ -69,3 +69,4 @@ tests/tidepool-smoke/results/
 
 # Large reference media (extracted frames tracked instead)
 asciicker-gameplay-animted.gif
+scripts/lib/find-ghostty-window
