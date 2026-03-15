@@ -580,26 +580,31 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   function renderEditMode(th: any, muted: string, accent: string, w: number) {
     listBox.hide();
     detailBox.hide();
+    paneSep.hide();
     titleInput.show();
     kindLabel.show();
     editArea.show();
 
-    titleInput.left = 1;
-    titleInput.right = 1;
+    titleInput.left = 2;
+    titleInput.right = 2;
     titleInput.top = 0;
-    kindLabel.left = 1;
-    kindLabel.right = 1;
-    kindLabel.top = 1;
-    editArea.left = 1;
-    editArea.right = 1;
-    editArea.top = 3;
+    kindLabel.left = 2;
+    kindLabel.right = 2;
+    kindLabel.top = 2;
+    editArea.left = 2;
+    editArea.right = 2;
+    editArea.top = 4;
 
+    const ruleW = Math.max(10, w - 8);
     kindLabel.setContent(
-      `{${muted}-fg}Kind: ${editKind}  Tags: ${editTags.length ? editTags.map(t => `#${t}`).join(" ") : "(none)"}{/${muted}-fg}`
+      `{${muted}-fg}${"─".repeat(ruleW)}\n` +
+      `Kind: ${editKind}  │  Tags: ${editTags.length ? editTags.map(t => `#${t}`).join(" ") : "(none)"}  │  Tab: title↔body{/${muted}-fg}`
     );
+    kindLabel.height = 2;
 
-    statusBar.setContent(`{${muted}-fg} [${editingId ? "EDIT" : "NEW"}]  ${editTitle || "untitled"}{/${muted}-fg}`);
-    commandBar.setContent(`{${muted}-fg} Ctrl-S save  Esc cancel{/${muted}-fg}`);
+    const modeLabel = editingId ? "EDIT" : "NEW";
+    statusBar.setContent(`{${muted}-fg} [${modeLabel}]  ${editTitle || "untitled"}{/${muted}-fg}`);
+    commandBar.setContent(`{${muted}-fg} Ctrl-S save  Esc cancel  Tab switch title↔body{/${muted}-fg}`);
   }
 
   // ── Mode transitions ─────────────────────────────────────────
@@ -690,6 +695,25 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   listBox.on("select item", (_item: any, idx: number) => {
     selectedIdx = idx;
     render(); // update preview
+  });
+
+  // Mouse click to select list item
+  listBox.on("click", () => {
+    if (mode === "list") {
+      const idx = (listBox as any).selected ?? 0;
+      selectedIdx = idx;
+      render();
+    }
+  });
+
+  // Double-click to open (simulated via rapid click)
+  let lastClickTime = 0;
+  listBox.on("click", () => {
+    const now = Date.now();
+    if (now - lastClickTime < 400 && mode === "list") {
+      openEntry(selectedIdx);
+    }
+    lastClickTime = now;
   });
 
   listBox.key(["j", "down"], () => {
@@ -808,6 +832,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     editArea.readInput();
   });
 
+  titleInput.key(["tab"], () => {
+    editTitle = titleInput.getValue();
+    editArea.focus();
+    editArea.readInput();
+  });
+
   titleInput.key(["escape"], () => {
     setMode(editingId ? "read" : "list");
     if (mode === "list") listBox.focus();
@@ -816,6 +846,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
 
   editArea.key(["C-s"], () => {
     saveEdit();
+  });
+
+  editArea.key(["tab"], () => {
+    editBody = editArea.getValue();
+    titleInput.focus();
+    titleInput.readInput();
   });
 
   editArea.key(["escape"], () => {
