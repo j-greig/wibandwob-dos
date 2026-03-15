@@ -19,7 +19,7 @@ import {
   PLAIN_HEADING_CONFIG,
   type PanelDef,
 } from "../../src/services/microapp-sdk.js";
-import type { PanelType, CEPanelDef } from "../../src/services/microapp-sdk.js";
+import type { PanelType, CEPanelDef } from "../../src/core/canvas-types.js";
 
 // Re-export so existing consumers don't break
 export type { PanelType, CEPanelDef };
