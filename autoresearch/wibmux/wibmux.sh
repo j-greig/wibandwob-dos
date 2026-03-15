@@ -2,29 +2,26 @@
 # WibMux — Ghostty-native tmux replacement for WibWob-DOS
 # Uses Ghostty AppleScript API (1.3+). macOS only.
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SELF="$0"
+[[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SHADER_DIR="$REPO_ROOT/shaders"
-ACTIVE_SHADER_CONFIG="$REPO_ROOT/scratch/.ghostty-shaders"
+# Ghostty config includes this path (from main repo, not worktree)
+ACTIVE_SHADER_CONFIG="$HOME/Repos/wibandwob-dos/scratch/.ghostty-shaders"
 GHOSTTY_CONFIG="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
 [[ -f "$GHOSTTY_CONFIG" ]] || GHOSTTY_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/ghostty/config"
 WIBWOB_PORT="${WIBWOB_PORT:-8099}"
-
 # State directory for tracking window IDs by label
 STATE_DIR="$REPO_ROOT/scratch/.wibmux"
 mkdir -p "$STATE_DIR"
-
 # ─── Helpers ─────────────────────────────────────────
-
 die() { echo "ERROR: $*" >&2; exit 1; }
-
 # Save window ID for a label
 save_label() {
   local label="$1" win_id="$2"
   echo "$win_id" > "$STATE_DIR/$label.id"
 }
-
 # Load window ID for a label
 load_label() {
   local label="$1"
@@ -33,13 +30,11 @@ load_label() {
     cat "$id_file"
   fi
 }
-
 # Remove label tracking
 remove_label() {
   local label="$1"
   rm -f "$STATE_DIR/$label.id"
 }
-
 # Check if a window ID still exists in Ghostty
 window_exists() {
   local win_id="$1"
@@ -52,19 +47,16 @@ window_exists() {
     end tell
   " 2>/dev/null | grep -q "true"
 }
-
 # Find window by label — first check tracking file, then title match
 resolve_window() {
   local label="$1"
   local win_id
-
   # Check tracked ID first
   win_id=$(load_label "$label")
   if [[ -n "$win_id" ]] && window_exists "$win_id"; then
     echo "$win_id"
     return 0
   fi
-
   # Fall back to title match
   win_id=$(osascript -e "
     tell application \"Ghostty\"
@@ -75,17 +67,14 @@ resolve_window() {
       end repeat
     end tell
   " 2>/dev/null)
-
   if [[ -n "$win_id" ]]; then
     # Save for future lookups
     save_label "$label" "$win_id"
     echo "$win_id"
     return 0
   fi
-
   return 1
 }
-
 # Get first terminal ID in a window
 get_terminal() {
   local win_id="$1"
@@ -99,9 +88,7 @@ get_terminal() {
     end tell
   " 2>/dev/null
 }
-
 # ─── Commands ────────────────────────────────────────
-
 cmd_create() {
   local label="" cmd=""
   while [[ $# -gt 0 ]]; do
@@ -112,29 +99,31 @@ cmd_create() {
     esac
   done
   [[ -z "$label" ]] && label="wibwob"
-
-  # Default command: run WibWob-DOS
-  if [[ -z "$cmd" ]]; then
-    cmd="cd $REPO_ROOT && WIBWOB_LABEL=$label bun run dev"
-  fi
-
+  # No default command — just opens a shell
   local win_id
-  win_id=$(osascript <<APPLESCRIPT
+  if [[ -n "$cmd" ]]; then
+    win_id=$(osascript <<APPLESCRIPT
 tell application "Ghostty"
   set cfg to new surface configuration
-  set command of cfg to "/bin/bash"
-  set initial input of cfg to "export WIBMUX_LABEL=${label}; ${cmd}" & return
+  set initial input of cfg to "${cmd}" & return
   set initial working directory of cfg to "$REPO_ROOT"
   set newWin to new window with configuration cfg
   return id of newWin
 end tell
 APPLESCRIPT
-  ) || die "Failed to create Ghostty window"
-
+    ) || die "Failed to create Ghostty window"
+  else
+    win_id=$(osascript <<APPLESCRIPT
+tell application "Ghostty"
+  set newWin to new window
+  return id of newWin
+end tell
+APPLESCRIPT
+    ) || die "Failed to create Ghostty window"
+  fi
   save_label "$label" "$win_id"
   echo "$win_id"
 }
-
 cmd_list() {
   osascript -e '
     tell application "Ghostty"
@@ -148,6 +137,23 @@ cmd_list() {
     end tell
   ' 2>/dev/null
 }
+cmd_focus_index() {
+  local idx="$1"
+  local win_id
+  win_id=$(osascript -e "
+    tell application \"Ghostty\"
+      set wList to every window
+      if (count of wList) > $idx then
+        set w to item $((idx + 1)) of wList
+        set t to first terminal of w
+        focus t
+        return id of w
+      end if
+    end tell
+  " 2>/dev/null)
+  [[ -z "$win_id" ]] && die "No window at index $idx"
+  echo "$win_id"
+}
 
 cmd_focus() {
   local label="" win_id=""
@@ -158,12 +164,10 @@ cmd_focus() {
       *)       shift ;;
     esac
   done
-
   if [[ -n "$label" ]]; then
     win_id=$(resolve_window "$label") || die "No window found for label: $label"
   fi
   [[ -z "$win_id" ]] && die "Specify --label or --id"
-
   # Focus terminal (which brings window to front per SDEF)
   local term_id
   term_id=$(get_terminal "$win_id")
@@ -196,7 +200,6 @@ cmd_focus() {
     " 2>/dev/null || die "Failed to focus window"
   fi
 }
-
 cmd_attach() {
   local label=""
   while [[ $# -gt 0 ]]; do
@@ -206,12 +209,10 @@ cmd_attach() {
     esac
   done
   [[ -z "$label" ]] && label="wibwob"
-
   # Check if WibWob API is reachable
   if ! curl -sf "http://127.0.0.1:$WIBWOB_PORT/health" >/dev/null 2>&1; then
     echo "WARN: WibWob API not reachable on port $WIBWOB_PORT"
   fi
-
   # Find existing window or create new one
   local win_id
   win_id=$(resolve_window "$label") && {
@@ -219,11 +220,9 @@ cmd_attach() {
     echo "Attached to existing window: $win_id"
     return 0
   }
-
   echo "No existing window found, creating new one..."
   cmd_create --label "$label"
 }
-
 cmd_close() {
   local label="" win_id=""
   while [[ $# -gt 0 ]]; do
@@ -233,16 +232,13 @@ cmd_close() {
       *)       shift ;;
     esac
   done
-
   if [[ -n "$label" ]]; then
     win_id=$(resolve_window "$label") || die "No window found for label: $label"
   fi
   [[ -z "$win_id" ]] && die "Specify --label or --id"
-
   # Send exit to shell, then close window
   local term_id
   term_id=$(get_terminal "$win_id")
-
   osascript -e "
     tell application \"Ghostty\"
       repeat with w in windows
@@ -262,11 +258,9 @@ cmd_close() {
       return false
     end tell
   " 2>/dev/null || true  -- best effort
-
   # Clean up tracking
   [[ -n "$label" ]] && remove_label "$label"
 }
-
 cmd_send() {
   local label="" text="" win_id=""
   while [[ $# -gt 0 ]]; do
@@ -277,17 +271,14 @@ cmd_send() {
       *)       shift ;;
     esac
   done
-
   if [[ -n "$label" ]]; then
     win_id=$(resolve_window "$label") || die "No window found for label: $label"
   fi
   [[ -z "$win_id" ]] && die "Specify --label or --id"
   [[ -z "$text" ]] && die "Specify --text"
-
   local term_id
   term_id=$(get_terminal "$win_id")
   [[ -z "$term_id" ]] && die "No terminal found in window $win_id"
-
   osascript -e "
     tell application \"Ghostty\"
       repeat with w in windows
@@ -302,13 +293,11 @@ cmd_send() {
     end tell
   " 2>/dev/null || die "Failed to send text to terminal"
 }
-
 cmd_read() {
   # Read via WibWob HTTP API, not terminal scraping
   local endpoint="${1:-/screenshot/ansi}"
   curl -sf "http://127.0.0.1:$WIBWOB_PORT$endpoint" 2>/dev/null || die "WibWob API not reachable on port $WIBWOB_PORT"
 }
-
 cmd_layout() {
   local file="" tabs=""
   while [[ $# -gt 0 ]]; do
@@ -318,7 +307,6 @@ cmd_layout() {
       *)      shift ;;
     esac
   done
-
   if [[ -n "$file" ]]; then
     [[ -f "$file" ]] || die "Layout file not found: $file"
     _apply_layout_file "$file"
@@ -328,39 +316,32 @@ cmd_layout() {
     die "Specify --file <path> or --tabs <tab specs>"
   fi
 }
-
 _apply_layout_file() {
   local file="$1"
   local tab_count
   tab_count=$(python3 -c "import json; d=json.load(open('$file')); print(len(d.get('tabs',[])))" 2>/dev/null)
   [[ -z "$tab_count" || "$tab_count" == "0" ]] && die "No tabs in layout file"
-
   local first_cmd
   first_cmd=$(python3 -c "import json; d=json.load(open('$file')); print(d['tabs'][0].get('command','bash'))" 2>/dev/null)
-
   local win_id
   win_id=$(osascript -e "
     tell application \"Ghostty\"
       set cfg to new surface configuration
-      set command of cfg to \"/bin/bash\"
       set initial input of cfg to \"$first_cmd\" & return
       set initial working directory of cfg to \"$REPO_ROOT\"
       set newWin to new window with configuration cfg
       return id of newWin
     end tell
   " 2>/dev/null) || die "Failed to create layout window"
-
   local i=1
   while [[ $i -lt $tab_count ]]; do
     local tab_cmd
     tab_cmd=$(python3 -c "import json; d=json.load(open('$file')); print(d['tabs'][$i].get('command','bash'))" 2>/dev/null)
-
     osascript -e "
       tell application \"Ghostty\"
         repeat with w in windows
           if id of w is \"$win_id\" then
             set cfg to new surface configuration
-            set command of cfg to \"/bin/bash\"
             set initial input of cfg to \"$tab_cmd\" & return
             set initial working directory of cfg to \"$REPO_ROOT\"
             new tab in w with configuration cfg
@@ -368,27 +349,21 @@ _apply_layout_file() {
         end repeat
       end tell
     " 2>/dev/null || echo "WARN: Failed to create tab $i"
-
     i=$((i + 1))
   done
-
   echo "Layout applied: $tab_count tabs from $file"
 }
-
 _apply_inline_tabs() {
   local specs=("$@")
   local first=true win_id=""
-
   for spec in "${specs[@]}"; do
     local name="${spec%%:*}"
     local cmd="${spec#*:}"
     [[ "$name" == "$cmd" ]] && cmd="bash"
-
     if $first; then
       win_id=$(osascript -e "
         tell application \"Ghostty\"
           set cfg to new surface configuration
-          set command of cfg to \"/bin/bash\"
           set initial input of cfg to \"$cmd\" & return
           set initial working directory of cfg to \"$REPO_ROOT\"
           set newWin to new window with configuration cfg
@@ -402,7 +377,6 @@ _apply_inline_tabs() {
           repeat with w in windows
             if id of w is \"$win_id\" then
               set cfg to new surface configuration
-              set command of cfg to \"/bin/bash\"
               set initial input of cfg to \"$cmd\" & return
               set initial working directory of cfg to \"$REPO_ROOT\"
               new tab in w with configuration cfg
@@ -412,10 +386,8 @@ _apply_inline_tabs() {
       " 2>/dev/null || echo "WARN: Failed to create tab: $name"
     fi
   done
-
   echo "Layout applied: ${#specs[@]} tabs"
 }
-
 cmd_shader() {
   local name=""
   while [[ $# -gt 0 ]]; do
@@ -425,7 +397,6 @@ cmd_shader() {
     esac
   done
   [[ -z "$name" ]] && die "Specify --name <shader-name|none>"
-
   if [[ "$name" == "none" || "$name" == "off" ]]; then
     rm -f "$ACTIVE_SHADER_CONFIG"
   else
@@ -437,14 +408,12 @@ cmd_shader() {
     else
       die "Shader not found: $name (looked in $SHADER_DIR)"
     fi
-
     cat > "$ACTIVE_SHADER_CONFIG" <<EOF
 # WibMux shader config (auto-generated)
 custom-shader = ${glsl}
 custom-shader-animation = always
 EOF
   fi
-
   # Reload via AppleScript action (no keystroke hack)
   osascript -e '
     tell application "Ghostty"
@@ -453,126 +422,152 @@ EOF
     end tell
   ' 2>/dev/null || die "Failed to reload Ghostty config"
 }
-
 cmd_shader_list() {
   [[ -d "$SHADER_DIR" ]] || die "Shader directory not found: $SHADER_DIR"
   for f in "$SHADER_DIR"/*.glsl; do
     [[ -f "$f" ]] && basename "$f" .glsl
   done
 }
-
-# ─── Status Bar (proto TUI) ──────────────────────────
-# Like tmux's bottom bar — uses ANSI scroll region to reserve last row
+# ─── Status Bar — tmux-style bottom row ──────────────
+# Reserves the last line of YOUR terminal via ANSI scroll region.
+# Shows: [0] zilla* [1] logs [2] dev     shader:none api●
+# Must be run INSIDE the terminal where you want the bar.
 
 cmd_bar() {
   local action="${1:-on}"
   case "$action" in
     on)  _bar_enable ;;
     off) _bar_disable ;;
-    update) _bar_paint ;;
-    *)   die "bar: on|off|update" ;;
+    *)   die "bar on|off" ;;
   esac
 }
 
-_bar_gather_status() {
-  # Count Ghostty windows (fast, cached for 2s)
-  local cache="$STATE_DIR/.bar-cache"
-  local now
-  now=$(date +%s)
-  if [[ -f "$cache" ]] && (( now - $(stat -f%m "$cache" 2>/dev/null || echo 0) < 2 )); then
-    cat "$cache"
-    return
-  fi
-
-  local win_count shader_name api_status
-  win_count=$(osascript -e 'tell application "Ghostty" to count windows' 2>/dev/null || echo "?")
-  if [[ -f "$ACTIVE_SHADER_CONFIG" ]]; then
-    shader_name=$(grep "^custom-shader" "$ACTIVE_SHADER_CONFIG" 2>/dev/null | sed 's|.*/||;s|\.glsl||' || echo "none")
+_bar_ttysize() {
+  # Get real terminal size from the tty, same as tmux's TIOCGWINSZ
+  local _r _c
+  if read -r _r _c < <(stty size </dev/tty 2>/dev/null); then
+    BAR_ROWS=$_r; BAR_COLS=$_c
   else
-    shader_name="none"
+    BAR_ROWS=${LINES:-24}; BAR_COLS=${COLUMNS:-80}
   fi
-  if curl -sf "http://127.0.0.1:$WIBWOB_PORT/health" >/dev/null 2>&1; then
-    api_status="●"
-  else
-    api_status="○"
-  fi
-
-  local status="wibmux │ win:${win_count} │ shader:${shader_name} │ api${api_status}:${WIBWOB_PORT}"
-  echo "$status" > "$cache"
-  echo "$status"
 }
 
 _bar_paint() {
-  local rows cols status pad
-  rows=$(tput lines 2>/dev/null || echo 24)
-  cols=$(tput cols 2>/dev/null || echo 80)
-  status=$(_bar_gather_status)
+  _bar_ttysize
+  local rows=$BAR_ROWS
+  local cols=$BAR_COLS
 
-  # Calculate padding
-  local slen=${#status}
-  (( slen > cols )) && status="${status:0:$cols}"
-  pad=$(( cols - ${#status} ))
-  (( pad < 0 )) && pad=0
+  # Build window list: [0] name* [1] name ...
+  local win_list=""
+  local idx=0
+  local front_id
+  front_id=$(osascript -e 'tell application "Ghostty" to return id of front window' 2>/dev/null || echo "")
 
-  # Save cursor, jump to last row, paint, restore
-  printf '\033[s'
-  printf "\033[${rows};1H"
-  printf '\033[0;30;46m'  # black on cyan (tmux-like)
-  printf ' %s' "$status"
-  printf "%${pad}s" ""
-  printf '\033[0m'
-  printf '\033[u'
+  while IFS='|' read -r wid wname; do
+    wid=$(echo "$wid" | xargs)
+    wname=$(echo "$wname" | xargs)
+    [[ -z "$wid" ]] && continue
+    local marker=""
+    [[ "$wid" == "$front_id" ]] && marker="*"
+    win_list="${win_list}[${idx}] ${wname}${marker}  "
+    idx=$((idx + 1))
+  done < <(osascript -e '
+    tell application "Ghostty"
+      set output to ""
+      repeat with w in windows
+        set output to output & (id of w) & "|" & (name of w) & linefeed
+      end repeat
+      return output
+    end tell
+  ' 2>/dev/null)
+
+  # Right side: shader + api status
+  local shader_name="none"
+  if [[ -f "$ACTIVE_SHADER_CONFIG" ]]; then
+    shader_name=$(grep "^custom-shader" "$ACTIVE_SHADER_CONFIG" 2>/dev/null | sed 's|.*/||;s|\.glsl||' || echo "none")
+  fi
+  local api_dot="○"
+  curl -sf "http://127.0.0.1:$WIBWOB_PORT/health" >/dev/null 2>&1 && api_dot="●"
+
+  local right="shader:${shader_name} api${api_dot}"
+  local left="$win_list"
+
+  # Trim left if too long
+  local right_len=${#right}
+  local max_left=$(( cols - right_len - 3 ))
+  (( ${#left} > max_left )) && left="${left:0:$max_left}"
+
+  local gap=$(( cols - ${#left} - right_len - 1 ))
+  (( gap < 1 )) && gap=1
+
+  # Paint: save cursor → jump to last row → draw → restore
+  # All output to /dev/tty so it hits the real terminal
+  {
+    printf '\033[s'
+    printf "\033[${rows};1H"
+    printf '\033[0;30;42m'  # black on green (tmux default)
+    printf '%s' "$left"
+    printf "%${gap}s" ""
+    printf '%s' "$right"
+    printf '\033[0m'
+    printf '\033[u'
+  } >/dev/tty
 }
 
 _bar_enable() {
-  local rows
-  rows=$(tput lines 2>/dev/null || echo 24)
+  # Kill any existing bar first
+  local pid_file="$STATE_DIR/.bar.pid"
+  [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" 2>/dev/null || true
+  rm -f "$pid_file"
 
-  # Set scroll region to all-but-last-row
-  printf "\033[1;$((rows-1))r"
+  _bar_ttysize
+  local rows=$BAR_ROWS
 
-  # Paint initial bar
+  # Reset scroll region to full, clear last 2 rows (clean up any old bar)
+  {
+    printf "\033[1;${rows}r"
+    printf "\033[$((rows - 1));1H\033[2K"
+    printf "\033[${rows};1H\033[2K"
+  } >/dev/tty
+
+  # Now set scroll region to reserve just the last row
+  printf "\033[1;$((rows - 1))r" >/dev/tty
+  # Move cursor into the scroll region
+  printf "\033[$((rows - 1));1H" >/dev/tty
+
   _bar_paint
 
-  # Write PID file for the refresh loop
+  # Background refresh
   local pid_file="$STATE_DIR/.bar.pid"
-
-  # Kill any existing bar loop
   [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" 2>/dev/null || true
 
-  # Background refresh loop (updates every 3s)
   (
     trap 'exit 0' TERM INT
     while true; do
-      sleep 3
+      sleep 2
       _bar_paint
     done
   ) &
   echo $! > "$pid_file"
   disown
-
-  echo "Status bar enabled (PID $(cat "$pid_file"))"
 }
 
 _bar_disable() {
   local pid_file="$STATE_DIR/.bar.pid"
   [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" 2>/dev/null || true
-  rm -f "$pid_file" "$STATE_DIR/.bar-cache"
+  rm -f "$pid_file"
 
-  # Restore full scroll region
-  local rows
-  rows=$(tput lines 2>/dev/null || echo 24)
-  printf "\033[1;${rows}r"
-  # Clear the last row
-  printf "\033[${rows};1H\033[2K"
-  printf '\033[u'
-
-  echo "Status bar disabled"
+  _bar_ttysize
+  local rows=$BAR_ROWS
+  # Restore full scroll region + clear the bar row
+  {
+    printf "\033[1;${rows}r"
+    printf "\033[${rows};1H\033[2K"
+    printf '\033[u'
+  } >/dev/tty
 }
-
 # ─── GUI Automation (System Events) ─────────────────
 # Navigate Ghostty's menus, click items, simulate human interaction
-
 cmd_menu() {
   local action="${1:-list}"
   shift || true
@@ -582,11 +577,9 @@ cmd_menu() {
     *)     die "menu: list|click" ;;
   esac
 }
-
 _menu_list() {
   # List all menu bar items and their sub-items
   local menu_name="${1:-}"
-
   if [[ -z "$menu_name" ]]; then
     # List top-level menu bar items
     osascript <<'AS'
@@ -625,13 +618,11 @@ end tell
 AS
   fi
 }
-
 _menu_click() {
   # Click a menu item: wibmux menu click "File" "New Window"
   local menu_bar_item="${1:-}" menu_item="${2:-}"
   [[ -z "$menu_bar_item" ]] && die "Usage: wibmux menu click <menu> <item>"
   [[ -z "$menu_item" ]] && die "Usage: wibmux menu click <menu> <item>"
-
   osascript <<AS
 tell application "Ghostty" to activate
 delay 0.2
@@ -647,13 +638,11 @@ tell application "System Events"
 end tell
 AS
 }
-
 # Navigate nested submenus: wibmux menu deep "View" "Tab Overview"
 cmd_click() {
   # Convenience alias: wibmux click <x> <y> (click at screen coordinates)
   local x="${1:-}" y="${2:-}"
   [[ -z "$x" || -z "$y" ]] && die "Usage: wibmux click <x> <y>"
-
   osascript <<AS
 tell application "Ghostty" to activate
 delay 0.2
@@ -662,7 +651,6 @@ tell application "System Events"
 end tell
 AS
 }
-
 # Keystroke simulation — send arbitrary keyboard shortcuts
 cmd_key() {
   # wibmux key "n" "command"        → Cmd+N
@@ -670,7 +658,6 @@ cmd_key() {
   # wibmux key "," "command,shift"  → Cmd+Shift+, (reload config)
   local key="${1:-}" mods="${2:-}"
   [[ -z "$key" ]] && die "Usage: wibmux key <key> [modifiers]"
-
   local mod_clause=""
   if [[ -n "$mods" ]]; then
     # Convert "command,shift" → "command down, shift down"
@@ -683,7 +670,6 @@ cmd_key() {
     done
     mod_clause=" using {${mod_list}}"
   fi
-
   osascript <<AS
 tell application "Ghostty" to activate
 delay 0.2
@@ -694,10 +680,8 @@ tell application "System Events"
 end tell
 AS
 }
-
 # ─── Window Inspector ────────────────────────────────
 # Detailed info about Ghostty windows (tabs, terminals, working dirs)
-
 cmd_inspect() {
   local win_id="${1:-}"
   if [[ -z "$win_id" ]]; then
@@ -745,11 +729,127 @@ end tell
 AS
   fi
 }
+# ─── Splits (panes within same window) ───────────────
+
+cmd_split() {
+  local dir="${1:-right}" cmd="${2:-}"
+
+  # Validate direction
+  case "$dir" in
+    right|left|down|up) ;;
+    h|horizontal) dir="right" ;;
+    v|vertical) dir="down" ;;
+    *) die "split direction: right|left|down|up (or h|v)" ;;
+  esac
+
+  if [[ -n "$cmd" ]]; then
+    osascript <<AS
+tell application "Ghostty"
+  set t to first terminal of front window
+  set cfg to new surface configuration
+  set initial input of cfg to "$cmd" & return
+  set newT to split t direction $dir with configuration cfg
+  return id of newT
+end tell
+AS
+  else
+    osascript <<AS
+tell application "Ghostty"
+  set t to first terminal of front window
+  set newT to split t direction $dir
+  return id of newT
+end tell
+AS
+  fi
+}
+
+# Set up tmux-like workspace: [L][R] on top, [BAR] on bottom
+cmd_workspace() {
+  # All in one AppleScript — split down, shrink, split top left/right
+  local bar_term
+  bar_term=$(osascript <<'AS'
+tell application "Ghostty"
+  set topT to first terminal of front window
+
+  -- split down to create bar pane
+  set barT to split topT direction down
+
+  -- shrink bar to 1 row
+  repeat 500 times
+    perform action "resize_split:up,1" on barT
+  end repeat
+
+  -- focus back to top pane, split left/right
+  focus topT
+  delay 0.3
+  split topT direction right
+
+  return id of barT
+end tell
+AS
+  ) || die "Failed to create workspace"
+
+  # Paint the bar
+  sleep 0.5
+  _workspace_paint_bar "$bar_term"
+  echo "$bar_term" > "$STATE_DIR/.bar-term"
+}
+
+_workspace_paint_bar() {
+  local bar_id="$1"
+  # Write a tiny bar script
+  local bar_script="$STATE_DIR/bar-loop.sh"
+  cat > "$bar_script" <<'BARSCRIPT'
+#!/bin/bash
+tput civis 2>/dev/null  # hide cursor
+while true; do
+  cols=$(tput cols 2>/dev/null || echo 80)
+  wins=$(wmux ls 2>/dev/null | while IFS='|' read -r id name; do
+    name=$(echo "$name" | xargs)
+    printf "[%s] " "$name"
+  done)
+  printf "\r\033[42;30m %-${cols}s\033[0m" "$wins"
+  sleep 2
+done
+BARSCRIPT
+  chmod +x "$bar_script"
+
+  # Send the bar script to the bar terminal
+  osascript -e "
+    tell application \"Ghostty\"
+      repeat with t in terminals of front window
+        if id of t is \"$bar_id\" then
+          input text \"bash $bar_script\" & return to t
+          return true
+        end if
+      end repeat
+    end tell
+  " 2>/dev/null
+}
+
+# Move focus between splits
+cmd_pane() {
+  local action="${1:-next}"
+  case "$action" in
+    next) osascript -e '
+      tell application "Ghostty"
+        set t to first terminal of front window
+        perform action "goto_split:next" on t
+      end tell
+    ' 2>/dev/null ;;
+    prev) osascript -e '
+      tell application "Ghostty"
+        set t to first terminal of front window
+        perform action "goto_split:previous" on t
+      end tell
+    ' 2>/dev/null ;;
+    *) die "pane: next|prev" ;;
+  esac
+}
 
 cmd_help() {
   cat <<EOF
 wibmux — Ghostty-native tmux replacement for WibWob-DOS
-
 SESSION:
   create   [--label NAME] [--cmd CMD]     Open a new Ghostty window
   list                                     List Ghostty windows
@@ -757,38 +857,42 @@ SESSION:
   attach   [--label NAME]                  Reconnect to a WibWob instance
   close    --label NAME | --id ID          Close a window
   inspect  [window-id]                     Deep inspect windows/tabs/terminals
-
 INPUT:
   send     --label NAME --text TEXT        Send text to a terminal
   read     [endpoint]                      Read via WibWob API
+WORKSPACE:
+  workspace                                tmux-style: [L][R] + bar at bottom
+  ws                                       alias for workspace
+
+SPLITS:
+  split    [right|left|down|up] [cmd]      Split pane (default: right)
+  split    h                               Split horizontal (left/right)
+  split    v                               Split vertical (top/bottom)
+  pane     next|prev                       Move focus between panes
 
 LAYOUT:
   layout   --file FILE | --tabs SPECS      Apply a project layout
-
 SHADERS:
   shader   --name NAME|none                Hot-swap Ghostty shader
   shader-list                              List available shaders
-
 STATUS BAR:
   bar on                                   Enable tmux-style status bar
   bar off                                  Disable status bar
   bar update                               Force refresh status bar
-
 GUI AUTOMATION:
   menu list [menu-name]                    List menu bar items (or submenu)
   menu click <menu> <item>                 Click a menu item
   key <key> [modifiers]                    Send keystroke (e.g. key n command)
   click <x> <y>                            Click at screen coordinates
-
   help                                     Show this help
 EOF
 }
-
 # ─── Dispatch ────────────────────────────────────────
-
 case "${1:-help}" in
   create)      shift; cmd_create "$@" ;;
-  list)        cmd_list ;;
+  list|ls)     cmd_list ;;
+  [0-9])       cmd_focus_index "$1" ;;
+  [0-9][0-9])  cmd_focus_index "$1" ;;
   focus)       shift; cmd_focus "$@" ;;
   attach)      shift; cmd_attach "$@" ;;
   close)       shift; cmd_close "$@" ;;
@@ -797,6 +901,9 @@ case "${1:-help}" in
   layout)      shift; cmd_layout "$@" ;;
   shader)      shift; cmd_shader "$@" ;;
   shader-list) cmd_shader_list ;;
+  workspace|ws) shift; cmd_workspace "$@" ;;
+  split)       shift; cmd_split "$@" ;;
+  pane)        shift; cmd_pane "$@" ;;
   bar)         shift; cmd_bar "$@" ;;
   menu)        shift; cmd_menu "$@" ;;
   key)         shift; cmd_key "$@" ;;
