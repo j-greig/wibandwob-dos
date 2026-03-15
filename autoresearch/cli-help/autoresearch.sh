@@ -92,13 +92,13 @@ echo ""
 echo "=== Default Fallthrough (15 pts) ==="
 
 check "dot-syntax works" 5 \
-  "wibwob theme.cycle 2>/dev/null | jq -e '.ok'"
+  "wibwob primer.list 2>/dev/null | jq -e '.ok'"
 
 check "cmd <id> works" 5 \
-  "wibwob cmd theme.cycle 2>/dev/null | jq -e '.ok'"
+  "wibwob cmd primer.list 2>/dev/null | jq -e '.ok'"
 
 check "noun verb works" 5 \
-  "wibwob theme cycle 2>/dev/null | jq -e '.ok'"
+  "wibwob primer list 2>/dev/null | jq -e '.ok'"
 
 # ── Parity (20 pts) ──────────────────────────────────────────
 echo ""

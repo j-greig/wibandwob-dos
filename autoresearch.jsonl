@@ -1,1 +1,2 @@
 {"type":"config","name":"F7 Self-Maintaining CLI Help","metricName":"help_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"3d5d010","metric":100,"metrics":{},"status":"keep","description":"F7 CLI_COMMANDS table: replaces switch+hardcoded usage. completions now in help. All dispatch + fallthrough working.","timestamp":1773579956877,"segment":0}
