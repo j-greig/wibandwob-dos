@@ -1,6 +1,7 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
-import blessed from "blessed";
+import {
+  createTextViewer, createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+
 
 export default function setup(host: MicroappHost) {
   // ── Pattern Field ──
@@ -63,21 +64,14 @@ export default function setup(host: MicroappHost) {
     const win = host.createWindow({ title, width: 80, height: 30 });
     const timers = new Set<ReturnType<typeof setInterval>>();
 
-    const canvas = blessed.box({
-      parent: win.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      style: host.theme().body,
-    });
+    const canvas = createTextViewer(win.body, { wrap: false });
 
     let tick = 0;
 
     const render = () => {
-      const w = Math.max(12, Number(canvas.width) || 40);
-      const h = Math.max(6, Number(canvas.height) || 15);
-      canvas.setContent(generator(tick, w, h));
+      const w = Math.max(12, Number(canvas.element.width) || 40);
+      const h = Math.max(6, Number(canvas.element.height) || 15);
+      canvas.update({ content: generator(tick, w, h) });
       tick += 1;
       host.screen.render();
     };
@@ -94,12 +88,12 @@ export default function setup(host: MicroappHost) {
     win.captureText(() => canvas.getContent());
 
     win.onRestyle(() => {
-      canvas.style = host.theme().body;
+      canvas.update({});
       host.screen.render();
     });
 
     win.onCleanup(() => clearTimers(timers));
-    win.setFocusTarget(canvas);
+    win.setFocusTarget(canvas.element);
     win.focus();
   }
 }
