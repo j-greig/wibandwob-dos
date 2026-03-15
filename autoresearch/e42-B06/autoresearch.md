@@ -117,10 +117,44 @@ Key entry points for audit:
 - COAT: every change must work without the TUI
 - One logical change per commit
 
-## Chosen Focus
+## Chosen Focus: God File Decomposition — `ui-parts.ts`
 
-_Not yet chosen. Agent will fill this in after auditing B01–B05 results._
+### Why This
+
+`ui-parts.ts` is 2,379 lines — the largest file in the codebase. It mixes 5 unrelated
+concerns in one file: layout primitives, chrome components, scroll containers, sidebar/tabs,
+and pattern generators. This directly violates invariant #1 (single source of truth per
+concern) and makes it impossible for an agent to understand one component without reading
+2,400 lines.
+
+The other god files (app-controller 2,334; file-manager 1,623) are harder to split safely —
+app-controller is a composition root, file-manager is a single window. `ui-parts.ts` has
+clear natural seams that map to subdirectory modules.
+
+### Primary Metric
+
+`max_ui_parts_lines` (lower is better) — line count of `src/core/ui-parts.ts` after extraction.
+Target: ≤500 lines (barrel re-exports + layout primitives only).
+
+### Plan
+
+Extract into `src/core/ui/` subdirectory:
+
+| File | Contains | ~Lines |
+|------|----------|--------|
+| `ui-parts-chrome.ts` | createHeaderBar, createStatusBar, createTextBlock, createRule, createFigletDisplay, createAnimatedPanel, createButtonBar | ~400 |
+| `ui-parts-scroll.ts` | createScrollViewport, createBorderedPanel, createCollapsibleBlock, createContentStack | ~400 |
+| `ui-parts-panels.ts` | createSidebarPanel, resolveSidebarWidth, createSelectableList, createInlineSearch, createRestyleBundle, deferRender, createTabs | ~470 |
+| `ui-parts-patterns.ts` | 11 pattern generators, PATTERNS, sinWave, randHistory, xLabels, hslToRgb, ansiGradientLine | ~210 |
+| `ui-parts.ts` (remains) | Layout primitives (clamp, applyRect, createNodePart, createStack, createRow, breakpoints, createGrid) + barrel re-exports from sub-modules | ~500 |
+
+### Constraints
+
+- Every existing import of `ui-parts.ts` must continue to work (barrel re-exports)
+- `microapp-sdk.ts` imports unchanged
+- `bun run health` must pass after each extraction
+- One sub-module per commit
 
 ## What's Been Tried
 
-_Nothing yet — B06 begins after B01–B05._
+_Starting now._
