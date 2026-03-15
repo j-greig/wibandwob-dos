@@ -716,24 +716,28 @@ def run_shader_to_music():
         swell = 0.5 + 0.5 * np.sin(2 * np.pi * t_arr / swell_periods[i])
         tc *= swell
         
-        # Mid-piece breakdown: tracks 0 and 3 (organ + choir) dip for ~4 bars
-        # Creates a sparse section that contrasts with the full texture
-        mid = duration * 0.45  # breakdown at ~45% through
-        break_dur = 4 * (60.0 / genre_cfg["bpm"]) * 4  # 4 bars
-        if i in (0, 3):  # organ and choir drop
-            break_start = int(mid * sr)
-            break_end = int((mid + break_dur) * sr)
-            break_end = min(break_end, n_samples)
-            fade = int(1.5 * sr)
-            # Fade out into breakdown
-            fo_start = max(0, break_start - fade)
-            if break_start - fo_start > 0:
-                tc[fo_start:break_start] *= np.linspace(1, 0, break_start - fo_start)
-            tc[break_start:break_end] *= 0.05  # nearly silent, not dead
-            # Fade back in
-            fi_end = min(break_end + fade, n_samples)
-            if fi_end - break_end > 0:
-                tc[break_end:fi_end] *= np.linspace(0.05, 1, fi_end - break_end)
+        # Two breakdowns — inverse voicings for maximum energy contrast
+        bar_secs = 4 * (60.0 / genre_cfg["bpm"])
+        fade = int(1.5 * sr)
+        
+        def apply_dip(tc, start_sec, dur_sec):
+            s = int(start_sec * sr)
+            e = min(int((start_sec + dur_sec) * sr), n_samples)
+            fo_start = max(0, s - fade)
+            if s - fo_start > 0:
+                tc[fo_start:s] *= np.linspace(1, 0.05, s - fo_start)
+            tc[s:e] *= 0.05
+            fi_end = min(e + fade, n_samples)
+            if fi_end - e > 0:
+                tc[e:fi_end] *= np.linspace(0.05, 1, fi_end - e)
+        
+        # Break 1 @ 20%: bells + glass drop (tracks 1,2), organ+choir remain
+        if i in (1, 2):
+            apply_dip(tc, duration * 0.20, bar_secs * 3)
+        
+        # Break 2 @ 50%: organ + choir drop (tracks 0,3), bells+glass remain
+        if i in (0, 3):
+            apply_dip(tc, duration * 0.50, bar_secs * 4)
 
     # Mix
     print("[shader-music] Mixing...")
