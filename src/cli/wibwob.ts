@@ -300,14 +300,19 @@ async function cmdWrite(windowId?: string) {
     process.exit(1);
   }
 
-  // Build the microapp command prefix
-  const prefix = `microapp.${appType}`;
+  // Build candidate commands: try microapp prefix first, then bare prefix for host windows
+  const microPrefix = `microapp.${appType}`;
+  // For host windows like "wibwob-agent", derive a bare prefix: "agent"
+  const barePrefix = appType.replace(/^wibwob-/, "");
 
   // Try write → send → create fallback convention
   const candidates = [
-    { cmd: `${prefix}.write`, args: { text: trimmed, windowId: id } },
-    { cmd: `${prefix}.send`, args: { message: trimmed } },
-    { cmd: `${prefix}.create`, args: { body: trimmed, title: trimmed.slice(0, 50) } },
+    { cmd: `${microPrefix}.write`, args: { text: trimmed, windowId: id } },
+    { cmd: `${microPrefix}.send`, args: { message: trimmed } },
+    { cmd: `${microPrefix}.create`, args: { body: trimmed, title: trimmed.slice(0, 50) } },
+    // Host window fallbacks (agent.send, companion.send, etc.)
+    { cmd: `${barePrefix}.send`, args: { text: trimmed } },
+    { cmd: `${barePrefix}.write`, args: { text: trimmed } },
   ];
 
   // Get available commands to find which one exists
@@ -328,7 +333,7 @@ async function cmdWrite(windowId?: string) {
   }
 
   process.stderr.write(
-    `App ${appType} does not support write (no ${prefix}.write, .send, or .create command)\n`,
+    `App ${appType} does not support write (no write/send/create command found)\n`,
   );
   process.exit(1);
 }
@@ -378,11 +383,14 @@ async function cmdPlumb(args: string[]) {
     process.exit(1);
   }
 
-  const prefix = `microapp.${dstAppType}`;
+  const microPrefix = `microapp.${dstAppType}`;
+  const barePrefix = dstAppType.replace(/^wibwob-/, "");
   const candidates = [
-    { cmd: `${prefix}.write`, args: { text, windowId: toId } },
-    { cmd: `${prefix}.send`, args: { message: text } },
-    { cmd: `${prefix}.create`, args: { body: text, title: text.slice(0, 50) } },
+    { cmd: `${microPrefix}.write`, args: { text, windowId: toId } },
+    { cmd: `${microPrefix}.send`, args: { message: text } },
+    { cmd: `${microPrefix}.create`, args: { body: text, title: text.slice(0, 50) } },
+    { cmd: `${barePrefix}.send`, args: { text } },
+    { cmd: `${barePrefix}.write`, args: { text } },
   ];
 
   const cmdList = (await api("/commands/list")) as {

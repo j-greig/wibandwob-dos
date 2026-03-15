@@ -41,6 +41,7 @@ export interface AppMenuActions {
   exportFocusedWindowText: (args?: Record<string, unknown>) => void;
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
+  agentSend: (args?: Record<string, unknown>) => void;
   reloadAgentPrompt: () => void;
   reloadMicroapps: () => unknown;
   quit: () => void;
@@ -522,6 +523,15 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     actionKey: "openWibWobAgent",
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Chat", favourite: true }],
     palettePlacement: { order: 130 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "agent.send",
+    label: "Send to Wib&Wob Chat",
+    description: "Send a text message to the Wib&Wob agent chat. Args: text (string, required).",
+    group: "system",
+    actionKey: "agentSend",
     api: true,
     agent: true
   },

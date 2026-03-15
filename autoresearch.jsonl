@@ -1,0 +1,1 @@
+{"run":1,"commit":"c001387","metric":90,"metrics":{},"status":"keep","description":"Comprehensive cross-app plumb: 6 pairs (figlet↔figlet, contour→figlet, figlet→journal, contour→journal, figlet→terminal, plasma→figlet) all pass. 90/90.","timestamp":1773581748365,"segment":0}

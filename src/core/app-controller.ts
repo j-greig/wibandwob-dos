@@ -1891,6 +1891,16 @@ export class TsTuiMvpApp {
         }
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
+      agentSend: (args?: Record<string, unknown>) => {
+        const text = typeof args?.text === "string" ? args.text : typeof args?.message === "string" ? args.message : "";
+        if (!text.trim()) return;
+        const win = this.findWindowByAppType("wibwob-agent");
+        if (win?.writeInput) {
+          win.writeInput(text);
+        } else {
+          this.overlays.flash("No agent chat window open");
+        }
+      },
       reloadAgentPrompt: () => {
         if (!this.activeAgentSession) {
           this.overlays.flash("No active agent session to reload");

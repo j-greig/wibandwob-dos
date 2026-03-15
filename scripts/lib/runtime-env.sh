@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 
 WW_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-WW_DEFAULT_API="${WIBWOB_API:-${WW_API:-http://127.0.0.1:${CONTROL_API_PORT:-8099}}}"
+_ww_detect_port() {
+  local port
+  for port in "${CONTROL_API_PORT:-8099}" 8099 8100 8098; do
+    if curl -sf --max-time 0.5 "http://127.0.0.1:${port}/health" &>/dev/null; then
+      printf '%s' "$port"
+      return
+    fi
+  done
+  printf '%s' "${CONTROL_API_PORT:-8099}"
+}
+
+if [[ -n "${WIBWOB_API:-}" ]]; then
+  WW_DEFAULT_API="$WIBWOB_API"
+elif [[ -n "${WW_API:-}" ]]; then
+  WW_DEFAULT_API="$WW_API"
+else
+  WW_DEFAULT_API="http://127.0.0.1:$(_ww_detect_port)"
+fi
 
 ww_api_base() {
   printf '%s\n' "$WW_DEFAULT_API"

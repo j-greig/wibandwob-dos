@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const PRIMER_ROOTS = ["modules", "modules-private", "docs"] as const;
+export const PRIMER_ROOTS = ["microapps", "microapps-private", "docs"] as const;
 
 const APP_FILE = fileURLToPath(import.meta.url);
 const CONFIG_ROOT = path.dirname(APP_FILE);

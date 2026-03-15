@@ -450,6 +450,7 @@ export function openTextViewerWindow(params: {
     skippedCommentLines: m?.skippedCommentLines,
     contentPreview: params.content.split("\n").slice(0, 8).join("\n")
   });
+  frame.captureText = () => params.content;
   frame.setFocusTarget(viewer);
   frame.refresh = () => setViewportContent(viewer, currentContent);
   frame.onRestyle = createRestyleBundle([
