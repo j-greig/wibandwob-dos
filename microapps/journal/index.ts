@@ -503,16 +503,17 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       detailBox.hide();
     }
 
-    // Build list items
+    // Build list items with colored peer glyphs
     const items: string[] = [];
-    const maxTitleW = twoPane ? Math.floor(w * 0.40) - 16 : w - 20;
+    const maxTitleW = twoPane ? Math.floor(w * 0.38) - 16 : w - 20;
     for (const e of entries) {
       const icon = KIND_ICON[e.kind] || "░";
       const glyph = PEER_GLYPH[e.peer] || "·";
+      const fg = peerColor(e.peer, th);
       const age = timeAgo(e.updatedAt);
       const title = truncate(e.title, maxTitleW);
       const tagStr = e.tags.length > 0 ? ` {${accent}-fg}${e.tags.map(t => `#${t}`).join(" ")}{/${accent}-fg}` : "";
-      items.push(` ${glyph} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
+      items.push(` {${fg}-fg}${glyph}{/${fg}-fg} ${icon} ${title}  {${muted}-fg}${age}{/${muted}-fg}${tagStr}`);
     }
     if (items.length === 0) {
       items.push(`  {${muted}-fg}no entries yet — press n to create{/${muted}-fg}`);
