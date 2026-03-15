@@ -111,4 +111,29 @@ host-delegated microapp wrapper.
 
 ## What's Been Tried
 
-_Nothing yet — this loop starts after E042 S07–S10._
+### Blessed Elimination — Easy Wins (31→27)
+Migrated 4 microapps to pure SDK Handle API (zero blessed imports):
+- **demo-heartbeat** (159→87 lines) — createTextViewer + createStatusBar
+- **workspace-beacon** (272 lines) — createHeaderBar + createStatusBar + createTextViewer + createRule
+- **command-lab** (220 lines) — createSplitView + createListPanel + createScrollView + createHeaderBar + createStatusBar
+- **generative-art** (105 lines) — createTextViewer replacing blessed.box canvas
+
+### Blessed Elimination — Remaining 27 Categorized
+The remaining microapps fall into categories that can't trivially drop blessed:
+1. **Render engines** (7): plasma, contour-studio, tr808, monster-cam, spore-clock, asciicker, terrarium — need blessed for canvas/pixel rendering. **Exempt.**
+2. **Complex apps** (8): journal, wiretext, symbient-twitter, llm-orch-studio, sy2-chronicles, zine, figlet-banner, demo-glitchbox — 500+ lines, deep blessed integration. Need per-app effort.
+3. **Layout tests** (4): layout-probe, demo-layout-stress-test-pi/codex, demo-e026-demo — intentionally exercise LayoutPart API. **Exempt.**
+4. **Chat/input apps** (3): world-chatroom, terminal, demo-patchbay-lab — blessed keypress/input. Need createInputLine enhancements first.
+5. **Remaining** (5): demo-touchlab-mvp, terrarium-life, wibwobworld, contour-studio — mixed.
+
+**Realistic blessed-free target: ~15-18 microapps** (after exemptions for render engines + layout tests). Current: 27. Gap: ~10 more migrations of medium-complexity apps.
+
+### Key Learning
+Most remaining blessed usage falls into two categories the Handle API can't replace yet:
+1. **Canvas rendering** — raw blessed.box used as a frame buffer for animations (plasma, contour, tr808). These need blessed.
+2. **Deep input handling** — blessed keypress events, inputOnFocus, cursor management. The SDK `createInputLine` covers simple cases but not chat-style multi-line input.
+
+**To move the metric further, the SDK needs:**
+- `createCanvas(parent, opts)` — a blessed.box wrapper for render-engine use (legitimises the pattern)
+- Enhanced `createInputLine` with multi-line support and keypress forwarding
+- `createChatView(parent, opts)` — transcript + input combo for chat microapps
