@@ -231,7 +231,7 @@ export function renderSearchResultPreview(
   result: { file: string; line: number; text: string },
 ): PreviewResult {
   const filePath = result.file;
-  const header = `{bold}${path.basename(filePath)}{/bold}:{result.line}`;
+  const header = `{bold}${path.basename(filePath)}{/bold}:${result.line}`;
 
   try {
     const content = safeReadFile(filePath) ?? "";

@@ -17,7 +17,7 @@ import { createScrollbar } from "../../core/ui-primitives.js";
 import { createRestyleBundle, type RestyleEntry } from "../../ui/containers.js";
 import { setViewportContent } from "../browser-utils.js";
 
-import type { FileManagerParams, FileEntry, SortField } from "./types.js";
+import type { FileManagerParams, FileEntry, FileAction, SortField } from "./types.js";
 import { SORT_CYCLE } from "./types.js";
 import { formatSize, escapeBlessedTags } from "./icons.js";
 import { createGitState, refreshGitStatus, gitSummary } from "./git.js";
@@ -255,7 +255,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
     return getSelectedEntry()?.fullPath ?? null;
   }
 
-  function dispatchAction(action: string): void {
+  function dispatchAction(action: FileAction | string): void {
     const entry = getSelectedEntry();
     const filePath = entry?.fullPath ?? null;
 
@@ -408,11 +408,11 @@ export function openFileManagerV3(params: FileManagerParams): void {
   let contextMenuBox: blessed.Widgets.BoxElement | null = null;
 
   function closeContextMenu(): void {
-    if (contextMenuBox) {
-      contextMenuBox.destroy();
-      contextMenuBox = null;
-      params.screen.render();
-    }
+    if (!contextMenuBox) return;
+    const box = contextMenuBox;
+    contextMenuBox = null; // null BEFORE destroy to prevent re-entry from blur
+    box.destroy();
+    params.screen.render();
   }
 
   function showContextMenu(x: number, y: number): void {
@@ -589,6 +589,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
   ] as RestyleEntry[]).restyle;
 
   frame.cleanup = () => {
+    frame.frame.removeAllListeners("resize");
     search.destroy();
     closeContextMenu();
     destroyAllColumns();

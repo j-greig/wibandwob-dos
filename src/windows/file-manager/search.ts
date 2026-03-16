@@ -4,7 +4,7 @@
  * Spawns `rg` as a child process, parses results incrementally,
  * and calls back with batches. No blessed dependencies.
  */
-import type { ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { SearchResult } from "./types.js";
 
 export interface SearchEngine {
@@ -53,7 +53,6 @@ export function createSearchEngine(callbacks: SearchCallbacks): SearchEngine {
 
     isActive = true;
 
-    const { spawn } = require("node:child_process") as typeof import("node:child_process");
     const args = ["--no-heading", "--line-number", "--color=never", "--max-count=200"];
     if (glob) args.push("--glob", glob);
     args.push("--", query, cwd);
