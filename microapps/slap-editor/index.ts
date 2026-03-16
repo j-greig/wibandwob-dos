@@ -547,14 +547,12 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         continue;
       }
 
-      // Gutter — active line shows absolute number bold, others show relative distance
+      // Gutter — absolute line numbers, current line highlighted
       const isCurrentLine = row === cursorRow;
+      const lineNum = String(row + 1).padStart(gutterW - 1);
       if (isCurrentLine) {
-        const lineNum = String(row + 1).padStart(gutterW - 1);
         gutterLines.push(`${currentLineGutterBg}${gutterActive}${lineNum} ${A.r}`);
       } else {
-        const relDist = Math.abs(row - cursorRow);
-        const lineNum = String(relDist).padStart(gutterW - 1);
         gutterLines.push(`${gutterAccent}${lineNum} ${A.r}`);
       }
 
