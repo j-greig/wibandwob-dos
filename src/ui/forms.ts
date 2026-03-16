@@ -830,7 +830,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
     border: "line",
     style: getStyle(false),
     value: value || undefined,
-  } as any);
+  } as Record<string, unknown>);
 
   function getStyle(focused: boolean) {
     const t = theme();
@@ -845,7 +845,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
     // Show placeholder when empty and not focused
     if (!value && !focused && placeholder) {
       node.setValue(placeholder);
-    } else if ((node as any).getValue?.() === placeholder) {
+    } else if (((node as Record<string, any>)).getValue?.() === placeholder) {
       node.setValue(value);
     }
   }
@@ -855,7 +855,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
     if (disabled) return;
     // Defer to let blessed update internal value
     setTimeout(() => {
-      const newVal = (node as any).getValue?.() ?? "";
+      const newVal = ((node as Record<string, any>)).getValue?.() ?? "";
       if (newVal !== value && newVal !== placeholder) {
         const prev = value;
         value = newVal;
@@ -866,7 +866,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
 
   node.on("focus", () => {
     if (disabled) { node.screen?.focusNext?.(); return; }
-    if ((node as any).getValue?.() === placeholder) {
+    if (((node as Record<string, any>)).getValue?.() === placeholder) {
       node.setValue(value);
     }
     applyVisuals();
@@ -875,7 +875,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
   node.on("blur", applyVisuals);
 
   return {
-    node: node as any,
+    node: node as blessed.Widgets.BoxElement,
     layout(rect: Rect) {
       node.position.top = rect.top;
       node.position.left = rect.left;
@@ -891,7 +891,7 @@ export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
       if (props.placeholder !== undefined) placeholder = props.placeholder;
       if (props.disabled !== undefined) {
         disabled = props.disabled;
-        (node as any).focusable = !disabled;
+        ((node as Record<string, any>)).focusable = !disabled;
       }
       applyVisuals();
     },

@@ -65,7 +65,7 @@ export function createScrollViewport(
         parent: container,
         top: 0,
         left: 0,
-        width: "100%" as any,
+        width: "100%" as unknown as number,
         height: headerHeight,
         style: theme().header,
       })
@@ -75,7 +75,7 @@ export function createScrollViewport(
     parent: container,
     top: headerHeight,
     left: 0,
-    width: "100%" as any,
+    width: "100%" as unknown as number,
     height: 0,
     mouse: true,
     keys: true,
@@ -90,7 +90,7 @@ export function createScrollViewport(
         parent: container,
         bottom: 0,
         left: 0,
-        width: "100%" as any,
+        width: "100%" as unknown as number,
         height: footerHeight,
         style: theme().header,
       })
@@ -160,7 +160,7 @@ export function createScrollViewport(
     },
 
     scrollPercent() {
-      return (viewport as any).getScrollPerc?.() ?? 0;
+      return (viewport as Record<string, any>).getScrollPerc?.() ?? 0;
     },
   };
 }
@@ -257,11 +257,11 @@ export function createBorderedPanel(
   function applyColors() {
     const th = getTheme();
     const borderFg = active ? th.titleBarFocused.bg : th.windowBorderUnfocused.fg;
-    (outer as any).style    = { fg: borderFg, bg: th.body.bg };
-    (titleBox as any).style = active
+    (outer as Record<string, any>).style    = { fg: borderFg, bg: th.body.bg };
+    (titleBox as Record<string, any>).style = active
       ? { fg: th.titleBarFocused.fg, bg: th.titleBarFocused.bg, bold: true }
       : th.body;
-    (inner as any).style = th.body;
+    (inner as Record<string, any>).style = th.body;
   }
 
   return {
@@ -665,29 +665,29 @@ export function createSidebarPanel(opts: SidebarPanelOptions): SidebarPanel {
 
     if (isOpenState) {
       sidebar.show();
-      sidebar.width = sw as any;
-      sidebar.height = "100%" as any;
+      sidebar.width = sw as unknown as number;
+      sidebar.height = "100%" as unknown as number;
       if (side === "left") {
-        sidebar.left = 0 as any;
-        (sidebar as any).right = undefined;
+        sidebar.left = 0 as unknown as number;
+        (sidebar as Record<string, any>).right = undefined;
       } else {
-        sidebar.left = mw as any;
-        (sidebar as any).right = undefined;
+        sidebar.left = mw as unknown as number;
+        (sidebar as Record<string, any>).right = undefined;
       }
       if (dividerNode) {
         dividerNode.show();
-        dividerNode.left = dLeft as any;
-        dividerNode.width = 1 as any;
-        dividerNode.height = "100%" as any;
+        dividerNode.left = dLeft as unknown as number;
+        dividerNode.width = 1 as unknown as number;
+        dividerNode.height = "100%" as unknown as number;
       }
     } else {
       sidebar.hide();
       if (dividerNode) dividerNode.hide();
     }
 
-    main.left = mLeft as any;
-    main.width = mw as any;
-    main.height = "100%" as any;
+    main.left = mLeft as unknown as number;
+    main.width = mw as unknown as number;
+    main.height = "100%" as unknown as number;
   }
 
   applyLayout();
@@ -1071,8 +1071,8 @@ export function createLayoutTabs(
       const idx = i;
       parent.key([`${i + 1}`], () => switchTo(idx));
     }
-    (parent as any).input = true;
-    (parent as any).keys = true;
+    (parent as Record<string, any>).input = true;
+    (parent as Record<string, any>).keys = true;
   }
 
   renderBar();

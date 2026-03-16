@@ -152,24 +152,24 @@ function renderInline(tokens: Token[]): string {
   for (const t of tokens) {
     switch (t.type) {
       case "text":
-        out += (t as any).tokens?.length ? renderInline((t as any).tokens) : ((t as any).text ?? "");
+        out += ((t as Record<string, any>)).tokens?.length ? renderInline(((t as Record<string, any>)).tokens) : (((t as Record<string, any>)).text ?? "");
         break;
       case "paragraph":
-        out += renderInline((t as any).tokens ?? []);
+        out += renderInline(((t as Record<string, any>)).tokens ?? []);
         break;
       case "strong":
-        out += theme.bold(renderInline((t as any).tokens ?? []));
+        out += theme.bold(renderInline(((t as Record<string, any>)).tokens ?? []));
         break;
       case "em":
-        out += theme.italic(renderInline((t as any).tokens ?? []));
+        out += theme.italic(renderInline(((t as Record<string, any>)).tokens ?? []));
         break;
       case "codespan":
-        out += theme.code((t as any).text ?? "");
+        out += theme.code(((t as Record<string, any>)).text ?? "");
         break;
       case "link": {
-        const linkText = renderInline((t as any).tokens ?? []);
-        const href = (t as any).href ?? "";
-        const text = (t as any).text ?? "";
+        const linkText = renderInline(((t as Record<string, any>)).tokens ?? []);
+        const href = ((t as Record<string, any>)).href ?? "";
+        const text = ((t as Record<string, any>)).text ?? "";
         const hrefComp = href.startsWith("mailto:") ? href.slice(7) : href;
         // Show link text underlined; only show URL for bare-URL links
         // or external links that differ substantially from the text.
@@ -187,9 +187,9 @@ function renderInline(tokens: Token[]): string {
         break;
       }
       case "br": out += "\n"; break;
-      case "del": out += theme.strikethrough(renderInline((t as any).tokens ?? [])); break;
-      case "html": out += (t as any).raw ?? ""; break;
-      default: if ((t as any).text) out += (t as any).text;
+      case "del": out += theme.strikethrough(renderInline(((t as Record<string, any>)).tokens ?? [])); break;
+      case "html": out += ((t as Record<string, any>)).raw ?? ""; break;
+      default: if (((t as Record<string, any>)).text) out += ((t as Record<string, any>)).text;
     }
   }
   return out;

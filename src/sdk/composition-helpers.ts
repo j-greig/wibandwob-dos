@@ -233,7 +233,7 @@ export function createListPanel(
       bg: t.body.bg,
       selected: { fg: t.selected.fg, bg: t.selected.bg },
     },
-  } as any);
+  } as Record<string, unknown>);
 
   el.on("select", (_item: any, index: number) => {
     const text = opts.items[index] ?? "";
@@ -245,16 +245,16 @@ export function createListPanel(
     update(o) {
       if (o.items !== undefined) {
         opts.items = o.items;
-        el.setItems(o.items as any);
+        el.setItems(o.items as string[]);
       }
       if (o.selected !== undefined) el.select(o.selected);
       const t2 = theme();
       el.style.fg = t2.body.fg;
       el.style.bg = t2.body.bg;
-      (el.style as any).selected = { fg: t2.selected.fg, bg: t2.selected.bg };
+      ((el.style as Record<string, any>)).selected = { fg: t2.selected.fg, bg: t2.selected.bg };
     },
     getSelected() {
-      return (el as any).selected ?? 0;
+      return (el as Record<string, any>).selected ?? 0;
     },
     onSelect(cb) {
       selectCallbacks.push(cb);
@@ -776,7 +776,7 @@ export function createInputLine(
     keys: true,
     inputOnFocus: true,
     style: t.input ?? t.body,
-  } as any);
+  } as Record<string, unknown>);
 
   if (opts.placeholder) {
     el.setContent(opts.placeholder);
@@ -789,7 +789,7 @@ export function createInputLine(
   });
 
   return {
-    element: el as any,
+    element: el as blessed.Widgets.BoxElement,
     getValue() {
       return el.getValue();
     },

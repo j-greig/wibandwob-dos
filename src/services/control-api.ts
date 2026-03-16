@@ -509,12 +509,12 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      const id = typeof body.id === "string" ? body.id : "";
       if (!id) {
         return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
-      const rawArgs = typeof (body as any).args === "object" && (body as any).args !== null
-        ? (body as any).args as Record<string, unknown>
+      const rawArgs = typeof body.args === "object" && body.args !== null
+        ? body.args as Record<string, unknown>
         : undefined;
       // Validate args against Zod schema if the command defines one
       let args = rawArgs;
@@ -549,11 +549,11 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/figlet/open-default") {
-      const text = typeof (body as any).text === "string" && (body as any).text.trim()
-        ? (body as any).text.trim()
+      const text = typeof body.text === "string" && body.text.trim()
+        ? body.text.trim()
         : "WIB WOB";
-      const font = typeof (body as any).font === "string" && (body as any).font.trim()
-        ? (body as any).font.trim()
+      const font = typeof body.font === "string" && body.font.trim()
+        ? body.font.trim()
         : undefined;
       const result = this.runApiCommand(
         "figlet.open",
@@ -568,19 +568,19 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/zine/open") {
-      const filePath = typeof (body as any).filePath === "string" && (body as any).filePath.trim()
-        ? (body as any).filePath.trim()
+      const filePath = typeof body.filePath === "string" && body.filePath.trim()
+        ? body.filePath.trim()
         : undefined;
       let args: Record<string, unknown> | undefined;
       if (filePath) {
         args = { filePath };
-      } else if (typeof (body as any).index === "number") {
+      } else if (typeof body.index === "number") {
         const listed = this.runApiCommand("microapp.wibwob.zine.list-canvases");
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
         }
         const files = (listed.result as any)?.files;
-        const picked = Array.isArray(files) ? files.find((f: any) => Number(f?.index) === Number((body as any).index)) : undefined;
+        const picked = Array.isArray(files) ? files.find((f: any) => Number(f?.index) === Number(body.index)) : undefined;
         if (!picked?.filePath) {
           return Response.json({ ok: false, error: "Invalid zine canvas index" }, { status: 400 });
         }
@@ -641,11 +641,11 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
-        ok: this.deps.windows.focus(Number((body as any).id)),
+        ok: this.deps.windows.focus(Number(body.id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
-      const b = body as any;
+      const b = body as Record<string, unknown>;
       if (!Number.isFinite(Number(b.left)) || !Number.isFinite(Number(b.top))) {
         return Response.json(
           { ok: false, error: "left and top are required numbers" },
@@ -661,7 +661,7 @@ export class ControlApiService {
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
-      const b = body as any;
+      const b = body as Record<string, unknown>;
       if (!Number.isFinite(Number(b.width)) || !Number.isFinite(Number(b.height))) {
         return Response.json(
           { ok: false, error: "width and height are required numbers" },
@@ -678,20 +678,20 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
-        ok: this.deps.windows.close(Number((body as any).id)),
+        ok: this.deps.windows.close(Number(body.id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/maximize") {
       return Response.json({
-        ok: this.deps.windows.toggleMaximize(Number((body as any).id)),
+        ok: this.deps.windows.toggleMaximize(Number(body.id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/batch") {
       // Body: { ops: Array<{ id, left?, top?, width?, height?, close? }> }
       // Each op can move, resize, or close a window. All applied in order.
-      const ops = (body as any).ops as Array<{
+      const ops = body.ops as Array<{
         id: number;
         left?: number; top?: number;
         width?: number; height?: number;
@@ -740,17 +740,17 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
         ok: this.deps.windows.sendInput(
-          Number((body as any).id),
-          String((body as any).input ?? ""),
-          (body as any).sender ? String((body as any).sender) : undefined,
+          Number(body.id),
+          String(body.input ?? ""),
+          body.sender ? String(body.sender) : undefined,
         ),
       });
     }
     // Dedicated endpoint for session-to-agent messages — always requires sender
     if (request.method === "POST" && url.pathname === "/windows/agent-message") {
-      const sender = (body as any).sender ? String((body as any).sender) : undefined;
-      const text = String((body as any).text ?? (body as any).input ?? "");
-      const id = Number((body as any).id);
+      const sender = body.sender ? String(body.sender) : undefined;
+      const text = String(body.text ?? body.input ?? "");
+      const id = Number(body.id);
       return Response.json({
         ok: this.deps.windows.sendInput(id, text, sender),
       });
@@ -758,14 +758,14 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/editor/write") {
       return Response.json({
         ok: this.deps.windows.writeEditorText(
-          Number((body as any).id),
-          String((body as any).text ?? ""),
+          Number(body.id),
+          String(body.text ?? ""),
         ),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
-      const id = Number((body as any).id);
+      const id = Number(body.id);
       const text = this.deps.windows.captureText(id);
       if (!text) return Response.json({ ok: false, path: null });
       // File export is a control-API concern, not a facade concern
@@ -773,8 +773,8 @@ export class ControlApiService {
         ? path.resolve(this.identity.capturesDir)
         : path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
-      const name = typeof (body as any).name === "string" ? (body as any).name
-        : typeof (body as any).label === "string" ? (body as any).label
+      const name = typeof body.name === "string" ? body.name
+        : typeof body.label === "string" ? body.label
         : `window-${id}`;
       const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
       const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
@@ -813,7 +813,7 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/select") {
-      const index = Number((body as any).index);
+      const index = Number(body.index);
       if (!Number.isFinite(index)) {
         return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
       }
@@ -825,13 +825,13 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
-      const rawName = (body as any).name;
+      const rawName = body.name;
       return Response.json(
         this.deps.workspace.save(typeof rawName === "string" ? rawName : undefined),
       );
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
-      const rawName = (body as any).name;
+      const rawName = body.name;
       return Response.json(
         this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
       );
