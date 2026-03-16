@@ -178,8 +178,10 @@ function renderOverview(state: InspectorState): string {
   healthLines.push(sectionHeader("HEALTH", colW));
   healthLines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}${delta(s.stats.render.fps, prev?.stats.render.fps)}`, 12));
   healthLines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms${delta(s.stats.render.avgFrameMs, prev?.stats.render.avgFrameMs)}`, 12));
-  healthLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB ${progressBar(s.stats.rssMb, 512, 20)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`, 12));
-  healthLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB ${progressBar(s.stats.heapUsedMb, 256, 20)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`, 12));
+  const rssMax = Math.max(512, Math.ceil(s.stats.rssMb / 128) * 128);
+  const heapMax = Math.max(256, Math.ceil(s.stats.heapUsedMb / 64) * 64);
+  healthLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}/${rssMax}MB ${progressBar(s.stats.rssMb, rssMax, 18)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`, 12));
+  healthLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}/${heapMax}MB ${progressBar(s.stats.heapUsedMb, heapMax, 18)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`, 12));
   healthLines.push(sectionFooter(colW));
 
   const agentLines: string[] = [];
@@ -279,8 +281,20 @@ function renderCommands(commands: CommandListItem[]): string {
   if (commands.length === 0) return "  ◌ Loading commands…";
   const rows = commands.slice().sort((a, b) => a.id.localeCompare(b.id));
   const ready = rows.filter((c) => c.available).length;
+
+  // Namespace summary
+  const ns = new Map<string, number>();
+  for (const c of rows) {
+    const prefix = c.id.split(".").slice(0, -1).join(".") || c.id;
+    ns.set(prefix, (ns.get(prefix) ?? 0) + 1);
+  }
+  const topNs = [...ns.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const nsSummary = topNs.map(([k, v]) => `${k} ${v}`).join(" · ");
+
   const lines: string[] = [];
   lines.push(sectionHeader(`COMMANDS (${rows.length} total, ${ready} ready)`));
+  lines.push(`│  ${nsSummary}`);
+  lines.push(`│`);
   lines.push(`│ ${"ID".padEnd(34)} ${"SURF".padEnd(12)} ${"AVAIL".padEnd(6)} LABEL`);
   lines.push(`│ ${"─".repeat(34)} ${"─".repeat(12)} ${"─".repeat(6)} ${"─".repeat(20)}`);
   for (const c of rows) {
