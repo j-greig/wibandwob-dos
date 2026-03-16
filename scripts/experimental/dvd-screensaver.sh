@@ -19,6 +19,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 API="${WIBWOB_API:-http://127.0.0.1:8099}"
 TEXT="${1:-DVD}"
 FONT="${2:-banner3}"
@@ -43,7 +46,7 @@ curl -sf -X POST "$API/view/figlet/open-default" \
 sleep 0.8
 
 # ── Get window ID (last line from windows -q) ──
-W="$HOME/Repos/wibandwob-dos/src/cli/wibwob.ts"
+W="$APP_ROOT/src/cli/wibwob.ts"
 FID=$("$W" windows -q 2>/dev/null | tail -1)
 
 if [ -z "$FID" ]; then

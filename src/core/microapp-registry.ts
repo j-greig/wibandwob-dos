@@ -28,6 +28,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.world":              "core",
   "wibwob.terminal":           "core",
   "wibwob.chatroom":           "core",
+  "wibwob.pi-sessions":        "core",
 
   // ── Beta: functional, opt-in ───────────────────────────────────────
   "wibwob.plasma":             "beta",
