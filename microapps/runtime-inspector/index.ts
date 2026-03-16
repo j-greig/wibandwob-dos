@@ -185,7 +185,7 @@ function renderOverview(state: InspectorState): string {
   healthLines.push(sectionFooter(colW));
 
   const agentLines: string[] = [];
-  agentLines.push(sectionHeader("AGENT", colW));
+  agentLines.push(sectionHeader("WIB&WOB AGENT", colW));
   agentLines.push(kvLine("status", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
   agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
   agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
@@ -371,7 +371,7 @@ function renderStats(state: InspectorState): string {
 
   // ── Agent + Scramble (two-column) ──
   const agentLines: string[] = [];
-  agentLines.push(sectionHeader("AGENT", colW));
+  agentLines.push(sectionHeader("WIB&WOB AGENT", colW));
   agentLines.push(kvLine("active", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
   agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
   agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
