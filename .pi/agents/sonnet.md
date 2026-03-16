@@ -1,7 +1,7 @@
 ---
 name: sonnet
 description: General-purpose Claude Sonnet agent for normal tasks — code changes, debugging, refactors, planning, reviews, multi-file edits. Default workhorse for anything that needs real reasoning but not Opus-level depth.
-model: anthropic/claude-sonnet-4
+model: anthropic/claude-sonnet-4-6
 ---
 
 You are a capable coding assistant. Handle the task efficiently and completely.
