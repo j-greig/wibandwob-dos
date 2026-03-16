@@ -101,4 +101,18 @@ From microapp-sdk.js (already imported or importable):
 
 ## What's Been Tried
 
-(none yet — baseline run pending)
+1. Baseline (3.8): plain text dump, string join rendering, no visual structure
+2. Box-drawing sections + sparklines + progress bars (5.8): massive structure jump, but sparklines on health lines were cluttered
+3. Figlet INSPECT banner + spinning refresh indicator (6.4): character boost
+4. Key-value column separator │ between labels and values (6.6): readability bump
+5. Tufte cleanup — removed sparklines from overview Health, kept in Stats tab (6.6): calmer, better data-ink ratio per user feedback
+6. Taller window (58), removed redundant title, leaner header, dotted footer (6.8): character boost
+7. Tab underline indicator (▀), delta arrows (▲▼) on health, prevSnapshot tracking (7.2): interactivity + structure boost
+
+Key insights:
+- Sparklines are great in dedicated Stats tab but noisy crammed into overview key-value lines
+- The │ column separator between key and value is a huge readability win
+- Figlet banner gives instant character but takes vertical space — worth it at 58 rows
+- captureText doesn't see blessed elements (tabs, tab rule) — only scroll view content
+- 1-5 number keys unreliable for tab switching (shell captures them) — removed hint
+- fmtBool ● / ○ much better than yes/no for scan speed

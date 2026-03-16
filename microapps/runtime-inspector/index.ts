@@ -102,6 +102,15 @@ function delta(current: number, previous: number | undefined): string {
   return "";
 }
 
+function fmtUptime(totalFrames: number, fps: number): string {
+  const secs = fps > 0 ? Math.floor(totalFrames / fps) : 0;
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
 const SPIN = ["◐", "◓", "◑", "◒"];
 function spinChar(tick: number): string {
   return SPIN[tick % SPIN.length]!;
@@ -175,10 +184,10 @@ function renderOverview(state: InspectorState): string {
   lines.push("");
 
   // ── Footer ──
-  const uptime = s.stats.render.totalFrames;
   const winCount = s.state.windows.length;
+  const uptime = fmtUptime(s.stats.render.totalFrames, s.stats.render.fps);
   lines.push(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
-  lines.push(`  ${winCount} windows · ${state.commands.length} commands · ${uptime} frames · ${state.updatedAt}`);
+  lines.push(`  ${winCount} windows · ${state.commands.length} cmds · up ${uptime} · ${state.updatedAt}`);
 
   return lines.join("\n");
 }
@@ -229,8 +238,9 @@ function renderWindows(s: RuntimeInspectionSnapshot | undefined): string {
     const title = clip(w.title, 28).padEnd(28);
     const pos = `@${w.left},${w.top}`.padEnd(9);
     const size = `${w.width}x${w.height}`.padEnd(8);
-    const focus = w.focused ? "◆" : "·";
-    lines.push(`│ ${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${focus}`);
+    const marker = w.focused ? "◆" : "·";
+    const prefix = w.focused ? "▸" : " ";
+    lines.push(`│${prefix}${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${marker}`);
   }
   lines.push(sectionFooter());
   return lines.join("\n");
@@ -415,8 +425,10 @@ function openRuntimeInspector(host: MicroappHost) {
     const agentIcon = state.snapshot?.stats.agent.active ? "● AGENT" : "○ idle";
     const winCount = state.snapshot?.state.windows.length ?? 0;
     const fps = state.snapshot?.stats.render.fps.toFixed(0) ?? "—";
+    const snap = state.snapshot;
+    const up = snap ? fmtUptime(snap.stats.render.totalFrames, snap.stats.render.fps) : "—";
     header.update({
-      left: ` ${spin}  ${app?.instanceId ?? "?"}  ◆ ${winCount} wins  ${agentIcon}  ${fps} fps`,
+      left: ` ${spin}  ${app?.instanceId ?? "?"}  ◆ ${winCount} wins  ${agentIcon}  ${fps} fps  up ${up}`,
       right: `${state.updatedAt} `,
     });
     const tabName = paneKeys[tabs.getActive()] ?? "overview";
