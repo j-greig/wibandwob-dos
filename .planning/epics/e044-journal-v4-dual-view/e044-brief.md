@@ -39,7 +39,7 @@ are 130–425).
 |------|------|
 | `microapps/journal/index.ts` | Main implementation (~1430 lines) |
 | `microapps/journal/microapp.json` | Registration metadata |
-| `src/core/app-controller.ts:1695` | "No editor window found" flash source |
+| `src/core/app-controller.ts:1592` | "No editor window found" flash source |
 | `scratch/journal-v2/entries/*.json` | Structured entry storage |
 | `~/.pi/agent/sessions/{encoded-cwd}/` | Raw pi session JSONL logs |
 | `.planning/spikes/spk-journal-v4-auto-journal/spike.md` | Prior spike with design options |
@@ -83,6 +83,9 @@ on active mode, muted on inactive. Clicking either label switches view mode.
 #### S02 — `journal.auto-capture` command
 **Status:** not-started
 
+**First deliverable**: register `journal.auto-capture` in `command-catalog.ts`
+with proper schema, then implement the handler.
+
 Scan `~/.pi/agent/sessions/{encoded-cwd}/` for sessions newer than the last
 capture timestamp. For each new session, create a structured journal entry with:
 - Title derived from first user message
@@ -95,16 +98,22 @@ capture timestamp. For each new session, create a structured journal entry with:
 
 Auto-captured entries display a `⚡` icon in the JRN list.
 
-- [ ] AC-06: `journal.auto-capture` command exists and is API-callable.
-  Test: `POST /commands/run { "id": "journal.auto-capture" }` → `{ ok, captured: N }`.
-- [ ] AC-07: New sessions since last capture produce entries in `scratch/journal-v2/entries/`.
+- [ ] AC-06: `journal.auto-capture` registered in `command-catalog.ts` with args schema.
+  Test: `wibwob commands -q | grep auto-capture` returns the command.
+- [ ] AC-07: Command is API-callable: `POST /commands/run { "id": "journal.auto-capture" }` → `{ ok, captured: N }`.
+  Test: API call returns valid response.
+- [ ] AC-08: New sessions since last capture produce entries in `scratch/journal-v2/entries/`.
   Test: Run a pi session, then auto-capture → new `.json` file with `meta.sessionId`.
-- [ ] AC-08: Running auto-capture twice doesn't duplicate entries.
+- [ ] AC-09: Running auto-capture twice doesn't duplicate entries.
   Test: Run twice → entry count unchanged.
-- [ ] AC-09: Auto-captured entries show `⚡` icon in Journal list view.
+- [ ] AC-10: Auto-captured entries show `⚡` icon in Journal list view.
   Test: Visual verify icon next to auto-captured entry.
-- [ ] AC-10: Entry body includes files changed and tools used.
+- [ ] AC-11: Entry body includes files changed and tools used.
   Test: Read entry → body contains file paths and tool names from session.
+- [ ] AC-12: Skips incomplete sessions (no end marker or modified within last 60s).
+  Test: Start a pi session (don't finish) → auto-capture → session not captured.
+- [ ] AC-13: Integration test covers the command end-to-end.
+  Test: `bun run test:integration` includes `journal.auto-capture` test.
 
 #### S03 — Cross-link: `⚡` entry → LOG view filtered to source session
 **Status:** not-started
@@ -112,9 +121,9 @@ Auto-captured entries display a `⚡` icon in the JRN list.
 When reading an auto-captured entry in JRN view, a keybind (e.g. `L`) or
 clickable `⚡` icon jumps to LOG view filtered to that specific session.
 
-- [ ] AC-11: Pressing `L` on an auto-captured entry switches to LOG view showing that session.
+- [ ] AC-14: Pressing `L` on an auto-captured entry switches to LOG view showing that session.
   Test: Select `⚡` entry → press `L` → viewMode = "sessions", selected session matches `meta.sessionId`.
-- [ ] AC-12: Non-auto-captured entries ignore the `L` key.
+- [ ] AC-15: Non-auto-captured entries ignore the `L` key.
   Test: Select a human entry → press `L` → nothing happens.
 
 ### F03 — Session Tree Navigation
@@ -126,13 +135,13 @@ Pi sessions are stored as trees — `/tree` navigates branches, all branches liv
 in a single file. Expose this in LOG view: show branch points, allow navigating
 to any previous point, filter by message type, bookmark labels.
 
-- [ ] AC-13: LOG view detects session files with tree structure (multiple branches).
+- [ ] AC-16: LOG view detects session files with tree structure (multiple branches).
   Test: Open a session with branches → tree indicator visible.
-- [ ] AC-14: Branch points are navigable — user can select a branch to follow.
+- [ ] AC-17: Branch points are navigable — user can select a branch to follow.
   Test: Navigate to branch point → list of branches shown → select one.
-- [ ] AC-15: Filter by message type (user, assistant, tool_call, tool_result).
+- [ ] AC-18: Filter by message type (user, assistant, tool_call, tool_result).
   Test: Apply filter → only matching messages shown.
-- [ ] AC-16: Entries can be bookmarked/labelled within a session.
+- [ ] AC-19: Entries can be bookmarked/labelled within a session.
   Test: Press `B` on a message → bookmark icon appears; bookmarks persist across reloads.
 
 ### F04 — Bug Fixes & Bloat Audit
@@ -142,14 +151,17 @@ to any previous point, filter by message type, bookmark labels.
 
 When Journal is the focused window and an `editor.write` command fires (e.g.
 from agent tools), the Journal window doesn't have `writeInput`, so
-`app-controller.ts:1695` flashes "No editor window found". Fix: either add
-`writeInput` to Journal (so it can receive text in edit mode) or make the flash
-smarter (skip non-editor windows gracefully, try other windows).
+`app-controller.ts:1592` flashes "No editor window found".
 
-- [ ] AC-17: With Journal focused, `editor.write` does not flash error.
+**Fix**: Make the `editor.write` dispatch smarter — skip non-editor windows
+gracefully and try to find an actual editor window instead of just using the
+focused window. Do NOT add `writeInput` to Journal just to suppress the flash —
+that's a COAT violation (Journal is not an editor).
+
+- [ ] AC-20: With Journal focused, `editor.write` does not flash error.
   Test: Focus Journal → `POST /commands/run { "id": "editor.write", "args": { "text": "hello" } }` → no flash.
-- [ ] AC-18: If Journal is in edit mode, `editor.write` inserts text into the edit textarea.
-  Test: Journal edit mode focused → editor.write → text appears in body field.
+- [ ] AC-21: `editor.write` finds an actual editor window even when a non-editor is focused.
+  Test: Focus Journal, have an editor open → `editor.write` routes to the editor.
 
 #### S06 — Journal bloat audit & decomposition
 **Status:** not-started
@@ -158,11 +170,15 @@ Break `microapps/journal/index.ts` (~1430 lines) into sub-modules. Target: main
 file < 500 lines, with extracted modules for session logic, rendering, and
 entry CRUD.
 
-- [ ] AC-19: Main `index.ts` is under 500 lines.
+- [ ] AC-22: Main `index.ts` is under 500 lines.
   Test: `wc -l microapps/journal/index.ts` < 500.
-- [ ] AC-20: Extracted modules: `journal-sessions.ts`, `journal-render.ts`, `journal-entries.ts`.
+- [ ] AC-23: Extracted modules: `journal-sessions.ts`, `journal-render.ts`, `journal-entries.ts`.
   Test: Files exist and are imported by `index.ts`.
-- [ ] AC-21: All existing commands still work after decomposition.
+- [ ] AC-24: All existing commands still work after decomposition.
   Test: `bun run test` + manual verify create/read/update/delete/list/export/import.
-- [ ] AC-22: `captureText()` and `writeInput()` methods added.
-  Test: `describeState()` and `captureText()` return valid data.
+- [ ] AC-25: `captureText()` method added to Journal window.
+  Test: `wibwob read <journal-id>` returns journal text content.
+- [ ] AC-26: `writeInput()` added — only functional in edit mode (maps to body textarea).
+  Test: Journal in edit mode → `wibwob write <id>` inserts text into body; in list mode → no-op.
+- [ ] AC-27: Integration tests for all Journal commands.
+  Test: `bun run test:integration` covers journal CRUD commands.

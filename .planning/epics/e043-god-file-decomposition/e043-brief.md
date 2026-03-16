@@ -82,11 +82,13 @@ restore handlers call `openHostWindow("xxx", snapshot)` directly.
 | Phase 2.1: Trivial wrappers | ✅ Done | 05037410 | -10 LOC |
 | Phase 2.2: Backrooms cluster | ✅ Done | 3b73f7f2 | -9 LOC |
 | Phase 2 prep: openRegisteredWindow | ✅ Done | e97bcde3 | +35 LOC in registry |
-| Phase 2.3-2.8: Remaining windows | ⬜ Ready | — | ~-100 LOC est. |
-| Phase 3: getAppMenuActions extract | ⬜ Ready | — | ~-400 LOC est. |
-| Phase 4: Restore simplification | ⬜ Ready | — | ~-30 LOC est. |
+| Phase 2.3: 7 more windows registered | ✅ Done | 0cff1cdd | -73 LOC |
+| Phase 2.4: Inline 8 one-liner delegates | ✅ Done | 255943a8 | -30 LOC |
+| Boundary: plasma-engine → microapps/ | ✅ Done | 95e44c83 | 506 LOC moved |
+| Phase 3: getAppMenuActions extract | [-] Deferred | — | 52 this.xxx deps, impractical |
+| Phase 4: Restore simplification | ✅ Done | — | covered in P2.4 |
 
-app-controller.ts: 2358 → 2141 (current, -217 LOC, -9.2%)
+app-controller.ts: 2358 → 2038 (final, **-320 LOC, -13.6%**)
 
 ## Expected Outcome
 
