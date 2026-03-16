@@ -59,6 +59,9 @@ export function openFileManagerWindow(params: {
   let entries: Array<{ label: string; fullPath: string; isDirectory: boolean; size: number; mtime: number }> = [];
   let filterValue = params.restore?.filterValue ?? "";
   let previewRawContent = "";
+  let editMode = false;
+  let editFilePath: string | null = null;
+  let editDirty = false;
   let viewMode: "list" | "icon" = params.restore?.viewMode ?? "list";
   const showHidden = true; // always show dotfiles
   let sortField: "name" | "size" | "modified" | "type" = params.restore?.sortField ?? "name";
@@ -368,6 +371,87 @@ export function openFileManagerWindow(params: {
     hidden: viewMode === "icon"
   });
 
+  // ── Inline editor overlay (same position as preview) ────
+  const editorBox = blessed.textarea({
+    parent: frame.body,
+    top: 3,
+    left: `${splitRatio}%+1`,
+    right: 0,
+    bottom: 1,
+    keys: true,
+    inputOnFocus: true,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    style: theme().body,
+    hidden: true,
+  });
+
+  const enterEditMode = (filePath: string) => {
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return;
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      editFilePath = filePath;
+      editDirty = false;
+      editMode = true;
+      editorBox.setValue(content);
+      preview.hide();
+      editorBox.show();
+      editorBox.focus();
+      setPreviewHeader(`{bold}EDIT{/bold} ${path.basename(filePath)}`);
+      renderStatusBar();
+      params.screen.render();
+    } catch {
+      params.overlays.flash("Could not open file for editing");
+    }
+  };
+
+  const exitEditMode = () => {
+    editMode = false;
+    editorBox.hide();
+    preview.show();
+    editFilePath = null;
+    editDirty = false;
+    list.focus();
+    const idx = (list as blessed.Widgets.ListElement).selected ?? 0;
+    updatePreview(idx);
+    renderStatusBar();
+    params.screen.render();
+  };
+
+  const saveEditBuffer = () => {
+    if (!editFilePath) return;
+    try {
+      const content = editorBox.getValue();
+      fs.writeFileSync(editFilePath, content, "utf8");
+      editDirty = false;
+      setPreviewHeader(`{bold}EDIT{/bold} ${path.basename(editFilePath)}`);
+      params.overlays.flash(`Saved ${path.basename(editFilePath)}`);
+      renderStatusBar();
+    } catch {
+      params.overlays.flash("Save failed");
+    }
+  };
+
+  editorBox.on("keypress", (_ch: string, key: { name?: string; ctrl?: boolean }) => {
+    if (key.name === "escape") {
+      exitEditMode();
+      return;
+    }
+    if (key.ctrl && key.name === "s") {
+      saveEditBuffer();
+      return;
+    }
+    if (!editDirty) {
+      editDirty = true;
+      if (editFilePath) {
+        setPreviewHeader(`{bold}EDIT{/bold} ${path.basename(editFilePath)} \u2022`);
+        renderStatusBar();
+        params.screen.render();
+      }
+    }
+  });
+
   // ── Split ratio helpers ─────────────────────────────────
 
   /** Reapply splitRatio to all panes that depend on it. */
@@ -381,8 +465,15 @@ export function openFileManagerWindow(params: {
     divider.left = `${splitRatio}%`;
     previewHeaderBar.left = `${splitRatio}%+1`;
     preview.left = `${splitRatio}%+1`;
+    editorBox.left = `${splitRatio}%+1`;
     fillDivider();
     setViewportContent(preview, previewRawContent);
+    // Re-render list items to reflow name padding to new width
+    if (viewMode === "list" && entries.length > 0) {
+      const sel = (list as blessed.Widgets.ListElement).selected ?? 0;
+      list.setItems(entries.map(formatListItem));
+      list.select(Math.min(sel, entries.length - 1));
+    }
     params.screen.render();
   };
 
@@ -520,7 +611,11 @@ export function openFileManagerWindow(params: {
       if (untracked) parts.push(`${untracked}?`);
       gitSummary = parts.length ? ` git:${parts.join("/")}` : " git:clean";
     }
-    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search q:close`);
+    if (editMode) {
+      statusInfo.setContent(` EDIT: ${editFilePath ? path.basename(editFilePath) : ""}${editDirty ? " \u2022" : ""} \u2502 Ctrl+S:save ESC:exit`);
+    } else {
+      statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open e:edit V:view Y:yank E:ext${macHints} S:search q:close`);
+    }
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -1359,6 +1454,11 @@ export function openFileManagerWindow(params: {
     }
     if (key.name === "v" && !key.ctrl && !key.meta) {
       viewSelected();
+      return;
+    }
+    if (key.name === "e" && !key.ctrl && !key.meta) {
+      const filePath = getEntryPath();
+      if (filePath) enterEditMode(filePath);
       return;
     }
     if (key.name === "space") {
