@@ -1,3 +1,4 @@
+import blessed from "blessed";
 import type {
   CommandListItem,
   MicroappHost,
@@ -19,6 +20,7 @@ type PaneKey = "overview" | "ui" | "windows" | "commands" | "stats";
 
 interface InspectorState {
   snapshot?: RuntimeInspectionSnapshot;
+  prevSnapshot?: RuntimeInspectionSnapshot;
   commands: CommandListItem[];
   error?: string;
   updatedAt: string;
@@ -93,6 +95,13 @@ function blankLine(): string {
   return "│";
 }
 
+function delta(current: number, previous: number | undefined): string {
+  if (previous === undefined) return "";
+  if (current > previous) return " ▲";
+  if (current < previous) return " ▼";
+  return "";
+}
+
 const SPIN = ["◐", "◓", "◑", "◒"];
 function spinChar(tick: number): string {
   return SPIN[tick % SPIN.length]!;
@@ -146,11 +155,12 @@ function renderOverview(state: InspectorState): string {
   lines.push("");
 
   // ── Health ──
+  const prev = state.prevSnapshot;
   lines.push(sectionHeader("HEALTH"));
-  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}`));
-  lines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
-  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 24)}`));
-  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}`));
+  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}${delta(s.stats.render.fps, prev?.stats.render.fps)}`));
+  lines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms${delta(s.stats.render.avgFrameMs, prev?.stats.render.avgFrameMs)}`));
+  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 24)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`));
+  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`));
   lines.push(sectionFooter());
   lines.push("");
 
@@ -349,8 +359,37 @@ function openRuntimeInspector(host: MicroappHost) {
 
   const footer = createStatusBar(win.body, { height: 2 });
 
+  // Tab underline rule — shows which tab is active with a positional marker
+  const tabRule = blessed.box({
+    parent: win.body,
+    top: 3,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { fg: "white", bg: undefined },
+    content: "",
+  });
+
+  function renderTabRule() {
+    const labels = paneKeys.map((k) => k.charAt(0).toUpperCase() + k.slice(1));
+    const parts: string[] = [];
+    for (let i = 0; i < labels.length; i++) {
+      const label = ` ${labels[i]} `;
+      if (i === tabs.getActive()) {
+        parts.push("▀".repeat(label.length));
+      } else {
+        parts.push(" ".repeat(label.length));
+      }
+      if (i < labels.length - 1) {
+        parts.push(" ");
+      }
+    }
+    tabRule.setContent(parts.join(""));
+  }
+
   const scroll = createScrollView(win.body, {
-    topOffset: 3,
+    topOffset: 4,
     bottomOffset: 2,
     vi: true,
   });
@@ -393,6 +432,7 @@ function openRuntimeInspector(host: MicroappHost) {
     updatePaneContent();
     scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
+    renderTabRule();
     host.screen.render();
   }
 
@@ -406,6 +446,7 @@ function openRuntimeInspector(host: MicroappHost) {
         fetchRuntimeInspection(),
         fetchRuntimeCommands(),
       ]);
+      state.prevSnapshot = state.snapshot;
       state.snapshot = inspectionPayload.snapshot;
       state.commands = commandsPayload.commands;
       state.updatedAt = new Date().toLocaleTimeString();
@@ -462,6 +503,7 @@ function openRuntimeInspector(host: MicroappHost) {
   tabs.onSwitch(() => {
     scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
+    renderTabRule();
     host.screen.render();
   });
 
@@ -494,6 +536,7 @@ function openRuntimeInspector(host: MicroappHost) {
     clearTimers(timers);
     header.destroy();
     tabs.destroy();
+    tabRule.destroy();
     footer.destroy();
     scroll.destroy();
   });
