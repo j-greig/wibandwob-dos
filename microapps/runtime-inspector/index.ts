@@ -145,22 +145,31 @@ function renderOverview(state: InspectorState): string {
     lines.push("");
   }
 
-  // ── Identity ──
-  lines.push(sectionHeader("IDENTITY"));
-  lines.push(kvLine("instance", `${app.instanceId ?? "?"} ${app.instanceLabel ? `(${app.instanceLabel})` : ""}`));
-  lines.push(kvLine("theme", app.theme ?? "-"));
-  lines.push(kvLine("api", app.controlApiBaseUrl ?? "-"));
-  lines.push(sectionFooter());
-  lines.push("");
+  // ── Identity + Desktop (two-column layout) ──
+  const colW = 58;
+  const identLines: string[] = [];
+  identLines.push(sectionHeader("IDENTITY", colW));
+  identLines.push(kvLine("instance", `${app.instanceId ?? "?"}`, 12));
+  identLines.push(kvLine("theme", app.theme ?? "-", 12));
+  identLines.push(kvLine("api", app.controlApiBaseUrl ?? "-", 12));
+  identLines.push(sectionFooter(colW));
 
-  // ── Desktop ──
-  lines.push(sectionHeader("DESKTOP"));
-  lines.push(kvLine("windows", String(s.state.windows.length)));
-  lines.push(kvLine("focus", `${focus.windowId ?? "—"} ${focus.title ?? ""}`.trimEnd()));
-  lines.push(kvLine("menu", s.ui.menu.open ? `● ${s.ui.menu.label ?? "open"}` : "○ closed"));
-  lines.push(kvLine("overlay", overlay ? `${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}` : "—"));
-  lines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blocked ? fmtList(blockerLabels) : ""}`));
-  lines.push(sectionFooter());
+  const deskLines: string[] = [];
+  deskLines.push(sectionHeader("DESKTOP", colW));
+  deskLines.push(kvLine("windows", String(s.state.windows.length), 12));
+  deskLines.push(kvLine("focus", clip(`${focus.windowId ?? "—"} ${focus.title ?? ""}`.trimEnd(), 38), 12));
+  deskLines.push(kvLine("menu", s.ui.menu.open ? `● ${s.ui.menu.label ?? "open"}` : "○ closed", 12));
+  deskLines.push(kvLine("overlay", overlay ? clip(`${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}`, 38) : "—", 12));
+  deskLines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blocked ? clip(fmtList(blockerLabels), 30) : ""}`, 12));
+  deskLines.push(sectionFooter(colW));
+
+  // Merge side by side
+  const maxRows = Math.max(identLines.length, deskLines.length);
+  for (let i = 0; i < maxRows; i++) {
+    const left = (identLines[i] ?? "").padEnd(colW);
+    const right = deskLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
   lines.push("");
 
   // ── Health ──
