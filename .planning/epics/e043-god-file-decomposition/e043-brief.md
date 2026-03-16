@@ -74,13 +74,27 @@ to registry lookups + a few remaining non-window actions (theme, workspace, clip
 `getRestoreActions()` simplifies once factories are in the registry —
 restore handlers call `openHostWindow("xxx", snapshot)` directly.
 
+## Progress
+
+| Phase | Status | Commit | LOC change |
+|-------|--------|--------|------------|
+| Phase 1: FX Pipeline | ✅ Done | 4bd3ee65 | -198 LOC from app-controller |
+| Phase 2.1: Trivial wrappers | ✅ Done | 05037410 | -10 LOC |
+| Phase 2.2: Backrooms cluster | ✅ Done | 3b73f7f2 | -9 LOC |
+| Phase 2 prep: openRegisteredWindow | ✅ Done | e97bcde3 | +35 LOC in registry |
+| Phase 2.3-2.8: Remaining windows | ⬜ Ready | — | ~-100 LOC est. |
+| Phase 3: getAppMenuActions extract | ⬜ Ready | — | ~-400 LOC est. |
+| Phase 4: Restore simplification | ⬜ Ready | — | ~-30 LOC est. |
+
+app-controller.ts: 2358 → 2141 (current, -217 LOC, -9.2%)
+
 ## Expected Outcome
 
 | File | Before | After |
 |------|--------|-------|
-| app-controller.ts | 2358 | ~1000 |
+| app-controller.ts | 2358 | ~1400 |
 | host-window-registrations.ts | 43 | ~350 |
-| fx-pipeline.ts | 0 | ~250 |
+| fx-pipeline.ts | 0 | ~280 |
 | app-action-wiring.ts | 0 | ~200 |
 
 ## Verification
