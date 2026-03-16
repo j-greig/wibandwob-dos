@@ -206,8 +206,13 @@ function renderOverview(state: InspectorState): string {
   // ── Footer ──
   const winCount = s.state.windows.length;
   const uptime = fmtUptime(s.stats.render.totalFrames, s.stats.render.fps);
+  // Dynamic status pulse
+  let pulse = "nominal";
+  if (s.stats.agent.active) pulse = "agent active";
+  else if (s.stats.rssMb > 600) pulse = "high memory";
+  else if (s.stats.render.fps < 2) pulse = "low fps";
   lines.push(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
-  lines.push(`  ${winCount} windows · ${state.commands.length} cmds · up ${uptime} · ${state.updatedAt}`);
+  lines.push(`  ${winCount} wins · ${state.commands.length} cmds · up ${uptime} · ${pulse} · ${state.updatedAt}`);
 
   return lines.join("\n");
 }
