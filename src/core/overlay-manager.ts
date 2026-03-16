@@ -11,6 +11,7 @@ import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import path from "node:path";
 
 import { theme } from "./theme/resolver.js";
+import { createScrollbar, scrollableStyle } from "./ui-primitives.js";
 import { EMPTY_FILE_SELECTED } from "./empty-states.js";
 import { createModal, createButtonBar, showToast, type ModalPosition } from "./modal.js";
 import type { Box, List, Textbox } from "./types.js";
@@ -460,10 +461,10 @@ export class OverlayManager {
       vi: true,
       scrollable: true,
       alwaysScroll: true,
+      scrollbar: createScrollbar(),
       items: [],
       style: {
-        fg: "white",
-        bg: "black",
+        ...scrollableStyle({ fg: "white", bg: "black" }),
         selected: { fg: "black", bg: "white" }
       }
     }) as List;
@@ -478,10 +479,8 @@ export class OverlayManager {
       vi: true,
       scrollable: true,
       alwaysScroll: true,
-      style: {
-        fg: "white",
-        bg: "black",
-      }
+      scrollbar: createScrollbar(),
+      style: scrollableStyle({ fg: "white", bg: "black" })
     });
 
     blessed.box({
@@ -711,10 +710,10 @@ export class OverlayManager {
       vi: true,
       scrollable: true,
       alwaysScroll: true,
+      scrollbar: createScrollbar(),
       items: [],
       style: {
-        fg: "white",
-        bg: "black",
+        ...scrollableStyle({ fg: "white", bg: "black" }),
         selected: { fg: "black", bg: "white" }
       }
     }) as List;
@@ -727,7 +726,8 @@ export class OverlayManager {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      style: { fg: "white", bg: "black" }
+      scrollbar: createScrollbar(),
+      style: scrollableStyle({ fg: "white", bg: "black" })
     });
     blessed.box({
       parent: modal.box,

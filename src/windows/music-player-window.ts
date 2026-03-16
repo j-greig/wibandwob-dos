@@ -17,6 +17,7 @@ import * as path from "path";
 import { promisify } from "util";
 
 import { theme } from "../core/theme/resolver.js";
+import { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 import { createRestyleBundle, createLayoutButtonBar, clamp, type ButtonBarPart } from "../core/ui-parts.js";
 import type { ThemeTokens } from "../core/theme/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -872,7 +873,8 @@ export function openMusicPlayerWindow(
     top: 0, left: 0, width: 1, height: 1,
     hidden: true,
     mouse: true, keys: false, vi: false, scrollable: true,
-    style: { ...theme().body, selected: { ...theme().body, inverse: true } },
+    scrollbar: createScrollbar(),
+    style: { ...scrollableStyle(theme().body), selected: { ...theme().body, inverse: true } },
     tags: true,
   }) as blessed.Widgets.ListElement;
 
@@ -1187,7 +1189,7 @@ export function openMusicPlayerWindow(
       [vizPane,    () => theme().body],
     ]).restyle();
     playlistPane.style = {
-      ...theme().body,
+      ...scrollableStyle(theme().body),
       selected: { ...theme().body, inverse: true },
     };
     toolbar.restyle();

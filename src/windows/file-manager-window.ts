@@ -12,7 +12,7 @@ import path from "node:path";
 
 import { theme } from "../core/theme/resolver.js";
 import { EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../core/empty-states.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
 import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
@@ -383,7 +383,8 @@ export function openFileManagerWindow(params: {
     mouse: true,
     scrollable: true,
     alwaysScroll: true,
-    style: theme().body,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(theme().body),
     hidden: true,
   });
 
