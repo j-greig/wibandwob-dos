@@ -9,7 +9,8 @@ type PrimitiveGroup = {
   types: string[];
 };
 
-const REPO_ROOT = process.cwd();
+// Resolve from script location so it works from any cwd, including git worktrees
+const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const SRC_ROOT = path.join(REPO_ROOT, "src");
 const OUTPUT_FILE = path.join(SRC_ROOT, "core", "primitives.ts");
 

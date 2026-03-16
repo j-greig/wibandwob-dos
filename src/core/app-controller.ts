@@ -1929,54 +1929,34 @@ export class TsTuiMvpApp {
         finder.sortBy(field);
       },
 
-      // ── Finder: E045 edit/save ────────────────────────────
-      finderEdit: (args) => {
-        const filePath = typeof args?.path === "string" ? args.path : undefined;
-        if (filePath) {
-          // Open file manager + trigger edit mode (TODO: needs direct dispatch)
-          this.openHostWindow("file-manager");
-          this.overlays.flash(`Use 'e' key in File Manager to edit ${filePath}`);
-        } else {
-          this.overlays.flash("Use 'e' key in File Manager to edit selected file");
-        }
+      // ── Finder: E045/E047 commands via finder controller ──
+      finderEdit: () => {
+        const finder = this.getFocusedFinder();
+        if (finder?.edit) { finder.edit(); }
+        else { this.overlays.flash("No Finder window focused"); }
       },
       finderSave: () => {
-        this.overlays.flash("Use Ctrl+S in File Manager edit mode to save");
+        // Save is handled by the inline editor (Ctrl+S), not the finder controller
+        this.overlays.flash("Use Ctrl+S in edit mode");
       },
-      // ── Finder: new E045 commands ─────────────────────────
       finderYankContents: () => {
-        // Dispatched to focused finder window via its writeInput or similar
-        // For now, the keybind Y handles it directly in file-manager-window.ts
-        this.overlays.flash("Use Y key in File Manager to yank contents");
+        const finder = this.getFocusedFinder();
+        if (finder?.yankContents) { finder.yankContents(); }
+        else { this.overlays.flash("No Finder window focused"); }
       },
       finderOpenExternal: (args) => {
-        const filePath = typeof args?.path === "string" ? args.path : undefined;
-        if (filePath) {
-          const { execSync } = require("node:child_process");
-          for (const cmd of ["cursor", "code", "zed", "subl"]) {
-            try {
-              execSync(`which ${cmd}`, { stdio: "ignore" });
-              execSync(`${cmd} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
-              this.overlays.flash(`Opened in ${cmd}`);
-              return;
-            } catch { /* next */ }
-          }
-          this.overlays.flash("No external editor found");
-        } else {
-          this.overlays.flash("finder.open_external requires path arg");
-        }
+        const finder = this.getFocusedFinder();
+        if (finder?.openExternal) { finder.openExternal(); }
+        else { this.overlays.flash("No Finder window focused"); }
       },
       finderShare: (args) => {
         const mode = typeof args?.mode === "string" ? args.mode : "path";
         const finder = this.getFocusedFinder();
-        if (!finder) {
-          this.overlays.flash("No Finder window focused");
-          return;
-        }
-        // The actual clipboard op happens in file-manager-window keybinds (c for path, Y for contents)
-        this.overlays.flash(mode === "contents" ? "Use Y in File Manager" : "Use c in File Manager");
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        if (mode === "contents") { finder.yankContents?.(); }
+        else { finder.copyPath?.(); }
       },
-      finderExportListing: (args) => {
+      finderExportListing: () => {
         this.overlays.flash("finder.export_listing — coming soon");
       },
 

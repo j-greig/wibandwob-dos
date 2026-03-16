@@ -194,6 +194,31 @@ When agent tooling causes friction — improve it, don't work around it.
 Branch naming: `epic/e0NN-slug`, `spike/spk-slug`, `fix/slug`, `feat/slug`.
 Never commit directly to `main`. Run `git status` first.
 
+### Worktrees (mandatory for epics)
+
+Every epic/spike branch gets its own **git worktree** at `~/Repos/`.
+This prevents concurrent agents from stomping each other's working trees.
+
+```bash
+# Create: branch from main, worktree at ~/Repos/<short-name>
+git branch epic/e0NN-slug main
+git worktree add ~/Repos/wibwob-<short-name> epic/e0NN-slug
+
+# Work exclusively in the worktree directory
+cd ~/Repos/wibwob-<short-name>
+
+# When done: merge to main from the main worktree, then prune
+cd ~/Repos/wibandwob-dos-cinema   # or wherever main is checked out
+git merge epic/e0NN-slug --no-edit
+git worktree remove ~/Repos/wibwob-<short-name>
+```
+
+**Rules:**
+- Set `cwd` to the worktree path for all subagents and ralph loops
+- Never `git checkout` a branch that's checked out in another worktree
+- `git worktree list` to see all active worktrees before creating a new one
+- Naming: `~/Repos/wibwob-<slug>` (e.g. `wibwob-pi`, `wibwob-layout-sdk`)
+
 Checkbox: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
 
 ## Constraints

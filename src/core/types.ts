@@ -287,9 +287,24 @@ export interface FinderController {
   search: (query: string, glob?: string) => void;
   navigateTo: (directoryPath: string) => void;
   toggleView: () => void;
-
   refresh: () => void;
   sortBy: (field: "name" | "size" | "modified" | "type") => void;
+
+  // E047 v3 additions — COAT: expose all actions for API/agent dispatch
+  /** Get the currently selected file path (if any). */
+  getSelectedPath?: () => string | null;
+  /** Open selected file in inline editor. */
+  edit?: () => void;
+  /** Copy selected file contents to clipboard. */
+  yankContents?: () => void;
+  /** Copy selected file path to clipboard. */
+  copyPath?: () => void;
+  /** Open selected file in external editor. */
+  openExternal?: () => void;
+  /** Quick Look (macOS). */
+  quicklook?: () => void;
+  /** Reveal in system file manager. */
+  reveal?: () => void;
 }
 
 export interface DragState {

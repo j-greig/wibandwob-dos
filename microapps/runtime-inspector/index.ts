@@ -1,3 +1,4 @@
+import blessed from "blessed";
 import type {
   CommandListItem,
   MicroappHost,
@@ -12,16 +13,23 @@ import {
   createTabs,
   fetchRuntimeCommands,
   fetchRuntimeInspection,
+  renderFiglet,
 } from "../../src/services/microapp-sdk.js";
 
 type PaneKey = "overview" | "ui" | "windows" | "commands" | "stats";
 
 interface InspectorState {
   snapshot?: RuntimeInspectionSnapshot;
+  prevSnapshot?: RuntimeInspectionSnapshot;
   commands: CommandListItem[];
   error?: string;
   updatedAt: string;
   refreshInFlight: boolean;
+  fpsHistory: RingBuffer;
+  rssHistory: RingBuffer;
+  heapHistory: RingBuffer;
+  frameHistory: RingBuffer;
+  refreshCount: number;
 }
 
 function clip(value: string, width: number): string {
@@ -30,138 +38,386 @@ function clip(value: string, width: number): string {
 }
 
 function fmtBool(value: boolean): string {
-  return value ? "yes" : "no";
+  return value ? "●" : "○";
 }
 
 function fmtList(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
+// ── Visual helpers ────────────────────────────────────────────────────────
+
+const SPARK = "▁▂▃▄▅▆▇█";
+const BAR_FILL = "█";
+const BAR_EMPTY = "░";
+
+/** Rolling buffer for sparkline history */
+class RingBuffer {
+  private buf: number[];
+  private pos = 0;
+  private full = false;
+  constructor(private size: number) { this.buf = new Array(size).fill(0); }
+  push(v: number) { this.buf[this.pos] = v; this.pos = (this.pos + 1) % this.size; if (this.pos === 0) this.full = true; }
+  values(): number[] {
+    if (!this.full) return this.buf.slice(0, this.pos);
+    return [...this.buf.slice(this.pos), ...this.buf.slice(0, this.pos)];
+  }
+}
+
+function sparkline(values: number[]): string {
+  if (values.length === 0) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  return values.map((v) => SPARK[Math.min(Math.floor(((v - min) / range) * 7), 7)]).join("");
+}
+
+function progressBar(value: number, max: number, width: number): string {
+  const ratio = Math.min(value / (max || 1), 1);
+  const filled = Math.round(ratio * width);
+  return BAR_FILL.repeat(filled) + BAR_EMPTY.repeat(width - filled);
+}
+
+function sectionHeader(title: string, width: number = 60): string {
+  const pad = width - title.length - 4;
+  return `┌─ ${title} ${"─".repeat(Math.max(0, pad))}┐`;
+}
+
+function sectionFooter(width: number = 60): string {
+  return `└${"─".repeat(width - 2)}┘`;
+}
+
+function kvLine(key: string, value: string, keyWidth: number = 16): string {
+  return `│  ${key.padEnd(keyWidth)} │ ${value}`;
+}
+
+function blankLine(): string {
+  return "│";
+}
+
+function delta(current: number, previous: number | undefined): string {
+  if (previous === undefined) return "";
+  if (current > previous) return " ▲";
+  if (current < previous) return " ▼";
+  return "";
+}
+
+function fmtUptime(totalFrames: number, fps: number): string {
+  const secs = fps > 0 ? Math.floor(totalFrames / fps) : 0;
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+const SPIN = ["◐", "◓", "◑", "◒"];
+function spinChar(tick: number): string {
+  return SPIN[tick % SPIN.length]!;
+}
+
 // ── Pane renderers ────────────────────────────────────────────────────────
 
 function renderOverview(state: InspectorState): string {
   if (!state.snapshot) {
-    return state.error ? `Runtime Inspector\n\nError: ${state.error}` : "Runtime Inspector\n\nLoading…";
+    return state.error
+      ? `  ⚠ Error: ${state.error}`
+      : "  ◌ Loading…";
   }
   const s = state.snapshot;
   const app = s.state.app;
   const focus = s.state.focus;
   const overlay = s.ui.overlay;
   const blockerLabels = s.ui.blockers.map((b) => b.label || b.type);
-  return [
-    "Runtime Inspector",
-    "",
-    "Identity",
-    `  instanceId      ${app.instanceId ?? "?"}`,
-    `  instanceLabel   ${app.instanceLabel ?? "-"}`,
-    `  theme           ${app.theme ?? "-"}`,
-    `  api             ${app.controlApiBaseUrl ?? "-"}`,
-    "",
-    "Desktop",
-    `  windows         ${s.state.windows.length}`,
-    `  focus           ${focus.windowId ?? "none"} ${focus.title ?? ""}`.trimEnd(),
-    `  menu            ${s.ui.menu.open ? s.ui.menu.label ?? "open" : "closed"}`,
-    `  overlay         ${overlay ? `${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}` : "none"}`,
-    `  blocked         ${fmtBool(s.ui.blocked)}`,
-    `  blockers        ${fmtList(blockerLabels)}`,
-    "",
-    "Health",
-    `  render fps      ${s.stats.render.fps.toFixed(1)}`,
-    `  avg frame       ${s.stats.render.avgFrameMs.toFixed(1)}ms`,
-    `  rss             ${s.stats.rssMb.toFixed(1)}MB`,
-    `  heap            ${s.stats.heapUsedMb.toFixed(1)}MB`,
-    `  agent           ${s.stats.agent.active ? "active" : "idle"}`,
-    `  scramble        ${s.scramble.status} · ${s.scramble.model}`,
-    "",
-    `Commands visible: ${state.commands.length}`,
-    `Updated: ${state.updatedAt}`,
-  ].join("\n");
+
+  const fpsVals = state.fpsHistory.values();
+  const rssVals = state.rssHistory.values();
+  const heapVals = state.heapHistory.values();
+
+  const lines: string[] = [];
+
+  // ── Figlet banner (reactive to system state) ──
+  const bannerWord = s.stats.agent.active ? "ACTIVE" :
+    (s.stats.rssMb > 600 || s.stats.render.fps < 2) ? "ALERT" : "INSPECT";
+  const banner = renderFiglet(bannerWord, "small");
+  if (banner) {
+    for (const line of banner.split("\n")) {
+      if (line.trim()) lines.push(`  ${line}`);
+    }
+  }
+
+  // ── System health bar ──
+  const healthScore = Math.min(100, Math.round(
+    (Math.min(s.stats.render.fps / 10, 1) * 40) +
+    (Math.max(0, 1 - s.stats.rssMb / 1024) * 30) +
+    (Math.max(0, 1 - s.stats.heapUsedMb / 512) * 30)
+  ));
+  const healthBar = progressBar(healthScore, 100, 40);
+  const healthLabel = healthScore >= 80 ? "GOOD" : healthScore >= 50 ? "FAIR" : "WARN";
+  lines.push(`  system health  ${healthBar}  ${healthScore}% ${healthLabel}`);
+  lines.push("");
+
+  // ── Identity + Desktop (two-column layout) ──
+  const colW = 58;
+  const identLines: string[] = [];
+  identLines.push(sectionHeader("IDENTITY", colW));
+  identLines.push(kvLine("instance", `${app.instanceId ?? "?"}`, 12));
+  identLines.push(kvLine("theme", app.theme ?? "-", 12));
+  identLines.push(kvLine("api", app.controlApiBaseUrl ?? "-", 12));
+  identLines.push(sectionFooter(colW));
+
+  const deskLines: string[] = [];
+  deskLines.push(sectionHeader("DESKTOP", colW));
+  deskLines.push(kvLine("windows", String(s.state.windows.length), 12));
+  deskLines.push(kvLine("focus", clip(`${focus.windowId ?? "—"} ${focus.title ?? ""}`.trimEnd(), 38), 12));
+  deskLines.push(kvLine("menu", s.ui.menu.open ? `● ${s.ui.menu.label ?? "open"}` : "○ closed", 12));
+  deskLines.push(kvLine("overlay", overlay ? clip(`${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}`, 38) : "—", 12));
+  deskLines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blocked ? clip(fmtList(blockerLabels), 30) : ""}`, 12));
+  deskLines.push(sectionFooter(colW));
+
+  // Merge side by side
+  const maxRows = Math.max(identLines.length, deskLines.length);
+  for (let i = 0; i < maxRows; i++) {
+    const left = (identLines[i] ?? "").padEnd(colW);
+    const right = deskLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
+  lines.push("");
+
+  // ── Health + Agent (two-column layout) ──
+  const prev = state.prevSnapshot;
+  const healthLines: string[] = [];
+  healthLines.push(sectionHeader("HEALTH", colW));
+  healthLines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}${delta(s.stats.render.fps, prev?.stats.render.fps)}`, 12));
+  healthLines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms${delta(s.stats.render.avgFrameMs, prev?.stats.render.avgFrameMs)}`, 12));
+  const rssMax = Math.max(512, Math.ceil(s.stats.rssMb / 128) * 128);
+  const heapMax = Math.max(256, Math.ceil(s.stats.heapUsedMb / 64) * 64);
+  healthLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}/${rssMax}MB ${progressBar(s.stats.rssMb, rssMax, 18)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`, 12));
+  healthLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}/${heapMax}MB ${progressBar(s.stats.heapUsedMb, heapMax, 18)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`, 12));
+  healthLines.push(sectionFooter(colW));
+
+  const agentLines: string[] = [];
+  agentLines.push(sectionHeader("WIB&WOB AGENT", colW));
+  agentLines.push(kvLine("status", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
+  agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
+  agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
+  agentLines.push(kvLine("tools", String(s.stats.agent.toolRunCount), 12));
+  agentLines.push(kvLine("scramble", `${s.scramble.status} · ${s.scramble.model}`, 12));
+  agentLines.push(sectionFooter(colW));
+
+  const maxRows2 = Math.max(healthLines.length, agentLines.length);
+  for (let i = 0; i < maxRows2; i++) {
+    const left = (healthLines[i] ?? "").padEnd(colW);
+    const right = agentLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
+  lines.push("");
+
+  // ── Windows (compact, top by z-order, full width) ──
+  const fullW = colW * 2 + 2;
+  const windows = s.state.windows.slice().sort((a, b) => b.zIndex - a.zIndex);
+  const showCount = Math.min(windows.length, 8);
+  // Double-line header for primary table
+  const wTitle = `WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`;
+  const wPad = fullW - wTitle.length - 4;
+  lines.push(`╔═ ${wTitle} ${"═".repeat(Math.max(0, wPad))}╗`);
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(28)} ${"TITLE".padEnd(38)} ${"POS".padEnd(10)} ${"SIZE".padEnd(9)} Z`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(28)} ${"─".repeat(38)} ${"─".repeat(10)} ${"─".repeat(9)} ──`);
+  for (let i = 0; i < showCount; i++) {
+    const w = windows[i]!;
+    const marker = w.focused ? "▸" : " ";
+    const appType = clip(w.appType ?? w.kind, 28).padEnd(28);
+    const title = clip(w.title, 38).padEnd(38);
+    const pos = `@${w.left},${w.top}`.padEnd(10);
+    const size = `${w.width}x${w.height}`.padEnd(9);
+    lines.push(`│${marker}${String(w.id).padStart(3)} ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}`);
+  }
+  lines.push(`╚${"═".repeat(fullW - 2)}╝`);
+  lines.push("");
+
+  // ── UI summary (one-liner) ──
+  const menuStr = s.ui.menu.open ? `menu: ● ${s.ui.menu.label ?? "open"}` : "menu: ○";
+  const overlayStr = overlay ? `overlay: ${overlay.type}` : "overlay: —";
+  const blockerStr = s.ui.blocked ? `blocked: ● (${s.ui.blockers.length})` : "blocked: ○";
+  lines.push(`  UI  ${menuStr}  ·  ${overlayStr}  ·  ${blockerStr}  →  Ui tab`);
+  lines.push("");
+
+  // ── Footer ──
+  const winCount = s.state.windows.length;
+  const uptime = fmtUptime(s.stats.render.totalFrames, s.stats.render.fps);
+  // Dynamic status pulse
+  // Dynamic status pulse with severity
+  let pulse = "nominal";
+  const conditions: string[] = [];
+  if (s.stats.agent.active) conditions.push("agent active");
+  if (s.stats.rssMb > 600) conditions.push("high mem");
+  if (s.stats.render.fps < 2) conditions.push("low fps");
+  if (s.ui.blocked) conditions.push("blocked");
+  pulse = conditions.length > 0 ? conditions.slice(0, 2).join(" · ") : "nominal";
+  lines.push(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
+  lines.push(`  ${winCount} wins · ${state.commands.length} cmds · up ${uptime} · ${pulse} · ${state.updatedAt}`);
+
+  return lines.join("\n");
 }
 
 function renderUi(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading UI state…";
+  if (!s) return "  ◌ Loading UI state…";
   const overlay = s.ui.overlay;
-  const lines = [
-    "UI State",
-    "",
-    `menu.open     ${fmtBool(s.ui.menu.open)}`,
-    `menu.label    ${s.ui.menu.label ?? "-"}`,
-    `overlay.type  ${overlay?.type ?? "-"}`,
-    `overlay.label ${overlay?.label ?? "-"}`,
-    `blocked       ${fmtBool(s.ui.blocked)}`,
-    "",
-    "Blockers",
-  ];
+  const colW = 58;
+  const lines: string[] = [];
+
+  // ── Menu + Overlay (two-column) ──
+  const menuLines: string[] = [];
+  menuLines.push(sectionHeader("MENU", colW));
+  menuLines.push(kvLine("open", fmtBool(s.ui.menu.open), 12));
+  menuLines.push(kvLine("label", s.ui.menu.label ?? "—", 12));
+  menuLines.push(sectionFooter(colW));
+
+  const ovLines: string[] = [];
+  ovLines.push(sectionHeader("OVERLAY", colW));
+  ovLines.push(kvLine("type", overlay?.type ?? "—", 12));
+  ovLines.push(kvLine("label", overlay?.label ?? "—", 12));
+  ovLines.push(sectionFooter(colW));
+
+  const maxR = Math.max(menuLines.length, ovLines.length);
+  for (let i = 0; i < maxR; i++) {
+    const left = (menuLines[i] ?? "").padEnd(colW);
+    const right = ovLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
+  lines.push("");
+
+  // ── Blockers (full width) ──
+  lines.push(sectionHeader("BLOCKERS"));
+  lines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blockers.length > 0 ? `(${s.ui.blockers.length})` : ""}`));
   if (s.ui.blockers.length === 0) {
-    lines.push("  none");
+    lines.push(kvLine("", "none"));
   } else {
     for (const b of s.ui.blockers) {
-      lines.push(`  - ${b.type}${b.label ? ` · ${b.label}` : ""}`);
-      if (b.escapeCommands?.length) lines.push(`      escape: ${b.escapeCommands.join(", ")}`);
-      if (b.continueCommands?.length) lines.push(`      continue: ${b.continueCommands.join(", ")}`);
+      lines.push(kvLine("", `▸ ${b.type}${b.label ? ` · ${b.label}` : ""}`));
+      if (b.escapeCommands?.length) lines.push(kvLine("  escape", b.escapeCommands.join(", ")));
+      if (b.continueCommands?.length) lines.push(kvLine("  continue", b.continueCommands.join(", ")));
     }
   }
+  lines.push(sectionFooter());
+
   return lines.join("\n");
 }
 
 function renderWindows(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading windows…";
-  if (s.state.windows.length === 0) return "No open windows.";
+  if (!s) return "  ◌ Loading windows…";
+  if (s.state.windows.length === 0) return "  No open windows.";
   const windows = s.state.windows.slice().sort((a, b) => a.zIndex - b.zIndex);
-  return [
-    "Windows",
-    "",
-    " id  type                     title                          pos       size     z  f",
-    ...windows.map((w) => {
-      const appType = clip(w.appType ?? w.kind, 24).padEnd(24);
-      const title = clip(w.title, 30).padEnd(30);
-      const pos = `@${w.left},${w.top}`.padEnd(9);
-      const size = `${w.width}x${w.height}`.padEnd(8);
-      return `${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${w.focused ? "*" : "-"}`;
-    }),
-  ].join("\n");
+  const lines: string[] = [];
+  lines.push(sectionHeader(`WINDOWS (${windows.length})`));
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(28)} ${"TITLE".padEnd(38)} ${"POS".padEnd(10)} ${"SIZE".padEnd(9)} ${"Z".padStart(2)}  F`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(28)} ${"─".repeat(38)} ${"─".repeat(10)} ${"─".repeat(9)} ${"──"}  ─`);
+  for (const w of windows) {
+    const appType = clip(w.appType ?? w.kind, 28).padEnd(28);
+    const title = clip(w.title, 38).padEnd(38);
+    const pos = `@${w.left},${w.top}`.padEnd(10);
+    const size = `${w.width}x${w.height}`.padEnd(9);
+    const marker = w.focused ? "◆" : "·";
+    const prefix = w.focused ? "▸" : " ";
+    lines.push(`│${prefix}${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${marker}`);
+  }
+  lines.push(sectionFooter());
+  return lines.join("\n");
 }
 
 function renderCommands(commands: CommandListItem[]): string {
-  if (commands.length === 0) return "Loading commands…";
+  if (commands.length === 0) return "  ◌ Loading commands…";
   const rows = commands.slice().sort((a, b) => a.id.localeCompare(b.id));
-  return [
-    `Commands (${rows.length})`,
-    "",
-    " id                                 surf         availability  label",
-    ...rows.map((c) => {
-      const surfaces = clip(c.surfaces.join(","), 12).padEnd(12);
-      const availability = (c.available ? "ready" : "off").padEnd(12);
-      return ` ${clip(c.id, 34).padEnd(34)} ${surfaces} ${availability} ${c.label}`;
-    }),
-  ].join("\n");
+  const ready = rows.filter((c) => c.available).length;
+
+  // Namespace summary with mini bar chart
+  const ns = new Map<string, number>();
+  for (const c of rows) {
+    const prefix = c.id.split(".").slice(0, -1).join(".") || c.id;
+    ns.set(prefix, (ns.get(prefix) ?? 0) + 1);
+  }
+  const topNs = [...ns.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxNs = topNs.length > 0 ? topNs[0]![1] : 1;
+
+  const lines: string[] = [];
+  lines.push(sectionHeader(`COMMANDS (${rows.length} total, ${ready} ready)`));
+  for (const [name, count] of topNs) {
+    const barLen = Math.max(1, Math.round((count / maxNs) * 20));
+    lines.push(`│  ${name.padEnd(32)} ${BAR_FILL.repeat(barLen).padEnd(20)} ${String(count).padStart(3)}`);
+  }
+  lines.push(`│`);
+  lines.push(`│ ${"ID".padEnd(34)} ${"SURF".padEnd(12)} ${"AVAIL".padEnd(6)} LABEL`);
+  lines.push(`│ ${"─".repeat(34)} ${"─".repeat(12)} ${"─".repeat(6)} ${"─".repeat(20)}`);
+  for (const c of rows) {
+    const surfaces = clip(c.surfaces.join(","), 12).padEnd(12);
+    const avail = c.available ? "  ●  " : "  ○  ";
+    lines.push(`│ ${clip(c.id, 34).padEnd(34)} ${surfaces} ${avail} ${c.label}`);
+  }
+  lines.push(sectionFooter());
+  return lines.join("\n");
 }
 
-function renderStats(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading stats…";
-  return [
-    "Runtime Stats",
-    "",
-    "Render",
-    `  fps              ${s.stats.render.fps.toFixed(1)}`,
-    `  avgFrameMs       ${s.stats.render.avgFrameMs.toFixed(1)}`,
-    `  totalFrames      ${s.stats.render.totalFrames}`,
-    "",
-    "Memory",
-    `  rssMb            ${s.stats.rssMb.toFixed(1)}`,
-    `  heapUsedMb       ${s.stats.heapUsedMb.toFixed(1)}`,
-    "",
-    "Agent",
-    `  active           ${fmtBool(s.stats.agent.active)}`,
-    `  streaming        ${fmtBool(s.stats.agent.streaming)}`,
-    `  messageCount     ${s.stats.agent.messageCount}`,
-    `  toolRunCount     ${s.stats.agent.toolRunCount}`,
-    "",
-    "Scramble",
-    `  status           ${s.scramble.status}`,
-    `  model            ${s.scramble.model}`,
-    `  sessionId        ${s.scramble.sessionId}`,
-  ].join("\n");
+function renderStats(state: InspectorState): string {
+  const s = state.snapshot;
+  if (!s) return "  ◌ Loading stats…";
+
+  const fpsVals = state.fpsHistory.values();
+  const rssVals = state.rssHistory.values();
+  const heapVals = state.heapHistory.values();
+  const colW = 58;
+
+  const lines: string[] = [];
+
+  // ── Render + Memory (two-column) ──
+  const renderLines: string[] = [];
+  renderLines.push(sectionHeader("RENDER", colW));
+  renderLines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`, 12));
+  renderLines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`, 12));
+  renderLines.push(kvLine("frames", String(s.stats.render.totalFrames), 12));
+  renderLines.push(sectionFooter(colW));
+
+  const memLines: string[] = [];
+  const rssMax2 = Math.max(512, Math.ceil(s.stats.rssMb / 128) * 128);
+  const heapMax2 = Math.max(256, Math.ceil(s.stats.heapUsedMb / 64) * 64);
+  memLines.push(sectionHeader("MEMORY", colW));
+  memLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}/${rssMax2}MB ${progressBar(s.stats.rssMb, rssMax2, 16)}`, 12));
+  memLines.push(kvLine("rss trend", sparkline(rssVals), 12));
+  memLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}/${heapMax2}MB ${progressBar(s.stats.heapUsedMb, heapMax2, 16)}`, 12));
+  memLines.push(kvLine("heap trend", sparkline(heapVals), 12));
+  memLines.push(sectionFooter(colW));
+
+  const maxR1 = Math.max(renderLines.length, memLines.length);
+  for (let i = 0; i < maxR1; i++) {
+    const left = (renderLines[i] ?? "").padEnd(colW);
+    const right = memLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
+  lines.push("");
+
+  // ── Agent + Scramble (two-column) ──
+  const agentLines: string[] = [];
+  agentLines.push(sectionHeader("WIB&WOB AGENT", colW));
+  agentLines.push(kvLine("active", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
+  agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
+  agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
+  agentLines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount), 12));
+  agentLines.push(sectionFooter(colW));
+
+  const scrLines: string[] = [];
+  scrLines.push(sectionHeader("SCRAMBLE", colW));
+  scrLines.push(kvLine("status", s.scramble.status, 12));
+  scrLines.push(kvLine("model", s.scramble.model, 12));
+  scrLines.push(kvLine("session", s.scramble.sessionId, 12));
+  scrLines.push(sectionFooter(colW));
+
+  const maxR2 = Math.max(agentLines.length, scrLines.length);
+  for (let i = 0; i < maxR2; i++) {
+    const left = (agentLines[i] ?? "").padEnd(colW);
+    const right = scrLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────
@@ -193,7 +449,7 @@ function openRuntimeInspector(host: MicroappHost) {
   const win = host.createWindow({
     title: "Runtime Inspector",
     width: 132,
-    height: 38,
+    height: 58,
     left: 6,
     top: 3,
   });
@@ -203,6 +459,11 @@ function openRuntimeInspector(host: MicroappHost) {
     commands: [],
     updatedAt: "never",
     refreshInFlight: false,
+    fpsHistory: new RingBuffer(30),
+    rssHistory: new RingBuffer(30),
+    heapHistory: new RingBuffer(30),
+    frameHistory: new RingBuffer(30),
+    refreshCount: 0,
   };
 
   const paneKeys: PaneKey[] = ["overview", "ui", "windows", "commands", "stats"];
@@ -211,7 +472,7 @@ function openRuntimeInspector(host: MicroappHost) {
 
   // ── SDK Handle components ──
 
-  const header = createHeaderBar(win.body, { left: " Runtime Inspector", height: 2 });
+  const header = createHeaderBar(win.body, { left: "", height: 2 });
 
   const tabs = createTabs(win.body, {
     tabs: paneKeys.map((k) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), content: "" })),
@@ -223,8 +484,37 @@ function openRuntimeInspector(host: MicroappHost) {
 
   const footer = createStatusBar(win.body, { height: 2 });
 
+  // Tab underline rule — shows which tab is active with a positional marker
+  const tabRule = blessed.box({
+    parent: win.body,
+    top: 3,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { fg: "white", bg: undefined },
+    content: "",
+  });
+
+  function renderTabRule() {
+    const labels = paneKeys.map((k) => k.charAt(0).toUpperCase() + k.slice(1));
+    const parts: string[] = [];
+    for (let i = 0; i < labels.length; i++) {
+      const label = ` ${labels[i]} `;
+      if (i === tabs.getActive()) {
+        parts.push("▀".repeat(label.length));
+      } else {
+        parts.push(" ".repeat(label.length));
+      }
+      if (i < labels.length - 1) {
+        parts.push(" ");
+      }
+    }
+    tabRule.setContent(parts.join(""));
+  }
+
   const scroll = createScrollView(win.body, {
-    topOffset: 3,
+    topOffset: 4,
     bottomOffset: 2,
     vi: true,
   });
@@ -240,22 +530,28 @@ function openRuntimeInspector(host: MicroappHost) {
     paneContent.set("ui", renderUi(state.snapshot));
     paneContent.set("windows", renderWindows(state.snapshot));
     paneContent.set("commands", renderCommands(state.commands));
-    paneContent.set("stats", renderStats(state.snapshot));
+    paneContent.set("stats", renderStats(state));
   }
 
   function renderChrome() {
     const app = state.snapshot?.state.app;
     const focus = state.snapshot?.state.focus;
+    const spin = spinChar(state.refreshCount);
+    const agentIcon = state.snapshot?.stats.agent.active ? "● AGENT" : "○ idle";
+    const winCount = state.snapshot?.state.windows.length ?? 0;
+    const fps = state.snapshot?.stats.render.fps.toFixed(0) ?? "—";
+    const snap = state.snapshot;
+    const up = snap ? fmtUptime(snap.stats.render.totalFrames, snap.stats.render.fps) : "—";
     header.update({
-      left: ` {bold}Runtime Inspector{/bold}  instance ${app?.instanceId ?? "?"} · windows ${state.snapshot?.state.windows.length ?? 0} · focus ${clip(focus?.title ?? "none", 40)}`,
-      right: `updated ${state.updatedAt} `,
+      left: ` ${spin}  ${app?.instanceId ?? "?"}  ◆ ${winCount} wins  ${agentIcon}  ${fps} fps  up ${up}`,
+      right: `${state.updatedAt} `,
     });
     const tabName = paneKeys[tabs.getActive()] ?? "overview";
     footer.update({
       left: ` tab ${tabs.getActive() + 1}/${paneKeys.length} · ${tabName}`,
       right: state.error
         ? `error: ${clip(state.error, 60)} `
-        : "1-5 switch · Tab next · j/k scroll · r refresh ",
+        : "o/u/w/c/s jump · j/k scroll · r refresh ",
     });
   }
 
@@ -263,6 +559,7 @@ function openRuntimeInspector(host: MicroappHost) {
     updatePaneContent();
     scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
+    renderTabRule();
     host.screen.render();
   }
 
@@ -276,10 +573,20 @@ function openRuntimeInspector(host: MicroappHost) {
         fetchRuntimeInspection(),
         fetchRuntimeCommands(),
       ]);
+      state.prevSnapshot = state.snapshot;
       state.snapshot = inspectionPayload.snapshot;
       state.commands = commandsPayload.commands;
       state.updatedAt = new Date().toLocaleTimeString();
       state.error = undefined;
+      state.refreshCount++;
+      // Push history for sparklines
+      const snap = state.snapshot;
+      if (snap) {
+        state.fpsHistory.push(snap.stats.render.fps);
+        state.rssHistory.push(snap.stats.rssMb);
+        state.heapHistory.push(snap.stats.heapUsedMb);
+        state.frameHistory.push(snap.stats.render.avgFrameMs);
+      }
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error);
     } finally {
@@ -313,6 +620,17 @@ function openRuntimeInspector(host: MicroappHost) {
     });
   }
   win.body.key(["r"], () => void refresh());
+  // Quick-jump keys: o=overview, u=ui, w=windows, c=commands, s=stats
+  const jumpMap: Record<string, number> = { o: 0, u: 1, w: 2, c: 3, s: 4 };
+  for (const [key, idx] of Object.entries(jumpMap)) {
+    win.body.key([key], () => {
+      tabs.update({ active: idx });
+      scroll.update({ content: paneContent.get(paneKeys[idx]!) ?? "" });
+      renderChrome();
+      renderTabRule();
+      host.screen.render();
+    });
+  }
   win.body.key(["j", "down"], () => scroll.scrollTo((scroll.element as any).childBase + 1));
   win.body.key(["k", "up"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 1)));
   win.body.key(["pagedown"], () => scroll.scrollTo((scroll.element as any).childBase + 12));
@@ -323,6 +641,7 @@ function openRuntimeInspector(host: MicroappHost) {
   tabs.onSwitch(() => {
     scroll.update({ content: paneContent.get(activeKey()) ?? "" });
     renderChrome();
+    renderTabRule();
     host.screen.render();
   });
 
@@ -355,6 +674,7 @@ function openRuntimeInspector(host: MicroappHost) {
     clearTimers(timers);
     header.destroy();
     tabs.destroy();
+    tabRule.destroy();
     footer.destroy();
     scroll.destroy();
   });
