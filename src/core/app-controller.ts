@@ -1112,9 +1112,7 @@ export class TsTuiMvpApp {
 
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
-  private openTerrainLabWindow(): WindowRecord | undefined {
-    return this.openHostWindow("terrain-lab");
-  }
+  // openTerrainLabWindow — removed, use openHostWindow("terrain-lab") directly
 
   // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
 
@@ -1141,12 +1139,7 @@ export class TsTuiMvpApp {
 
   // openPlasmaFromPrimer — removed, migrated to microapp.wibwob.plasma.from-primer
 
-  private openMusicPlayerWindow(restore?: {
-    filePath?: string;
-    volume?: number;
-  }): WindowRecord | undefined {
-    return this.openHostWindow("music-player", restore);
-  }
+  // openMusicPlayerWindow — removed, use openHostWindow("music-player", restore) directly
 
   private openCompanionWindow(restore?: {
     tick?: number;
@@ -1671,7 +1664,7 @@ export class TsTuiMvpApp {
             : undefined;
         this.exportFocusedWindowText(id, name);
       },
-      openTerrainLab: () => this.openTerrainLabWindow(),
+      openTerrainLab: () => this.openHostWindow("terrain-lab"),
       openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
         const filePath =
@@ -1897,7 +1890,7 @@ export class TsTuiMvpApp {
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        this.openMusicPlayerWindow(filePath ? { filePath } : undefined);
+        this.openHostWindow("music-player", filePath ? { filePath } : undefined);
       },
       openSy2Chronicles: (args) => {
         const result = this.commands.runDynamic("microapp.wibwob.sy2chronicles.open", args);
