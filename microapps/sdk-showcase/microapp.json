@@ -11,7 +11,7 @@
     "multiInstance": false,
     "persist": false,
     "menu": [
-      { "category": "demos", "order": 50, "label": "SDK Showcase" }
+      { "category": "applications", "order": 170, "label": "SDK Showcase" }
     ],
     "palette": { "order": 220, "label": "SDK Showcase" },
     "agent": true,

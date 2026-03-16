@@ -57,7 +57,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.layout-probe":                   "internal",
   "wibwob.heartbeat":                      "internal",
   "wibwob.file-manager":                     "core",
-  "wibwob.sdk-showcase":                     "internal",
+  "wibwob.sdk-showcase":                     "beta",
   "wibwob.data-dashboard":                  "internal",
   "wibwob.example.hello":                  "internal",
   "wibwob.example.e026":                   "internal",

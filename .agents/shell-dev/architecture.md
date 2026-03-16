@@ -17,6 +17,8 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 - `src/core/window-chrome.ts` — maps content size to window size; chrome offsets live here, never inline in window code
 - `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers
 - `src/core/safe-fs.ts` — filesystem wrappers (safeReadFile, safeWriteFile, safeReadJSON, etc.)
+- `src/core/host-window-registry.ts` — declarative registry for host window types (replaces private openers)
+- `src/core/host-window-registrations.ts` — register all host window factories at startup
 - `src/core/theme/resolver.ts` — runtime theme state, cycle, external theme registration with token fallback fill
 - `src/core/ui-parts.ts` — **shim**: re-exports from `src/ui/` for backward compat
 
