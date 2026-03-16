@@ -28,7 +28,20 @@ curl -sf http://127.0.0.1:8099/commands/run \
   -d '{"id":"microapp.wibwob.runtime-inspector.open"}' > /dev/null 2>&1 || true
 
 # Let the UI settle (render, layout, data fetch)
-sleep 3
+sleep 2
+
+# Ensure we're on the Overview tab by sending key "1" to the window
+# Find the window ID first
+WIN_ID=$(curl -sf http://127.0.0.1:8099/state 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for w in d.get('windows', []):
+    if 'runtime-inspector' in w.get('appType', '').lower() or 'Runtime Inspector' in w.get('title', ''):
+        print(w['id']); break
+" 2>/dev/null || echo "")
+
+# Wait another beat for data to load
+sleep 1
 
 # ── 4. Capture text screenshot of all tabs ───────────────────────────
 mkdir -p "$(dirname "$TEXT_PATH")"
@@ -43,8 +56,8 @@ mkdir -p "$(dirname "$TEXT_PATH")"
 echo "=== SOURCE: index.ts ==="  >> "$TEXT_PATH"
 wc -l microapps/runtime-inspector/index.ts >> "$TEXT_PATH"
 
-# ── 5. Archive ───────────────────────────────────────────────────────
-SHOTS_DIR="scratch/autoresearch-shots"
+# ── 5. Archive into run subdir ────────────────────────────────────────
+SHOTS_DIR="autoresearch/runtime-inspector/shots"
 mkdir -p "$SHOTS_DIR"
 NEXT_NUM=$(printf "%03d" "$(( $(ls "$SHOTS_DIR"/*.txt 2>/dev/null | wc -l) + 1 ))")
 STAMP=$(date +%H%M%S)

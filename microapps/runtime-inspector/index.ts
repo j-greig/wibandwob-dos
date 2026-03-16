@@ -12,6 +12,7 @@ import {
   createTabs,
   fetchRuntimeCommands,
   fetchRuntimeInspection,
+  renderFiglet,
 } from "../../src/services/microapp-sdk.js";
 
 type PaneKey = "overview" | "ui" | "windows" | "commands" | "stats";
@@ -92,6 +93,11 @@ function blankLine(): string {
   return "│";
 }
 
+const SPIN = ["◐", "◓", "◑", "◒"];
+function spinChar(tick: number): string {
+  return SPIN[tick % SPIN.length]!;
+}
+
 // ── Pane renderers ────────────────────────────────────────────────────────
 
 function renderOverview(state: InspectorState): string {
@@ -111,6 +117,15 @@ function renderOverview(state: InspectorState): string {
   const heapVals = state.heapHistory.values();
 
   const lines: string[] = [];
+
+  // ── Figlet banner ──
+  const banner = renderFiglet("INSPECT", "small");
+  if (banner) {
+    for (const line of banner.split("\n")) {
+      if (line.trim()) lines.push(`  ${line}`);
+    }
+    lines.push("");
+  }
 
   // ── Identity ──
   lines.push(sectionHeader("IDENTITY"));
@@ -355,9 +370,11 @@ function openRuntimeInspector(host: MicroappHost) {
   function renderChrome() {
     const app = state.snapshot?.state.app;
     const focus = state.snapshot?.state.focus;
+    const spin = spinChar(state.refreshCount);
+    const agentIcon = state.snapshot?.stats.agent.active ? "● AGENT" : "○ idle";
     header.update({
-      left: ` {bold}Runtime Inspector{/bold}  instance ${app?.instanceId ?? "?"} · windows ${state.snapshot?.state.windows.length ?? 0} · focus ${clip(focus?.title ?? "none", 40)}`,
-      right: `updated ${state.updatedAt} `,
+      left: ` {bold}Runtime Inspector{/bold}  ${spin}  ${app?.instanceId ?? "?"}  ◆ ${state.snapshot?.state.windows.length ?? 0} wins  ${agentIcon}`,
+      right: `#${state.refreshCount} ${state.updatedAt} `,
     });
     const tabName = paneKeys[tabs.getActive()] ?? "overview";
     footer.update({
