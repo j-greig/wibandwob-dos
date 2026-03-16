@@ -19,16 +19,12 @@ export function keyToAction(
 
   if (ctrl || meta) return null; // Let ctrl/meta combos pass through
 
+  // Note: enter/return handled by blessed list's "select" event directly
   switch (key.name) {
-    case "enter":
-    case "return":
-      return "open";
     case "backspace":
       return "navigate-up";
     case "tab":
       return "toggle-view";
-    case "escape":
-      return "search-cancel";
     case "space":
       return "quicklook";
   }

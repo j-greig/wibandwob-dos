@@ -37,6 +37,8 @@ export interface ColumnManagerDeps {
   onSelect: (columnIndex: number, entry: FileEntry) => void;
   onNavigateInto: (columnIndex: number, dirPath: string) => void;
   onNavigateUp: () => void;
+  /** Called for keypresses the column doesn't handle internally. */
+  onKeypress?: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => void;
 }
 
 // ── Entry building ───────────────────────────────────────────────────────────
@@ -163,10 +165,16 @@ export function createColumn(
         deps.onNavigateInto(columnIndex, entry.fullPath);
       }
     } else {
-      // File selected — let the parent handle open
       deps.onSelect(columnIndex, entry);
     }
   });
+
+  // Forward unhandled keypresses to parent for action dispatch
+  if (deps.onKeypress) {
+    list.on("keypress", (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+      deps.onKeypress!(ch, key);
+    });
+  }
 
   return {
     list,

@@ -97,6 +97,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
   });
 
   // ── Status bar ─────────────────────────────────────────────────────────────
+  // ── Status bar: info left, buttons right ─────────────────────────────────
   const statusBar = blessed.box({
     parent: frame.body,
     bottom: 0,
@@ -106,6 +107,43 @@ export function openFileManagerV3(params: FileManagerParams): void {
     tags: true,
     style: theme().footer,
   });
+  const statusInfo = blessed.box({
+    parent: statusBar,
+    top: 0,
+    left: 0,
+    right: 42,
+    height: 1,
+    tags: true,
+    style: theme().footer,
+  });
+  // Clickable button bar (right side)
+  const btnStyle = { fg: theme().accent.fg, bg: theme().footer.bg ?? theme().body.bg };
+  const buttons = [
+    { label: " \u2195Sort ", action: () => dispatchAction("sort-cycle"), width: 7 },
+    { label: " \u21BBRefr ", action: () => dispatchAction("refresh"), width: 7 },
+    { label: " Edit ", action: () => dispatchAction("edit"), width: 6 },
+    { label: " Ext\u2197 ", action: () => dispatchAction("external-editor"), width: 6 },
+    { label: " Yank ", action: () => dispatchAction("yank-contents"), width: 6 },
+    { label: " Copy ", action: () => dispatchAction("copy-path"), width: 6 },
+  ];
+  let btnRight = 0;
+  const buttonWidgets: blessed.Widgets.BoxElement[] = [];
+  for (const btn of [...buttons].reverse()) {
+    const w = blessed.box({
+      parent: statusBar,
+      top: 0,
+      right: btnRight,
+      width: btn.width,
+      height: 1,
+      content: btn.label,
+      mouse: true,
+      clickable: true,
+      style: btnStyle,
+    });
+    w.on("click", btn.action);
+    buttonWidgets.push(w);
+    btnRight += btn.width;
+  }
 
   // ── Search engine ──────────────────────────────────────────────────────────
   const search = createSearchEngine({
@@ -149,6 +187,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
       onSelect: handleSelect,
       onNavigateInto: handleNavigateInto,
       onNavigateUp: handleNavigateUp,
+      onKeypress: handleColumnKeypress,
     }, depth, dirPath, Math.max(0, colLeft), layout.columnWidth);
 
     columnWidgets.push(col);
@@ -362,29 +401,42 @@ export function openFileManagerV3(params: FileManagerParams): void {
     params.overlays.flash("No external editor found");
   }
 
-  // ── Keyboard: global for the column area ───────────────────────────────────
+  // ── Keyboard handler (forwarded from each column's list widget) ─────────────
 
-  columnsContainer.on("keypress", (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+  function handleColumnKeypress(ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg): void {
+    // Left: go to parent column or navigate up
+    if (key.name === "left") {
+      if (activeColumnIndex > 0) {
+        activeColumnIndex--;
+        columnWidgets[activeColumnIndex]?.list.focus();
+        const entry = getSelectedEntry();
+        if (entry) handleSelect(activeColumnIndex, entry);
+        params.screen.render();
+      } else {
+        handleNavigateUp();
+      }
+      return;
+    }
+    // Right: drill into selected dir or move to next column
+    if (key.name === "right") {
+      const entry = getSelectedEntry();
+      if (entry?.isDirectory && entry.label !== "../") {
+        handleNavigateInto(activeColumnIndex, entry.fullPath);
+      } else if (activeColumnIndex < columnWidgets.length - 1) {
+        activeColumnIndex++;
+        columnWidgets[activeColumnIndex]?.list.focus();
+        params.screen.render();
+      }
+      return;
+    }
+
+    // Action dispatch (e, Y, E, c, o, v, etc.)
     const action = keyToAction(ch, key);
     if (action) {
       dispatchAction(action);
       return;
     }
-    // Left/right arrow: switch active column
-    if (key.name === "left" && activeColumnIndex > 0) {
-      activeColumnIndex--;
-      columnWidgets[activeColumnIndex]?.list.focus();
-      repositionColumns();
-      params.screen.render();
-      return;
-    }
-    if (key.name === "right" && activeColumnIndex < columnWidgets.length - 1) {
-      activeColumnIndex++;
-      columnWidgets[activeColumnIndex]?.list.focus();
-      repositionColumns();
-      params.screen.render();
-      return;
-    }
+
     // Jump-to-letter
     if (ch && isJumpChar(ch) && !isActionChar(ch)) {
       const col = columnWidgets[activeColumnIndex];
@@ -401,7 +453,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
         handleSelect(activeColumnIndex, match);
       }
     }
-  });
+  }
 
   // ── Context menu ────────────────────────────────────────────────────────────
 
@@ -544,9 +596,8 @@ export function openFileManagerV3(params: FileManagerParams): void {
     const totalSize = entries.filter(e => !e.isDirectory).reduce((s, e) => s + e.size, 0);
     const gs = gitSummary(git);
     const sortLabel = sortField.charAt(0).toUpperCase() + sortField.slice(1);
-    const macHints = IS_MAC ? " SPC:look o:finder" : "";
-    statusBar.setContent(
-      ` ${entries.length} items | ${dirs} dirs, ${files} files (${formatSize(totalSize)})${gs} | \u2195${sortLabel} | \u21B5:open e:edit E:ext Y:yank c:copy${macHints} s:search`,
+    statusInfo.setContent(
+      ` ${entries.length} items | ${dirs} dirs, ${files} files (${formatSize(totalSize)})${gs} | \u2195${sortLabel}`,
     );
   }
 
@@ -586,6 +637,8 @@ export function openFileManagerV3(params: FileManagerParams): void {
     [previewHeader, () => ({ ...theme().footer, bold: true })],
     [previewBox, () => theme().body],
     [statusBar, () => theme().footer],
+    [statusInfo, () => theme().footer],
+    ...buttonWidgets.map(w => [w, () => ({ fg: theme().accent.fg, bg: theme().footer.bg ?? theme().body.bg })] as RestyleEntry),
   ] as RestyleEntry[]).restyle;
 
   frame.cleanup = () => {
