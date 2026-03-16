@@ -40,6 +40,7 @@ export function keyToAction(
     case "o": return "reveal";
     case "s": return "search-start";
     case "/": return "filter-focus";
+    case "m": return "context-menu";
     default: return null;
   }
 }
@@ -55,7 +56,7 @@ export function isJumpChar(ch: string | undefined): boolean {
 /**
  * Actions that should NOT trigger jump-to-letter even though they're single chars.
  */
-const ACTION_CHARS = new Set(["v", "e", "c", "Y", "E", "o", "s"]);
+const ACTION_CHARS = new Set(["v", "e", "c", "Y", "E", "o", "s", "m"]);
 
 export function isActionChar(ch: string): boolean {
   return ACTION_CHARS.has(ch);

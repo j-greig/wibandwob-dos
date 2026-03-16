@@ -34,7 +34,10 @@ export interface ColumnManagerDeps {
   screen: blessed.Widgets.Screen;
   git: GitState;
   sortField: SortField;
+  /** Called when selection changes (arrow keys). */
   onSelect: (columnIndex: number, entry: FileEntry) => void;
+  /** Called when Enter is pressed on a file (open it). */
+  onOpenFile: (columnIndex: number, entry: FileEntry) => void;
   onNavigateInto: (columnIndex: number, dirPath: string) => void;
   onNavigateUp: () => void;
   /** Called for keypresses the column doesn't handle internally. */
@@ -154,7 +157,7 @@ export function createColumn(
     }
   });
 
-  // Enter → open or navigate into
+  // Enter → open file or navigate into directory
   list.on("select", (_item, idx) => {
     const entry = entries[idx];
     if (!entry) return;
@@ -165,7 +168,8 @@ export function createColumn(
         deps.onNavigateInto(columnIndex, entry.fullPath);
       }
     } else {
-      deps.onSelect(columnIndex, entry);
+      // Enter on a file → open it (not just preview)
+      deps.onOpenFile(columnIndex, entry);
     }
   });
 

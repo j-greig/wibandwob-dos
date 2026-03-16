@@ -185,6 +185,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
       git,
       sortField,
       onSelect: handleSelect,
+      onOpenFile: (_, entry) => { params.onOpenFile(entry.fullPath); },
       onNavigateInto: handleNavigateInto,
       onNavigateUp: handleNavigateUp,
       onKeypress: handleColumnKeypress,
@@ -370,6 +371,16 @@ export function openFileManagerV3(params: FileManagerParams): void {
       case "refresh": {
         const currentCol = columnWidgets[activeColumnIndex];
         if (currentCol) navigateTo(currentCol.state.path, activeColumnIndex);
+        break;
+      }
+      case "context-menu": {
+        // Show context menu near the active column's selected item
+        const col = columnWidgets[activeColumnIndex];
+        if (col) {
+          const x = Number(col.list.aleft || 0) + 2;
+          const y = Number(col.list.atop || 0) + (col.state.selectedIndex - (col.list.childBase || 0)) + 1;
+          showContextMenu(x, y);
+        }
         break;
       }
     }
