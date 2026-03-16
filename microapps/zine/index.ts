@@ -316,21 +316,14 @@ export default function setup(host: MicroappHost) {
     // ── Toolbar (bottom nav bar) ────────────────────────────────────
     let paused = false;
     type ToolbarAction = "sidebar" | "search" | "pause";
-    const toolbar = createButtonBar<ToolbarAction>(
+    const toolbar = createButtonBar(
       root,
-      [
-        { id: "sidebar", label: "[ ] Files" },
-        { id: "search",  label: "/ Search"  },
-        { id: "pause",   label: "⏸ Pause"   },
-      ],
-      (id) => {
-        if (id === "sidebar") toggleSidebar();
-        else if (id === "search") inlineSearch.open();
-        else if (id === "pause") {
-          paused = !paused;
-          updateStatus();
-          host.screen.render();
-        }
+      {
+        buttons: [
+          { label: "[ ] Files", action: () => toggleSidebar() },
+          { label: "/ Search",  action: () => inlineSearch.open() },
+          { label: "⏸ Pause",   action: () => { paused = !paused; updateStatus(); host.screen.render(); } },
+        ],
       },
     );
     // Position the bar at the bottom of root and call layout() to place buttons
