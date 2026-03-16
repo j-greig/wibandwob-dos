@@ -172,25 +172,34 @@ function renderOverview(state: InspectorState): string {
   }
   lines.push("");
 
-  // ── Health ──
+  // ── Health + Agent (two-column layout) ──
   const prev = state.prevSnapshot;
-  lines.push(sectionHeader("HEALTH"));
-  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}${delta(s.stats.render.fps, prev?.stats.render.fps)}`));
-  lines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms${delta(s.stats.render.avgFrameMs, prev?.stats.render.avgFrameMs)}`));
-  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 24)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`));
-  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`));
-  lines.push(sectionFooter());
+  const healthLines: string[] = [];
+  healthLines.push(sectionHeader("HEALTH", colW));
+  healthLines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}${delta(s.stats.render.fps, prev?.stats.render.fps)}`, 12));
+  healthLines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms${delta(s.stats.render.avgFrameMs, prev?.stats.render.avgFrameMs)}`, 12));
+  healthLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB ${progressBar(s.stats.rssMb, 512, 20)}${delta(s.stats.rssMb, prev?.stats.rssMb)}`, 12));
+  healthLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB ${progressBar(s.stats.heapUsedMb, 256, 20)}${delta(s.stats.heapUsedMb, prev?.stats.heapUsedMb)}`, 12));
+  healthLines.push(sectionFooter(colW));
+
+  const agentLines: string[] = [];
+  agentLines.push(sectionHeader("AGENT", colW));
+  agentLines.push(kvLine("status", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
+  agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
+  agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
+  agentLines.push(kvLine("tools", String(s.stats.agent.toolRunCount), 12));
+  agentLines.push(kvLine("scramble", `${s.scramble.status} · ${s.scramble.model}`, 12));
+  agentLines.push(sectionFooter(colW));
+
+  const maxRows2 = Math.max(healthLines.length, agentLines.length);
+  for (let i = 0; i < maxRows2; i++) {
+    const left = (healthLines[i] ?? "").padEnd(colW);
+    const right = agentLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
   lines.push("");
 
-  // ── Agent & Scramble ──
-  lines.push(sectionHeader("AGENT"));
-  lines.push(kvLine("status", s.stats.agent.active ? "● ACTIVE" : "○ idle"));
-  lines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming)));
-  lines.push(kvLine("messages", String(s.stats.agent.messageCount)));
-  lines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount)));
-  lines.push(kvLine("scramble", `${s.scramble.status} · ${s.scramble.model}`));
-  lines.push(sectionFooter());
-  lines.push("");
+  // (Agent section now in two-column layout above)
 
   // ── Footer ──
   const winCount = s.state.windows.length;
