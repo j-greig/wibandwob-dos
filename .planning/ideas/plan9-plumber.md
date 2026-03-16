@@ -59,3 +59,20 @@ plumberService.route({ action: "open", data: "/path/to/file.md" });
 Medium-term. Not blocking current work but architecturally significant.
 Fits the symbient philosophy — plumbing is content-aware routing that both
 humans and agents use identically.
+
+## wibwob:// URL Scheme
+
+Register a macOS URL handler for `wibwob://` URIs. When Ghostty (or any terminal)
+renders an OSC 8 hyperlink with `wibwob://open?path=/foo/bar`, clicking it routes
+to the running WibWob-DOS file browser via the control API.
+
+Use cases:
+- Pi agent output with clickable file paths → open in wibwob file browser
+- Terminal output with file references → plumb to editor/viewer
+- Cross-process routing (any tool can emit wibwob:// links)
+
+Implementation:
+1. macOS .app bundle or `open -a` handler registered for `wibwob://`
+2. Handler script: parse URI, call `wibwob run "finder.open" --path <path>`
+3. Fallback: if wibwob not running, `open <path>` (system default)
+4. Pi extension: emit file paths as OSC 8 links with `wibwob://` scheme

@@ -110,6 +110,8 @@ import {
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
+import { registerAllHostWindows } from "./host-window-registrations.js";
+import { getHostWindow, type HostWindowDeps } from "./host-window-registry.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -117,8 +119,8 @@ import {
 import { ScrambleBrain } from "../services/scramble-brain.js";
 
 
-import { openMusicPlayerWindow } from "../windows/music-player-window.js";
-import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
+// music-player-window — now registered via host-window-registry
+// terrain-lab-window — now registered via host-window-registry
 // Editor window factory now used via EditorCoordinator
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
@@ -452,6 +454,7 @@ export class TsTuiMvpApp {
 
     // Rebuild menus after microapps may have registered dynamic commands
     this.rebuildMenusFromCommands();
+    registerAllHostWindows();
 
     this.renderChrome();
     this.runtimeStats.init();
@@ -709,6 +712,43 @@ export class TsTuiMvpApp {
 
   /** Focus an existing window of appType, or create one. Single-instance by default.
    *  Returns undefined if the create function did not actually produce a new window. */
+  /** Build the standard deps object for host window factories. */
+  private buildHostWindowDeps(): HostWindowDeps {
+    return {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      content: this.content,
+      backrooms: this.backrooms,
+      editor: this.editor,
+      geometry: this.geometry,
+      runtimeNode: this.runtimeNode,
+      runtimeCommands: this.runtimeCommands,
+      runtimeInspection: this.runtimeInspection,
+      runtimeWindows: this.runtimeWindows,
+      runtimeWorkspace: this.runtimeWorkspace,
+      invalidation: this.invalidation,
+      commands: this.commands,
+      scrambleBrain: this.scrambleBrain,
+      onStateChanged: () => this.syncLiveState(),
+      openTextViewer: (title, content, kind, filePath) =>
+        this.openTextViewerWindow(title, content, kind as any, filePath),
+      openFile: (filePath) => this.editor.openFile(filePath),
+      flash: (msg) => this.overlays.flash(msg),
+    };
+  }
+
+  /**
+   * Open a host window via the declarative registry.
+   * Falls back to undefined if the appType is not registered.
+   */
+  openHostWindow(appType: string, restore?: Record<string, unknown>): WindowRecord | undefined {
+    const entry = getHostWindow(appType);
+    if (!entry) return undefined;
+    const deps = this.buildHostWindowDeps();
+    return this.focusOrCreate(appType as any, () => entry.factory(deps, restore), entry.multiInstance);
+  }
+
   private focusOrCreate(
     appType: AppType,
     createFn: () => void,
@@ -1070,13 +1110,7 @@ export class TsTuiMvpApp {
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
   private openTerrainLabWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("terrain-lab", () => {
-      openTerrainLabStudioWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    return this.openHostWindow("terrain-lab");
   }
 
   // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
@@ -1108,17 +1142,7 @@ export class TsTuiMvpApp {
     filePath?: string;
     volume?: number;
   }): WindowRecord | undefined {
-    return this.focusOrCreate("music-player", () => {
-      openMusicPlayerWindow(
-        {
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          onStateChanged: () => this.syncLiveState(),
-        },
-        restore,
-      );
-    });
+    return this.openHostWindow("music-player", restore as any);
   }
 
   private openCompanionWindow(restore?: {
