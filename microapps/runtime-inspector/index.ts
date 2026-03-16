@@ -86,7 +86,7 @@ function sectionFooter(width: number = 60): string {
 }
 
 function kvLine(key: string, value: string, keyWidth: number = 16): string {
-  return `│ ${key.padEnd(keyWidth)} ${value}`;
+  return `│  ${key.padEnd(keyWidth)} │ ${value}`;
 }
 
 function blankLine(): string {
@@ -381,7 +381,7 @@ function openRuntimeInspector(host: MicroappHost) {
       left: ` tab ${tabs.getActive() + 1}/${paneKeys.length} · ${tabName}`,
       right: state.error
         ? `error: ${clip(state.error, 60)} `
-        : "1-5 switch · Tab next · j/k scroll · r refresh ",
+        : "Tab/S-Tab switch · j/k scroll · r refresh ",
     });
   }
 

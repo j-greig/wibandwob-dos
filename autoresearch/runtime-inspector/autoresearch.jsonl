@@ -1,3 +1,4 @@
 {"type":"config","name":"Runtime Inspector UI Quality","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"5aa889e","metric":3.8,"metrics":{"layout":4,"readability":5,"structure":4,"interactivity":3,"character":3},"status":"keep","description":"Baseline: plain text dump, L4 R5 S4 I3 Ch3","timestamp":1773666433538,"segment":0}
 {"run":2,"commit":"971d3ab","metric":5.8,"metrics":{"layout":6,"readability":6,"structure":7,"interactivity":5,"character":5},"status":"keep","description":"Box-drawing sections, sparklines, progress bars, visual indicators. L6 R6 S7 I5 Ch5","timestamp":1773666618373,"segment":0}
+{"run":3,"commit":"07b746b","metric":6.4,"metrics":{"layout":7,"readability":6,"structure":7,"interactivity":6,"character":6},"status":"keep","description":"Figlet INSPECT banner, spinning refresh indicator, richer header chrome. L7 R6 S7 I6 Ch6","timestamp":1773666738353,"segment":0}
