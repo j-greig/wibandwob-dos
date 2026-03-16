@@ -73,8 +73,8 @@ export function openFileManagerWindow(params: {
   //   < 80 cols  → 45%  (compact: sidebar needs more room)
   //   80–130     → 35%  (normal)
   //   > 130      → 28%  (wide: preview deserves the space)
-  const responsiveSplit = (): number => {
-    const w = Number(frame?.body?.width ?? params.screen.width) || 100;
+  const responsiveSplit = (bodyWidth?: number): number => {
+    const w = bodyWidth ?? (Number(params.screen.width) || 100);
     if (w < 80) return 45;
     if (w <= 130) return 35;
     return 28;
@@ -1680,7 +1680,7 @@ export function openFileManagerWindow(params: {
   frame.frame.on("resize", () => {
     // Recalc responsive split unless user has manually dragged
     if (!splitLocked) {
-      splitRatio = responsiveSplit();
+      splitRatio = responsiveSplit(Number(frame.body.width) || undefined);
     }
     renderFilter();
     renderSearchBox();
