@@ -144,8 +144,17 @@ function renderOverview(state: InspectorState): string {
     for (const line of banner.split("\n")) {
       if (line.trim()) lines.push(`  ${line}`);
     }
-    lines.push("");
   }
+
+  // ── System health bar ──
+  const healthScore = Math.min(100, Math.round(
+    (Math.min(s.stats.render.fps / 10, 1) * 40) +
+    (Math.max(0, 1 - s.stats.rssMb / 1024) * 30) +
+    (Math.max(0, 1 - s.stats.heapUsedMb / 512) * 30)
+  ));
+  const healthBar = progressBar(healthScore, 100, 40);
+  lines.push(`  system health  ${healthBar}  ${healthScore}%`);
+  lines.push("");
 
   // ── Identity + Desktop (two-column layout) ──
   const colW = 58;
