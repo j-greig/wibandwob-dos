@@ -1,1 +1,2 @@
 {"type":"config","name":"Runtime Inspector UI Quality","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"5aa889e","metric":3.8,"metrics":{"layout":4,"readability":5,"structure":4,"interactivity":3,"character":3},"status":"keep","description":"Baseline: plain text dump, L4 R5 S4 I3 Ch3","timestamp":1773666433538,"segment":0}

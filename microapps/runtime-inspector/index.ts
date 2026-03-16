@@ -22,6 +22,11 @@ interface InspectorState {
   error?: string;
   updatedAt: string;
   refreshInFlight: boolean;
+  fpsHistory: RingBuffer;
+  rssHistory: RingBuffer;
+  heapHistory: RingBuffer;
+  frameHistory: RingBuffer;
+  refreshCount: number;
 }
 
 function clip(value: string, width: number): string {
@@ -30,138 +35,237 @@ function clip(value: string, width: number): string {
 }
 
 function fmtBool(value: boolean): string {
-  return value ? "yes" : "no";
+  return value ? "●" : "○";
 }
 
 function fmtList(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
+// ── Visual helpers ────────────────────────────────────────────────────────
+
+const SPARK = "▁▂▃▄▅▆▇█";
+const BAR_FILL = "█";
+const BAR_EMPTY = "░";
+
+/** Rolling buffer for sparkline history */
+class RingBuffer {
+  private buf: number[];
+  private pos = 0;
+  private full = false;
+  constructor(private size: number) { this.buf = new Array(size).fill(0); }
+  push(v: number) { this.buf[this.pos] = v; this.pos = (this.pos + 1) % this.size; if (this.pos === 0) this.full = true; }
+  values(): number[] {
+    if (!this.full) return this.buf.slice(0, this.pos);
+    return [...this.buf.slice(this.pos), ...this.buf.slice(0, this.pos)];
+  }
+}
+
+function sparkline(values: number[]): string {
+  if (values.length === 0) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  return values.map((v) => SPARK[Math.min(Math.floor(((v - min) / range) * 7), 7)]).join("");
+}
+
+function progressBar(value: number, max: number, width: number): string {
+  const ratio = Math.min(value / (max || 1), 1);
+  const filled = Math.round(ratio * width);
+  return BAR_FILL.repeat(filled) + BAR_EMPTY.repeat(width - filled);
+}
+
+function sectionHeader(title: string, width: number = 60): string {
+  const pad = width - title.length - 4;
+  return `┌─ ${title} ${"─".repeat(Math.max(0, pad))}┐`;
+}
+
+function sectionFooter(width: number = 60): string {
+  return `└${"─".repeat(width - 2)}┘`;
+}
+
+function kvLine(key: string, value: string, keyWidth: number = 16): string {
+  return `│ ${key.padEnd(keyWidth)} ${value}`;
+}
+
+function blankLine(): string {
+  return "│";
+}
+
 // ── Pane renderers ────────────────────────────────────────────────────────
 
 function renderOverview(state: InspectorState): string {
   if (!state.snapshot) {
-    return state.error ? `Runtime Inspector\n\nError: ${state.error}` : "Runtime Inspector\n\nLoading…";
+    return state.error
+      ? `  ⚠ Error: ${state.error}`
+      : "  ◌ Loading…";
   }
   const s = state.snapshot;
   const app = s.state.app;
   const focus = s.state.focus;
   const overlay = s.ui.overlay;
   const blockerLabels = s.ui.blockers.map((b) => b.label || b.type);
-  return [
-    "Runtime Inspector",
-    "",
-    "Identity",
-    `  instanceId      ${app.instanceId ?? "?"}`,
-    `  instanceLabel   ${app.instanceLabel ?? "-"}`,
-    `  theme           ${app.theme ?? "-"}`,
-    `  api             ${app.controlApiBaseUrl ?? "-"}`,
-    "",
-    "Desktop",
-    `  windows         ${s.state.windows.length}`,
-    `  focus           ${focus.windowId ?? "none"} ${focus.title ?? ""}`.trimEnd(),
-    `  menu            ${s.ui.menu.open ? s.ui.menu.label ?? "open" : "closed"}`,
-    `  overlay         ${overlay ? `${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}` : "none"}`,
-    `  blocked         ${fmtBool(s.ui.blocked)}`,
-    `  blockers        ${fmtList(blockerLabels)}`,
-    "",
-    "Health",
-    `  render fps      ${s.stats.render.fps.toFixed(1)}`,
-    `  avg frame       ${s.stats.render.avgFrameMs.toFixed(1)}ms`,
-    `  rss             ${s.stats.rssMb.toFixed(1)}MB`,
-    `  heap            ${s.stats.heapUsedMb.toFixed(1)}MB`,
-    `  agent           ${s.stats.agent.active ? "active" : "idle"}`,
-    `  scramble        ${s.scramble.status} · ${s.scramble.model}`,
-    "",
-    `Commands visible: ${state.commands.length}`,
-    `Updated: ${state.updatedAt}`,
-  ].join("\n");
+
+  const fpsVals = state.fpsHistory.values();
+  const rssVals = state.rssHistory.values();
+  const heapVals = state.heapHistory.values();
+
+  const lines: string[] = [];
+
+  // ── Identity ──
+  lines.push(sectionHeader("IDENTITY"));
+  lines.push(kvLine("instance", `${app.instanceId ?? "?"} ${app.instanceLabel ? `(${app.instanceLabel})` : ""}`));
+  lines.push(kvLine("theme", app.theme ?? "-"));
+  lines.push(kvLine("api", app.controlApiBaseUrl ?? "-"));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  // ── Desktop ──
+  lines.push(sectionHeader("DESKTOP"));
+  lines.push(kvLine("windows", String(s.state.windows.length)));
+  lines.push(kvLine("focus", `${focus.windowId ?? "—"} ${focus.title ?? ""}`.trimEnd()));
+  lines.push(kvLine("menu", s.ui.menu.open ? `● ${s.ui.menu.label ?? "open"}` : "○ closed"));
+  lines.push(kvLine("overlay", overlay ? `${overlay.type}${overlay.label ? ` · ${overlay.label}` : ""}` : "—"));
+  lines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blocked ? fmtList(blockerLabels) : ""}`));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  // ── Health ──
+  lines.push(sectionHeader("HEALTH"));
+  lines.push(kvLine("render fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`));
+  lines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
+  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 20)}  ${sparkline(rssVals)}`));
+  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 20)}  ${sparkline(heapVals)}`));
+  lines.push(kvLine("total frames", String(s.stats.render.totalFrames)));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  // ── Agent & Scramble ──
+  lines.push(sectionHeader("AGENT"));
+  lines.push(kvLine("status", s.stats.agent.active ? "● ACTIVE" : "○ idle"));
+  lines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming)));
+  lines.push(kvLine("messages", String(s.stats.agent.messageCount)));
+  lines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount)));
+  lines.push(kvLine("scramble", `${s.scramble.status} · ${s.scramble.model}`));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  // ── Footer ──
+  lines.push(`  ${state.commands.length} commands · refresh #${state.refreshCount} · ${state.updatedAt}`);
+
+  return lines.join("\n");
 }
 
 function renderUi(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading UI state…";
+  if (!s) return "  ◌ Loading UI state…";
   const overlay = s.ui.overlay;
-  const lines = [
-    "UI State",
-    "",
-    `menu.open     ${fmtBool(s.ui.menu.open)}`,
-    `menu.label    ${s.ui.menu.label ?? "-"}`,
-    `overlay.type  ${overlay?.type ?? "-"}`,
-    `overlay.label ${overlay?.label ?? "-"}`,
-    `blocked       ${fmtBool(s.ui.blocked)}`,
-    "",
-    "Blockers",
-  ];
+  const lines: string[] = [];
+
+  lines.push(sectionHeader("MENU"));
+  lines.push(kvLine("open", fmtBool(s.ui.menu.open)));
+  lines.push(kvLine("label", s.ui.menu.label ?? "—"));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  lines.push(sectionHeader("OVERLAY"));
+  lines.push(kvLine("type", overlay?.type ?? "—"));
+  lines.push(kvLine("label", overlay?.label ?? "—"));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  lines.push(sectionHeader("BLOCKERS"));
+  lines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blockers.length > 0 ? `(${s.ui.blockers.length})` : ""}`));
   if (s.ui.blockers.length === 0) {
-    lines.push("  none");
+    lines.push(kvLine("", "none"));
   } else {
     for (const b of s.ui.blockers) {
-      lines.push(`  - ${b.type}${b.label ? ` · ${b.label}` : ""}`);
-      if (b.escapeCommands?.length) lines.push(`      escape: ${b.escapeCommands.join(", ")}`);
-      if (b.continueCommands?.length) lines.push(`      continue: ${b.continueCommands.join(", ")}`);
+      lines.push(kvLine("", `▸ ${b.type}${b.label ? ` · ${b.label}` : ""}`));
+      if (b.escapeCommands?.length) lines.push(kvLine("  escape", b.escapeCommands.join(", ")));
+      if (b.continueCommands?.length) lines.push(kvLine("  continue", b.continueCommands.join(", ")));
     }
   }
+  lines.push(sectionFooter());
+
   return lines.join("\n");
 }
 
 function renderWindows(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading windows…";
-  if (s.state.windows.length === 0) return "No open windows.";
+  if (!s) return "  ◌ Loading windows…";
+  if (s.state.windows.length === 0) return "  No open windows.";
   const windows = s.state.windows.slice().sort((a, b) => a.zIndex - b.zIndex);
-  return [
-    "Windows",
-    "",
-    " id  type                     title                          pos       size     z  f",
-    ...windows.map((w) => {
-      const appType = clip(w.appType ?? w.kind, 24).padEnd(24);
-      const title = clip(w.title, 30).padEnd(30);
-      const pos = `@${w.left},${w.top}`.padEnd(9);
-      const size = `${w.width}x${w.height}`.padEnd(8);
-      return `${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${w.focused ? "*" : "-"}`;
-    }),
-  ].join("\n");
+  const lines: string[] = [];
+  lines.push(sectionHeader(`WINDOWS (${windows.length})`));
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(24)} ${"TITLE".padEnd(28)} ${"POS".padEnd(9)} ${"SIZE".padEnd(8)} ${"Z".padStart(2)}  F`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(24)} ${"─".repeat(28)} ${"─".repeat(9)} ${"─".repeat(8)} ${"──"}  ─`);
+  for (const w of windows) {
+    const appType = clip(w.appType ?? w.kind, 24).padEnd(24);
+    const title = clip(w.title, 28).padEnd(28);
+    const pos = `@${w.left},${w.top}`.padEnd(9);
+    const size = `${w.width}x${w.height}`.padEnd(8);
+    const focus = w.focused ? "◆" : "·";
+    lines.push(`│ ${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${focus}`);
+  }
+  lines.push(sectionFooter());
+  return lines.join("\n");
 }
 
 function renderCommands(commands: CommandListItem[]): string {
-  if (commands.length === 0) return "Loading commands…";
+  if (commands.length === 0) return "  ◌ Loading commands…";
   const rows = commands.slice().sort((a, b) => a.id.localeCompare(b.id));
-  return [
-    `Commands (${rows.length})`,
-    "",
-    " id                                 surf         availability  label",
-    ...rows.map((c) => {
-      const surfaces = clip(c.surfaces.join(","), 12).padEnd(12);
-      const availability = (c.available ? "ready" : "off").padEnd(12);
-      return ` ${clip(c.id, 34).padEnd(34)} ${surfaces} ${availability} ${c.label}`;
-    }),
-  ].join("\n");
+  const ready = rows.filter((c) => c.available).length;
+  const lines: string[] = [];
+  lines.push(sectionHeader(`COMMANDS (${rows.length} total, ${ready} ready)`));
+  lines.push(`│ ${"ID".padEnd(34)} ${"SURF".padEnd(12)} ${"AVAIL".padEnd(6)} LABEL`);
+  lines.push(`│ ${"─".repeat(34)} ${"─".repeat(12)} ${"─".repeat(6)} ${"─".repeat(20)}`);
+  for (const c of rows) {
+    const surfaces = clip(c.surfaces.join(","), 12).padEnd(12);
+    const avail = c.available ? "  ●  " : "  ○  ";
+    lines.push(`│ ${clip(c.id, 34).padEnd(34)} ${surfaces} ${avail} ${c.label}`);
+  }
+  lines.push(sectionFooter());
+  return lines.join("\n");
 }
 
-function renderStats(s: RuntimeInspectionSnapshot | undefined): string {
-  if (!s) return "Loading stats…";
-  return [
-    "Runtime Stats",
-    "",
-    "Render",
-    `  fps              ${s.stats.render.fps.toFixed(1)}`,
-    `  avgFrameMs       ${s.stats.render.avgFrameMs.toFixed(1)}`,
-    `  totalFrames      ${s.stats.render.totalFrames}`,
-    "",
-    "Memory",
-    `  rssMb            ${s.stats.rssMb.toFixed(1)}`,
-    `  heapUsedMb       ${s.stats.heapUsedMb.toFixed(1)}`,
-    "",
-    "Agent",
-    `  active           ${fmtBool(s.stats.agent.active)}`,
-    `  streaming        ${fmtBool(s.stats.agent.streaming)}`,
-    `  messageCount     ${s.stats.agent.messageCount}`,
-    `  toolRunCount     ${s.stats.agent.toolRunCount}`,
-    "",
-    "Scramble",
-    `  status           ${s.scramble.status}`,
-    `  model            ${s.scramble.model}`,
-    `  sessionId        ${s.scramble.sessionId}`,
-  ].join("\n");
+function renderStats(state: InspectorState): string {
+  const s = state.snapshot;
+  if (!s) return "  ◌ Loading stats…";
+
+  const fpsVals = state.fpsHistory.values();
+  const rssVals = state.rssHistory.values();
+  const heapVals = state.heapHistory.values();
+
+  const lines: string[] = [];
+
+  lines.push(sectionHeader("RENDER"));
+  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`));
+  lines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
+  lines.push(kvLine("total frames", String(s.stats.render.totalFrames)));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  lines.push(sectionHeader("MEMORY"));
+  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(1)}MB  ${progressBar(s.stats.rssMb, 512, 24)}`));
+  lines.push(kvLine("rss history", sparkline(rssVals)));
+  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(1)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}`));
+  lines.push(kvLine("heap history", sparkline(heapVals)));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  lines.push(sectionHeader("AGENT"));
+  lines.push(kvLine("active", s.stats.agent.active ? "● ACTIVE" : "○ idle"));
+  lines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming)));
+  lines.push(kvLine("messages", String(s.stats.agent.messageCount)));
+  lines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount)));
+  lines.push(sectionFooter());
+  lines.push("");
+
+  lines.push(sectionHeader("SCRAMBLE"));
+  lines.push(kvLine("status", s.scramble.status));
+  lines.push(kvLine("model", s.scramble.model));
+  lines.push(kvLine("session", s.scramble.sessionId));
+  lines.push(sectionFooter());
+
+  return lines.join("\n");
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────
@@ -203,6 +307,11 @@ function openRuntimeInspector(host: MicroappHost) {
     commands: [],
     updatedAt: "never",
     refreshInFlight: false,
+    fpsHistory: new RingBuffer(30),
+    rssHistory: new RingBuffer(30),
+    heapHistory: new RingBuffer(30),
+    frameHistory: new RingBuffer(30),
+    refreshCount: 0,
   };
 
   const paneKeys: PaneKey[] = ["overview", "ui", "windows", "commands", "stats"];
@@ -240,7 +349,7 @@ function openRuntimeInspector(host: MicroappHost) {
     paneContent.set("ui", renderUi(state.snapshot));
     paneContent.set("windows", renderWindows(state.snapshot));
     paneContent.set("commands", renderCommands(state.commands));
-    paneContent.set("stats", renderStats(state.snapshot));
+    paneContent.set("stats", renderStats(state));
   }
 
   function renderChrome() {
@@ -280,6 +389,15 @@ function openRuntimeInspector(host: MicroappHost) {
       state.commands = commandsPayload.commands;
       state.updatedAt = new Date().toLocaleTimeString();
       state.error = undefined;
+      state.refreshCount++;
+      // Push history for sparklines
+      const snap = state.snapshot;
+      if (snap) {
+        state.fpsHistory.push(snap.stats.render.fps);
+        state.rssHistory.push(snap.stats.rssMb);
+        state.heapHistory.push(snap.stats.heapUsedMb);
+        state.frameHistory.push(snap.stats.render.avgFrameMs);
+      }
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error);
     } finally {
