@@ -106,13 +106,10 @@ import {
   promptForBackroomsRunOptions as promptForBackroomsRunOptionsWindow,
   promptForBackroomsTv as promptForBackroomsTvWindow,
 } from "../windows/backrooms-windows.js";
-import { openFileManagerWindow as openFarjsFileManagerWindow, type FileManagerRestore } from "../windows/file-manager-window.js";
-import { openPrimerBrowserWindow as openPrimerBrowserListWindow } from "../windows/primer-browser-window.js";
-import { openPrimerGalleryWindow as openPrimerGalleryListWindow } from "../windows/primer-gallery-window.js";
+import { type FileManagerRestore } from "../windows/file-manager-window.js";
 import { openTextViewerWindow as openContentViewerWindow } from "../windows/text-viewer-window.js";
-import { openBrowserReaderWindow as openBrowserReaderContentWindow } from "../windows/browser-reader-window.js";
+// browser-reader-window — now registered via host-window-registry
 import {
-  openCommandPaletteWindow as openPaletteWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
@@ -131,7 +128,7 @@ import { ScrambleBrain } from "../services/scramble-brain.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { ChromeBrowserService } from "../services/chrome-browser-service.js";
-import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
+// chrome-browser-window — now registered via host-window-registry
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 
@@ -985,16 +982,7 @@ export class TsTuiMvpApp {
   private openPrimerBrowserWindow(restore?: {
     selectedIndex?: number;
   }): WindowRecord | undefined {
-    return this.focusOrCreate("primer-browser", () => {
-      openPrimerBrowserListWindow({
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        entries: this.content.collectPrimerEntries(),
-        onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    return this.openHostWindow("primer-browser", restore as Record<string, unknown> | undefined);
   }
 
   private getFocusedFinder() {
@@ -1022,28 +1010,7 @@ export class TsTuiMvpApp {
   private openFileManagerWindow(
     restore?: FileManagerRestore,
   ): WindowRecord | undefined {
-    return this.focusOrCreate("file-manager", () => {
-      openFarjsFileManagerWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        startPath: restore?.currentPath ?? REPO_ROOT,
-        restore,
-        onOpenFile: (filePath) => {
-          this.editor.openFile(filePath);
-        },
-        onViewFile: (filePath) => {
-          const content = safeReadFile(filePath) ?? "";
-          this.openTextViewerWindow(
-            path.basename(filePath),
-            content,
-            "reader",
-            filePath,
-          );
-        },
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    return this.openHostWindow("file-manager", restore as Record<string, unknown> | undefined);
   }
 
   private openPrimerGalleryWindow(restore?: {
@@ -1051,54 +1018,19 @@ export class TsTuiMvpApp {
     searchValue?: string;
     selectedIndex?: number;
   }): WindowRecord | undefined {
-    const allEntries = this.content.collectGalleryEntries();
-    return this.focusOrCreate("primer-gallery", () => {
-      openPrimerGalleryListWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        allEntries,
-        tabs: this.content.buildGalleryTabs(allEntries),
-        onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    return this.openHostWindow("primer-gallery", restore as Record<string, unknown> | undefined);
   }
 
   private openChromeBrowserWindow(
     initialUrl?: string,
   ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "web-reader",
-      () => {
-        openChromeBrowserWindow({
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          initialUrl,
-          onStateChanged: () => this.syncLiveState(),
-        });
-      },
-      true,
-    );
+    return this.openHostWindow("web-reader", initialUrl ? { url: initialUrl } : undefined);
   }
 
   private openBrowserReaderWindow(
     filePath = MASTER_PHILOSOPHY_PATH,
   ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "reader-viewer",
-      () => {
-        openBrowserReaderContentWindow({
-          filePath,
-          onOpenTextViewer: (title, content, kind, nextFilePath) =>
-            this.openTextViewerWindow(title, content, kind, nextFilePath),
-          onError: (message) => this.overlays.flash(message),
-        });
-      },
-      true,
-    );
+    return this.openHostWindow("reader-viewer", { filePath });
   }
 
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
@@ -1199,12 +1131,7 @@ export class TsTuiMvpApp {
   }
 
   private openCommandPaletteWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("command-palette", () => {
-      openPaletteWindow({
-        windowManager: this.windowManager,
-        commands: this.commands.buildPalette(),
-      });
-    });
+    return this.openHostWindow("command-palette");
   }
 
   private promptForPrimer(): void {

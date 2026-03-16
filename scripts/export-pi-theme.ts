@@ -120,28 +120,28 @@ const piTheme = {
     warning: "warning",
     muted: "muted",
     dim: "dim",
-    text: "text",
+    text: "",                    // terminal native text
     thinkingText: "muted",
 
-    // Backgrounds — darkest possible base, base for surfaces
-    selectedBg: "base",
-    userMessageBg: "base",
-    userMessageText: "text",
-    customMessageBg: "base",
-    customMessageText: "text",
+    // Backgrounds — "" = terminal native (true black), darkest for subtle tint
+    selectedBg: "darkest",
+    userMessageBg: "",           // terminal native — as dark as it gets
+    userMessageText: "",
+    customMessageBg: "",
+    customMessageText: "",
     customMessageLabel: "chrome",
     toolPendingBg: "darkest",
-    toolSuccessBg: tintBg(darkestBg, successColor, 0.1),
-    toolErrorBg: tintBg(darkestBg, errorColor, 0.1),
-    toolTitle: "accent",         // blue for tool titles
-    toolOutput: "text",
+    toolSuccessBg: tintBg(darkestBg, successColor, 0.08),
+    toolErrorBg: tintBg(darkestBg, errorColor, 0.08),
+    toolTitle: "",               // terminal default — clean
+    toolOutput: "muted",
 
     // Markdown — pink headings, purple links, blue code
     mdHeading: "highlight",      // pink/red
     mdLink: "chrome",            // purple
     mdLinkUrl: "muted",
     mdCode: "accent",            // blue (not green)
-    mdCodeBlock: "text",
+    mdCodeBlock: "",             // terminal native for code blocks
     mdCodeBlockBorder: "dim",
     mdQuote: "muted",
     mdQuoteBorder: "chrome",
