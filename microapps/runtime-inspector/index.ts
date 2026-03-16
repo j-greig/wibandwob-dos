@@ -326,18 +326,21 @@ function renderCommands(commands: CommandListItem[]): string {
   const rows = commands.slice().sort((a, b) => a.id.localeCompare(b.id));
   const ready = rows.filter((c) => c.available).length;
 
-  // Namespace summary
+  // Namespace summary with mini bar chart
   const ns = new Map<string, number>();
   for (const c of rows) {
     const prefix = c.id.split(".").slice(0, -1).join(".") || c.id;
     ns.set(prefix, (ns.get(prefix) ?? 0) + 1);
   }
   const topNs = [...ns.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const nsSummary = topNs.map(([k, v]) => `${k} ${v}`).join(" · ");
+  const maxNs = topNs.length > 0 ? topNs[0]![1] : 1;
 
   const lines: string[] = [];
   lines.push(sectionHeader(`COMMANDS (${rows.length} total, ${ready} ready)`));
-  lines.push(`│  ${nsSummary}`);
+  for (const [name, count] of topNs) {
+    const barLen = Math.max(1, Math.round((count / maxNs) * 20));
+    lines.push(`│  ${name.padEnd(32)} ${BAR_FILL.repeat(barLen).padEnd(20)} ${String(count).padStart(3)}`);
+  }
   lines.push(`│`);
   lines.push(`│ ${"ID".padEnd(34)} ${"SURF".padEnd(12)} ${"AVAIL".padEnd(6)} LABEL`);
   lines.push(`│ ${"─".repeat(34)} ${"─".repeat(12)} ${"─".repeat(6)} ${"─".repeat(20)}`);
@@ -613,19 +616,7 @@ function openRuntimeInspector(host: MicroappHost) {
     });
   }
   win.body.key(["r"], () => void refresh());
-  win.body.key(["f"], () => {
-    // Toggle maximize
-    const s = state.snapshot?.state;
-    if (!s) return;
-    const screen = s.screen;
-    const w = win.window;
-    if (w.width === screen.width && w.height === screen.height - 1) {
-      w.left = 6; w.top = 3; w.width = 132; w.height = 58;
-    } else {
-      w.left = 0; w.top = 1; w.width = screen.width; w.height = screen.height - 1;
-    }
-    host.screen.render();
-  });
+  // (fullscreen toggle removed — win.window API not guaranteed)
   win.body.key(["j", "down"], () => scroll.scrollTo((scroll.element as any).childBase + 1));
   win.body.key(["k", "up"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 1)));
   win.body.key(["pagedown"], () => scroll.scrollTo((scroll.element as any).childBase + 12));
