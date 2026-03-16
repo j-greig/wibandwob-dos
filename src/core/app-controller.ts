@@ -732,7 +732,7 @@ export class TsTuiMvpApp {
       scrambleBrain: this.scrambleBrain,
       onStateChanged: () => this.syncLiveState(),
       openTextViewer: (title, content, kind, filePath) =>
-        this.openTextViewerWindow(title, content, kind as any, filePath),
+        this.openTextViewerWindow(title, content, kind, filePath),
       openFile: (filePath) => this.editor.openFile(filePath),
       flash: (msg) => this.overlays.flash(msg),
     };
@@ -746,7 +746,7 @@ export class TsTuiMvpApp {
     const entry = getHostWindow(appType);
     if (!entry) return undefined;
     const deps = this.buildHostWindowDeps();
-    return this.focusOrCreate(appType as any, () => entry.factory(deps, restore), entry.multiInstance);
+    return this.focusOrCreate(appType as AppType, () => entry.factory(deps, restore), entry.multiInstance);
   }
 
   private focusOrCreate(
@@ -1142,7 +1142,7 @@ export class TsTuiMvpApp {
     filePath?: string;
     volume?: number;
   }): WindowRecord | undefined {
-    return this.openHostWindow("music-player", restore as any);
+    return this.openHostWindow("music-player", restore);
   }
 
   private openCompanionWindow(restore?: {

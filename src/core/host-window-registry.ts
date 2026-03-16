@@ -39,7 +39,7 @@ export interface HostWindowDeps {
   commands: CommandRegistry;
   scrambleBrain: ScrambleBrain;
   onStateChanged: () => void;
-  openTextViewer: (title: string, content: string, kind: string, filePath?: string) => void;
+  openTextViewer: (title: string, content: string, kind: "primer" | "reader", filePath?: string) => void;
   openFile: (filePath: string) => void;
   flash: (msg: string) => void;
 }

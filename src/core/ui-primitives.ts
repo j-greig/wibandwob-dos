@@ -33,7 +33,7 @@ export function scrollableStyle(base: Record<string, any>): Record<string, any> 
  * Use this instead of `el.style = {...}` when restyling widgets.
  * @primitive
  */
-export function safeSetStyle(el: any, newStyle: Record<string, any>): void {
+export function safeSetStyle(el: { scrollable?: boolean; type?: string; style: Record<string, any> }, newStyle: Record<string, any>): void {
   const patched = { ...newStyle };
 
   // Blessed scrollable elements need style.scrollbar + style.track
