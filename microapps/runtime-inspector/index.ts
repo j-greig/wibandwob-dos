@@ -147,11 +147,10 @@ function renderOverview(state: InspectorState): string {
 
   // ── Health ──
   lines.push(sectionHeader("HEALTH"));
-  lines.push(kvLine("render fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`));
-  lines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
-  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 20)}  ${sparkline(rssVals)}`));
-  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 20)}  ${sparkline(heapVals)}`));
-  lines.push(kvLine("total frames", String(s.stats.render.totalFrames)));
+  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}`));
+  lines.push(kvLine("frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
+  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB  ${progressBar(s.stats.rssMb, 512, 24)}`));
+  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}`));
   lines.push(sectionFooter());
   lines.push("");
 
@@ -166,7 +165,7 @@ function renderOverview(state: InspectorState): string {
   lines.push("");
 
   // ── Footer ──
-  lines.push(`  ${state.commands.length} commands · refresh #${state.refreshCount} · ${state.updatedAt}`);
+  lines.push(`  ${state.commands.length} commands  ·  ${state.updatedAt}`);
 
   return lines.join("\n");
 }
