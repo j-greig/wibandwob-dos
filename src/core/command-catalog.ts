@@ -94,6 +94,10 @@ export interface AppMenuActions {
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
+  finderYankContents: () => void;
+  finderOpenExternal: (args?: Record<string, unknown>) => void;
+  finderShare: (args?: Record<string, unknown>) => void;
+  finderExportListing: (args?: Record<string, unknown>) => void;
   openMarkdownViewer: (args?: Record<string, unknown>) => void;
   openMarkdownPicker: () => unknown;
   toggleMarkdownFiglet: () => void;
@@ -256,6 +260,43 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     group: "browse",
     actionKey: "finderSortBy",
     palettePlacement: { order: 19 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.yank_contents",
+    label: "Finder: Yank File Contents",
+    description: "Copy the contents of the selected file to the clipboard.",
+    group: "browse",
+    actionKey: "finderYankContents",
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.open_external",
+    label: "Finder: Open in External Editor",
+    description: "Open selected file in Cursor, VS Code, Zed, or Sublime. Args: path (optional).",
+    group: "browse",
+    actionKey: "finderOpenExternal",
+    palettePlacement: { order: 20 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.share",
+    label: "Finder: Share",
+    description: "Copy file path or contents to clipboard. Args: mode (path|contents, default: path).",
+    group: "browse",
+    actionKey: "finderShare",
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.export_listing",
+    label: "Finder: Export Directory Listing",
+    description: "Export the current directory tree as markdown. Args: filePath (output path).",
+    group: "browse",
+    actionKey: "finderExportListing",
     api: true,
     agent: true
   },

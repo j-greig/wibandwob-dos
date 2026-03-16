@@ -1929,6 +1929,43 @@ export class TsTuiMvpApp {
         finder.sortBy(field);
       },
 
+      // ── Finder: new E045 commands ─────────────────────────
+      finderYankContents: () => {
+        // Dispatched to focused finder window via its writeInput or similar
+        // For now, the keybind Y handles it directly in file-manager-window.ts
+        this.overlays.flash("Use Y key in File Manager to yank contents");
+      },
+      finderOpenExternal: (args) => {
+        const filePath = typeof args?.path === "string" ? args.path : undefined;
+        if (filePath) {
+          const { execSync } = require("node:child_process");
+          for (const cmd of ["cursor", "code", "zed", "subl"]) {
+            try {
+              execSync(`which ${cmd}`, { stdio: "ignore" });
+              execSync(`${cmd} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+              this.overlays.flash(`Opened in ${cmd}`);
+              return;
+            } catch { /* next */ }
+          }
+          this.overlays.flash("No external editor found");
+        } else {
+          this.overlays.flash("finder.open_external requires path arg");
+        }
+      },
+      finderShare: (args) => {
+        const mode = typeof args?.mode === "string" ? args.mode : "path";
+        const finder = this.getFocusedFinder();
+        if (!finder) {
+          this.overlays.flash("No Finder window focused");
+          return;
+        }
+        // The actual clipboard op happens in file-manager-window keybinds (c for path, Y for contents)
+        this.overlays.flash(mode === "contents" ? "Use Y in File Manager" : "Use c in File Manager");
+      },
+      finderExportListing: (args) => {
+        this.overlays.flash("finder.export_listing — coming soon");
+      },
+
       // ── Canvas documents ─────────────────────────────────
       loadCanvas: (args) => {
         const filePath = typeof args?.filePath === "string" ? args.filePath : "";

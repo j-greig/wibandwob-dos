@@ -1132,6 +1132,49 @@ export function openFileManagerWindow(params: {
     }
   };
 
+  const yankFileContents = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return;
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      if (copyToClipboard(content)) {
+        params.overlays.flash(`Yanked ${content.split("\n").length} lines from ${path.basename(filePath)}`);
+      }
+    } catch {
+      params.overlays.flash("Could not read file");
+    }
+  };
+
+  const openSelectedInExternalEditor = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    // Detect installed editors in preference order
+    const editors = [
+      { cmd: "cursor", name: "Cursor" },
+      { cmd: "code", name: "VS Code" },
+      { cmd: "zed", name: "Zed" },
+      { cmd: "subl", name: "Sublime" },
+    ];
+    for (const editor of editors) {
+      try {
+        execSync(`which ${editor.cmd}`, { stdio: "ignore" });
+        execSync(`${editor.cmd} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        params.overlays.flash(`Opened in ${editor.name}`);
+        return;
+      } catch { /* not installed, try next */ }
+    }
+    // Fallback: $VISUAL or $EDITOR
+    const envEditor = process.env.VISUAL || process.env.EDITOR;
+    if (envEditor) {
+      try {
+        execSync(`${envEditor} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        params.overlays.flash(`Opened in ${envEditor}`);
+        return;
+      } catch { /* fall through */ }
+    }
+    params.overlays.flash("No external editor found (cursor, code, zed, subl)");
+  };
+
   const revealInFinder = (index?: number) => {
     const filePath = getEntryPath(index);
     if (!filePath) return;
@@ -1324,6 +1367,14 @@ export function openFileManagerWindow(params: {
     }
     if (key.name === "c" && !key.ctrl && !key.meta) {
       copyPathToClipboard();
+      return;
+    }
+    if (ch === "Y" && !key.ctrl && !key.meta) {
+      yankFileContents();
+      return;
+    }
+    if (ch === "E" && !key.ctrl && !key.meta) {
+      openSelectedInExternalEditor();
       return;
     }
     if (key.name === "o" && !key.ctrl && !key.meta) {
