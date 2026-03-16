@@ -165,7 +165,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       ].join("\n");
 
       // Set content directly to preserve ANSI codes
-      (infoBlock.node as any).setContent(infoText);
+      infoBlock.node.setContent(infoText);
       statusBar.update({
         left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
         right: `${s.terrain} \u2502 ${s.mode} \u2502 L${s.levels} \u2502 #${s.seed}`,

@@ -288,7 +288,7 @@ export function openFileManagerWindow(params: {
   });
   const list = listHandle.node;
   // Enable blessed tags for coloured file type indicators
-  (list as any).parseTags = true;
+  list.parseTags = true;
 
   // Left pane: icon grid (icon view) — full width, toggled via hidden
   const iconGrid = blessed.box({
@@ -316,7 +316,7 @@ export function openFileManagerWindow(params: {
     left: `${PREVIEW_SPLIT_RATIO}%`,
     width: 1,
     bottom: 1,
-    style: { fg: (theme() as any).border?.fg || "gray", bg: theme().body?.bg },
+    style: { fg: theme().muted.fg || "gray", bg: theme().body.bg },
     content: "",
     hidden: viewMode === "icon"
   });

@@ -19,12 +19,12 @@ export function fitLineToWidth(line: string, width: number): string {
 /** Convert raw text into viewport-safe lines, accounting for inner width and scrollbar, then setContent. */
 export function setViewportContent(viewport: Box, raw: string): void {
   const outer = Math.max(1, Number(viewport.width) || 1);
-  const iw = Number((viewport as any).iwidth ?? 0);
-  const sb = (viewport as any).scrollbar ? 1 : 0;
+  const iw = Number(viewport.iwidth ?? 0);
+  const sb = viewport.scrollbar ? 1 : 0;
   const width = Math.max(1, outer - iw - sb);
   if (width <= 0) return;
   const minRows = Math.max(1, Number(viewport.height) || 1);
-  const hasTags = !!(viewport as any).parseTags;
+  const hasTags = !!viewport.parseTags;
   const rows = raw.replace(/\r\n/g, "\n").split("\n").map((line) =>
     hasTags ? line : fitLineToWidth(line, width)
   );

@@ -872,7 +872,7 @@ export function openMusicPlayerWindow(
     top: 0, left: 0, width: 1, height: 1,
     hidden: true,
     mouse: true, keys: false, vi: false, scrollable: true,
-    style: { ...(theme().body as any), selected: { ...(theme().body as any), inverse: true } },
+    style: { ...theme().body, selected: { ...theme().body, inverse: true } },
     tags: true,
   }) as blessed.Widgets.ListElement;
 
@@ -1037,7 +1037,7 @@ export function openMusicPlayerWindow(
     const dur   = ctrl.duration;
     const ratio = dur > 0 ? elaps / dur : 0;
     const t = theme();
-    const accentFg = (t.accent as any)?.fg || "cyan";
+    const accentFg = t.accent?.fg || "cyan";
 
     // State-dependent colours
     const stateCol = ctrl.state === "playing" ? "green" : ctrl.state === "paused" ? "yellow" : "gray";
@@ -1086,7 +1086,7 @@ export function openMusicPlayerWindow(
 
   function renderPlaylist() {
     if (!playlistVisible) return;
-    const accentFg = ((theme().accent as any)?.fg) || "cyan";
+    const accentFg = theme().accent?.fg || "cyan";
     const plW = Number(playlistPane.width) || PLAYLIST_WIDTH;
     // Header row
     const headerLine = `{bold} PLAYLIST{/bold} {gray-fg}(${ctrl.files.length} tracks){/gray-fg}`;
@@ -1101,8 +1101,8 @@ export function openMusicPlayerWindow(
       }
       return `  {gray-fg}${num}.{/gray-fg} ${label.replace(/\{/g, "\\{")}`;
     })];
-    (playlistPane as any).setItems(items);
-    (playlistPane as any).select(ctrl.selectedIndex + 1); // +1 for header
+    playlistPane.setItems(items);
+    playlistPane.select(ctrl.selectedIndex + 1); // +1 for header
   }
 
   function render() {
@@ -1187,8 +1187,8 @@ export function openMusicPlayerWindow(
       [vizPane,    () => theme().body],
     ]).restyle();
     playlistPane.style = {
-      ...(theme().body as any),
-      selected: { ...(theme().body as any), inverse: true },
+      ...theme().body,
+      selected: { ...theme().body, inverse: true },
     };
     toolbar.restyle();
     renderViz();

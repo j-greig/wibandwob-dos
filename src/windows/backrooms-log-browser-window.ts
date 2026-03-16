@@ -151,7 +151,7 @@ export function openBackroomsLogBrowserWindow(params: {
   function refreshList() {
     entries = scanLogs(params.logsDir);
     const listWidth = Math.max(20, Math.floor(Number(frame.body.width) * 0.25));
-    (list as any).setItems(entries.map(e => formatEntry(e, listWidth)));
+    list.setItems(entries.map(e => formatEntry(e, listWidth)));
     if (entries.length > 0) {
       list.select(Math.min(selectedIndex, entries.length - 1));
     }
@@ -187,9 +187,9 @@ export function openBackroomsLogBrowserWindow(params: {
       // Restore saved scroll position
       const saved = previewScrollPositions.get(entry.path);
       if (saved !== undefined) {
-        (preview as any).scrollTo(saved);
+        preview.scrollTo(saved);
       } else {
-        (preview as any).scrollTo(0);
+        preview.scrollTo(0);
       }
     }
     params.screen.render();
@@ -199,11 +199,11 @@ export function openBackroomsLogBrowserWindow(params: {
   function saveScrollPos() {
     const entry = entries[selectedIndex];
     if (entry && !entry.live) {
-      previewScrollPositions.set(entry.path, (preview as any).getScroll?.() ?? 0);
+      previewScrollPositions.set(entry.path, preview.getScroll?.() ?? 0);
     }
   }
 
-  list.on("select item", (_item: any, index: number) => {
+  list.on("select item", (_item: blessed.Widgets.BlessedElement, index: number) => {
     saveScrollPos();
     selectedIndex = index;
     loadPreview();
