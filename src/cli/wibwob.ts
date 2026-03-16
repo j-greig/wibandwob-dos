@@ -662,6 +662,63 @@ async function cmdCompletions() {
   process.exit(0);
 }
 
+// ── Open (deep-link router) ──────────────────────────────
+
+async function cmdOpen(args: string[]) {
+  // wibwob open <path-or-url> [--app <hint>] [--line <n>]
+  const target = args[1];
+  if (!target) {
+    process.stderr.write("Usage: wibwob open <path|url> [--app editor|finder|markdown|primer] [--line N]\n");
+    process.exit(1);
+  }
+
+  const flags = parseFlags(args.slice(2));
+  const { route, discoverInstance, dispatch } = await import("../../lib/wibwob-router.js");
+
+  const isUrl = target.startsWith("wibwob://");
+  const intent = isUrl
+    ? { url: target }
+    : {
+        path: target,
+        line: flags.line ? Number(flags.line) : undefined,
+        app: flags.app as "editor" | "finder" | "markdown" | "primer" | undefined,
+      };
+
+  const result = route(intent);
+  if (!result) {
+    process.stderr.write(`Cannot route: ${target}\n`);
+    process.exit(1);
+  }
+
+  // Try WibWob-DOS first
+  const projectRoot = resolveBase();
+  const instance = await discoverInstance(projectRoot);
+
+  if (instance) {
+    const ok = await dispatch(instance, result);
+    if (ok) {
+      out({ ok: true, routed: result.commands.map((c) => c.id), target });
+      return;
+    }
+    process.stderr.write("WibWob-DOS dispatch failed — falling back to system open\n");
+  }
+
+  // Fallback: system open
+  const { execSync } = await import("node:child_process");
+  const openTarget = intent.path ?? target;
+  try {
+    if (process.platform === "darwin") {
+      execSync(`open ${JSON.stringify(openTarget)}`, { stdio: "ignore" });
+    } else {
+      execSync(`xdg-open ${JSON.stringify(openTarget)} 2>/dev/null`, { stdio: "ignore" });
+    }
+    out({ ok: true, fallback: true, target: openTarget });
+  } catch {
+    process.stderr.write(`Failed to open: ${openTarget}\n`);
+    process.exit(1);
+  }
+}
+
 // ── CLI Command Table (single source of truth) ──────────
 
 interface CliCommand {
@@ -686,6 +743,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
   { name: "instances",   desc: "List running instances (via sockets)",             fn: () => cmdInstances() },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
+  { name: "open",        args: "<path|url> [--app A] [--line N]", desc: "Open file/dir/URL in WibWob-DOS (fallback: system)", fn: (a) => cmdOpen(a) },
   { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },
   { name: "cmd",         args: "<id> [--key val]", desc: "Run command by ID",                   fn: (a) => {
     const id = a[1];
