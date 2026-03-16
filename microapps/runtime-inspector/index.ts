@@ -212,22 +212,23 @@ function renderOverview(state: InspectorState): string {
   }
   lines.push("");
 
-  // ── Windows (compact, top by z-order) ──
+  // ── Windows (compact, top by z-order, full width) ──
+  const fullW = colW * 2 + 2;
   const windows = s.state.windows.slice().sort((a, b) => b.zIndex - a.zIndex);
   const showCount = Math.min(windows.length, 8);
-  lines.push(sectionHeader(`WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`));
-  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(22)} ${"TITLE".padEnd(26)} ${"POS".padEnd(9)} ${"SIZE".padEnd(8)} Z`);
-  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(22)} ${"─".repeat(26)} ${"─".repeat(9)} ${"─".repeat(8)} ──`);
+  lines.push(sectionHeader(`WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`, fullW));
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(28)} ${"TITLE".padEnd(38)} ${"POS".padEnd(10)} ${"SIZE".padEnd(9)} Z`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(28)} ${"─".repeat(38)} ${"─".repeat(10)} ${"─".repeat(9)} ──`);
   for (let i = 0; i < showCount; i++) {
     const w = windows[i]!;
     const marker = w.focused ? "▸" : " ";
-    const appType = clip(w.appType ?? w.kind, 22).padEnd(22);
-    const title = clip(w.title, 26).padEnd(26);
-    const pos = `@${w.left},${w.top}`.padEnd(9);
-    const size = `${w.width}x${w.height}`.padEnd(8);
+    const appType = clip(w.appType ?? w.kind, 28).padEnd(28);
+    const title = clip(w.title, 38).padEnd(38);
+    const pos = `@${w.left},${w.top}`.padEnd(10);
+    const size = `${w.width}x${w.height}`.padEnd(9);
     lines.push(`│${marker}${String(w.id).padStart(3)} ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}`);
   }
-  lines.push(sectionFooter());
+  lines.push(sectionFooter(fullW));
   lines.push("");
 
   // ── UI summary (one-liner) ──
@@ -305,13 +306,13 @@ function renderWindows(s: RuntimeInspectionSnapshot | undefined): string {
   const windows = s.state.windows.slice().sort((a, b) => a.zIndex - b.zIndex);
   const lines: string[] = [];
   lines.push(sectionHeader(`WINDOWS (${windows.length})`));
-  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(24)} ${"TITLE".padEnd(28)} ${"POS".padEnd(9)} ${"SIZE".padEnd(8)} ${"Z".padStart(2)}  F`);
-  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(24)} ${"─".repeat(28)} ${"─".repeat(9)} ${"─".repeat(8)} ${"──"}  ─`);
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(28)} ${"TITLE".padEnd(38)} ${"POS".padEnd(10)} ${"SIZE".padEnd(9)} ${"Z".padStart(2)}  F`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(28)} ${"─".repeat(38)} ${"─".repeat(10)} ${"─".repeat(9)} ${"──"}  ─`);
   for (const w of windows) {
-    const appType = clip(w.appType ?? w.kind, 24).padEnd(24);
-    const title = clip(w.title, 28).padEnd(28);
-    const pos = `@${w.left},${w.top}`.padEnd(9);
-    const size = `${w.width}x${w.height}`.padEnd(8);
+    const appType = clip(w.appType ?? w.kind, 28).padEnd(28);
+    const title = clip(w.title, 38).padEnd(38);
+    const pos = `@${w.left},${w.top}`.padEnd(10);
+    const size = `${w.width}x${w.height}`.padEnd(9);
     const marker = w.focused ? "◆" : "·";
     const prefix = w.focused ? "▸" : " ";
     lines.push(`│${prefix}${String(w.id).padStart(3)}  ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}  ${marker}`);
@@ -612,6 +613,19 @@ function openRuntimeInspector(host: MicroappHost) {
     });
   }
   win.body.key(["r"], () => void refresh());
+  win.body.key(["f"], () => {
+    // Toggle maximize
+    const s = state.snapshot?.state;
+    if (!s) return;
+    const screen = s.screen;
+    const w = win.window;
+    if (w.width === screen.width && w.height === screen.height - 1) {
+      w.left = 6; w.top = 3; w.width = 132; w.height = 58;
+    } else {
+      w.left = 0; w.top = 1; w.width = screen.width; w.height = screen.height - 1;
+    }
+    host.screen.render();
+  });
   win.body.key(["j", "down"], () => scroll.scrollTo((scroll.element as any).childBase + 1));
   win.body.key(["k", "up"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 1)));
   win.body.key(["pagedown"], () => scroll.scrollTo((scroll.element as any).childBase + 12));
