@@ -117,7 +117,7 @@ import {
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
 import { registerAllHostWindows } from "./host-window-registrations.js";
-import { getHostWindow, type HostWindowDeps } from "./host-window-registry.js";
+import { getHostWindow, openRegisteredWindow, type HostWindowDeps } from "./host-window-registry.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -749,10 +749,7 @@ export class TsTuiMvpApp {
    * Falls back to undefined if the appType is not registered.
    */
   openHostWindow(appType: string, restore?: Record<string, unknown>): WindowRecord | undefined {
-    const entry = getHostWindow(appType);
-    if (!entry) return undefined;
-    const deps = this.buildHostWindowDeps();
-    return this.focusOrCreate(appType as AppType, () => entry.factory(deps, restore), entry.multiInstance);
+    return openRegisteredWindow(appType, this.buildHostWindowDeps(), restore);
   }
 
   private focusOrCreate(

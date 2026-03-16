@@ -72,32 +72,37 @@ function tintBg(base: string, tint: string, strength = 0.15): string {
   );
 }
 
-const baseBg = bg(t.body);
-const surfaceBg = bg(t.bodyAlt);
+// Use the darkest available bg (agentBg crust > body base > shadow)
+const darkestBg = bg(t.agentBg) || bg(t.body);
+const baseBg = bg(t.body);       // mid-dark for surfaces
+const surfaceBg = bg(t.bodyAlt); // lighter surface for panels
 const textColor = fg(t.body);
 const mutedColor = fg(t.muted);
-const accentColor = fg(t.accent);
-const highlightColor = fg(t.highlight);
+const accentColor = fg(t.accent);          // blue
+const highlightColor = fg(t.highlight);    // pink/red
+const borderColor = fg(t.windowBorderFocused); // mauve/purple — bright chrome accent
 const successColor = fg(t.success);
 const errorColor = fg(t.error);
 const warningColor = fg(t.warning);
 
-// Dim: halfway between muted and base bg
+// Dim: halfway between muted and darkest bg
 function midpoint(a: string, b: string): string {
   return tintBg(a, b, 0.5);
 }
-const dimColor = midpoint(mutedColor, baseBg);
+const dimColor = midpoint(mutedColor, darkestBg);
 
 const piTheme = {
   $schema:
     "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   name: `wibwob-${slug}`,
   vars: {
+    darkest: darkestBg,
     base: baseBg,
     surface: surfaceBg,
     text: textColor,
-    accent: accentColor,
-    highlight: highlightColor,
+    accent: accentColor,       // blue
+    chrome: borderColor,       // purple/mauve — bright window chrome accent
+    highlight: highlightColor, // pink/red
     success: successColor,
     error: errorColor,
     warning: warningColor,
@@ -105,10 +110,10 @@ const piTheme = {
     dim: dimColor,
   },
   colors: {
-    // Core UI
-    accent: "accent",
-    border: "accent",
-    borderAccent: "highlight",
+    // Core UI — purple chrome accent is the primary brand color
+    accent: "chrome",
+    border: "chrome",
+    borderAccent: "accent",
     borderMuted: "dim",
     success: "success",
     error: "error",
@@ -118,51 +123,51 @@ const piTheme = {
     text: "text",
     thinkingText: "muted",
 
-    // Backgrounds & Content
-    selectedBg: "surface",
-    userMessageBg: "surface",
+    // Backgrounds — darkest possible base, base for surfaces
+    selectedBg: "base",
+    userMessageBg: "base",
     userMessageText: "text",
-    customMessageBg: "surface",
+    customMessageBg: "base",
     customMessageText: "text",
-    customMessageLabel: "accent",
-    toolPendingBg: "base",
-    toolSuccessBg: tintBg(baseBg, successColor, 0.12),
-    toolErrorBg: tintBg(baseBg, errorColor, 0.12),
-    toolTitle: "accent",
+    customMessageLabel: "chrome",
+    toolPendingBg: "darkest",
+    toolSuccessBg: tintBg(darkestBg, successColor, 0.1),
+    toolErrorBg: tintBg(darkestBg, errorColor, 0.1),
+    toolTitle: "accent",         // blue for tool titles
     toolOutput: "text",
 
-    // Markdown
-    mdHeading: "highlight",
-    mdLink: "accent",
+    // Markdown — pink headings, purple links, blue code
+    mdHeading: "highlight",      // pink/red
+    mdLink: "chrome",            // purple
     mdLinkUrl: "muted",
-    mdCode: "success",
+    mdCode: "accent",            // blue (not green)
     mdCodeBlock: "text",
     mdCodeBlockBorder: "dim",
     mdQuote: "muted",
-    mdQuoteBorder: "accent",
+    mdQuoteBorder: "chrome",
     mdHr: "dim",
-    mdListBullet: "accent",
+    mdListBullet: "chrome",      // purple bullets
 
     // Tool Diffs
     toolDiffAdded: "success",
     toolDiffRemoved: "error",
     toolDiffContext: "muted",
 
-    // Syntax Highlighting
+    // Syntax Highlighting — purple keywords, blue functions
     syntaxComment: "muted",
-    syntaxKeyword: "highlight",
-    syntaxFunction: "accent",
-    syntaxVariable: warningColor,    // use warning/yellow tone for vars
+    syntaxKeyword: "chrome",     // purple
+    syntaxFunction: "accent",    // blue
+    syntaxVariable: warningColor,
     syntaxString: "success",
-    syntaxNumber: "highlight",
-    syntaxType: "accent",
-    syntaxOperator: "accent",
+    syntaxNumber: "highlight",   // pink
+    syntaxType: "accent",        // blue
+    syntaxOperator: "chrome",    // purple
     syntaxPunctuation: "muted",
 
-    // Thinking levels (gradient from muted → accent → highlight → error)
+    // Thinking levels (dim → purple → blue → pink → red)
     thinkingOff: "dim",
     thinkingMinimal: "muted",
-    thinkingLow: "accent",
+    thinkingLow: "chrome",
     thinkingMedium: "accent",
     thinkingHigh: "highlight",
     thinkingXhigh: "error",
@@ -171,9 +176,9 @@ const piTheme = {
     bashMode: "warning",
   },
   export: {
-    pageBg: baseBg,
-    cardBg: surfaceBg,
-    infoBg: tintBg(surfaceBg, accentColor, 0.08),
+    pageBg: darkestBg,
+    cardBg: baseBg,
+    infoBg: tintBg(baseBg, borderColor, 0.08),
   },
 };
 
