@@ -9,6 +9,7 @@
  */
 
 import blessed from "blessed";
+import { escapeBlessedTags as escBraces } from "../core/blessed-escape.js";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle } from "../core/ui-parts.js";
@@ -114,9 +115,6 @@ function renderHistory(brain: ScrambleBrain): string {
     .join("\n");
 }
 
-function escBraces(s: string): string {
-  return s.replace(/\{/g, "\\{");
-}
 
 // ── S1: Full floating window ──────────────────────────────────────────────────
 

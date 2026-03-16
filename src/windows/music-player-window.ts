@@ -17,6 +17,7 @@ import * as path from "path";
 import { promisify } from "util";
 
 import { theme } from "../core/theme/resolver.js";
+import { escapeBlessedTags } from "../core/blessed-escape.js";
 import { createRestyleBundle, createLayoutButtonBar, clamp, type ButtonBarPart } from "../core/ui-parts.js";
 import type { ThemeTokens } from "../core/theme/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -1059,7 +1060,7 @@ export function openMusicPlayerWindow(
       trackName = `{gray-fg}No track loaded \u2014 press {white-fg}o{/white-fg} to browse{/gray-fg}`;
     } else {
       // Strip extension and clean up filename for display
-      const display = ctrl.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").replace(/\{/g, "\\{");
+      const display = escapeBlessedTags(ctrl.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
       trackName = `{bold}{white-fg}${display}{/white-fg}{/bold}`;
     }
 
@@ -1094,12 +1095,12 @@ export function openMusicPlayerWindow(
       const name    = basename(fp);
       const playing = fp === ctrl.filePath && ctrl.state !== "stopped";
       const maxLen  = plW - 6;
-      const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "\u2026" : name;
+      const label   = escapeBlessedTags(name.length > maxLen ? name.slice(0, maxLen - 1) + "\u2026" : name);
       const num     = String(i + 1).padStart(2, " ");
       if (playing) {
-        return `{${accentFg}-fg}\u25B6 ${num}. ${label.replace(/\{/g, "\\{")}{/${accentFg}-fg}`;
+        return `{${accentFg}-fg}\u25B6 ${num}. ${label}{/${accentFg}-fg}`;
       }
-      return `  {gray-fg}${num}.{/gray-fg} ${label.replace(/\{/g, "\\{")}`;
+      return `  {gray-fg}${num}.{/gray-fg} ${label}`;
     })];
     playlistPane.setItems(items);
     playlistPane.select(ctrl.selectedIndex + 1); // +1 for header
@@ -1111,7 +1112,7 @@ export function openMusicPlayerWindow(
     renderPlaylist();
     renderViz();
     // Dynamic title with now-playing info
-    const titleTrack = ctrl.fileName !== "(no file)" ? ctrl.fileName.replace(/\{/g, "\\{") : "";
+    const titleTrack = ctrl.fileName !== "(no file)" ? escapeBlessedTags(ctrl.fileName) : "";
     const titleState = ctrl.state === "playing" ? " \u25B6" : ctrl.state === "paused" ? " \u23F8" : "";
     frame.frame.setLabel(` \u266B ${titleTrack ? titleTrack + titleState : "Music Player"} `);
     toolbar.update({ leftText: "", activeId: ctrl.state === "playing" ? "playpause" : "stop" });
