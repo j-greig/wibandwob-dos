@@ -1,0 +1,487 @@
+/**
+ * file-manager/window.ts — File Manager v3: Column Browser
+ *
+ * Entry point that creates the window and wires all extracted modules:
+ * types, icons, git, preview, search, keys, columns.
+ *
+ * Replaces the 1858-line file-manager-window.ts god function.
+ */
+import blessed from "blessed";
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import { copyToClipboard } from "../../core/clipboard.js";
+import { safeReadFile } from "../../core/safe-fs.js";
+import { theme } from "../../core/theme/resolver.js";
+import { createScrollbar } from "../../core/ui-primitives.js";
+import { createRestyleBundle, type RestyleEntry } from "../../ui/containers.js";
+import { setViewportContent } from "../browser-utils.js";
+
+import type { FileManagerParams, FileEntry, SortField } from "./types.js";
+import { SORT_CYCLE } from "./types.js";
+import { formatSize, escapeBlessedTags } from "./icons.js";
+import { createGitState, refreshGitStatus, gitSummary } from "./git.js";
+import { renderEmptyPreview, renderDirectoryPreview, renderFilePreview } from "./preview.js";
+import { createSearchEngine } from "./search.js";
+import { keyToAction, isJumpChar, isActionChar } from "./keys.js";
+import {
+  createColumn, calculateColumnLayout, buildEntries, formatColumnItem,
+  type ColumnWidget,
+} from "./columns.js";
+
+const IS_MAC = process.platform === "darwin";
+
+// ── Main factory ─────────────────────────────────────────────────────────────
+
+export function openFileManagerV3(params: FileManagerParams): void {
+  const startPath = params.restore?.currentPath ?? params.startPath;
+  const git = createGitState();
+  let sortField: SortField = params.restore?.sortField ?? "name";
+  let columnWidgets: ColumnWidget[] = [];
+  let activeColumnIndex = 0;
+  let previewContent = "";
+
+  // ── Frame ──────────────────────────────────────────────────────────────────
+  const frame = params.windowManager.createFrame("File Manager", "browser");
+  {
+    const screenW = Number(params.screen.width);
+    const screenH = Number(params.screen.height);
+    frame.frame.width = Math.min(180, Math.max(80, Math.floor(screenW * 0.85)));
+    frame.frame.height = Math.max(30, screenH - 6);
+  }
+
+  // ── Breadcrumb bar ─────────────────────────────────────────────────────────
+  const breadcrumb = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    mouse: true,
+    style: { ...theme().footer, bold: true },
+  });
+
+  // ── Columns container ──────────────────────────────────────────────────────
+  const columnsContainer = blessed.box({
+    parent: frame.body,
+    top: 1,
+    left: 0,
+    right: 0,
+    bottom: 1,
+  });
+
+  // ── Preview pane (rightmost) ───────────────────────────────────────────────
+  const previewHeader = blessed.box({
+    parent: columnsContainer,
+    top: 0,
+    right: 0,
+    width: "40%",
+    height: 1,
+    tags: true,
+    style: { ...theme().footer, bold: true },
+  });
+
+  const previewBox = blessed.box({
+    parent: columnsContainer,
+    top: 1,
+    right: 0,
+    width: "40%",
+    bottom: 0,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    tags: true,
+    style: theme().body,
+  });
+
+  // ── Status bar ─────────────────────────────────────────────────────────────
+  const statusBar = blessed.box({
+    parent: frame.body,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: theme().footer,
+  });
+
+  // ── Search engine ──────────────────────────────────────────────────────────
+  const search = createSearchEngine({
+    onResults: (results) => {
+      // TODO: display incremental search results
+    },
+    onComplete: (results) => {
+      if (results.length === 0) {
+        params.overlays.flash("No matches found");
+      } else {
+        params.overlays.flash(`${results.length} matches`);
+      }
+    },
+    onError: (msg) => params.overlays.flash(msg),
+  });
+
+  // ── Git ────────────────────────────────────────────────────────────────────
+  refreshGitStatus(git, startPath);
+
+  // ── Column management ──────────────────────────────────────────────────────
+
+  function navigateTo(dirPath: string, depth: number): void {
+    // Remove columns deeper than `depth`
+    while (columnWidgets.length > depth) {
+      const removed = columnWidgets.pop()!;
+      removed.destroy();
+    }
+
+    refreshGitStatus(git, dirPath);
+    const bodyWidth = Number(columnsContainer.width) || 80;
+    const previewW = Math.max(20, Math.floor(bodyWidth * 0.4));
+    const layout = calculateColumnLayout(depth + 1, bodyWidth, previewW);
+
+    // Create the new column
+    const colLeft = (depth - layout.scrollOffset) * layout.columnWidth;
+    const col = createColumn({
+      parent: columnsContainer,
+      screen: params.screen,
+      git,
+      sortField,
+      onSelect: handleSelect,
+      onNavigateInto: handleNavigateInto,
+      onNavigateUp: handleNavigateUp,
+    }, depth, dirPath, Math.max(0, colLeft), layout.columnWidth);
+
+    columnWidgets.push(col);
+    activeColumnIndex = depth;
+
+    // Reposition all visible columns
+    repositionColumns();
+
+    // Focus the new column
+    col.list.focus();
+    updateBreadcrumb();
+    updateStatusBar();
+    params.screen.render();
+    params.onStateChanged();
+  }
+
+  function repositionColumns(): void {
+    const bodyWidth = Number(columnsContainer.width) || 80;
+    const previewW = Math.max(20, Math.floor(bodyWidth * 0.4));
+    const layout = calculateColumnLayout(columnWidgets.length, bodyWidth, previewW);
+
+    for (let i = 0; i < columnWidgets.length; i++) {
+      const widget = columnWidgets[i]!;
+      const visIdx = i - layout.scrollOffset;
+      if (visIdx < 0 || visIdx >= layout.visibleColumns) {
+        widget.list.hide();
+      } else {
+        widget.list.left = visIdx * layout.columnWidth;
+        widget.list.width = layout.columnWidth;
+        widget.list.show();
+        // Dim non-active columns
+        if (i === activeColumnIndex) {
+          widget.list.style = { ...theme().body, selected: theme().selected, item: theme().body };
+        } else {
+          widget.list.style = { ...theme().body, selected: { ...theme().body, bold: true }, item: theme().body };
+        }
+        // Re-render items for new width
+        const entries = widget.state.entries;
+        widget.list.setItems(entries.map(e => formatColumnItem(e, git, layout.columnWidth)));
+        widget.list.select(widget.state.selectedIndex);
+      }
+    }
+
+    // Position preview pane
+    previewHeader.left = layout.previewLeft;
+    previewHeader.width = bodyWidth - layout.previewLeft;
+    previewBox.left = layout.previewLeft;
+    previewBox.width = bodyWidth - layout.previewLeft;
+  }
+
+  // ── Event handlers ─────────────────────────────────────────────────────────
+
+  function handleSelect(columnIndex: number, entry: FileEntry): void {
+    activeColumnIndex = columnIndex;
+    // Remove any columns to the right
+    while (columnWidgets.length > columnIndex + 1) {
+      const removed = columnWidgets.pop()!;
+      removed.destroy();
+    }
+    repositionColumns();
+
+    if (entry.isDirectory) {
+      const result = renderDirectoryPreview(entry.fullPath, Number(previewBox.height) || 20);
+      previewHeader.setContent(` ${result.header}`);
+      previewContent = result.content;
+      setViewportContent(previewBox, previewContent);
+    } else {
+      const result = renderFilePreview(entry, Math.max(1, (Number(previewBox.width) || 40) - 2));
+      previewHeader.setContent(` ${result.header}`);
+      previewContent = result.content;
+      setViewportContent(previewBox, previewContent);
+    }
+    updateBreadcrumb();
+    updateStatusBar();
+    params.screen.render();
+  }
+
+  function handleNavigateInto(columnIndex: number, dirPath: string): void {
+    navigateTo(dirPath, columnIndex + 1);
+  }
+
+  function handleNavigateUp(): void {
+    if (columnWidgets.length <= 1) return;
+    const removed = columnWidgets.pop()!;
+    removed.destroy();
+    activeColumnIndex = columnWidgets.length - 1;
+    repositionColumns();
+    columnWidgets[activeColumnIndex]?.list.focus();
+    updateBreadcrumb();
+    updateStatusBar();
+    params.screen.render();
+  }
+
+  // ── Action dispatch ────────────────────────────────────────────────────────
+
+  function getSelectedEntry(): FileEntry | null {
+    const col = columnWidgets[activeColumnIndex];
+    if (!col) return null;
+    return col.state.entries[col.state.selectedIndex] ?? null;
+  }
+
+  function getSelectedPath(): string | null {
+    return getSelectedEntry()?.fullPath ?? null;
+  }
+
+  function dispatchAction(action: string): void {
+    const entry = getSelectedEntry();
+    const filePath = entry?.fullPath ?? null;
+
+    switch (action) {
+      case "open":
+        if (entry?.isDirectory) {
+          handleNavigateInto(activeColumnIndex, entry.fullPath);
+        } else if (filePath) {
+          params.onOpenFile(filePath);
+        }
+        break;
+      case "view":
+        if (filePath && !entry?.isDirectory) params.onViewFile(filePath);
+        break;
+      case "edit":
+        if (filePath && !entry?.isDirectory) params.onOpenFile(filePath);
+        break;
+      case "copy-path":
+        if (filePath && copyToClipboard(filePath)) {
+          params.overlays.flash(`Copied: ${path.basename(filePath)}`);
+        }
+        break;
+      case "yank-contents":
+        if (filePath && !entry?.isDirectory) {
+          try {
+            const content = fs.readFileSync(filePath, "utf8");
+            if (copyToClipboard(content)) {
+              params.overlays.flash(`Yanked ${content.split("\n").length} lines`);
+            }
+          } catch { params.overlays.flash("Could not read file"); }
+        }
+        break;
+      case "external-editor":
+        if (filePath) openInExternalEditor(filePath);
+        break;
+      case "reveal":
+        if (filePath && IS_MAC) {
+          try { execSync(`open -R ${JSON.stringify(filePath)}`); } catch {}
+        }
+        break;
+      case "quicklook":
+        if (filePath && IS_MAC) {
+          try { execSync(`qlmanage -p ${JSON.stringify(filePath)} &>/dev/null &`); } catch {}
+        }
+        break;
+      case "navigate-up":
+        handleNavigateUp();
+        break;
+      case "navigate-into":
+        if (entry?.isDirectory) handleNavigateInto(activeColumnIndex, entry.fullPath);
+        break;
+      case "search-start": {
+        const col = columnWidgets[activeColumnIndex];
+        if (col) {
+          params.overlays.flash("Search: type query (TODO: search overlay)");
+        }
+        break;
+      }
+      case "toggle-view":
+        params.overlays.flash("Column view only (icon view removed in v3)");
+        break;
+      case "sort-cycle": {
+        const idx = SORT_CYCLE.indexOf(sortField);
+        sortField = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]!;
+        // Rebuild all columns with new sort
+        const paths = columnWidgets.map(w => ({ path: w.state.path, sel: w.state.selectedIndex }));
+        destroyAllColumns();
+        for (let i = 0; i < paths.length; i++) {
+          navigateTo(paths[i]!.path, i);
+        }
+        break;
+      }
+      case "refresh": {
+        const currentCol = columnWidgets[activeColumnIndex];
+        if (currentCol) navigateTo(currentCol.state.path, activeColumnIndex);
+        break;
+      }
+    }
+  }
+
+  function openInExternalEditor(filePath: string): void {
+    const editors = [
+      { cmd: "cursor", name: "Cursor" },
+      { cmd: "code", name: "VS Code" },
+      { cmd: "zed", name: "Zed" },
+      { cmd: "subl", name: "Sublime" },
+    ];
+    for (const editor of editors) {
+      try {
+        execSync(`which ${editor.cmd}`, { stdio: "ignore" });
+        execSync(`${editor.cmd} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        params.overlays.flash(`Opened in ${editor.name}`);
+        return;
+      } catch {}
+    }
+    const env = process.env.VISUAL || process.env.EDITOR;
+    if (env) {
+      try {
+        execSync(`${env} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        params.overlays.flash(`Opened in ${env}`);
+        return;
+      } catch {}
+    }
+    params.overlays.flash("No external editor found");
+  }
+
+  // ── Keyboard: global for the column area ───────────────────────────────────
+
+  columnsContainer.on("keypress", (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+    const action = keyToAction(ch, key);
+    if (action) {
+      dispatchAction(action);
+      return;
+    }
+    // Left/right arrow: switch active column
+    if (key.name === "left" && activeColumnIndex > 0) {
+      activeColumnIndex--;
+      columnWidgets[activeColumnIndex]?.list.focus();
+      repositionColumns();
+      params.screen.render();
+      return;
+    }
+    if (key.name === "right" && activeColumnIndex < columnWidgets.length - 1) {
+      activeColumnIndex++;
+      columnWidgets[activeColumnIndex]?.list.focus();
+      repositionColumns();
+      params.screen.render();
+      return;
+    }
+    // Jump-to-letter
+    if (ch && isJumpChar(ch) && !isActionChar(ch)) {
+      const col = columnWidgets[activeColumnIndex];
+      if (!col) return;
+      const entries = col.state.entries;
+      const startIdx = col.state.selectedIndex + 1;
+      const normalized = ch.toLowerCase();
+      const ordered = [...entries.slice(startIdx), ...entries.slice(0, startIdx)];
+      const match = ordered.find(e => e.label.toLowerCase().startsWith(normalized));
+      if (match) {
+        const idx = entries.indexOf(match);
+        col.list.select(idx);
+        col.state.selectedIndex = idx;
+        handleSelect(activeColumnIndex, match);
+      }
+    }
+  });
+
+  // ── UI updates ─────────────────────────────────────────────────────────────
+
+  function updateBreadcrumb(): void {
+    const segments = columnWidgets.map((w, i) => {
+      const name = path.basename(w.state.path) || w.state.path;
+      if (i === activeColumnIndex) return `{bold}${escapeBlessedTags(name)}{/bold}`;
+      return `{gray-fg}${escapeBlessedTags(name)}{/gray-fg}`;
+    });
+    breadcrumb.setContent(` \u2302 ${segments.join(" / ")}`);
+  }
+
+  function updateStatusBar(): void {
+    const col = columnWidgets[activeColumnIndex];
+    if (!col) return;
+    const entries = col.state.entries.filter(e => e.label !== "../");
+    const dirs = entries.filter(e => e.isDirectory).length;
+    const files = entries.filter(e => !e.isDirectory).length;
+    const totalSize = entries.filter(e => !e.isDirectory).reduce((s, e) => s + e.size, 0);
+    const gs = gitSummary(git);
+    const sortLabel = sortField.charAt(0).toUpperCase() + sortField.slice(1);
+    const macHints = IS_MAC ? " SPC:look o:finder" : "";
+    statusBar.setContent(
+      ` ${entries.length} items | ${dirs} dirs, ${files} files (${formatSize(totalSize)})${gs} | \u2195${sortLabel} | \u21B5:open e:edit E:ext Y:yank c:copy${macHints} s:search`,
+    );
+  }
+
+  function destroyAllColumns(): void {
+    for (const w of columnWidgets) w.destroy();
+    columnWidgets = [];
+  }
+
+  // ── Frame wiring ───────────────────────────────────────────────────────────
+
+  frame.describeState = () => ({
+    appType: "file-manager" as const,
+    summary: `Column browser: ${columnWidgets.map(w => path.basename(w.state.path)).join(" / ")}`,
+    columns: columnWidgets.map(w => ({ path: w.state.path, selectedIndex: w.state.selectedIndex })),
+    sortField,
+  });
+
+  frame.captureText = () => {
+    const col = columnWidgets[activeColumnIndex];
+    if (!col) return "";
+    return col.state.entries.map(e => e.label).join("\n");
+  };
+
+  frame.finder = {
+    search: (query, glob) => {
+      const col = columnWidgets[activeColumnIndex];
+      if (col) search.start(query, col.state.path, glob);
+    },
+    navigateTo: (dirPath) => navigateTo(dirPath, 0),
+    toggleView: () => {},
+    refresh: () => dispatchAction("refresh"),
+    sortBy: (field) => { sortField = field; dispatchAction("refresh"); },
+  };
+
+  frame.onRestyle = createRestyleBundle([
+    [breadcrumb, () => ({ ...theme().footer, bold: true })],
+    [previewHeader, () => ({ ...theme().footer, bold: true })],
+    [previewBox, () => theme().body],
+    [statusBar, () => theme().footer],
+  ] as RestyleEntry[]).restyle;
+
+  frame.cleanup = () => {
+    search.destroy();
+    destroyAllColumns();
+  };
+
+  // Show empty preview
+  const empty = renderEmptyPreview();
+  previewHeader.setContent(` ${empty.header}`);
+  setViewportContent(previewBox, empty.content);
+
+  // Navigate to start path
+  navigateTo(startPath, 0);
+
+  // Resize handler
+  frame.frame.on("resize", () => {
+    repositionColumns();
+    params.screen.render();
+  });
+}
