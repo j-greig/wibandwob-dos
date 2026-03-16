@@ -166,7 +166,7 @@ export default function setup(host: MicroappHost) {
     let tick = 0;
     let activePanelId = cePanelDefs[0]?.id ?? "";
     let searchQuery = "";
-    let dragging: { id: string; offsetX: number; offsetY: number } | undefined;
+    let dragging: { id: string; offsetX: number; offsetY: number; moved: boolean } | undefined;
     const panelPositionOverrides = new Map<string, { x: number; y: number }>();
     const contentOverrides = new Map<string, string>();
     const timers = new Set<ReturnType<typeof setInterval>>();
@@ -224,6 +224,8 @@ export default function setup(host: MicroappHost) {
       width: { fixed: SIDEBAR_WIDTH },
       mainMinWidth: 12,
     });
+    // Start with sidebar closed — open with [ key or toolbar button
+    sidePanel.setOpen(false);
 
     // ── Sidebar ─────────────────────────────────────────────────────
     const sidebarListHandle = createSelectableList({
@@ -266,6 +268,7 @@ export default function setup(host: MicroappHost) {
         }
         contentOverrides.clear();
         panelPositionOverrides.clear();
+        seedPositionsFromYaml();
         activePanelId = cePanelDefs[0]?.id ?? "";
         watcher = fs.watch(activeFilePath, onFileChange);
         // Update window chrome title bar
@@ -329,11 +332,15 @@ export default function setup(host: MicroappHost) {
         ],
       },
     );
-    // Position the bar at the bottom of root and call layout() to place buttons
+    // Position the bar at the bottom of root
     function layoutToolbar() {
       const w = Math.max(20, Number(root.width) || 80);
       const h = Number(root.height) || 24;
-      toolbar.layout({ top: h - 1, left: 0, width: w, height: 1 });
+      const el = toolbar.element;
+      el.top = h - 1;
+      el.left = 0;
+      el.width = w;
+      el.height = 1;
     }
     layoutToolbar();
 
@@ -389,11 +396,13 @@ export default function setup(host: MicroappHost) {
       const sidebarLabel = sidePanel.isOpen() ? "[▶] Files" : "[ ] Files";
       const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
       toolbar.update({
-        leftText: ` Zine  ${panelCount} panels  ${scroll}%${q}`,
-        activeId: paused ? "pause" : undefined,
-        buttonLabels: { sidebar: ` ${sidebarLabel} `, pause: ` ${pauseLabel} ` },
+        buttons: [
+          { label: ` ${sidebarLabel} `, action: () => toggleSidebar() },
+          { label: "/ Search",  action: () => inlineSearch.open() },
+          { label: ` ${pauseLabel} `, action: () => { paused = !paused; updateStatus(); host.screen.render(); } },
+        ],
       });
-      statusBar.setContent("");
+      statusBar.setContent(` Zine  ${panelCount} panels  ${scroll}%${q}`);
     }
 
     // ── Build ZineNodes from items ──────────────────────────────────
@@ -649,11 +658,55 @@ export default function setup(host: MicroappHost) {
             break;
           }
         }
+        selfWriteFlag = true;
         fs.writeFileSync(filePath, doc.toString(), "utf8");
       } catch { /* silent — editor still has the content */ }
     }
 
+    /** Load saved x/y positions from YAML to seed drag overrides on startup. */
+    function seedPositionsFromYaml() {
+      try {
+        const raw = fs.readFileSync(activeFilePath, "utf8");
+        const doc = YAML.parse(raw);
+        if (!doc?.panels) return;
+        for (const p of doc.panels) {
+          if (p.id && typeof p.x === "number" && typeof p.y === "number") {
+            panelPositionOverrides.set(p.id, { x: p.x, y: p.y });
+          }
+        }
+      } catch { /* silent */ }
+    }
+    // Seed on initial load
+    seedPositionsFromYaml();
+
+    /** Write panel position back to the .canvas.yaml file after drag/nudge. */
+    function savePanelPosition(panelId: string) {
+      const pos = panelPositionOverrides.get(panelId);
+      if (!pos) return;
+      try {
+        const raw = fs.readFileSync(activeFilePath, "utf8");
+        const doc = YAML.parseDocument(raw);
+        const panels = doc.get("panels") as any;
+        if (!panels || !panels.items) return;
+        for (const item of panels.items) {
+          const id = item.get("id");
+          if (id === panelId) {
+            item.set("x", pos.x);
+            item.set("y", pos.y);
+            break;
+          }
+        }
+        selfWriteFlag = true;
+        fs.writeFileSync(activeFilePath, doc.toString(), "utf8");
+      } catch { /* silent */ }
+    }
+
+    /** Track which panels have an open editor — prevents duplicate windows. */
+    const openEditors = new Set<string>();
+
     function openInEditor(panelId: string) {
+      if (openEditors.has(panelId)) return; // already open — don't spawn another
+
       const zNode = zineNodes.get(panelId);
       if (!zNode || zNode.item.type !== "panel") return;
 
@@ -668,7 +721,35 @@ export default function setup(host: MicroappHost) {
         ?? (zNode.item.content ? zNode.item.content(0, iw, ih) : "");
       const panelTitle = zNode.item.title ?? panelId;
 
-      host.runGlobalCommand(dispatch.command, dispatch.buildArgs(panelId, content, panelTitle));
+      openEditors.add(panelId);
+
+      // Wrap onSave to clear editor tracking when user saves
+      const origArgs = dispatch.buildArgs(panelId, content, panelTitle);
+      if (typeof origArgs.onSave === "function") {
+        const origOnSave = origArgs.onSave as (s: string) => void;
+        origArgs.onSave = (newContent: string) => {
+          origOnSave(newContent);
+          openEditors.delete(panelId);
+        };
+      }
+
+      host.runGlobalCommand(dispatch.command, origArgs);
+
+      // Safety valve: poll to detect editor window closed (no onClose callback available).
+      // Check every 2s, give up after 60s so re-open is always possible.
+      let checks = 0;
+      const pollClose = setInterval(() => {
+        checks++;
+        if (checks > 30) { openEditors.delete(panelId); clearInterval(pollClose); return; }
+        // If no text-editor window with our title exists, clear the lock
+        try {
+          const wins = host.windows.getWindows();
+          const stillOpen = wins.some((w: any) =>
+            w.appType === "text-editor" && w.title?.includes(panelTitle)
+          );
+          if (!stillOpen) { openEditors.delete(panelId); clearInterval(pollClose); }
+        } catch { /* ignore */ }
+      }, 2000);
     }
 
     // ── Mouse: click-to-focus, double-click-to-edit, drag-to-move ──
@@ -691,35 +772,47 @@ export default function setup(host: MicroappHost) {
     let lastClickId = "";
     const DBLCLICK_MS = 350;
 
-    const handleMouse = (data: any) => {
-      if (!canvas.parent) return;
-      if (data.action === "wheeldown" || data.action === "wheelup") return;
-      if (data.action === "mousedown" && !isInsideCanvas(data.x, data.y)) return;
+    // ── Mouse: click-to-select, drag-to-move, wheel-to-scroll ─────
+    // Use screen-level mouse for drag (canvas swallows mousemove for scroll).
+    // Track drag state at screen coordinates to avoid coordinate transform issues.
+    let dragScreenStart: { sx: number; sy: number; origX: number; origY: number } | undefined;
 
-      if (data.action === "mouseup") {
-        dragging = undefined;
+    const zineMouse = (data: any) => {
+      if (!canvas.parent) return;
+
+      // Wheel: scroll canvas
+      if (data.action === "wheeldown" && isInsideCanvas(data.x, data.y)) {
+        canvas.scroll(3); renderLayoutAndContent(); host.screen.render();
+        return;
+      }
+      if (data.action === "wheelup" && isInsideCanvas(data.x, data.y)) {
+        canvas.scroll(-3); renderLayoutAndContent(); host.screen.render();
         return;
       }
 
-      if (data.action === "mousedown") {
+      // Mouseup: finish drag, save position
+      if (data.action === "mouseup") {
+        if (dragging && dragging.moved) {
+          savePanelPosition(dragging.id);
+        }
+        dragging = undefined;
+        dragScreenStart = undefined;
+        return;
+      }
+
+      // Mousedown inside canvas: start drag
+      if (data.action === "mousedown" && isInsideCanvas(data.x, data.y)) {
         const pt = safePointerToContent(data.x, data.y);
         if (!pt) return;
         const node = hitPanel(panelNodes, pt.x, pt.y);
         if (node) {
-          const now = Date.now();
-          if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
-            openInEditor(node.def.id);
-            lastClickTime = 0;
-            return;
-          }
-          lastClickTime = now;
-          lastClickId = node.def.id;
-
           dragging = {
             id: node.def.id,
             offsetX: pt.x - node.x,
             offsetY: pt.y - node.y,
+            moved: false,
           };
+          dragScreenStart = { sx: data.x, sy: data.y, origX: node.x, origY: node.y };
           activePanelId = node.def.id;
           applyStyles();
           host.screen.render();
@@ -727,13 +820,16 @@ export default function setup(host: MicroappHost) {
         return;
       }
 
-      if (data.action === "mousemove" && dragging) {
-        const pt = safePointerToContent(data.x, data.y);
-        if (!pt) return;
+      // Mousemove: drag panel using screen-coordinate delta
+      if (data.action === "mousemove" && dragging && dragScreenStart) {
+        const dx = data.x - dragScreenStart.sx;
+        const dy = data.y - dragScreenStart.sy;
+        if (dx === 0 && dy === 0) return;
+        dragging.moved = true;
         const node = panelNodes.get(dragging.id);
         if (!node) return;
-        const newX = Math.max(0, pt.x - dragging.offsetX);
-        const newY = Math.max(0, pt.y - dragging.offsetY);
+        const newX = Math.max(0, dragScreenStart.origX + dx);
+        const newY = Math.max(0, dragScreenStart.origY + dy);
         panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
         node.x = newX;
         node.y = newY;
@@ -742,18 +838,7 @@ export default function setup(host: MicroappHost) {
         host.screen.render();
       }
     };
-    host.screen.on("mouse", handleMouse);
-
-    const handleWheel = (data: any) => {
-      if (!canvas.parent) return;
-      if (!isInsideCanvas(data.x, data.y)) return;
-      if (data.action === "wheeldown") {
-        canvas.scroll(3); renderLayoutAndContent(); host.screen.render();
-      } else if (data.action === "wheelup") {
-        canvas.scroll(-3); renderLayoutAndContent(); host.screen.render();
-      }
-    };
-    host.screen.on("mouse", handleWheel);
+    host.screen.on("mouse", zineMouse);
 
     // ── Build + first render ────────────────────────────────────────
     refreshSidebarList();
@@ -762,7 +847,10 @@ export default function setup(host: MicroappHost) {
 
     // ── Hot reload — watch canvas file for changes ───────────────────
     let reloadDebounce: ReturnType<typeof setTimeout> | undefined;
+    /** Set to true when we write to the YAML ourselves — skip the next file-change reload. */
+    let selfWriteFlag = false;
     function onFileChange() {
+      if (selfWriteFlag) { selfWriteFlag = false; return; }
       clearTimeout(reloadDebounce);
       reloadDebounce = setTimeout(() => {
         try {
@@ -777,6 +865,7 @@ export default function setup(host: MicroappHost) {
           }
           contentOverrides.clear();
           panelPositionOverrides.clear();
+          seedPositionsFromYaml();
           rebuild();
           updateStatus();
         } catch { /* ignore transient write races */ }
@@ -808,30 +897,77 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
-    canvas.key(["j", "down"], () => scrollBy(1));
-    canvas.key(["k", "up"], () => scrollBy(-1));
-    canvas.key(["S-j", "S-down"], () => scrollBy(5));
-    canvas.key(["S-k", "S-up"], () => scrollBy(-5));
-    canvas.key(["C-j", "C-down"], () => scrollBy(10));
-    canvas.key(["C-k", "C-up"], () => scrollBy(-10));
-    canvas.key(["pagedown"], () => scrollBy(20));
-    canvas.key(["pageup"], () => scrollBy(-20));
-    canvas.key(["home", "g"], () => { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); });
-    canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
-    canvas.key(["/"], () => inlineSearch.open());
-    canvas.key(["r"], () => rebuild());
-    canvas.key(["["], () => toggleSidebar());
+    // ── Keyboard: canvas receives blessed key events directly ─────
+    canvas.on("keypress", (_ch: string, key: any) => {
+      if (!key) return;
+      const shift = !!key.shift;
+      const ctrl = !!key.ctrl;
 
-    win.onInput((ch: string, key?: IKeyEventArg) => {
-      const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
-      if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
-      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
-      if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
-      if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
-      if (ch === "/") { inlineSearch.open(); return; }
-      if (ch === "r") { rebuild(); return; }
-      if (ch === "[") { toggleSidebar(); return; }
+      // Tab / Shift-Tab: cycle panel selection
+      if (key.name === "tab" && !shift) { cyclePanelSelection(true); return; }
+      if (key.name === "tab" && shift)  { cyclePanelSelection(false); return; }
+
+      // Arrow keys: move selected panel (shift=10, ctrl=10)
+      if (activePanelId && (key.name === "up" || key.name === "down" || key.name === "left" || key.name === "right")) {
+        const step = shift ? 10 : 1;
+        if (key.name === "up")    { nudgePanel(0, -step); return; }
+        if (key.name === "down")  { nudgePanel(0, step); return; }
+        if (key.name === "left")  { nudgePanel(-step, 0); return; }
+        if (key.name === "right") { nudgePanel(step, 0); return; }
+      }
+
+      // j/k: scroll canvas
+      const scrollSpeed = shift ? 5 : ctrl ? 10 : 1;
+      if (key.name === "j" || (_ch === "j")) { scrollBy(1 * scrollSpeed); return; }
+      if (key.name === "k" || (_ch === "k")) { scrollBy(-1 * scrollSpeed); return; }
+      if (key.name === "pagedown") { scrollBy(20); return; }
+      if (key.name === "pageup")   { scrollBy(-20); return; }
+      if (key.name === "home" || _ch === "g") { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); return; }
+      if (key.name === "end"  || _ch === "G") { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); return; }
+
+      // Enter: edit selected panel
+      if (key.name === "return" || key.name === "enter") {
+        if (activePanelId) openInEditor(activePanelId);
+        return;
+      }
+
+      if (_ch === "/") { inlineSearch.open(); return; }
+      if (_ch === "r") { rebuild(); return; }
+      if (_ch === "[") { toggleSidebar(); return; }
+      if (key.name === "escape") { activePanelId = ""; applyStyles(); host.screen.render(); return; }
     });
+
+    /** Move the active panel by dx/dy, update overrides, re-render, save. */
+    function nudgePanel(dx: number, dy: number) {
+      if (!activePanelId) return;
+      const node = panelNodes.get(activePanelId);
+      if (!node) return;
+      const cur = panelPositionOverrides.get(activePanelId) ?? { x: node.x, y: node.y };
+      const nx = Math.max(0, cur.x + dx);
+      const ny = Math.max(0, cur.y + dy);
+      panelPositionOverrides.set(activePanelId, { x: nx, y: ny });
+      renderLayoutAndContent();
+      host.screen.render();
+      savePanelPosition(activePanelId);
+    }
+
+    /** Cycle active panel selection. */
+    function cyclePanelSelection(forward: boolean) {
+      const ids = [...panelNodes.keys()].filter(id => {
+        const n = panelNodes.get(id);
+        return n && n.item.type === "panel";
+      });
+      if (ids.length === 0) return;
+      const idx = ids.indexOf(activePanelId);
+      const next = forward
+        ? (idx + 1) % ids.length
+        : (idx - 1 + ids.length) % ids.length;
+      activePanelId = ids[next]!;
+      applyStyles();
+      host.screen.render();
+    }
+
+    // win.onInput is for API/plumb write-in, not keyboard — keyboard handled by canvas.on("keypress") above
 
     // ── Resize reflow ───────────────────────────────────────────────
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -893,8 +1029,7 @@ export default function setup(host: MicroappHost) {
       clearTimers(timers);
       clearTimeout(reloadDebounce);
       watcher.close();
-      host.screen.off("mouse", handleMouse);
-      host.screen.off("mouse", handleWheel);
+      host.screen.off("mouse", zineMouse);
     });
 
     return win.record;

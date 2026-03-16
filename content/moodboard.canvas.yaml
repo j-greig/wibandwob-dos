@@ -238,6 +238,8 @@ panels:
     w: 30
     h: 20
     col: 2
+    x: 155
+    y: 9
 
   - id: wib-says
     type: text
@@ -251,6 +253,8 @@ panels:
     w: 42
     h: 9
     col: 2
+    x: 156
+    y: 31
 
   - id: wob-says
     type: text
@@ -264,6 +268,8 @@ panels:
     w: 42
     h: 9
     col: 2
+    x: 155
+    y: 41
 
   - id: owl-accent
     type: ascii-art
@@ -276,3 +282,5 @@ panels:
     w: 20
     h: 8
     col: 2
+    x: 154
+    y: 50

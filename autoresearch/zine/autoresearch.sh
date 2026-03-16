@@ -72,7 +72,7 @@ check "captureText implemented" 5 \
 echo ""
 echo "=== Slice 2: Moodboard canvas (30 pts) ==="
 
-CANVAS="scratch/moodboard.canvas.yaml"
+CANVAS="content/moodboard.canvas.yaml"
 
 check "moodboard.canvas.yaml exists" 5 \
   "[ -f '$CANVAS' ]"

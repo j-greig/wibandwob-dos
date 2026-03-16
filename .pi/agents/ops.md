@@ -34,6 +34,9 @@ wibwob write <id>                # pipe stdin text into a window
 wibwob plumb --from <id> --to <id>  # route text between windows
 wibwob commands -q               # list all command IDs
 wibwob cmd <id> [--key val ...]  # run command by ID
+wibwob cmd window.close --id 3  # close window (arg is --id, NOT --windowId)
+wibwob cmd window.focus --id 3  # focus window
+wibwob cmd window.move --id 3 --x 10 --y 5  # move window
 wibwob start                     # idempotent launch
 wibwob restart                   # clean restart
 wibwob attach                    # resurrect from orphan workspace
