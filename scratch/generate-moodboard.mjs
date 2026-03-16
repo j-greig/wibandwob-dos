@@ -70,6 +70,23 @@ const folkCats = primer("folk-chaos-order-punk.txt");
 const postcard = primer("www-postcard-castle.txt");
 const catSimple = primer("cat-cat-simple.txt");
 
+// ── Joan Stark pieces ───────────────────────────────────────
+
+function jgs(name) {
+  const p = `/Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples/${name}`;
+  try {
+    // Strip comment headers
+    return readFileSync(p, "utf8").split("\n").filter(l => !l.startsWith("#")).join("\n").trim();
+  } catch { return ""; }
+}
+
+const jgsSleepyCat = jgs("sleeping-cat-0000-2.txt");
+const jgsMoonStars = jgs("moon-and-stars-0000.txt");
+const jgsBirds = jgs("more-birds-0000.txt");
+const jgsOwl = jgs("4-line-owl-0000.txt");
+const jgsStar = jgs("six-pointed-star-0000.txt");
+const jgsSun = jgs("sun-0000-4.txt");
+
 // ── Hand-drawn blocks ───────────────────────────────────────
 
 const philoBlock = [
@@ -197,6 +214,7 @@ stamp(philoBlock, 55, 0);
 stamp(postcard, 110, 0);      // Castle postcard
 stamp(principlesBlock, 155, 0);
 stamp(catSimple, 215, 3);     // Smol cat in corner
+stamp(jgsMoonStars, 225, 1); // Moon & stars top-right corner
 
 // Horizontal divider
 hline("═", 0, 15, W);
@@ -205,12 +223,42 @@ hline("═", 0, 15, W);
 
 stamp(coatFig, 2, 17);
 stamp(coatDiagram, 2, 22);
+
+// COAT annotation — to the right of the COAT box
+const coatAnnotation = [
+  "Define every command, window,",
+  "state query, and workspace op",
+  "ONCE in the shared runtime.",
+  "",
+  "TUI, CLI, API, and agents are",
+  "thin adapters over four seams.",
+  "No adapter owns semantics.",
+  "",
+  "\"Would this work if I deleted",
+  " the TUI and only had the API?\"",
+].join("\n");
+stamp(coatAnnotation, 16, 22);
+
 stamp(adapterDiagram, 68, 17);
+
+// Adapter annotation — below the Runtime box
+const adapterAnnotation = [
+  "Human and agent have EQUAL",
+  "control. Same commands, same",
+  "state, same windows. No",
+  "second-class citizens.",
+].join("\n");
+stamp(adapterAnnotation, 82, 30);
+
 stamp(lifecycleBlock, 140, 17);
 stamp(sdkBlock, 185, 17);
 
 // Label the adapter diagram
 stamp("── EQUAL PEER INTERFACES ──", 68, 16);
+
+// JGS accents in row 2 gaps (must avoid box-drawing collisions)
+stamp(jgsBirds, 108, 29);      // Birds flying between diagrams
+stamp(jgsSleepyCat, 108, 33);  // Sleepy cat under birds
 
 // Horizontal divider
 hline("═", 0, 38, W);
@@ -221,8 +269,10 @@ stamp(archBlock, 2, 39);
 stamp(tierBlock, 130, 39);
 stamp(northStar, 2, 60);
 
-// Accent: repeat folk cats bottom-right
+// Accent: folk cats + jgs pieces bottom-right
 stamp(folkCats, 130, 49);
+stamp(jgsSun, 234, 42);        // Sun mid-right, clear of boxes
+stamp(jgsOwl, 100, 55);       // Owl between arch box and folk cats
 
 // ── OUTPUT ──────────────────────────────────────────────────
 const output = canvas.map((row) => row.join("").trimEnd()).join("\n");
