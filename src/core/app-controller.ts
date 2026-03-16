@@ -106,7 +106,7 @@ import {
   promptForBackroomsRunOptions as promptForBackroomsRunOptionsWindow,
   promptForBackroomsTv as promptForBackroomsTvWindow,
 } from "../windows/backrooms-windows.js";
-import { type FileManagerRestore } from "../windows/file-manager-window.js";
+// file-manager-window — now registered via host-window-registry
 import { openTextViewerWindow as openContentViewerWindow } from "../windows/text-viewer-window.js";
 // browser-reader-window — now registered via host-window-registry
 import {
@@ -940,13 +940,7 @@ export class TsTuiMvpApp {
     };
   }
 
-  private openBackroomsLogBrowserWindow(): WindowRecord | undefined {
-    return this.openHostWindow("backrooms-log-browser");
-  }
-
-  private promptForBackroomsTv(): WindowRecord | undefined {
-    return this.openHostWindow("backrooms-primer-picker");
-  }
+  // openBackroomsLogBrowserWindow, promptForBackroomsTv — inlined as openHostWindow calls
 
   private openBackroomsPrimerPicker(
     theme: string,
@@ -979,11 +973,7 @@ export class TsTuiMvpApp {
     return this.openHostWindow("backrooms-tv", channel as unknown as Record<string, unknown>);
   }
 
-  private openPrimerBrowserWindow(restore?: {
-    selectedIndex?: number;
-  }): WindowRecord | undefined {
-    return this.openHostWindow("primer-browser", restore as Record<string, unknown> | undefined);
-  }
+  // openPrimerBrowserWindow — inlined as openHostWindow("primer-browser", restore)
 
   private getFocusedFinder() {
     const win = this.windowManager.getFocusedWindow();
@@ -1007,31 +997,13 @@ export class TsTuiMvpApp {
     };
   }
 
-  private openFileManagerWindow(
-    restore?: FileManagerRestore,
-  ): WindowRecord | undefined {
-    return this.openHostWindow("file-manager", restore as Record<string, unknown> | undefined);
-  }
+  // openFileManagerWindow — inlined as openHostWindow("file-manager", restore)
 
-  private openPrimerGalleryWindow(restore?: {
-    activeTabIndex?: number;
-    searchValue?: string;
-    selectedIndex?: number;
-  }): WindowRecord | undefined {
-    return this.openHostWindow("primer-gallery", restore as Record<string, unknown> | undefined);
-  }
+  // openPrimerGalleryWindow — inlined as openHostWindow("primer-gallery", restore)
 
-  private openChromeBrowserWindow(
-    initialUrl?: string,
-  ): WindowRecord | undefined {
-    return this.openHostWindow("web-reader", initialUrl ? { url: initialUrl } : undefined);
-  }
+  // openChromeBrowserWindow — inlined as openHostWindow("web-reader", ...)
 
-  private openBrowserReaderWindow(
-    filePath = MASTER_PHILOSOPHY_PATH,
-  ): WindowRecord | undefined {
-    return this.openHostWindow("reader-viewer", { filePath });
-  }
+  // openBrowserReaderWindow — inlined as openHostWindow("reader-viewer", ...)
 
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
@@ -1125,14 +1097,12 @@ export class TsTuiMvpApp {
         saveWorkspace: () => this.saveWorkspace(),
         promptForWorkspaceSave: () => this.promptForWorkspaceSave(),
         promptForWorkspaceLoad: () => this.promptForWorkspaceLoad(),
-        openCommandPaletteWindow: () => this.openCommandPaletteWindow(),
+        openCommandPaletteWindow: () => this.openHostWindow("command-palette"),
       });
     });
   }
 
-  private openCommandPaletteWindow(): WindowRecord | undefined {
-    return this.openHostWindow("command-palette");
-  }
+  // openCommandPaletteWindow — inlined as openHostWindow("command-palette")
 
   private promptForPrimer(): void {
     promptForPrimerFile({
@@ -1393,18 +1363,18 @@ export class TsTuiMvpApp {
       openEditorWindow: (filePath, title, initial, restore) =>
         this.editor.openWindow(filePath, title, initial, restore),
       openBrowserReaderWindow: (filePath) =>
-        this.openBrowserReaderWindow(filePath),
+        this.openHostWindow("reader-viewer", { filePath }),
       openFigletWindow: (text, font) => {
         this.commands.runDynamic("microapp.wibwob.figlet.open", { text, font });
         return undefined; // microapp creates its own window
       },
       openPrimerGalleryWindow: (restore) =>
-        this.openPrimerGalleryWindow(restore),
+        this.openHostWindow("primer-gallery", restore as Record<string, unknown> | undefined),
       openPrimerBrowserWindow: (restore) =>
-        this.openPrimerBrowserWindow(restore),
-      openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
+        this.openHostWindow("primer-browser", restore as Record<string, unknown> | undefined),
+      openFileManagerWindow: (restore) => this.openHostWindow("file-manager", restore as Record<string, unknown> | undefined),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
-      openBackroomsLogBrowserWindow: () => this.openBackroomsLogBrowserWindow(),
+      openBackroomsLogBrowserWindow: () => this.openHostWindow("backrooms-log-browser"),
       openBackroomsPrimerPickerWindow: () =>
         this.openBackroomsPrimerPicker("liminal fluorescent maze", {
           theme: "liminal fluorescent maze",
@@ -1413,7 +1383,7 @@ export class TsTuiMvpApp {
           model: "sonnet",
         }),
       openChromeBrowserWindow: (restore) =>
-        this.openChromeBrowserWindow(restore?.url),
+        this.openHostWindow("web-reader", restore?.url ? { url: restore.url } : undefined),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
 
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
@@ -1481,8 +1451,8 @@ export class TsTuiMvpApp {
   /** Action bridge between the command catalog/registry and concrete controller behaviour. */
   private getAppMenuActions(): AppMenuActions {
     return {
-      browsePrimers: () => this.openPrimerBrowserWindow(),
-      openFileManager: () => this.openFileManagerWindow(),
+      browsePrimers: () => this.openHostWindow("primer-browser"),
+      openFileManager: () => this.openHostWindow("file-manager"),
       openPrimerPicker: () => this.openPrimerPicker(),
       openPrimerPrompt: (args) => {
         const filePath =
@@ -1734,7 +1704,7 @@ export class TsTuiMvpApp {
         const info = this.overlays.getActiveOverlayInfo();
         return info ? { active: true, ...info } : { active: false };
       },
-      openBackroomsPrompt: () => this.promptForBackroomsTv(),
+      openBackroomsPrompt: () => this.openHostWindow("backrooms-primer-picker"),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =
           typeof args?.theme === "string" && args.theme.trim()
@@ -1756,7 +1726,7 @@ export class TsTuiMvpApp {
             : "auto";
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
-      openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
+      openBackroomsLogBrowser: () => this.openHostWindow("backrooms-log-browser"),
       backroomsPickerInfo: () => {
         const api = this.getBackroomsPickerApi();
         if (!api?.info) return { active: false, error: "Backrooms picker not active" };
@@ -1788,20 +1758,20 @@ export class TsTuiMvpApp {
         const target = byId ?? this.windowManager.getFocusedWindow();
         if (target) this.windowManager.toggleMaximize(target);
       },
-      openGallery: () => this.openPrimerGalleryWindow(),
+      openGallery: () => this.openHostWindow("primer-gallery"),
       openBrowserReader: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        this.openBrowserReaderWindow(filePath);
+        this.openHostWindow("reader-viewer", { filePath });
       },
       openChromeBrowser: (args) => {
         const url =
           typeof args?.url === "string" && args.url.trim()
             ? args.url.trim()
             : undefined;
-        this.openChromeBrowserWindow(url);
+        this.openHostWindow("web-reader", url ? { url } : undefined);
       },
       openMusicPlayer: (args) => {
         const filePath =
@@ -1860,7 +1830,7 @@ export class TsTuiMvpApp {
         win?.writeInput?.("/meow");
       },
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
-      openCommandPalette: () => this.openCommandPaletteWindow(),
+      openCommandPalette: () => this.openHostWindow("command-palette"),
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: (args) => {
         const name =
