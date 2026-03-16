@@ -94,6 +94,8 @@ export interface AppMenuActions {
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
+  finderEdit: (args?: Record<string, unknown>) => void;
+  finderSave: () => void;
   finderYankContents: () => void;
   finderOpenExternal: (args?: Record<string, unknown>) => void;
   finderShare: (args?: Record<string, unknown>) => void;
@@ -260,6 +262,25 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     group: "browse",
     actionKey: "finderSortBy",
     palettePlacement: { order: 19 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.edit",
+    label: "Finder: Edit File",
+    description: "Open inline editor for the selected file. Args: path (optional).",
+    group: "browse",
+    actionKey: "finderEdit",
+    palettePlacement: { order: 17 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.save",
+    label: "Finder: Save Edited File",
+    description: "Save the currently edited file in the Finder inline editor.",
+    group: "browse",
+    actionKey: "finderSave",
     api: true,
     agent: true
   },
