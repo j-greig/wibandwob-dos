@@ -15,14 +15,16 @@ Uses mitsuhiko's `control.ts` Unix socket protocol (no changes to pi required).
 ## Slices
 
 ### Slice 0: `pi-sessions` microapp (MVP)
-- [~] S00: Scaffold microapp at `microapps/pi-sessions/`
-- [ ] S01: Session discovery — scan `~/.pi/session-control/*.sock`, list live sessions
-- [ ] S02: Session connection — Unix socket JSON-RPC client (send/get_message/get_summary/subscribe/abort)
-- [ ] S03: Session list window — blessed list showing live sessions with status
-- [ ] S04: Session detail window — streaming output from connected session
-- [ ] S05: Send message — input box to send prompts to a pi session
-- [ ] S06: Turn-end subscription — live updates when pi session completes a turn
-- [ ] S07: Command palette entries (open sessions, send message, get summary, abort)
+- [x] S00: Scaffold microapp at `microapps/pi-sessions/`
+- [x] S01: Session discovery — scan `~/.pi/session-control/*.sock`, batched probing (986 sockets in 32ms)
+- [x] S02: Session connection — Unix socket JSON-RPC client with timeouts, request IDs, buffer guards
+- [x] S03: Session list window — blessed list with alive/stale indicators, aliases, auto-refresh
+- [x] S04: Session detail window — streaming output log with turn_end subscription
+- [x] S05: Send message — textbox input + onInput for API/agent injection
+- [x] S06: Turn-end subscription — live updates when pi session completes a turn
+- [x] S07: Command palette entries (open, refresh) + direct API command
+- [x] S08: Code review + P0 fixes (timeouts, createTimer, style tags, onResize)
+- [x] S09: Integration test — connected to live pi session, protocol confirmed
 
 ### Slice 1: Command bridge spike (future)
 - [ ] S10: Load simple pi extension via jiti into Bun process
