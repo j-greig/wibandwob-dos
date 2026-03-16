@@ -2035,6 +2035,49 @@ export class TsTuiMvpApp {
           this.screen.render();
         }
       },
+
+      // ── Ghostty shader control ──────────────────────────
+      ghosttyShaderSet: (args) => {
+        const name = typeof args?.name === "string" ? args.name : "";
+        if (!name) return { ok: false, error: "Missing shader name" };
+        const action = name === "off" ? "off" : "on";
+        const shaderArgs = action === "on" ? [action, name] : [action];
+        try {
+          const { execSync } = require("node:child_process") as typeof import("node:child_process");
+          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
+          const output = execSync(`bash "${scriptPath}" ${shaderArgs.join(" ")}`, {
+            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          return { ok: true, shader: name, action, output };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+      ghosttyShaderList: () => {
+        try {
+          const { execSync } = require("node:child_process") as typeof import("node:child_process");
+          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
+          const output = execSync(`bash "${scriptPath}" list`, {
+            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          const shaders = output.split("\n").filter(Boolean);
+          return { ok: true, shaders };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+      ghosttyShaderStatus: () => {
+        try {
+          const { execSync } = require("node:child_process") as typeof import("node:child_process");
+          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
+          const output = execSync(`bash "${scriptPath}" status`, {
+            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          return { ok: true, status: output };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
     };
   }
 
