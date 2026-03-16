@@ -160,8 +160,8 @@ export class MenuOverlayManager {
       }
       if (selectedItem.separator) {
         const nextSelectable = findNextSelectable(index + 1, 1, true);
-        if (nextSelectable >= 0) {
-          (this.menuList as any).select(nextSelectable);
+        if (nextSelectable >= 0 && this.menuList) {
+          this.menuList.select(nextSelectable);
           this.screen.render();
         }
         return;
@@ -182,13 +182,13 @@ export class MenuOverlayManager {
         if (!this.menuList) {
           return;
         }
-        const idx = (this.menuList as any).selected as number;
+        const idx = this.menuList.selected;
         if (!visibleItems[idx]?.separator) {
           return;
         }
         const nextSelectable = findNextSelectable(idx + direction, direction, true);
         if (nextSelectable >= 0) {
-          (this.menuList as any).select(nextSelectable);
+          this.menuList.select(nextSelectable);
           this.screen.render();
         }
       }, 0);
@@ -209,10 +209,11 @@ export class MenuOverlayManager {
       }
     };
     // Defer by one tick so the click that opened this menu doesn't immediately close it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- blessed "mouse" event callback type mismatch
     setTimeout(() => { this.screen.on("mouse", outsideClickHandler as any); }, 0);
     // Clean up listener when menu closes so it doesn't accumulate
     const onceClose = () => {
-      (this.screen as any).removeListener("mouse", outsideClickHandler);
+      this.screen.removeListener("mouse", outsideClickHandler as any);
     };
     this.menuList.once("destroy", onceClose);
     this.onChange();

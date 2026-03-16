@@ -101,13 +101,13 @@ export class ShellChromeController {
     if (this.desktopChromeless) {
       this.deps.menuBar.hide();
       this.deps.statusLine.hide();
-      this.deps.desktop.top = 0 as any;
-      this.deps.desktop.bottom = 0 as any;
+      this.deps.desktop.top = 0;
+      this.deps.desktop.bottom = 0;
     } else {
       this.deps.menuBar.show();
       this.deps.statusLine.show();
-      this.deps.desktop.top = 1 as any;
-      this.deps.desktop.bottom = 1 as any;
+      this.deps.desktop.top = 1;
+      this.deps.desktop.bottom = 1;
     }
     this.deps.screen.render();
   }

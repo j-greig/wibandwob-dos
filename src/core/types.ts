@@ -257,6 +257,9 @@ export interface WindowRecord {
   // Maximize state (set by WindowManager on double-click titlebar)
   savedBounds?: { left: number; top: number; width: number; height: number };
 
+  // Chrome mode (set by WindowManager.setWindowChromeMode)
+  chromeless?: boolean;
+
   // Cross-cutting hooks — any window type may set these
   writeInput?: (input: string, sender?: string) => void;
   cleanup?: () => void;

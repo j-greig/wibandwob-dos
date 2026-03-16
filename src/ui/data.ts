@@ -96,7 +96,7 @@ export function createKeyValuePanel(opts: KeyValuePanelOptions = {}): KeyValuePa
       if (props.label !== undefined) label = props.label;
       if (props.keyWidth !== undefined) keyWidth = props.keyWidth;
       if (border) {
-        node.border = { type: "line" } as any;
+        node.border = { type: "line" };
         node.setLabel(label ? ` ${label} ` : "");
       }
     },
