@@ -579,8 +579,9 @@ export class ControlApiService {
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
         }
-        const files = (listed.result as any)?.files;
-        const picked = Array.isArray(files) ? files.find((f: any) => Number(f?.index) === Number(body.index)) : undefined;
+        const listResult = listed.result as { files?: { index?: number; filePath?: string }[] } | undefined;
+        const files = listResult?.files;
+        const picked = Array.isArray(files) ? files.find((f) => Number(f?.index) === Number(body.index)) : undefined;
         if (!picked?.filePath) {
           return Response.json({ ok: false, error: "Invalid zine canvas index" }, { status: 400 });
         }
@@ -798,7 +799,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/overlay/confirm") {
       const result = this.runApiCommand("overlay.confirm");
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { confirmed?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.confirmed) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
       }
@@ -806,7 +807,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/overlay/cancel") {
       const result = this.runApiCommand("overlay.cancel");
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { cancelled?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.cancelled) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
       }
@@ -818,7 +819,7 @@ export class ControlApiService {
         return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
       }
       const result = this.runApiCommand("overlay.select", { index });
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { selected?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.selected) {
         return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
       }

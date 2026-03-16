@@ -13,7 +13,7 @@ import blessed from "blessed";
 
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
-import { createRestyleBundle } from "../core/ui-parts.js";
+import { createRestyleBundle, type RestyleEntry } from "../core/ui-parts.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowRecord } from "../core/types.js";
@@ -111,7 +111,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
         track:     { fg: theme().muted.fg, bg: theme().body.bg },
       },
       scrollbar: { ch: "│", track: { ch: "░" } },
-    } as any);
+    });
 
     statusBar = blessed.box({
       parent: frame.body,
@@ -294,15 +294,20 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
 
   // ── onRestyle ─────────────────────────────────────────────────────────────
 
-  frame.onRestyle = createRestyleBundle([
+  const restyleEntries: RestyleEntry[] = [
     [editorWidget, () => theme().body],
-    ...(scrollBox ? [[scrollBox, () => ({
+  ];
+  if (scrollBox) {
+    restyleEntries.push([scrollBox, () => ({
       ...theme().body,
       scrollbar: { fg: theme().muted.fg, bg: theme().body.bg },
       track:     { fg: theme().muted.fg, bg: theme().body.bg },
-    })]] : []) as any,
-    ...(statusBar ? [[statusBar, () => ({ fg: theme().muted.fg, bg: theme().body.bg })]] : []) as any,
-  ]).restyle;
+    })]);
+  }
+  if (statusBar) {
+    restyleEntries.push([statusBar, () => ({ fg: theme().muted.fg, bg: theme().body.bg })]);
+  }
+  frame.onRestyle = createRestyleBundle(restyleEntries).restyle;
 
   // ── cleanup ────────────────────────────────────────────────────────────────
 
