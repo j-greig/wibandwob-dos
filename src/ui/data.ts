@@ -390,7 +390,7 @@ export function createDataTable(opts: DataTableOptions): DataTableHandle {
     }
   });
 
-  node.on("click", (_data: any) => {
+  node.on("click", (_data: blessed.Widgets.Events.IMouseEventArg) => {
     node.focus();
     // Detect header row click for sorting
     if (sortable && _data && typeof _data.y === "number" && typeof _data.x === "number") {

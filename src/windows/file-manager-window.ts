@@ -1143,12 +1143,12 @@ export function openFileManagerWindow(params: {
       style: { ...theme().body, selected: theme().selected },
     });
 
-    menuList.on("select", (_item: any, index: number) => {
+    menuList.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => {
       closeContextMenu();
       items[index]?.action();
     });
 
-    menuList.on("keypress", (_ch: any, key: any) => {
+    menuList.on("keypress", (_ch: string, key: { name: string }) => {
       if (key.name === "escape" || key.name === "q") {
         closeContextMenu();
       }
@@ -1227,7 +1227,7 @@ export function openFileManagerWindow(params: {
   });
 
   // Right-click context menu on list items
-  list.on("element click", (_el: any, mouse: any) => {
+  list.on("element click", (_el: blessed.Widgets.BlessedElement, mouse: { button?: string | number; x?: number; y?: number }) => {
     if (mouse && (mouse.button === "right" || mouse.button === 2)) {
       const filePath = getEntryPath();
       if (filePath) {

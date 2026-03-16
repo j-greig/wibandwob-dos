@@ -235,7 +235,7 @@ export function createListPanel(
     },
   } as Record<string, unknown>);
 
-  el.on("select", (_item: any, index: number) => {
+  el.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => {
     const text = opts.items[index] ?? "";
     for (const cb of selectCallbacks) cb(index, text);
   });

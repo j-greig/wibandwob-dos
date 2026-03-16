@@ -31,7 +31,7 @@ import fs from "node:fs";
 import { safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import type { BackroomsChannel } from "../core/types.js";
-import type { CommandSurface } from "../core/command-registry.js";
+import type { CommandListItem, CommandSurface } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
@@ -385,7 +385,10 @@ export class ControlApiService {
       });
       if (tierFilter) {
         const tiers = new Set(tierFilter.split(","));
-        commands = commands.filter((cmd: any) => tiers.has(cmd.tier) || (!cmd.tier && tiers.has("builtin")));
+        commands = commands.filter((cmd) => {
+          const tier = (cmd as CommandListItem & { tier?: string }).tier;
+          return tiers.has(tier ?? "builtin");
+        });
       }
       return Response.json({
         ok: true,
@@ -525,11 +528,11 @@ export class ControlApiService {
           return Response.json({
             ok: false,
             error: "Invalid arguments",
-            details: result.error.issues.map((i: any) => ({
+            details: result.error.issues.map((i) => ({
               path: i.path.join("."),
               message: i.message,
-              expected: i.expected,
-              received: i.received,
+              ...("expected" in i ? { expected: i.expected } : {}),
+              ...("received" in i ? { received: i.received } : {}),
             })),
           }, { status: 400 });
         }
@@ -595,7 +598,7 @@ export class ControlApiService {
 
     // ── View endpoints — all dispatch through command registry ──
     // Routes kept for backward compat; each is a thin shim over /commands/run.
-    const viewRoutes: Record<string, { id: string; argsMapper?: (b: any) => Record<string, unknown> | undefined }> = {
+    const viewRoutes: Record<string, { id: string; argsMapper?: (b: Record<string, unknown>) => Record<string, unknown> | undefined }> = {
       "/view/primer-browser/open":  { id: "primer.browse" },
       "/view/file-manager/open":    { id: "finder.open" },
       "/view/primer-gallery/open":  { id: "primer-gallery.open" },

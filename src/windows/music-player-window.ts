@@ -1123,7 +1123,7 @@ export function openMusicPlayerWindow(
 
   const unsub = ctrl.subscribe(render);
 
-  playlistPane.on("select", (_item: any, index: number) => {
+  playlistPane.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => {
     const f = ctrl.files[index];
     if (f) void ctrl.playFile(f);
   });
