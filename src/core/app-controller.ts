@@ -1589,7 +1589,8 @@ export class TsTuiMvpApp {
         if (win?.writeInput) {
           win.writeInput(text);
         } else {
-          this.overlays.flash("No editor window found");
+          // Return error for API/agent callers — don't flash, it's noisy
+          return { ok: false, error: "No editor window found" };
         }
       },
       agentSend: (args?: Record<string, unknown>) => {
