@@ -1929,6 +1929,20 @@ export class TsTuiMvpApp {
         finder.sortBy(field);
       },
 
+      // ── Finder: E045 edit/save ────────────────────────────
+      finderEdit: (args) => {
+        const filePath = typeof args?.path === "string" ? args.path : undefined;
+        if (filePath) {
+          // Open file manager + trigger edit mode (TODO: needs direct dispatch)
+          this.openHostWindow("file-manager");
+          this.overlays.flash(`Use 'e' key in File Manager to edit ${filePath}`);
+        } else {
+          this.overlays.flash("Use 'e' key in File Manager to edit selected file");
+        }
+      },
+      finderSave: () => {
+        this.overlays.flash("Use Ctrl+S in File Manager edit mode to save");
+      },
       // ── Finder: new E045 commands ─────────────────────────
       finderYankContents: () => {
         // Dispatched to focused finder window via its writeInput or similar
