@@ -158,7 +158,7 @@ sfx "$VOICE_DIR/v-wib.wav"
 $W figlet.open --text "wib" --font doom 2>&1 >/dev/null
 sleep 0.2
 # Position it left of centre
-WIB_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.kind=="figlet")][-1].id')
+WIB_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.appType=="wibwob.figlet")][-1].id')
 [ -n "$WIB_ID" ] && batch "{\"ops\":[{\"id\":$WIB_ID,\"left\":20,\"top\":22,\"width\":40,\"height\":10}]}"
 sleep 0.6
 
@@ -166,7 +166,7 @@ sleep 0.6
 sfx "$SFX/hit-word.wav"
 $W figlet.open --text "&" --font small 2>&1 >/dev/null
 sleep 0.2
-AMP_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.kind=="figlet")][-1].id')
+AMP_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.appType=="wibwob.figlet")][-1].id')
 [ -n "$AMP_ID" ] && batch "{\"ops\":[{\"id\":$AMP_ID,\"left\":62,\"top\":24,\"width\":12,\"height\":7}]}"
 sleep 0.4
 
@@ -175,7 +175,7 @@ sfx "$SFX/hit-word.wav"
 sfx "$VOICE_DIR/v-wob.wav"
 $W figlet.open --text "wob" --font banner 2>&1 >/dev/null
 sleep 0.2
-WOB_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.kind=="figlet")][-1].id')
+WOB_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.appType=="wibwob.figlet")][-1].id')
 [ -n "$WOB_ID" ] && batch "{\"ops\":[{\"id\":$WOB_ID,\"left\":76,\"top\":22,\"width\":45,\"height\":10}]}"
 sleep 0.8
 
@@ -184,7 +184,7 @@ sfx "$SFX/hit-word.wav"
 sfx "$VOICE_DIR/v-presents.wav"
 $W figlet.open --text "presents..." --font small 2>&1 >/dev/null
 sleep 0.2
-PRES_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.kind=="figlet")][-1].id')
+PRES_ID=$($W windows 2>/dev/null | jq -r '[.[] | select(.appType=="wibwob.figlet")][-1].id')
 [ -n "$PRES_ID" ] && batch "{\"ops\":[{\"id\":$PRES_ID,\"left\":55,\"top\":34,\"width\":50,\"height\":7}]}"
 
 sleep 2.0
@@ -244,7 +244,7 @@ $W figlet.open --text "ZOO" --font banner 2>&1 >/dev/null
 sleep 0.3
 
 # Position the figlets
-FIDS=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+FIDS=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 IDX=0; OPS="["
 for id in $FIDS; do
   [ $IDX -gt 0 ] && OPS+=","
@@ -316,7 +316,7 @@ sfx "$SFX/hit-word.wav"
 $W figlet.open --text "FERAL" --font doom 2>&1 >/dev/null
 sleep 0.3
 
-FIDS2=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+FIDS2=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 IDX=0; OPS2="["
 for id in $FIDS2; do
   [ $IDX -gt 0 ] && OPS2+=","
@@ -391,7 +391,7 @@ for i in $(seq 0 4); do
 done
 sleep 0.3
 
-FIDS3=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+FIDS3=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 IDX=0; OPS3="["
 for id in $FIDS3; do
   [ $IDX -ge 5 ] && break
@@ -457,7 +457,7 @@ for i in $(seq 0 4); do
 done
 sleep 0.3
 
-FIDS4=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+FIDS4=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 IDX=0; OPS4="["
 for id in $FIDS4; do
   [ $IDX -ge 5 ] && break
@@ -529,7 +529,7 @@ done
 sleep 0.3
 
 # Batch position all 20
-ALL_IDS=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+ALL_IDS=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 IDX=0; FINAL_OPS="["
 for id in $ALL_IDS; do
   [ $IDX -ge 20 ] && break
@@ -624,7 +624,7 @@ $W figlet.open --text "fin." --font small 2>&1 >/dev/null
 sleep 0.5
 
 # Position FIN under the shark
-FIN_ID=$($W windows 2>/dev/null | jq -r '.[] | select(.kind=="figlet") | .id')
+FIN_ID=$($W windows 2>/dev/null | jq -r '.[] | select(.appType=="wibwob.figlet") | .id')
 [ -n "$FIN_ID" ] && batch "{\"ops\":[{\"id\":$FIN_ID,\"left\":80,\"top\":28,\"width\":30,\"height\":7}]}"
 
 sleep 2.0
