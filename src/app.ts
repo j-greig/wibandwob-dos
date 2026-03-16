@@ -10,6 +10,20 @@ import { createRuntimeNode } from "./runtime/runtime-node.js";
 if (!process.env.TERM || process.env.TERM.includes("ghostty")) {
   process.env.TERM = "xterm-256color";
 }
+
+// Bulletproof stdin: if piped (not a TTY), reopen from /dev/tty so blessed
+// can read keyboard input. Without this, `echo x | bun run start` crashes.
+if (!process.stdin.isTTY) {
+  try {
+    const ttyFd = fs.openSync("/dev/tty", "r");
+    const ttyStream = fs.createReadStream("", { fd: ttyFd });
+    Object.defineProperty(process, "stdin", { value: ttyStream, writable: true });
+    // @ts-expect-error — setRawMode exists on tty.ReadStream
+    if (ttyStream.setRawMode) ttyStream.setRawMode(true);
+  } catch {
+    // /dev/tty not available (e.g. CI, Docker without tty) — proceed and hope for the best
+  }
+}
 process.env.HOME = process.env.HOME || os.homedir();
 
 const flags = parseAppFlags();

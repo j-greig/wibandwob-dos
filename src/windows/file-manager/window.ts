@@ -9,7 +9,7 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync, spawn as spawnProc } from "node:child_process";
 import { copyToClipboard } from "../../core/clipboard.js";
 import { safeReadFile } from "../../core/safe-fs.js";
 import { theme } from "../../core/theme/resolver.js";
@@ -333,12 +333,12 @@ export function openFileManagerV3(params: FileManagerParams): void {
         break;
       case "reveal":
         if (filePath && IS_MAC) {
-          try { execSync(`open -R ${JSON.stringify(filePath)}`); } catch {}
+          try { execFileSync("open", ["-R", filePath]); } catch {}
         }
         break;
       case "quicklook":
         if (filePath && IS_MAC) {
-          try { execSync(`qlmanage -p ${JSON.stringify(filePath)} &>/dev/null &`); } catch {}
+          try { spawnProc("qlmanage", ["-p", filePath], { stdio: "ignore", detached: true }).unref(); } catch {}
         }
         break;
       case "navigate-up":
@@ -395,8 +395,8 @@ export function openFileManagerV3(params: FileManagerParams): void {
     ];
     for (const editor of editors) {
       try {
-        execSync(`which ${editor.cmd}`, { stdio: "ignore" });
-        execSync(`${editor.cmd} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        execFileSync("which", [editor.cmd], { stdio: "ignore" });
+        spawnProc(editor.cmd, [filePath], { stdio: "ignore", detached: true }).unref();
         params.overlays.flash(`Opened in ${editor.name}`);
         return;
       } catch {}
@@ -404,7 +404,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
     const env = process.env.VISUAL || process.env.EDITOR;
     if (env) {
       try {
-        execSync(`${env} ${JSON.stringify(filePath)}`, { stdio: "ignore" });
+        spawnProc(env, [filePath], { stdio: "ignore", detached: true }).unref();
         params.overlays.flash(`Opened in ${env}`);
         return;
       } catch {}

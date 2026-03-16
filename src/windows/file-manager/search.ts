@@ -61,6 +61,8 @@ export function createSearchEngine(callbacks: SearchCallbacks): SearchEngine {
     process = proc;
     let buffer = "";
 
+    const MAX_RESULTS = 500;
+
     proc.stdout!.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
       const lines = buffer.split("\n");
@@ -70,6 +72,13 @@ export function createSearchEngine(callbacks: SearchCallbacks): SearchEngine {
         if (match) {
           results.push({ file: match[1]!, line: parseInt(match[2]!, 10), text: match[3]! });
         }
+      }
+      // Cap total results to prevent memory bloat in large repos
+      if (results.length >= MAX_RESULTS) {
+        proc.kill();
+        isActive = false;
+        callbacks.onComplete(results);
+        return;
       }
       callbacks.onResults(results);
     });
