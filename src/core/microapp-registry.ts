@@ -28,6 +28,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.world":              "core",
   "wibwob.terminal":           "core",
   "wibwob.chatroom":           "core",
+  "wibwob.pi-sessions":        "core",
 
   // ── Beta: functional, opt-in ───────────────────────────────────────
   "wibwob.plasma":             "beta",
@@ -38,7 +39,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.sy2chronicles":      "beta",
   "wibwob.tr808":              "beta",
   "wibwob.wiretext":           "beta",
-  "wibwob.zine":               "beta",
+  "wibwob.zine":               "core",
   "wibwob.terrarium":          "beta",
   "wibwob.terrarium-life":     "beta",
   "wibwob.tidepool":           "beta",

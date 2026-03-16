@@ -24,6 +24,9 @@ Options:
 import argparse, subprocess, sys, time, random
 from pathlib import Path
 
+# Resolve repo root from this script's location (scripts/fx/ → repo root)
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+
 def load_art(path):
     lines = [l for l in Path(path).read_text().splitlines() if not l.startswith('#')]
     # strip trailing empty lines
@@ -51,7 +54,7 @@ def write_to_window(text, win_id):
         ['bun', 'run', 'src/cli/wibwob.ts', 'write', str(win_id)],
         input=text.encode(),
         capture_output=True,
-        cwd='/Users/james/Repos/wibandwob-dos'
+        cwd=_REPO_ROOT
     )
     return proc.returncode == 0
 

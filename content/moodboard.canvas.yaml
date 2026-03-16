@@ -1,0 +1,290 @@
+meta:
+  title: "WibWob-DOS Architecture Moodboard"
+  columnHeaders: true
+
+columns:
+  0: { title: "Philosophy & Vision", width: 80 }
+  1: { title: "Architecture & COAT", width: 80 }
+  2: { title: "Art & Accents", width: 50 }
+
+panels:
+  - id: title-banner
+    type: figlet
+    title: "WibWob-DOS"
+    figletText: "WibWob-DOS"
+    figletFont: doom
+    w: 80
+    h: 10
+    col: 0
+
+  - id: north-star
+    type: text
+    title: "North Star"
+    text: |
+      We are building a terminal-native platform for microapps.
+
+      Microapps are small terminal applications that live inside a shared TUI
+      runtime called WibWob-DOS — Wib & Wob's Dual Operating System.
+
+      The runtime is dual-operated — designed to be controlled by both humans
+      and symbients through peer interfaces. A shared desktop where multiple
+      modes of intelligence coexist and collaborate.
+
+      The platform is: legible to humans, predictable for agents, expressive
+      for creators.
+    w: 78
+    h: 16
+    col: 0
+
+  - id: symbient-philosophy
+    type: text
+    title: "Symbient Philosophy"
+    text: |
+      A symbient is the opposite of a cyborg.
+
+        Cyborg:   human augmented by machines
+        Symbient: machines augmented with humanness
+
+      This platform exists in a liminal space between biological intelligence,
+      machine systems, human creativity, and agentic software. The runtime is
+      where humans, agents, and programs co-create tools.
+
+      It is not a full GUI framework, not a React clone, not an infinite
+      plugin system. It remains intentionally small and opinionated.
+    w: 78
+    h: 16
+    col: 0
+
+  - id: principles
+    type: text
+    title: "Core Design Principles"
+    text: |
+      RADICAL SIMPLICITY
+      Constraints are a feature. Small systems are easier to understand,
+      maintain, and for agents to reason about.
+
+      CONSTRAINED EXPRESSIVENESS
+      The public surface remains small and stable. Complexity emerges from
+      composition, sequencing, and interaction. Fewer primitives, stronger
+      defaults, clearer boundaries.
+
+      LEGIBILITY OVER CLEVERNESS
+      Prefer explicit architecture, clear boundaries, readable code.
+      Avoid magical abstractions, hidden state, implicit behaviour.
+
+      HOST OWNS COMPLEXITY
+      Microapps live inside a controlled environment. The host handles
+      rendering, focus, layout, lifecycle, and diagnostics.
+
+      UNIX INFLUENCE
+      Small tools, composable behaviours, explicit contracts, predictable
+      interfaces — applied to terminal applications.
+
+      ONE CONCEPT, ONE OWNER
+      Every piece of state, every behaviour, every measurement has exactly
+      one canonical owner. Extend the owner, never create a parallel helper.
+    w: 78
+    h: 28
+    col: 0
+
+  - id: coat-diagram
+    type: ascii-art
+    title: "COAT — Command Once, Adapt Thin"
+    asciiArt: |
+      ┌─────────────────────────────────────────────────────┐
+      │           SHARED SEMANTIC RUNTIME                    │
+      │                                                      │
+      │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
+      │  │ command   │  │ inspect  │  │ window   │          │
+      │  │ catalog   │  │ state    │  │ facade   │          │
+      │  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
+      │       │              │              │                │
+      │  ═════╪══════════════╪══════════════╪═══════════     │
+      │       │              │              │                │
+      │  ┌────┴────┐  ┌─────┴────┐  ┌─────┴────┐          │
+      │  │   TUI   │  │   CLI    │  │   API    │          │
+      │  │ (blessed)│  │ (wibwob) │  │ (HTTP)   │          │
+      │  └─────────┘  └──────────┘  └──────────┘          │
+      │                                                      │
+      │  "Would this work if I deleted the TUI               │
+      │   and only had the API?"                             │
+      └─────────────────────────────────────────────────────┘
+    w: 60
+    h: 22
+    col: 1
+
+  - id: coat-explanation
+    type: text
+    title: "COAT Explained"
+    text: |
+      COAT — Command Once, Adapt Thin.
+
+      Every interface is just another client of the runtime. The platform is
+      a shared semantic runtime with multiple peer interfaces:
+
+        TUI  — blessed terminal interface
+        CLI  — wibwob command surface
+        API  — HTTP control surface (port 8099)
+
+      The runtime owns four explicit seams:
+
+        command    — one catalog, one dispatch path, one discovery surface
+        inspection — one snapshot shape, one access path
+        window     — one facade, one lifecycle
+        workspace  — one save/restore path
+
+      TUI, CLI, API, agent, and microapps are thin adapters over these seams.
+      No adapter owns semantics. No adapter invents its own control path.
+
+      Enforced by: bun run check-coat (6 automated checks, 0 violations)
+    w: 70
+    h: 24
+    col: 1
+    x: 110
+    y: 24
+
+  - id: sdk-contract
+    type: text
+    title: "SDK Stability Contract"
+    text: |
+      ┌─────────────────────────────────────────────┐
+      │  SDK Contract (stable)                       │
+      │  - typed Handles, Options, Events            │
+      │  - semantic methods: update(), destroy()     │
+      │  - theme tokens: theme().body, theme().footer│
+      │                                              │
+      │  ═══════════ stability boundary ═══════════  │
+      │                                              │
+      │  Implementation (mutable)                    │
+      │  - blessed widgets, nodes, event wiring      │
+      │  - internal layout math, chrome sizing       │
+      │  - rendering optimisations                   │
+      └─────────────────────────────────────────────┘
+
+      Microapps code against the Handle interface, never against blessed.
+      The host can replace the rendering engine without breaking microapps.
+
+      Rules:
+        1. No blessed exposure. Blessed is internal.
+        2. Declarative over imperative.
+        3. Limited host services: ui, commands, events, storage, logger.
+        4. Stable semantic core. Add composition, not new primitives.
+    w: 70
+    h: 26
+    col: 1
+    x: 81
+    y: 40
+
+  - id: microapp-lifecycle
+    type: text
+    title: "Microapp Lifecycle"
+    text: |
+      1. DISCOVERY — microapp-loader scans microapps/ directories
+      2. REGISTRATION — manifest read, commands added to catalog
+      3. INSTANTIATION — host creates window, calls microapp factory
+      4. RUNNING — microapp receives host handle, renders content
+      5. RESTYLE — theme changes propagated via onRestyle callback
+      6. SNAPSHOT — describeState() called for workspace save
+      7. RESTORE — factory called with saved state args
+      8. TEARDOWN — window closed, cleanup callbacks invoked
+
+      Microapps are small. The host owns the hard parts.
+    w: 70
+    h: 16
+    col: 1
+
+  - id: tiers
+    type: text
+    title: "Microapp Tiers"
+    text: |
+      CORE    — ships with runtime, always available, never breaks
+      STABLE  — production quality, tested, documented
+      BETA    — functional but contract may change
+      EXPERIMENT — prototypes, may be removed
+
+      39 registered microapps. Zero SDK import violations.
+    w: 60
+    h: 11
+    col: 1
+
+  - id: folk-cats
+    type: ascii-art
+    title: "Folk Cats"
+    asciiArt: |
+      /\_/\     /\_/\     /\_/\
+      ( o.o )   ( >.< )   ( ^.^ )
+       > ^ <     > ^ <     > ^ <
+      /|   |\   /|   |\   /|   |\
+      (_|   |_) (_|   |_) (_|   |_)
+    w: 40
+    h: 9
+    col: 2
+
+  - id: castle
+    type: ascii-art
+    title: "The Castle"
+    asciiArt: |
+      ........./\.........
+      ......../||\........
+      ......./ || \.......
+      ....../  ||  \......
+      ...../   ||   \.....
+      ..../____||____\....
+      ....|  _  |  _  |..
+      ....| | | | | | |..
+      ....| |_| | |_| |..
+      ....|_____|_____|..
+      ....|     |     |..
+      ....|  _     _  |..
+      ....| | |   | | |..
+      ....| |_|   |_| |..
+      ....|___________|..
+    w: 30
+    h: 20
+    col: 2
+    x: 155
+    y: 10
+
+  - id: wib-says
+    type: text
+    title: "Wib Says"
+    text: |
+      "The best systems are the ones that
+       feel like they grew, not like they
+       were engineered."
+
+                          — Wib
+    w: 42
+    h: 9
+    col: 2
+    x: 212
+    y: 24
+
+  - id: wob-says
+    type: text
+    title: "Wob Says"
+    text: |
+      "Measure twice, abstract once.
+       Every abstraction is a bet that
+       the pattern will recur."
+
+                          — Wob
+    w: 42
+    h: 9
+    col: 2
+    x: 174
+    y: 36
+
+  - id: owl-accent
+    type: ascii-art
+    title: "Night Watch"
+    asciiArt: |
+      ,___,
+      (O,O)
+      /)  )
+      -"-"--
+    w: 20
+    h: 8
+    col: 2
+    x: 154
+    y: 50

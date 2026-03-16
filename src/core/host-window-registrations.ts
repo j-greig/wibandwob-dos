@@ -20,6 +20,8 @@ import { openPrimerGalleryWindow } from "../windows/primer-gallery-window.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openBrowserReaderWindow } from "../windows/browser-reader-window.js";
 import { openFileManagerWindow, type FileManagerRestore } from "../windows/file-manager-window.js";
+import { openFileManagerV3 } from "../windows/file-manager/window.js";
+import type { FileManagerRestore as FileManagerRestoreV3 } from "../windows/file-manager/types.js";
 import { openScrambleFloatingWindow, openScrambleSmolPopup } from "../windows/scramble-window.js";
 import {
   openCommandPaletteWindow,
@@ -162,8 +164,8 @@ export function registerAllHostWindows(): void {
   registerHostWindow({
     appType: "file-manager",
     factory: (deps, restore) => {
-      const r = restore as FileManagerRestore | undefined;
-      openFileManagerWindow({
+      const r = restore as FileManagerRestoreV3 | undefined;
+      openFileManagerV3({
         screen: deps.screen,
         windowManager: deps.windowManager,
         overlays: deps.overlays,
