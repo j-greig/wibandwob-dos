@@ -94,7 +94,10 @@ export default function setup(host: MicroappHost) {
 
     // If no path given, find canvas files and show a picker
     if (!filePath) {
-      const candidates = findCanvasFiles(path.join(REPO_ROOT, "content"));
+      const candidates = [
+        ...findCanvasFiles(path.join(REPO_ROOT, "content")),
+        ...findCanvasFiles(path.join(REPO_ROOT, "scratch")).filter(f => f.endsWith(".canvas.yaml")),
+      ];
       if (candidates.length === 0) return;
       if (candidates.length === 1) {
         filePath = candidates[0]!;

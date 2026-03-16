@@ -2,3 +2,4 @@
 {"run":1,"commit":"5464dec","metric":25,"metrics":{},"status":"keep","description":"Baseline: 25/100 — existing zine has menu category, describeState, onRestyle, typecheck+COAT pass","timestamp":1773669408855,"segment":0}
 {"run":2,"commit":"83984f6","metric":80,"metrics":{},"status":"keep","description":"Promote zine to core tier, create moodboard.canvas.yaml with 14 panels, fix loadCanvas test","timestamp":1773669564377,"segment":0}
 {"run":3,"commit":"1600eff","metric":100,"metrics":{},"status":"keep","description":"SDK migration: extract blessed to zine-widgets.ts, add captureText, remove direct blessed import from index.ts — 100/100","timestamp":1773669814294,"segment":0}
+{"run":4,"commit":"d8a64c3","metric":100,"metrics":{},"status":"keep","description":"Fix createButtonBar API mismatch — old 3-arg call to new ButtonBarOptions shape. This was the crash preventing zine from opening.","timestamp":1773670676091,"segment":0}
