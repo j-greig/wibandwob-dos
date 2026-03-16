@@ -66,19 +66,28 @@ const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 
 // ── Helpers ──────────────────────────────────────────────
 
-async function api(apiPath: string, method = "GET", body?: unknown): Promise<unknown> {
-  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-
+/** Build a fetch URL + options that handle both TCP and unix socket modes. */
+function socketFetchArgs(apiPath: string, extraOpts?: RequestInit): [string, RequestInit] {
+  const opts: RequestInit = { ...extraOpts };
   let url: string;
   if (IS_SOCKET) {
-    // Bun supports fetch() over unix sockets with the unix option
-    const sockPath = BASE.slice("unix://".length);
-    (opts as any).unix = sockPath;
+    (opts as any).unix = BASE.slice("unix://".length);
     url = `http://localhost${apiPath}`;
   } else {
     url = `${BASE}${apiPath}`;
   }
+  return [url, opts];
+}
+
+/** Build fetch options for a unix socket path (used by instance discovery). */
+function unixFetchOpts(sockPath: string): RequestInit {
+  return { unix: sockPath } as any;
+}
+
+async function api(apiPath: string, method = "GET", body?: unknown): Promise<unknown> {
+  const reqInit: RequestInit = { method, headers: { "Content-Type": "application/json" } };
+  if (body !== undefined) reqInit.body = JSON.stringify(body);
+  const [url, opts] = socketFetchArgs(apiPath, reqInit);
 
   const res = await fetch(url, opts);
   if (!res.ok) {
@@ -255,8 +264,7 @@ async function cmdRun(id: string, flags: Record<string, unknown>) {
 
 async function cmdScreenshot(id?: string) {
   const qs = id ? `?id=${id}` : "";
-  const url = IS_SOCKET ? `http://localhost/screenshot/text${qs}` : `${BASE}/screenshot/text${qs}`;
-  const opts: RequestInit = IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {};
+  const [url, opts] = socketFetchArgs(`/screenshot/text${qs}`);
   const res = await fetch(url, opts);
   if (!res.ok) {
     process.stderr.write(`Error: ${res.status}${res.status === 404 ? " — window not found" : ""}\n`);
@@ -366,9 +374,7 @@ async function cmdPlumb(args: string[]) {
   }
 
   // 2. Read source text via screenshot
-  const qs = `?id=${fromId}`;
-  const url = IS_SOCKET ? `http://localhost/screenshot/text${qs}` : `${BASE}/screenshot/text${qs}`;
-  const fetchOpts: RequestInit = IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {};
+  const [url, fetchOpts] = socketFetchArgs(`/screenshot/text?id=${fromId}`);
   const res = await fetch(url, fetchOpts);
   if (!res.ok) {
     process.stderr.write(`Could not read window ${fromId}: ${res.status}\n`);
@@ -424,10 +430,8 @@ async function cmdStart(args: string[]) {
 
   // Check if already running
   try {
-    const res = await fetch(
-      IS_SOCKET ? "http://localhost/health" : `${BASE}/health`,
-      IS_SOCKET ? { unix: BASE.slice("unix://".length) } as any : {},
-    );
+    const [healthUrl, healthOpts] = socketFetchArgs("/health");
+    const res = await fetch(healthUrl, healthOpts);
     if (res.ok) {
       const health = await res.json() as Record<string, unknown>;
       process.stderr.write(
@@ -487,7 +491,7 @@ async function cmdAttach() {
   let alive = false;
   if (fs.existsSync(sockPath)) {
     try {
-      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      const res = await fetch("http://localhost/health", unixFetchOpts(sockPath));
       alive = res.ok;
     } catch {
       alive = false;
@@ -500,18 +504,18 @@ async function cmdAttach() {
     // Save its state first
     try {
       await fetch("http://localhost/workspace/save", {
-        unix: sockPath,
+        ...unixFetchOpts(sockPath),
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: orphanWorkspace }),
-      } as any);
+      });
       process.stderr.write(`[attach] saved workspace as ${orphanWorkspace}\n`);
     } catch {
       process.stderr.write(`[attach] warning: could not save workspace\n`);
     }
     // Kill it
     try {
-      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      const res = await fetch("http://localhost/health", unixFetchOpts(sockPath));
       const health = await res.json() as Record<string, unknown>;
       if (health.pid) {
         process.kill(Number(health.pid), "SIGTERM");
@@ -584,7 +588,7 @@ async function cmdInstances() {
     const sockPath = path.join(instancesDir, sock);
     const label = sock.replace(/\.sock$/, "");
     try {
-      const res = await fetch("http://localhost/health", { unix: sockPath } as any);
+      const res = await fetch("http://localhost/health", unixFetchOpts(sockPath));
       if (res.ok) {
         const health = await res.json() as Record<string, unknown>;
         results.push({ label, socket: sockPath, ...health });
