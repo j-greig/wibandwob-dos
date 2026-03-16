@@ -14,11 +14,11 @@
  * renderPanel), panel-layout (column layout engine), canvas-types (ZineItem).
  */
 
-import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { createBox, createList, type BoxElement, type ListElement, type IKeyEventArg } from "./zine-widgets.js";
 import {
   layoutPanels,
   layoutColumns,
@@ -45,9 +45,9 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 /** Blessed node backing a ZineItem on the canvas. */
 interface ZineNode {
   item: ZineItem;
-  frame: blessed.Widgets.BoxElement;
-  titleBar?: blessed.Widgets.BoxElement;
-  content?: blessed.Widgets.BoxElement;
+  frame: BoxElement;
+  titleBar?: BoxElement;
+  content?: BoxElement;
 }
 
 /** Recursively find all .canvas.yaml files under a directory. */
@@ -71,7 +71,7 @@ function findCanvasFiles(dir: string, maxDepth = 3, depth = 0): string[] {
 export default function setup(host: MicroappHost) {
   let activePicker:
     | {
-        list: blessed.Widgets.ListElement;
+        list: ListElement;
         candidates: string[];
       }
     | undefined;
@@ -100,7 +100,7 @@ export default function setup(host: MicroappHost) {
         filePath = candidates[0]!;
       } else {
         closeActivePicker();
-        const picker = blessed.list({
+        const picker = createList({
           parent: host.screen,
           top: "center", left: "center",
           width: "60%", height: Math.min(candidates.length + 2, 20),
@@ -200,7 +200,7 @@ export default function setup(host: MicroappHost) {
     }
 
     // ── Root container ──────────────────────────────────────────────
-    const root = blessed.box({
+    const root = createBox({
       parent: win.body,
       top: 0, left: 0, right: 0, bottom: 0,
       keys: true, mouse: true, clickable: true,
@@ -208,7 +208,7 @@ export default function setup(host: MicroappHost) {
     });
 
     // ── Body area (between header row and toolbar row) ──────────────
-    const bodyArea = blessed.box({
+    const bodyArea = createBox({
       parent: root,
       top: 1, left: 0, right: 0, bottom: 1,
       style: host.theme().body,
@@ -285,7 +285,7 @@ export default function setup(host: MicroappHost) {
     });
 
     // ── Scrollable canvas ───────────────────────────────────────────
-    const canvas = blessed.box({
+    const canvas = createBox({
       parent: sidePanel.main,
       top: 0, left: 0, right: 0, bottom: 0,
       keys: true, mouse: true, clickable: true,
@@ -342,7 +342,7 @@ export default function setup(host: MicroappHost) {
     layoutToolbar();
 
     // ── Status bar (top) ────────────────────────────────────────────
-    const statusBar = blessed.box({
+    const statusBar = createBox({
       parent: root,
       top: 0, left: 0, right: 0, height: 1,
       tags: false,
@@ -408,7 +408,7 @@ export default function setup(host: MicroappHost) {
 
       for (const item of items) {
         if (item.type === "panel") {
-          const frame = blessed.box({
+          const frame = createBox({
             parent: canvas,
             top: 0, left: 0,
             width: item.w, height: item.h,
@@ -419,7 +419,7 @@ export default function setup(host: MicroappHost) {
             },
           });
 
-          const titleBar = blessed.box({
+          const titleBar = createBox({
             parent: frame,
             top: 0, left: 1, right: 1, height: 1,
             tags: false,
@@ -430,7 +430,7 @@ export default function setup(host: MicroappHost) {
 
           const iw = Math.max(1, item.w - 2);
           const ih = Math.max(1, item.h - 2);
-          const contentBox = blessed.box({
+          const contentBox = createBox({
             parent: frame,
             top: 1, left: 1,
             width: iw, height: ih,
@@ -461,7 +461,7 @@ export default function setup(host: MicroappHost) {
 
         } else if (item.type === "header") {
           const rule = "─".repeat(item.w);
-          const frame = blessed.box({
+          const frame = createBox({
             parent: canvas,
             top: item.y, left: item.x,
             width: item.w, height: 2,
@@ -826,7 +826,7 @@ export default function setup(host: MicroappHost) {
     canvas.key(["r"], () => rebuild());
     canvas.key(["["], () => toggleSidebar());
 
-    win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+    win.onInput((ch: string, key?: IKeyEventArg) => {
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
       if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
@@ -866,6 +866,19 @@ export default function setup(host: MicroappHost) {
           x: n.item.x, y: n.item.y, w: n.item.w, h: n.item.h,
         })),
       };
+    });
+
+    // ── captureText ────────────────────────────────────────────────
+    win.captureText(() => {
+      const snippets: string[] = [`ZINE: ${title}`, `panels=${[...zineNodes.values()].filter(n => n.item.type === "panel").length}`];
+      for (const [, node] of [...zineNodes.entries()].slice(0, 10)) {
+        if (node.item.title) snippets.push(`\n[${node.item.title}]`);
+        if (node.content) {
+          const firstLine = (node.content.getContent?.() ?? "").split("\n")[0] ?? "";
+          if (firstLine) snippets.push(firstLine);
+        }
+      }
+      return snippets.join("\n");
     });
 
     // ── Restyle ─────────────────────────────────────────────────────
