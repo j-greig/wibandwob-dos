@@ -213,20 +213,31 @@ function renderOverview(state: InspectorState): string {
 function renderUi(s: RuntimeInspectionSnapshot | undefined): string {
   if (!s) return "  ◌ Loading UI state…";
   const overlay = s.ui.overlay;
+  const colW = 58;
   const lines: string[] = [];
 
-  lines.push(sectionHeader("MENU"));
-  lines.push(kvLine("open", fmtBool(s.ui.menu.open)));
-  lines.push(kvLine("label", s.ui.menu.label ?? "—"));
-  lines.push(sectionFooter());
+  // ── Menu + Overlay (two-column) ──
+  const menuLines: string[] = [];
+  menuLines.push(sectionHeader("MENU", colW));
+  menuLines.push(kvLine("open", fmtBool(s.ui.menu.open), 12));
+  menuLines.push(kvLine("label", s.ui.menu.label ?? "—", 12));
+  menuLines.push(sectionFooter(colW));
+
+  const ovLines: string[] = [];
+  ovLines.push(sectionHeader("OVERLAY", colW));
+  ovLines.push(kvLine("type", overlay?.type ?? "—", 12));
+  ovLines.push(kvLine("label", overlay?.label ?? "—", 12));
+  ovLines.push(sectionFooter(colW));
+
+  const maxR = Math.max(menuLines.length, ovLines.length);
+  for (let i = 0; i < maxR; i++) {
+    const left = (menuLines[i] ?? "").padEnd(colW);
+    const right = ovLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
   lines.push("");
 
-  lines.push(sectionHeader("OVERLAY"));
-  lines.push(kvLine("type", overlay?.type ?? "—"));
-  lines.push(kvLine("label", overlay?.label ?? "—"));
-  lines.push(sectionFooter());
-  lines.push("");
-
+  // ── Blockers (full width) ──
   lines.push(sectionHeader("BLOCKERS"));
   lines.push(kvLine("blocked", `${fmtBool(s.ui.blocked)} ${s.ui.blockers.length > 0 ? `(${s.ui.blockers.length})` : ""}`));
   if (s.ui.blockers.length === 0) {
@@ -288,37 +299,56 @@ function renderStats(state: InspectorState): string {
   const fpsVals = state.fpsHistory.values();
   const rssVals = state.rssHistory.values();
   const heapVals = state.heapHistory.values();
+  const colW = 58;
 
   const lines: string[] = [];
 
-  lines.push(sectionHeader("RENDER"));
-  lines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`));
-  lines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`));
-  lines.push(kvLine("total frames", String(s.stats.render.totalFrames)));
-  lines.push(sectionFooter());
+  // ── Render + Memory (two-column) ──
+  const renderLines: string[] = [];
+  renderLines.push(sectionHeader("RENDER", colW));
+  renderLines.push(kvLine("fps", `${s.stats.render.fps.toFixed(1)}  ${sparkline(fpsVals)}`, 12));
+  renderLines.push(kvLine("avg frame", `${s.stats.render.avgFrameMs.toFixed(1)}ms`, 12));
+  renderLines.push(kvLine("frames", String(s.stats.render.totalFrames), 12));
+  renderLines.push(sectionFooter(colW));
+
+  const memLines: string[] = [];
+  memLines.push(sectionHeader("MEMORY", colW));
+  memLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB ${progressBar(s.stats.rssMb, 512, 18)}`, 12));
+  memLines.push(kvLine("rss trend", sparkline(rssVals), 12));
+  memLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB ${progressBar(s.stats.heapUsedMb, 256, 18)}`, 12));
+  memLines.push(kvLine("heap trend", sparkline(heapVals), 12));
+  memLines.push(sectionFooter(colW));
+
+  const maxR1 = Math.max(renderLines.length, memLines.length);
+  for (let i = 0; i < maxR1; i++) {
+    const left = (renderLines[i] ?? "").padEnd(colW);
+    const right = memLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
   lines.push("");
 
-  lines.push(sectionHeader("MEMORY"));
-  lines.push(kvLine("rss", `${s.stats.rssMb.toFixed(1)}MB  ${progressBar(s.stats.rssMb, 512, 24)}`));
-  lines.push(kvLine("rss history", sparkline(rssVals)));
-  lines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(1)}MB  ${progressBar(s.stats.heapUsedMb, 256, 24)}`));
-  lines.push(kvLine("heap history", sparkline(heapVals)));
-  lines.push(sectionFooter());
-  lines.push("");
+  // ── Agent + Scramble (two-column) ──
+  const agentLines: string[] = [];
+  agentLines.push(sectionHeader("AGENT", colW));
+  agentLines.push(kvLine("active", s.stats.agent.active ? "● ACTIVE" : "○ idle", 12));
+  agentLines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming), 12));
+  agentLines.push(kvLine("messages", String(s.stats.agent.messageCount), 12));
+  agentLines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount), 12));
+  agentLines.push(sectionFooter(colW));
 
-  lines.push(sectionHeader("AGENT"));
-  lines.push(kvLine("active", s.stats.agent.active ? "● ACTIVE" : "○ idle"));
-  lines.push(kvLine("streaming", fmtBool(s.stats.agent.streaming)));
-  lines.push(kvLine("messages", String(s.stats.agent.messageCount)));
-  lines.push(kvLine("tool runs", String(s.stats.agent.toolRunCount)));
-  lines.push(sectionFooter());
-  lines.push("");
+  const scrLines: string[] = [];
+  scrLines.push(sectionHeader("SCRAMBLE", colW));
+  scrLines.push(kvLine("status", s.scramble.status, 12));
+  scrLines.push(kvLine("model", s.scramble.model, 12));
+  scrLines.push(kvLine("session", s.scramble.sessionId, 12));
+  scrLines.push(sectionFooter(colW));
 
-  lines.push(sectionHeader("SCRAMBLE"));
-  lines.push(kvLine("status", s.scramble.status));
-  lines.push(kvLine("model", s.scramble.model));
-  lines.push(kvLine("session", s.scramble.sessionId));
-  lines.push(sectionFooter());
+  const maxR2 = Math.max(agentLines.length, scrLines.length);
+  for (let i = 0; i < maxR2; i++) {
+    const left = (agentLines[i] ?? "").padEnd(colW);
+    const right = scrLines[i] ?? "";
+    lines.push(`${left}  ${right}`);
+  }
 
   return lines.join("\n");
 }
