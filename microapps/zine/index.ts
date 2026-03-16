@@ -295,13 +295,7 @@ export default function setup(host: MicroappHost) {
       parent: sidePanel.main,
       top: 0, left: 0, right: 0, bottom: 0,
       keys: true, mouse: true, clickable: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        ch: "│",
-        track: { ch: "░" },
-        style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
-      },
+      scrollable: false,
       style: host.theme().body,
     });
 
@@ -780,15 +774,7 @@ export default function setup(host: MicroappHost) {
     const zineMouse = (data: any) => {
       if (!canvas.parent) return;
 
-      // Wheel: scroll canvas
-      if (data.action === "wheeldown" && isInsideCanvas(data.x, data.y)) {
-        canvas.scroll(3); renderLayoutAndContent(); host.screen.render();
-        return;
-      }
-      if (data.action === "wheelup" && isInsideCanvas(data.x, data.y)) {
-        canvas.scroll(-3); renderLayoutAndContent(); host.screen.render();
-        return;
-      }
+      // Wheel scroll disabled — use j/k keys. Mouse reserved for drag.
 
       // Mouseup: finish drag, save position
       if (data.action === "mouseup") {
@@ -820,25 +806,30 @@ export default function setup(host: MicroappHost) {
         return;
       }
 
-      // Mousemove: drag panel using screen-coordinate delta
-      if (data.action === "mousemove" && dragging && dragScreenStart) {
-        const dx = data.x - dragScreenStart.sx;
-        const dy = data.y - dragScreenStart.sy;
-        if (dx === 0 && dy === 0) return;
-        dragging.moved = true;
-        const node = panelNodes.get(dragging.id);
-        if (!node) return;
-        const newX = Math.max(0, dragScreenStart.origX + dx);
-        const newY = Math.max(0, dragScreenStart.origY + dy);
-        panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
-        node.x = newX;
-        node.y = newY;
-        node.frame.left = newX;
-        node.frame.top = newY;
-        host.screen.render();
-      }
+      // Mousemove handled on program level below (screen level misses motion events)
     };
     host.screen.on("mouse", zineMouse);
+
+    // ── Program-level mousemove for drag (bypasses blessed element routing) ──
+    const zineDragMove = (data: any) => {
+      // Terminal sends repeated mousedown (not mousemove) during drag — handle both
+      if ((data.action !== "mousedown" && data.action !== "mousemove") || !dragging || !dragScreenStart) return;
+      const dx = data.x - dragScreenStart.sx;
+      const dy = data.y - dragScreenStart.sy;
+      if (dx === 0 && dy === 0) return;
+      dragging.moved = true;
+      const node = panelNodes.get(dragging.id);
+      if (!node) return;
+      const newX = Math.max(0, dragScreenStart.origX + dx);
+      const newY = Math.max(0, dragScreenStart.origY + dy);
+      panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
+      node.x = newX;
+      node.y = newY;
+      node.frame.left = newX;
+      node.frame.top = newY;
+      host.screen.render();
+    };
+    host.screen.program.on("mouse", zineDragMove);
 
     // ── Build + first render ────────────────────────────────────────
     refreshSidebarList();
@@ -1030,6 +1021,7 @@ export default function setup(host: MicroappHost) {
       clearTimeout(reloadDebounce);
       watcher.close();
       host.screen.off("mouse", zineMouse);
+      host.screen.program.off("mouse", zineDragMove);
     });
 
     return win.record;

@@ -1,0 +1,1 @@
+{"run":1,"commit":"2a50fde","metric":100,"metrics":{},"status":"keep","description":"Keyboard panel nudge (arrows+shift), fix blessed keypress path, disable dbl-click editor, sidebar starts closed, selfWriteFlag prevents file-watch jiggle, persist positions to YAML","timestamp":1773676823321,"segment":0}
