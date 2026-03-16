@@ -201,7 +201,30 @@ function renderOverview(state: InspectorState): string {
   }
   lines.push("");
 
-  // (Agent section now in two-column layout above)
+  // ── Windows (compact, top by z-order) ──
+  const windows = s.state.windows.slice().sort((a, b) => b.zIndex - a.zIndex);
+  const showCount = Math.min(windows.length, 8);
+  lines.push(sectionHeader(`WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`));
+  lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(22)} ${"TITLE".padEnd(26)} ${"POS".padEnd(9)} ${"SIZE".padEnd(8)} Z`);
+  lines.push(`│ ${"─".repeat(4)} ${"─".repeat(22)} ${"─".repeat(26)} ${"─".repeat(9)} ${"─".repeat(8)} ──`);
+  for (let i = 0; i < showCount; i++) {
+    const w = windows[i]!;
+    const marker = w.focused ? "▸" : " ";
+    const appType = clip(w.appType ?? w.kind, 22).padEnd(22);
+    const title = clip(w.title, 26).padEnd(26);
+    const pos = `@${w.left},${w.top}`.padEnd(9);
+    const size = `${w.width}x${w.height}`.padEnd(8);
+    lines.push(`│${marker}${String(w.id).padStart(3)} ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}`);
+  }
+  lines.push(sectionFooter());
+  lines.push("");
+
+  // ── UI summary (one-liner) ──
+  const menuStr = s.ui.menu.open ? `menu: ● ${s.ui.menu.label ?? "open"}` : "menu: ○";
+  const overlayStr = overlay ? `overlay: ${overlay.type}` : "overlay: —";
+  const blockerStr = s.ui.blocked ? `blocked: ● (${s.ui.blockers.length})` : "blocked: ○";
+  lines.push(`  UI  ${menuStr}  ·  ${overlayStr}  ·  ${blockerStr}  →  Ui tab`);
+  lines.push("");
 
   // ── Footer ──
   const winCount = s.state.windows.length;
