@@ -140,8 +140,10 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   let findInput = "";
   let statusMessage = "";
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
-  let vimEnabled = true; // Toggle with Ctrl+V to disable vim mode
+  let vimEnabled = true;
   const vim = createVimState();
+  let pasteBuffer = ""; // Bracketed paste accumulator
+  let isPasting = false;
 
   const lang = detectLang(filePath ?? null);
   const langLabel = lang === "plain" ? "Plain Text" : lang.toUpperCase();
@@ -750,6 +752,31 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     ch: string | undefined,
     key: blessed.Widgets.Events.IKeyEventArg
   ) {
+    // Bracketed paste handling — terminal sends ESC[200~ ... ESC[201~
+    if (key.full === "\x1b[200~" || key.name === "bracketed-paste-start" || (ch && ch.includes("\x1b[200~"))) {
+      isPasting = true;
+      pasteBuffer = "";
+      // Switch to insert mode for paste if in normal mode
+      if (vimEnabled && vim.mode === "normal") {
+        vim.mode = "insert";
+      }
+      return;
+    }
+    if (key.full === "\x1b[201~" || key.name === "bracketed-paste-end" || (ch && ch.includes("\x1b[201~"))) {
+      if (pasteBuffer) {
+        engine.insertText(pasteBuffer);
+        highlightDirty = true;
+      }
+      isPasting = false;
+      pasteBuffer = "";
+      render();
+      return;
+    }
+    if (isPasting) {
+      if (ch) pasteBuffer += ch;
+      return;
+    }
+
     if (findMode) {
       handleFindKey(ch, key);
       return;
