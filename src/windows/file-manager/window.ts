@@ -152,6 +152,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
     }, depth, dirPath, Math.max(0, colLeft), layout.columnWidth);
 
     columnWidgets.push(col);
+    wireContextMenuToColumn(col);
     activeColumnIndex = depth;
 
     // Reposition all visible columns
@@ -402,16 +403,137 @@ export function openFileManagerV3(params: FileManagerParams): void {
     }
   });
 
+  // ── Context menu ────────────────────────────────────────────────────────────
+
+  let contextMenuBox: blessed.Widgets.BoxElement | null = null;
+
+  function closeContextMenu(): void {
+    if (contextMenuBox) {
+      contextMenuBox.destroy();
+      contextMenuBox = null;
+      params.screen.render();
+    }
+  }
+
+  function showContextMenu(x: number, y: number): void {
+    closeContextMenu();
+    const entry = getSelectedEntry();
+    if (!entry) return;
+
+    const items = [
+      { label: " Open               \u21B5 ", action: () => dispatchAction("open") },
+      { label: " Edit                e ", action: () => dispatchAction("edit") },
+      ...(IS_MAC ? [{ label: " Quick Look        SPC ", action: () => dispatchAction("quicklook") }] : []),
+      { label: " Copy Path           c ", action: () => dispatchAction("copy-path") },
+      ...(!entry.isDirectory ? [{ label: " Yank Contents       Y ", action: () => dispatchAction("yank-contents") }] : []),
+      { label: " External Editor     E ", action: () => dispatchAction("external-editor") },
+      ...(IS_MAC ? [{ label: " Reveal in Finder    o ", action: () => dispatchAction("reveal") }] : []),
+    ];
+
+    const menuW = 26;
+    const menuH = items.length + 2;
+    const screenW = Number(params.screen.width) || 80;
+    const screenH = Number(params.screen.height) || 24;
+    const menuX = Math.min(x, screenW - menuW - 1);
+    const menuY = Math.min(y, screenH - menuH - 1);
+
+    contextMenuBox = blessed.box({
+      parent: params.screen,
+      top: menuY,
+      left: menuX,
+      width: menuW,
+      height: menuH,
+      border: { type: "line" },
+      style: { ...theme().body, border: theme().windowBorderFocused },
+      tags: true,
+    });
+
+    const menuList = blessed.list({
+      parent: contextMenuBox,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      keys: true,
+      vi: true,
+      mouse: true,
+      tags: true,
+      items: items.map(i => i.label),
+      style: { ...theme().body, selected: theme().selected },
+    } as blessed.Widgets.ListOptions<blessed.Widgets.ListElementStyle>);
+
+    menuList.on("select", (_item: blessed.Widgets.BlessedElement, idx: number) => {
+      items[idx]?.action();
+      closeContextMenu();
+    });
+    menuList.on("keypress", (_ch: string, key: { name: string }) => {
+      if (key.name === "escape" || key.name === "q") closeContextMenu();
+    });
+    menuList.on("blur", () => closeContextMenu());
+
+    contextMenuBox.setFront();
+    menuList.focus();
+    params.screen.render();
+  }
+
+  // Wire right-click on each column
+  function wireContextMenuToColumn(col: ColumnWidget): void {
+    col.list.on("element click", (_el: blessed.Widgets.BlessedElement, mouse: { button?: string | number; x?: number; y?: number }) => {
+      if (mouse && (mouse.button === "right" || mouse.button === 2)) {
+        showContextMenu(mouse.x ?? 0, mouse.y ?? 0);
+      }
+    });
+  }
+
   // ── UI updates ─────────────────────────────────────────────────────────────
 
+  /** Segment boundaries for click detection: [{start, end, columnIndex}] */
+  let breadcrumbSegments: Array<{ start: number; end: number; index: number }> = [];
+
   function updateBreadcrumb(): void {
-    const segments = columnWidgets.map((w, i) => {
-      const name = path.basename(w.state.path) || w.state.path;
-      if (i === activeColumnIndex) return `{bold}${escapeBlessedTags(name)}{/bold}`;
-      return `{gray-fg}${escapeBlessedTags(name)}{/gray-fg}`;
-    });
-    breadcrumb.setContent(` \u2302 ${segments.join(" / ")}`);
+    const parts: string[] = [];
+    breadcrumbSegments = [];
+    let cursor = 3; // " ⌂ " prefix
+    for (let i = 0; i < columnWidgets.length; i++) {
+      const name = path.basename(columnWidgets[i]!.state.path) || columnWidgets[i]!.state.path;
+      const start = cursor;
+      cursor += name.length;
+      breadcrumbSegments.push({ start, end: cursor, index: i });
+      if (i === activeColumnIndex) {
+        parts.push(`{bold}${escapeBlessedTags(name)}{/bold}`);
+      } else {
+        parts.push(`{gray-fg}${escapeBlessedTags(name)}{/gray-fg}`);
+      }
+      if (i < columnWidgets.length - 1) {
+        cursor += 3; // " / "
+      }
+    }
+    breadcrumb.setContent(` \u2302 ${parts.join(" / ")}`);
   }
+
+  breadcrumb.on("click", (data: { x?: number }) => {
+    if (!data.x) return;
+    const relX = data.x - (Number(breadcrumb.aleft) || 0);
+    for (const seg of breadcrumbSegments) {
+      if (relX >= seg.start && relX < seg.end) {
+        // Collapse to this column depth
+        while (columnWidgets.length > seg.index + 1) {
+          const removed = columnWidgets.pop()!;
+          removed.destroy();
+        }
+        activeColumnIndex = seg.index;
+        repositionColumns();
+        columnWidgets[activeColumnIndex]?.list.focus();
+        updateBreadcrumb();
+        updateStatusBar();
+        // Update preview for selected item in this column
+        const entry = getSelectedEntry();
+        if (entry) handleSelect(activeColumnIndex, entry);
+        params.screen.render();
+        break;
+      }
+    }
+  });
 
   function updateStatusBar(): void {
     const col = columnWidgets[activeColumnIndex];
@@ -468,6 +590,7 @@ export function openFileManagerV3(params: FileManagerParams): void {
 
   frame.cleanup = () => {
     search.destroy();
+    closeContextMenu();
     destroyAllColumns();
   };
 
@@ -476,8 +599,30 @@ export function openFileManagerV3(params: FileManagerParams): void {
   previewHeader.setContent(` ${empty.header}`);
   setViewportContent(previewBox, empty.content);
 
-  // Navigate to start path
-  navigateTo(startPath, 0);
+  // Restore columns from saved state, or navigate to start path
+  const savedColumns = params.restore?.columns;
+  if (savedColumns && savedColumns.length > 0) {
+    for (let i = 0; i < savedColumns.length; i++) {
+      const saved = savedColumns[i]!;
+      if (fs.existsSync(saved.path)) {
+        navigateTo(saved.path, i);
+        // Restore selection
+        const col = columnWidgets[i];
+        if (col && saved.selectedIndex !== undefined) {
+          col.list.select(Math.min(saved.selectedIndex, col.state.entries.length - 1));
+          col.state.selectedIndex = col.list.selected;
+        }
+      }
+    }
+    // Trigger preview for the last column's selection
+    if (columnWidgets.length > 0) {
+      const lastCol = columnWidgets[columnWidgets.length - 1]!;
+      const entry = lastCol.state.entries[lastCol.state.selectedIndex];
+      if (entry) handleSelect(columnWidgets.length - 1, entry);
+    }
+  } else {
+    navigateTo(startPath, 0);
+  }
 
   // Resize handler
   frame.frame.on("resize", () => {
