@@ -833,7 +833,7 @@ class AudioController {
     });
   }
 
-  private _writeProc(input: string) { try { (this._proc as any)?.stdin?.write(input); } catch {} }
+  private _writeProc(input: string) { try { this._proc?.stdin?.write(input); } catch {} }
   private _startTicker() { this._stopTicker(); this._ticker = setInterval(() => { if (this._state === "playing") this._emit(); }, 250); }
   private _stopTicker()  { if (this._ticker) { clearInterval(this._ticker); this._ticker = null; } }
 }
@@ -1214,7 +1214,7 @@ export function openMusicPlayerWindow(
       volume: ctrl.volume, playlist: ctrl.files,
     }),
   };
-  (frame as any).musicPlayer = publicAPI;
+  frame.musicPlayer = publicAPI;
 
   deps.windowManager.registerWindow(frame);
   frame.focus();

@@ -161,6 +161,7 @@ function createMicroappHost(
           frame.focus();
         },
         close() { windowManager.closeWindow(frame.id); },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK widget may be any blessed element subtype
         setFocusTarget(widget) { frame.setFocusTarget(widget as any); },
         setTitle(title) {
           frame.title = title;

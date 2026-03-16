@@ -16,7 +16,7 @@
  *   Default config matches prototype exactly.
  */
 
-import { marked, type Token } from "marked";
+import { marked, type Token, type Tokens } from "marked";
 import { statSync } from "node:fs";
 import { safeReadFile } from "../core/safe-fs.js";
 import { visibleWidth, wrapTextWithAnsi, padToWidth } from "../core/ansi-utils.js";
@@ -200,12 +200,13 @@ function renderInline(tokens: Token[]): string {
 function renderListItem(tokens: Token[], parentDepth: number): string[] {
   const lines: string[] = [];
   for (const token of tokens) {
-    const t = token as any;
-    if (t.type === "list") {
-      lines.push(...renderList(t, parentDepth + 1));
-    } else if (t.type === "text") {
+    if (token.type === "list") {
+      lines.push(...renderList(token as Tokens.List, parentDepth + 1));
+    } else if (token.type === "text") {
+      const t = token as Tokens.Text;
       lines.push(t.tokens?.length ? renderInline(t.tokens) : (t.text ?? ""));
-    } else if (t.type === "paragraph") {
+    } else if (token.type === "paragraph") {
+      const t = token as Tokens.Paragraph;
       lines.push(renderInline(t.tokens ?? []));
     } else {
       const rendered = renderInline([token]);
@@ -334,30 +335,30 @@ function renderToken(
   const lines: string[] = [];
   switch (token.type) {
     case "heading": {
-      const t = token as any;
+      const t = token as Tokens.Heading;
       const headingText = renderInline(t.tokens ?? []);
       lines.push(...renderFigletHeading(headingText, t.depth, width, config));
       lines.push("");
       break;
     }
     case "paragraph": {
-      const t = token as any;
+      const t = token as Tokens.Paragraph;
       lines.push(renderInline(t.tokens ?? []));
       if (nextType && nextType !== "list" && nextType !== "space") lines.push("");
       break;
     }
     case "code":
-      lines.push(...renderCodeBlock(token as any, width));
+      lines.push(...renderCodeBlock(token as Tokens.Code, width));
       break;
     case "list":
-      lines.push(...renderList(token as any, 0));
+      lines.push(...renderList(token as Tokens.List, 0));
       lines.push("");
       break;
     case "table":
-      lines.push(...renderTable(token as any, width));
+      lines.push(...renderTable(token as Tokens.Table, width));
       break;
     case "blockquote": {
-      const t = token as any;
+      const t = token as Tokens.Blockquote;
       const quoteW = Math.max(1, width - 2);
       const quoteLines: string[] = [];
       const subTokens: Token[] = t.tokens ?? [];
@@ -379,7 +380,7 @@ function renderToken(
       break;
     case "html": break; // skip badges, img tags
     case "space": lines.push(""); break;
-    default: if ((token as any).text) lines.push((token as any).text);
+    default: if ("text" in token && typeof token.text === "string") lines.push(token.text);
   }
   return lines;
 }

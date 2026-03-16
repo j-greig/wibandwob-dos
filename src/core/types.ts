@@ -260,6 +260,10 @@ export interface WindowRecord {
   // Chrome mode (set by WindowManager.setWindowChromeMode)
   chromeless?: boolean;
 
+  // Music player public API (set by music-player-window.ts).
+  // Typed as unknown to avoid import cycle with windows/ — cast at call site.
+  musicPlayer?: unknown;
+
   // Cross-cutting hooks — any window type may set these
   writeInput?: (input: string, sender?: string) => void;
   cleanup?: () => void;
