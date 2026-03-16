@@ -9,6 +9,7 @@ import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { EditorEngine, type EditorTheme } from "./editor-engine.js";
+import { createVimState, handleVimKey, type VimState } from "./vim-mode.js";
 import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
@@ -139,6 +140,8 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   let findInput = "";
   let statusMessage = "";
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+  let vimEnabled = true; // Toggle with Ctrl+V to disable vim mode
+  const vim = createVimState();
 
   const lang = detectLang(filePath ?? null);
   const langLabel = lang === "plain" ? "Plain Text" : lang.toUpperCase();
@@ -650,19 +653,29 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       } else if (findInput) {
         statusLeft += "(no matches)";
       }
-    } else if (statusMessage) {
-      statusLeft = ` ${statusMessage}`;
+    } else if (vim.statusMessage || statusMessage) {
+      statusLeft = ` ${vim.statusMessage || statusMessage}`;
+    } else if (vim.commandMode) {
+      statusLeft = ` :${vim.commandBuffer}_`;
     } else {
-      statusLeft = ` Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1}`;
+      const vimTag = vimEnabled
+        ? vim.mode === "insert" ? " INSERT " : vim.mode === "visual" ? " VISUAL " : " NORMAL "
+        : "";
+      const opTag = vim.pendingOperator ? `${vim.pendingOperator}` : "";
+      statusLeft = ` ${vimTag}${opTag}Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1}`;
     }
     const scrollPct = engine.lineCount > 1
       ? Math.round((engine.scroll.row / Math.max(1, engine.lineCount - viewHeight)) * 100)
       : 100;
     const pct = Math.min(100, Math.max(0, scrollPct));
     // ANSI styled status bar
-    const statusLeftAnsi = findMode || statusMessage
+    const vimModeAnsi = vimEnabled
+      ? vim.mode === "insert" ? `${A.rev} INSERT ${A.r} ` : vim.mode === "visual" ? `${A.rev} VISUAL ${A.r} ` : `${A.rev} NORMAL ${A.r} `
+      : "";
+    const opAnsi = vim.pendingOperator ? `${accentCol}${vim.pendingOperator}${A.r}` : "";
+    const statusLeftAnsi = findMode || vim.statusMessage || statusMessage || vim.commandMode
       ? ` ${statusLeft.trim()}`
-      : ` ${accentCol}Ln ${desc.cursor.row + 1}${A.r}${dimCol}, Col ${desc.cursor.col + 1}${A.r}`;
+      : ` ${vimModeAnsi}${opAnsi}${accentCol}Ln ${desc.cursor.row + 1}${A.r}${dimCol}, Col ${desc.cursor.col + 1}${A.r}`;
     const langColour = hasHighlight ? accentCol : dimCol;
     // Visual scroll bar (5 chars)
     const barLen = 5;
@@ -740,6 +753,26 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     if (findMode) {
       handleFindKey(ch, key);
       return;
+    }
+
+    // Vim mode intercept
+    if (vimEnabled) {
+      const consumed = handleVimKey(engine, vim, ch, key, {
+        save: () => engine.saveFile().then((ok) => {
+          showStatus(ok ? `Written: ${engine.filePath}` : "No file path");
+          return ok;
+        }),
+        quit: () => win.close(),
+        copyToClipboard: (text) => host.screen.copyToClipboard(text),
+        flash: (msg) => showStatus(msg),
+        render: () => { highlightDirty = true; render(); },
+      }, height());
+
+      if (consumed) {
+        // If vim switched to insert mode, let subsequent keys fall through
+        return;
+      }
+      // In insert mode, vim returns false — fall through to normal editor handling
     }
 
     const shift = key.shift ?? false;
