@@ -165,7 +165,10 @@ function renderOverview(state: InspectorState): string {
   lines.push("");
 
   // ── Footer ──
-  lines.push(`  ${state.commands.length} commands  ·  ${state.updatedAt}`);
+  const uptime = s.stats.render.totalFrames;
+  const winCount = s.state.windows.length;
+  lines.push(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
+  lines.push(`  ${winCount} windows · ${state.commands.length} commands · ${uptime} frames · ${state.updatedAt}`);
 
   return lines.join("\n");
 }
@@ -311,7 +314,7 @@ function openRuntimeInspector(host: MicroappHost) {
   const win = host.createWindow({
     title: "Runtime Inspector",
     width: 132,
-    height: 38,
+    height: 58,
     left: 6,
     top: 3,
   });
@@ -334,7 +337,7 @@ function openRuntimeInspector(host: MicroappHost) {
 
   // ── SDK Handle components ──
 
-  const header = createHeaderBar(win.body, { left: " Runtime Inspector", height: 2 });
+  const header = createHeaderBar(win.body, { left: "", height: 2 });
 
   const tabs = createTabs(win.body, {
     tabs: paneKeys.map((k) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), content: "" })),
@@ -371,9 +374,11 @@ function openRuntimeInspector(host: MicroappHost) {
     const focus = state.snapshot?.state.focus;
     const spin = spinChar(state.refreshCount);
     const agentIcon = state.snapshot?.stats.agent.active ? "● AGENT" : "○ idle";
+    const winCount = state.snapshot?.state.windows.length ?? 0;
+    const fps = state.snapshot?.stats.render.fps.toFixed(0) ?? "—";
     header.update({
-      left: ` {bold}Runtime Inspector{/bold}  ${spin}  ${app?.instanceId ?? "?"}  ◆ ${state.snapshot?.state.windows.length ?? 0} wins  ${agentIcon}`,
-      right: `#${state.refreshCount} ${state.updatedAt} `,
+      left: ` ${spin}  ${app?.instanceId ?? "?"}  ◆ ${winCount} wins  ${agentIcon}  ${fps} fps`,
+      right: `${state.updatedAt} `,
     });
     const tabName = paneKeys[tabs.getActive()] ?? "overview";
     footer.update({
