@@ -121,6 +121,8 @@ From microapp-sdk.js (already imported or importable):
 18. System health bar: composite progress bar (9.4): Readability 10
 19. Full-width windows table spanning both columns (9.6): Layout 10
 20. Commands namespace histogram (9.6): Structure improvement on Commands tab
+21. Double-line border for windows table, health label GOOD/FAIR/WARN (9.8): Structure 10
+22. Mnemonic quick-jump keys o/u/w/c/s (10.0): Interactivity 10 — all axes maxed
 
 Key insights:
 - Sparklines are great in dedicated Stats tab but noisy crammed into overview key-value lines
@@ -129,3 +131,11 @@ Key insights:
 - captureText doesn't see blessed elements (tabs, tab rule) — only scroll view content
 - 1-5 number keys unreliable for tab switching (shell captures them) — removed hint
 - fmtBool ● / ○ much better than yes/no for scan speed
+- Two-column layout is the biggest single layout win — use the full window width
+- Full-width tables for data-heavy sections (windows) vs half-width for metadata (identity)
+- Four levels of box-drawing hierarchy: double-line > single-line > dotted > plain
+- Reactive elements (banner word, health bar, delta arrows) make a static dashboard feel alive
+- Mnemonic keybindings (first letter of tab name) are the cheapest interactivity win
+- Composite health score gives instant system assessment without reading individual metrics
+- Dynamic bar ceilings prevent misleading overflow (auto-scale to nearest power of 2)
+- Status pulse with multiple conditions is more informative than single-state labels
