@@ -9,7 +9,7 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
-import { execSync, execFileSync, spawn as spawnProc } from "node:child_process";
+import { execFileSync, spawn as spawnProc } from "node:child_process";
 import { copyToClipboard } from "../../core/clipboard.js";
 import { safeReadFile } from "../../core/safe-fs.js";
 import { theme } from "../../core/theme/resolver.js";
@@ -622,8 +622,10 @@ export function openFileManagerV3(params: FileManagerParams): void {
   frame.describeState = () => ({
     appType: "file-manager" as const,
     summary: `Column browser: ${columnWidgets.map(w => path.basename(w.state.path)).join(" / ")}`,
+    currentPath: columnWidgets[activeColumnIndex]?.state.path ?? startPath,
     columns: columnWidgets.map(w => ({ path: w.state.path, selectedIndex: w.state.selectedIndex })),
     sortField,
+    selectedFile: getSelectedPath(),
   });
 
   frame.captureText = () => {
@@ -641,6 +643,13 @@ export function openFileManagerV3(params: FileManagerParams): void {
     toggleView: () => {},
     refresh: () => dispatchAction("refresh"),
     sortBy: (field) => { sortField = field; dispatchAction("refresh"); },
+    getSelectedPath: () => getSelectedPath(),
+    edit: () => dispatchAction("edit"),
+    yankContents: () => dispatchAction("yank-contents"),
+    copyPath: () => dispatchAction("copy-path"),
+    openExternal: () => dispatchAction("external-editor"),
+    quicklook: () => dispatchAction("quicklook"),
+    reveal: () => dispatchAction("reveal"),
   };
 
   frame.onRestyle = createRestyleBundle([
