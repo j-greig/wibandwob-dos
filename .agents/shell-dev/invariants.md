@@ -94,3 +94,16 @@ Safe rule:
 - if we embed pi, wrap it behind one service — `wibwob-agent-session.ts`
 - our app still owns window chrome, workspace restore, desktop state, z-order/resize/drag, and typed metadata for agent-visible state
 - if terminal-hosted pi work ever returns, treat it as an experiment, not the architectural foundation
+
+## Blessed Mouse Drag Pattern
+
+Terminals send repeated `mousedown` (NOT `mousemove`) during a click-and-drag.
+Blessed's `screen.on("mouse")` element routing can swallow events during drag.
+
+**Correct drag pattern:**
+1. `screen.on("mouse")` for mousedown (start) and mouseup (end)
+2. `screen.program.on("mouse")` for drag motion — raw event stream, no element routing
+3. In the program handler, check `data.action === "mousedown"` with changing x,y
+4. Track drag state: `dragStart` screen coords + original element position
+5. Apply delta: `newPos = origPos + (currentMouse - dragStart)`
+6. Always clean up: `screen.program.off("mouse", handler)` in onCleanup

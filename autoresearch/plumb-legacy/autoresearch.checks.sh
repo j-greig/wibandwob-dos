@@ -1,0 +1,1 @@
+autoresearch/plumb/autoresearch.checks.sh
