@@ -10,6 +10,7 @@
 
 import blessed from "blessed";
 import type { MicroappHost, MicroappWindowHandle } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { connectPiSession, type PiSessionClient } from "../../lib/pi-session-client.js";
 import { discoverPiSessions, sessionDisplayName, type DiscoveredSession } from "../../lib/pi-session-discovery.js";
 
@@ -183,13 +184,11 @@ function openSessionList(host: MicroappHost) {
     host.screen.render();
   });
 
-  // Auto-refresh timer
-  const timer = setInterval(() => refresh(), REFRESH_INTERVAL_MS);
-  timers.add(timer);
+  // Auto-refresh timer (using SDK createTimer to avoid leaks)
+  createTimer(() => refresh(), REFRESH_INTERVAL_MS, timers);
 
   win.onCleanup(() => {
-    for (const t of timers) clearInterval(t);
-    timers.clear();
+    clearTimers(timers);
   });
 
   // Initial scan
@@ -229,9 +228,14 @@ function openSessionDetail(host: MicroappHost, session: DiscoveredSession) {
   const divider = blessed.box({
     parent: win.body,
     bottom: 2, left: 0, right: 0, height: 1,
-    content: "─".repeat(78),
     style: { ...host.theme().body, fg: "gray" },
   });
+
+  function updateDivider() {
+    const w = typeof divider.width === "number" ? divider.width : 78;
+    divider.setContent("─".repeat(Math.max(1, w)));
+  }
+  updateDivider();
 
   const input = blessed.textbox({
     parent: win.body,
@@ -255,7 +259,7 @@ function openSessionDetail(host: MicroappHost, session: DiscoveredSession) {
 
   function appendLog(text: string, style?: string) {
     const prefix = style ? `{${style}}` : "";
-    const suffix = style ? `{/${style.split("-")[0]}-fg}` : "";
+    const suffix = style ? `{/${style}}` : "";
     logLines.push(`${prefix}${text}${suffix}`);
     if (logLines.length > MAX_LOG_LINES) {
       logLines.splice(0, logLines.length - MAX_LOG_LINES);
@@ -393,7 +397,24 @@ function openSessionDetail(host: MicroappHost, session: DiscoveredSession) {
     input.style = host.theme().body;
     statusLine.style = host.theme().body;
     divider.style = { ...host.theme().body, fg: "gray" };
+    updateDivider();
     host.screen.render();
+  });
+
+  win.onResize(() => {
+    updateDivider();
+    host.screen.render();
+  });
+
+  // Allow API/agent to inject text as messages to the pi session
+  win.onInput(async (text: string) => {
+    if (!client?.connected) return;
+    appendLog(`→ ${text}`, "yellow-fg");
+    try {
+      await client.sendMessage(text, "followUp");
+    } catch (err) {
+      appendLog(`Send error: ${err instanceof Error ? err.message : String(err)}`, "red-fg");
+    }
   });
 
   win.onCleanup(() => {
