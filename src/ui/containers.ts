@@ -792,11 +792,11 @@ export function createSelectableList(opts: SelectableListOptions): SelectableLis
     node,
 
     setItems(newItems: string[]) {
-      (node as any).setItems(newItems);
+      node.setItems(newItems);
     },
 
     selected() {
-      return (node as any).selected ?? 0;
+      return node.selected ?? 0;
     },
 
     select(index: number) {
@@ -893,16 +893,16 @@ export function createInlineSearch(opts: InlineSearchOptions): InlineSearchHandl
       style: { fg: hfg, bg },
     });
 
-    if (initialValue) (inputNode as any).setValue(initialValue);
+    if (initialValue) inputNode.setValue(initialValue);
 
     closeBtn.on("click", () => handle.close());
     inputNode.key(["escape"], () => { onCancel(); handle.close(); });
     inputNode.key(["enter"], () => {
-      const val = ((inputNode as any).value ?? "").trim();
+      const val = (inputNode?.value ?? "").trim();
       onSubmit(val);
       handle.close();
     });
-    inputNode.key(["C-u"], () => { (inputNode as any).clearValue(); });
+    inputNode.key(["C-u"], () => { inputNode?.clearValue(); });
 
     inputNode.focus();
   }
@@ -932,7 +932,7 @@ export function createInlineSearch(opts: InlineSearchOptions): InlineSearchHandl
     },
 
     setValue(value: string) {
-      if (inputNode) (inputNode as any).setValue(value);
+      if (inputNode) inputNode.setValue(value);
     },
   };
 

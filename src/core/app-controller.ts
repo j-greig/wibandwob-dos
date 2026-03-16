@@ -361,7 +361,7 @@ export class TsTuiMvpApp {
       getState: () => this.getDesktopState(),
       syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
-      screenshotText: () => (this.screen as any).screenshot() as string,
+      screenshotText: () => this.screen.screenshot(),
       getSnapshot: (): RuntimeInspectionSnapshot => {
         const blockers = this.getRuntimeUiBlockers();
         return {

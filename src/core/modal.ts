@@ -149,9 +149,9 @@ export function createModal(options: ModalOptions): Modal {
     style: resolvedStyle
   }) as Box;
 
-  const savedGrabKeys = (screen as any).grabKeys;
+  const savedGrabKeys = screen.grabKeys;
   if (grabKeys) {
-    (screen as any).grabKeys = true;
+    screen.grabKeys = true;
   }
 
   const reposition = (newPos: ModalPosition) => {
@@ -167,7 +167,7 @@ export function createModal(options: ModalOptions): Modal {
 
   const destroy = () => {
     if (grabKeys) {
-      (screen as any).grabKeys = savedGrabKeys;
+      screen.grabKeys = savedGrabKeys;
     }
     box.destroy();
   };
