@@ -23,6 +23,8 @@ const COLUMN_MAX_WIDTH = 40;
 export interface ColumnWidget {
   list: blessed.Widgets.ListElement;
   state: ColumnState;
+  /** Update list items without firing select events. */
+  setItemsSilent(items: string[]): void;
   /** Destroy the blessed widget. */
   destroy(): void;
 }
@@ -138,7 +140,10 @@ export function createColumn(
   list.select(Math.min(selectedIndex, entries.length - 1));
 
   // Selection change → preview or navigate
+  // Guard: setItems() fires "select item" — prevent recursion
+  let suppressSelectItem = false;
   list.on("select item", () => {
+    if (suppressSelectItem) return;
     const idx = list.selected;
     state.selectedIndex = idx;
     const entry = entries[idx];
@@ -166,6 +171,11 @@ export function createColumn(
   return {
     list,
     state,
+    setItemsSilent(items: string[]) {
+      suppressSelectItem = true;
+      list.setItems(items);
+      suppressSelectItem = false;
+    },
     destroy() {
       list.destroy();
     },

@@ -186,9 +186,9 @@ export function openFileManagerV3(params: FileManagerParams): void {
         } else {
           widget.list.style = { ...theme().body, selected: { ...theme().body, bold: true }, item: theme().body };
         }
-        // Re-render items for new width
+        // Re-render items for new width (silent to prevent select→reposition loop)
         const entries = widget.state.entries;
-        widget.list.setItems(entries.map(e => formatColumnItem(e, git, layout.columnWidth)));
+        widget.setItemsSilent(entries.map(e => formatColumnItem(e, git, layout.columnWidth)));
         widget.list.select(widget.state.selectedIndex);
       }
     }
