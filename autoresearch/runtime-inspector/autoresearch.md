@@ -108,6 +108,19 @@ From microapp-sdk.js (already imported or importable):
 5. Tufte cleanup — removed sparklines from overview Health, kept in Stats tab (6.6): calmer, better data-ink ratio per user feedback
 6. Taller window (58), removed redundant title, leaner header, dotted footer (6.8): character boost
 7. Tab underline indicator (▀), delta arrows (▲▼) on health, prevSnapshot tracking (7.2): interactivity + structure boost
+8. Human-readable uptime (1h 17m), focused window marker (▸), tighter footer (7.4): readability
+9. Two-column layout for Identity+Desktop side by side (7.6): layout breakthrough
+10. Full 2x2 grid: Health+Agent side by side too (8.0): dashboard territory
+11. Two-column layout applied to ALL tabs (8.2): consistent design system
+12. Dynamic memory bar ceiling, namespace summary in Commands (8.4): interactivity
+13. Dynamic status pulse in footer (8.6): system self-awareness (Character 9)
+14. Compact windows table + UI one-liner in Overview (9.0): single-pane dashboard, all axes 9
+15. WIB&WOB AGENT naming (9.0): character
+16. Multi-condition pulse, Stats tab memory ceiling (9.0): refinement
+17. Reactive figlet banner: INSPECT/ACTIVE/ALERT (9.2): Character 10
+18. System health bar: composite progress bar (9.4): Readability 10
+19. Full-width windows table spanning both columns (9.6): Layout 10
+20. Commands namespace histogram (9.6): Structure improvement on Commands tab
 
 Key insights:
 - Sparklines are great in dedicated Stats tab but noisy crammed into overview key-value lines

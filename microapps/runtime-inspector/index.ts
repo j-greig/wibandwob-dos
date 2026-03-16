@@ -153,7 +153,8 @@ function renderOverview(state: InspectorState): string {
     (Math.max(0, 1 - s.stats.heapUsedMb / 512) * 30)
   ));
   const healthBar = progressBar(healthScore, 100, 40);
-  lines.push(`  system health  ${healthBar}  ${healthScore}%`);
+  const healthLabel = healthScore >= 80 ? "GOOD" : healthScore >= 50 ? "FAIR" : "WARN";
+  lines.push(`  system health  ${healthBar}  ${healthScore}% ${healthLabel}`);
   lines.push("");
 
   // ── Identity + Desktop (two-column layout) ──
@@ -216,7 +217,10 @@ function renderOverview(state: InspectorState): string {
   const fullW = colW * 2 + 2;
   const windows = s.state.windows.slice().sort((a, b) => b.zIndex - a.zIndex);
   const showCount = Math.min(windows.length, 8);
-  lines.push(sectionHeader(`WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`, fullW));
+  // Double-line header for primary table
+  const wTitle = `WINDOWS (${windows.length})${windows.length > showCount ? ` · top ${showCount}  →  Windows tab` : ""}`;
+  const wPad = fullW - wTitle.length - 4;
+  lines.push(`╔═ ${wTitle} ${"═".repeat(Math.max(0, wPad))}╗`);
   lines.push(`│ ${"ID".padEnd(4)} ${"TYPE".padEnd(28)} ${"TITLE".padEnd(38)} ${"POS".padEnd(10)} ${"SIZE".padEnd(9)} Z`);
   lines.push(`│ ${"─".repeat(4)} ${"─".repeat(28)} ${"─".repeat(38)} ${"─".repeat(10)} ${"─".repeat(9)} ──`);
   for (let i = 0; i < showCount; i++) {
@@ -228,7 +232,7 @@ function renderOverview(state: InspectorState): string {
     const size = `${w.width}x${w.height}`.padEnd(9);
     lines.push(`│${marker}${String(w.id).padStart(3)} ${appType} ${title} ${pos} ${size} ${String(w.zIndex).padStart(2)}`);
   }
-  lines.push(sectionFooter(fullW));
+  lines.push(`╚${"═".repeat(fullW - 2)}╝`);
   lines.push("");
 
   // ── UI summary (one-liner) ──
