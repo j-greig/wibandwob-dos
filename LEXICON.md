@@ -25,6 +25,12 @@
 - raw terminal dimensions in character cells, usually width x height, before any app-specific chrome or desktop layout rules
 - value: keeps the difference clear between actual terminal space and the desktop/window space we derive from it
 
+**TypeBox schema (tool params)**
+- a runtime type system for TypeScript from `@sinclair/typebox`. You write `Type.Object({ path: Type.String(), limit: Type.Optional(Type.Number()) })` and get both a JSON Schema (for the LLM tool-calling API) and a TypeScript type (via `Static<typeof schema>`) from the same declaration
+- pi uses this for every tool parameter definition — the schema goes to the LLM as the function signature, and the `description` on each field becomes the tool's parameter documentation the model reads
+- `Type.String()`, `Type.Number()`, `Type.Optional()`, `Type.Array()`, `Type.Union()` are the main primitives
+- value: single source of truth for tool params — no drift between what the LLM sees and what the handler receives. if WibWob-DOS adopts pi's tool bridge, these schemas are the contract
+
 ## ARCHITECTURE TERMS
 
 **imperative vs declarative**

@@ -346,18 +346,20 @@ function handleNormalMode(
       return true;
     }
     if (ch === "p") {
-      // Paste after cursor
-      if (state.register) {
+      // Paste after cursor — use register or system clipboard
+      const text = state.register || getSystemClipboard();
+      if (text) {
         engine.moveRight();
-        engine.insertText(state.register);
+        engine.insertText(text);
       }
       state.pendingCount = "";
       callbacks.render();
       return true;
     }
     if (ch === "P") {
-      if (state.register) {
-        engine.insertText(state.register);
+      const text = state.register || getSystemClipboard();
+      if (text) {
+        engine.insertText(text);
       }
       state.pendingCount = "";
       callbacks.render();
@@ -614,5 +616,31 @@ function applyOperatorOnMotion(
       engine.clearSelection();
       state.mode = "insert";
     }
+  }
+}
+
+// ── System clipboard ─────────────────────────────────────────────────────────
+
+function getSystemClipboard(): string {
+  try {
+    const { execSync } = require("node:child_process");
+    return execSync("pbpaste", { encoding: "utf8", timeout: 2000 }).replace(/\r\n/g, "\n");
+  } catch {
+    return "";
+  }
+}
+
+/** Copy to system clipboard via pbcopy/xclip. */
+export function systemCopy(text: string): boolean {
+  try {
+    const { execSync } = require("node:child_process");
+    if (process.platform === "darwin") {
+      execSync("pbcopy", { input: text });
+    } else {
+      execSync("xclip -selection clipboard", { input: text });
+    }
+    return true;
+  } catch {
+    return false;
   }
 }

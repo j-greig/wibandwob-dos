@@ -9,7 +9,7 @@ import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { EditorEngine, type EditorTheme } from "./editor-engine.js";
-import { createVimState, handleVimKey, type VimState } from "./vim-mode.js";
+import { createVimState, handleVimKey, systemCopy, type VimState } from "./vim-mode.js";
 import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
@@ -788,7 +788,7 @@ async function openEditor(host: MicroappHost, filePath?: string) {
           return ok;
         }),
         quit: () => win.close(),
-        copyToClipboard: (text) => host.screen.copyToClipboard(text),
+        copyToClipboard: (text) => { systemCopy(text); host.screen.copyToClipboard(text); },
         flash: (msg) => showStatus(msg),
         render: () => { highlightDirty = true; render(); },
       }, height());
@@ -843,15 +843,30 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     } else if (ctrl && key.name === "c") {
       const text = engine.getSelectedText();
       if (text) {
+        systemCopy(text);
         host.screen.copyToClipboard(text);
         showStatus(`Copied ${text.length} chars`);
       }
     } else if (ctrl && key.name === "x") {
       const text = engine.getSelectedText();
       if (text) {
+        systemCopy(text);
         host.screen.copyToClipboard(text);
         engine.deleteSelection(); highlightDirty = true;
         showStatus(`Cut ${text.length} chars`);
+      }
+    } else if (ctrl && key.name === "v") {
+      // Paste from system clipboard
+      try {
+        const { execSync } = require("node:child_process");
+        const text = execSync("pbpaste", { encoding: "utf8", timeout: 2000 });
+        if (text) {
+          engine.insertText(text);
+          highlightDirty = true;
+          showStatus(`Pasted ${text.split("\n").length} lines`);
+        }
+      } catch {
+        showStatus("Paste failed");
       }
     } else if (ctrl && key.name === "g") {
       findMode = true;
