@@ -92,7 +92,7 @@ check "has ascii-art panels" 5 \
 
 check "loadCanvas parses without error" 5 \
   "bun -e \"
-    const { loadCanvas } = require('./microapps/sy2-chronicles/content-loader.ts');
+    import { loadCanvas } from './microapps/sy2-chronicles/content-loader.ts';
     const doc = loadCanvas('$CANVAS');
     if (!doc || doc.panels.length === 0) process.exit(1);
     console.log('panels:', doc.panels.length);

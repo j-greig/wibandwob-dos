@@ -1,1 +1,2 @@
 {"type":"config","name":"Zine Moodboard Spike — Interactive Architecture Poster","metricName":"zine_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"5464dec","metric":25,"metrics":{},"status":"keep","description":"Baseline: 25/100 — existing zine has menu category, describeState, onRestyle, typecheck+COAT pass","timestamp":1773669408855,"segment":0}
