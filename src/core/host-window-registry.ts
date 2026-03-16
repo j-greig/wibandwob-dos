@@ -7,6 +7,7 @@
 
 import type * as blessed from "blessed";
 import type { WindowManager } from "./window-manager.js";
+import type { WindowRecord } from "./types.js";
 import type { OverlayManager } from "./overlay-manager.js";
 import type { ContentService } from "../services/content-service.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -66,4 +67,44 @@ export function listHostWindows(): HostWindowEntry[] {
 
 export function hasHostWindow(appType: string): boolean {
   return registry.has(appType);
+}
+
+/**
+ * Open a registered host window, reusing an existing instance if singleton.
+ *
+ * This is the primary dispatch function — replaces 30+ `this.openXxxWindow()`
+ * methods in app-controller. Returns the new or focused WindowRecord.
+ */
+export function openRegisteredWindow(
+  appType: string,
+  deps: HostWindowDeps,
+  restore?: Record<string, unknown>,
+): WindowRecord | undefined {
+  const entry = registry.get(appType);
+  if (!entry) return undefined;
+
+  // Singleton: focus existing window if present
+  if (!entry.multiInstance) {
+    const existing = findWindowByAppType(deps.windowManager, appType);
+    if (existing) {
+      existing.focus();
+      return existing;
+    }
+  }
+
+  // Create new window
+  const countBefore = deps.windowManager.getWindows().length;
+  entry.factory(deps, restore);
+  const windows = deps.windowManager.getWindows();
+  if (windows.length > countBefore) {
+    return windows[windows.length - 1];
+  }
+  return undefined;
+}
+
+/** Find an existing window by its appType (from describeState). */
+function findWindowByAppType(wm: WindowManager, appType: string): WindowRecord | undefined {
+  return [...wm.getWindows()]
+    .reverse()
+    .find((w) => w.describeState?.().appType === appType);
 }

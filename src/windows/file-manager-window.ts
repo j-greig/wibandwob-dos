@@ -21,7 +21,7 @@ import type { Box, List } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 
 import type { WindowManager } from "../core/window-manager.js";
-import { PREVIEW_SPLIT_RATIO, cleanLabel, setViewportContent } from "./browser-utils.js";
+import { cleanLabel, setViewportContent } from "./browser-utils.js";
 
 
 export interface FileManagerRestore {
@@ -67,6 +67,21 @@ export function openFileManagerWindow(params: {
   let searchActive = false;
   let searchResults: Array<{ file: string; line: number; text: string }> = [];
   let activeSearchProcess: ReturnType<typeof import("node:child_process").spawn> | null = null;
+
+  // ── Split ratio (sidebar width as % of body) ──────────
+  // Responsive breakpoints: narrow windows get a wider sidebar so names aren't clipped.
+  //   < 80 cols  → 45%  (compact: sidebar needs more room)
+  //   80–130     → 35%  (normal)
+  //   > 130      → 28%  (wide: preview deserves the space)
+  const responsiveSplit = (): number => {
+    const w = Number(frame?.body?.width ?? params.screen.width) || 100;
+    if (w < 80) return 45;
+    if (w <= 130) return 35;
+    return 28;
+  };
+  let splitRatio = responsiveSplit();
+  /** True once the user has manually dragged the divider — locks out auto-responsive. */
+  let splitLocked = false;
 
   // ── Git status ─────────────────────────────────────────
   let gitStatusMap: Map<string, string> = new Map(); // path -> status char (M/A/?/D)
@@ -263,7 +278,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 1,
     left: 0,
-    width: `${PREVIEW_SPLIT_RATIO}%`,
+    width: `${splitRatio}%`,
     height: 1,
     style: theme().footer
   });
@@ -272,7 +287,7 @@ export function openFileManagerWindow(params: {
   const searchBox = blessed.box({
     parent: frame.body,
     top: 1,
-    left: `${PREVIEW_SPLIT_RATIO}%`,
+    left: `${splitRatio}%`,
     right: 0,
     height: 1,
     style: theme().footer
@@ -283,7 +298,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 2,
     left: 0,
-    width: `${PREVIEW_SPLIT_RATIO}%`,
+    width: `${splitRatio}%`,
     bottom: 1,
   });
   const list = listHandle.node;
@@ -295,7 +310,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 2,
     left: 0,
-    width: viewMode === "icon" ? "100%" : `${PREVIEW_SPLIT_RATIO}%`,
+    width: viewMode === "icon" ? "100%" : `${splitRatio}%`,
     bottom: 1,
     mouse: true,
     keys: true,
@@ -313,7 +328,7 @@ export function openFileManagerWindow(params: {
   const divider = blessed.box({
     parent: frame.body,
     top: 2,
-    left: `${PREVIEW_SPLIT_RATIO}%`,
+    left: `${splitRatio}%`,
     width: 1,
     bottom: 1,
     style: { fg: theme().muted.fg || "gray", bg: theme().body.bg },
@@ -330,7 +345,7 @@ export function openFileManagerWindow(params: {
   const previewHeaderBar = blessed.box({
     parent: frame.body,
     top: 2,
-    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    left: `${splitRatio}%+1`,
     right: 0,
     height: 1,
     tags: true,
@@ -341,7 +356,7 @@ export function openFileManagerWindow(params: {
   const preview = blessed.box({
     parent: frame.body,
     top: 3,
-    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    left: `${splitRatio}%+1`,
     right: 0,
     bottom: 1,
     mouse: true,
@@ -351,6 +366,67 @@ export function openFileManagerWindow(params: {
     tags: true,
     style: theme().body,
     hidden: viewMode === "icon"
+  });
+
+  // ── Split ratio helpers ─────────────────────────────────
+
+  /** Reapply splitRatio to all panes that depend on it. */
+  const applySplitRatio = () => {
+    filterBox.width = `${splitRatio}%`;
+    searchBox.left = `${splitRatio}%`;
+    list.width = `${splitRatio}%`;
+    if (viewMode !== "icon") {
+      iconGrid.width = `${splitRatio}%`;
+    }
+    divider.left = `${splitRatio}%`;
+    previewHeaderBar.left = `${splitRatio}%+1`;
+    preview.left = `${splitRatio}%+1`;
+    fillDivider();
+    setViewportContent(preview, previewRawContent);
+    params.screen.render();
+  };
+
+  // ── Drag-to-resize divider ─────────────────────────────
+  divider.enableMouse();
+
+  let dragging = false;
+
+  divider.on("mousedown", () => {
+    dragging = true;
+  });
+
+  // Listen on the screen so mousemove is captured even outside the 1-col divider
+  params.screen.on("mouse", (data: { action: string; x: number; button?: string }) => {
+    if (!dragging) return;
+    if (data.action === "mouseup" || data.button === "mouseup") {
+      dragging = false;
+      return;
+    }
+    if (data.action !== "mousemove" && data.action !== "mousedown") return;
+
+    const bodyLeft = Number(frame.body.aleft) || 0;
+    const bodyWidth = Number(frame.body.width) || 1;
+    const relX = data.x - bodyLeft;
+    const newRatio = Math.round((relX / bodyWidth) * 100);
+    // Clamp 15%–70% so neither pane collapses
+    const clamped = Math.max(15, Math.min(70, newRatio));
+    if (clamped !== splitRatio) {
+      splitRatio = clamped;
+      splitLocked = true; // user chose — don't auto-resize anymore
+      applySplitRatio();
+    }
+  });
+
+  // Visual hint on hover
+  divider.on("mouseover", () => {
+    divider.style.fg = theme().accent.fg || "white";
+    params.screen.render();
+  });
+  divider.on("mouseout", () => {
+    if (!dragging) {
+      divider.style.fg = theme().muted.fg || "gray";
+      params.screen.render();
+    }
   });
 
   // ── Bottom status bar with clickable buttons ────────────
@@ -1008,11 +1084,8 @@ export function openFileManagerWindow(params: {
       divider.hidden = false;
       previewHeaderBar.hidden = false;
       // Restore split layout
-      list.width = `${PREVIEW_SPLIT_RATIO}%`;
-      filterBox.width = `${PREVIEW_SPLIT_RATIO}%`;
-      searchBox.left = `${PREVIEW_SPLIT_RATIO}%`;
       preview.hidden = false;
-      fillDivider();
+      applySplitRatio();
       // Sync selection from icon -> list
       list.select(iconSelected);
       applyFilter(iconSelected);
@@ -1605,12 +1678,19 @@ export function openFileManagerWindow(params: {
 
   params.windowManager.registerWindow(frame);
   frame.frame.on("resize", () => {
+    // Recalc responsive split unless user has manually dragged
+    if (!splitLocked) {
+      splitRatio = responsiveSplit();
+    }
     renderFilter();
     renderSearchBox();
     renderStatusBar();
     if (viewMode === "icon") renderIconGrid();
-    fillDivider();
-    setViewportContent(preview, previewRawContent);
+    if (viewMode === "list") applySplitRatio();
+    else {
+      fillDivider();
+      setViewportContent(preview, previewRawContent);
+    }
     params.screen.render();
   });
   navigateTo(initialPath, params.restore?.selectedIndex ?? 0);

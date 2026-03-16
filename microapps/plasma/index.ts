@@ -1,9 +1,5 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
-  createPlasmaPlayer,
-  moodNames,
-  RENDER_MODES,
-  extractMoodFromText,
   applyRect,
   createRestyleBundle,
   createStack,
@@ -14,9 +10,15 @@ import {
   createTextBlock,
   createRule,
   createCanvas,
+} from "../../src/services/microapp-sdk.js";
+import {
+  createPlasmaPlayer,
+  moodNames,
+  RENDER_MODES,
+  extractMoodFromText,
   type PlasmaModifiers,
   type PlasmaRenderMode,
-} from "../../src/services/microapp-sdk.js";
+} from "./plasma-engine.js";
 
 import fs from "node:fs";
 import path from "node:path";

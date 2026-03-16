@@ -11,8 +11,14 @@ import fs from "node:fs";
 import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+// child_process no longer needed here — FX pipeline extracted to fx-pipeline.ts
 import { log } from "../services/app-logger.js";
+import {
+  resolveSmearSource as fxResolveSmearSource,
+  runFxScript as fxRunFxScript,
+  smearTextSurface as fxSmearTextSurface,
+  type FxPipelineDeps,
+} from "./fx-pipeline.js";
 
 import {
   CONTROL_API_PORT,
@@ -100,18 +106,15 @@ import {
   promptForBackroomsRunOptions as promptForBackroomsRunOptionsWindow,
   promptForBackroomsTv as promptForBackroomsTvWindow,
 } from "../windows/backrooms-windows.js";
-import { openFileManagerWindow as openFarjsFileManagerWindow, type FileManagerRestore } from "../windows/file-manager-window.js";
-import { openPrimerBrowserWindow as openPrimerBrowserListWindow } from "../windows/primer-browser-window.js";
-import { openPrimerGalleryWindow as openPrimerGalleryListWindow } from "../windows/primer-gallery-window.js";
+// file-manager-window — now registered via host-window-registry
 import { openTextViewerWindow as openContentViewerWindow } from "../windows/text-viewer-window.js";
-import { openBrowserReaderWindow as openBrowserReaderContentWindow } from "../windows/browser-reader-window.js";
+// browser-reader-window — now registered via host-window-registry
 import {
-  openCommandPaletteWindow as openPaletteWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
 import { registerAllHostWindows } from "./host-window-registrations.js";
-import { getHostWindow, type HostWindowDeps } from "./host-window-registry.js";
+import { getHostWindow, openRegisteredWindow, type HostWindowDeps } from "./host-window-registry.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -125,7 +128,7 @@ import { ScrambleBrain } from "../services/scramble-brain.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { ChromeBrowserService } from "../services/chrome-browser-service.js";
-import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
+// chrome-browser-window — now registered via host-window-registry
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 
@@ -743,10 +746,7 @@ export class TsTuiMvpApp {
    * Falls back to undefined if the appType is not registered.
    */
   openHostWindow(appType: string, restore?: Record<string, unknown>): WindowRecord | undefined {
-    const entry = getHostWindow(appType);
-    if (!entry) return undefined;
-    const deps = this.buildHostWindowDeps();
-    return this.focusOrCreate(appType as AppType, () => entry.factory(deps, restore), entry.multiInstance);
+    return openRegisteredWindow(appType, this.buildHostWindowDeps(), restore);
   }
 
   private focusOrCreate(
@@ -940,22 +940,13 @@ export class TsTuiMvpApp {
     };
   }
 
-  private openBackroomsLogBrowserWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("backrooms-log-browser", () => {
-      openBackroomsLogBrowserWindowFactory(this.getBackroomsWindowContext());
-    });
-  }
-
-  private promptForBackroomsTv(): WindowRecord | undefined {
-    return this.focusOrCreate("backrooms-primer-picker", () => {
-      promptForBackroomsTvWindow(this.getBackroomsWindowContext());
-    });
-  }
+  // openBackroomsLogBrowserWindow, promptForBackroomsTv — inlined as openHostWindow calls
 
   private openBackroomsPrimerPicker(
     theme: string,
     defaults: BackroomsChannel,
   ): WindowRecord | undefined {
+    // Primer picker with specific theme/defaults uses its own context (not registry)
     return this.focusOrCreate("backrooms-primer-picker", () => {
       openBackroomsPrimerPickerWindow(
         this.getBackroomsWindowContext(),
@@ -979,29 +970,10 @@ export class TsTuiMvpApp {
   }
 
   openBackroomsTv(channel: BackroomsChannel): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "backrooms-tv",
-      () => {
-        openBackroomsTvWindow(this.getBackroomsWindowContext(), channel);
-      },
-      true,
-    );
+    return this.openHostWindow("backrooms-tv", channel as unknown as Record<string, unknown>);
   }
 
-  private openPrimerBrowserWindow(restore?: {
-    selectedIndex?: number;
-  }): WindowRecord | undefined {
-    return this.focusOrCreate("primer-browser", () => {
-      openPrimerBrowserListWindow({
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        entries: this.content.collectPrimerEntries(),
-        onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
-  }
+  // openPrimerBrowserWindow — inlined as openHostWindow("primer-browser", restore)
 
   private getFocusedFinder() {
     const win = this.windowManager.getFocusedWindow();
@@ -1025,93 +997,17 @@ export class TsTuiMvpApp {
     };
   }
 
-  private openFileManagerWindow(
-    restore?: FileManagerRestore,
-  ): WindowRecord | undefined {
-    return this.focusOrCreate("file-manager", () => {
-      openFarjsFileManagerWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        startPath: restore?.currentPath ?? REPO_ROOT,
-        restore,
-        onOpenFile: (filePath) => {
-          this.editor.openFile(filePath);
-        },
-        onViewFile: (filePath) => {
-          const content = safeReadFile(filePath) ?? "";
-          this.openTextViewerWindow(
-            path.basename(filePath),
-            content,
-            "reader",
-            filePath,
-          );
-        },
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
-  }
+  // openFileManagerWindow — inlined as openHostWindow("file-manager", restore)
 
-  private openPrimerGalleryWindow(restore?: {
-    activeTabIndex?: number;
-    searchValue?: string;
-    selectedIndex?: number;
-  }): WindowRecord | undefined {
-    const allEntries = this.content.collectGalleryEntries();
-    return this.focusOrCreate("primer-gallery", () => {
-      openPrimerGalleryListWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        allEntries,
-        tabs: this.content.buildGalleryTabs(allEntries),
-        onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
-  }
+  // openPrimerGalleryWindow — inlined as openHostWindow("primer-gallery", restore)
 
-  private openChromeBrowserWindow(
-    initialUrl?: string,
-  ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "web-reader",
-      () => {
-        openChromeBrowserWindow({
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          initialUrl,
-          onStateChanged: () => this.syncLiveState(),
-        });
-      },
-      true,
-    );
-  }
+  // openChromeBrowserWindow — inlined as openHostWindow("web-reader", ...)
 
-  private openBrowserReaderWindow(
-    filePath = MASTER_PHILOSOPHY_PATH,
-  ): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "reader-viewer",
-      () => {
-        openBrowserReaderContentWindow({
-          filePath,
-          onOpenTextViewer: (title, content, kind, nextFilePath) =>
-            this.openTextViewerWindow(title, content, kind, nextFilePath),
-          onError: (message) => this.overlays.flash(message),
-        });
-      },
-      true,
-    );
-  }
+  // openBrowserReaderWindow — inlined as openHostWindow("reader-viewer", ...)
 
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
-  private openTerrainLabWindow(): WindowRecord | undefined {
-    return this.openHostWindow("terrain-lab");
-  }
+  // openTerrainLabWindow — removed, use openHostWindow("terrain-lab") directly
 
   // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
 
@@ -1138,12 +1034,7 @@ export class TsTuiMvpApp {
 
   // openPlasmaFromPrimer — removed, migrated to microapp.wibwob.plasma.from-primer
 
-  private openMusicPlayerWindow(restore?: {
-    filePath?: string;
-    volume?: number;
-  }): WindowRecord | undefined {
-    return this.openHostWindow("music-player", restore);
-  }
+  // openMusicPlayerWindow — removed, use openHostWindow("music-player", restore) directly
 
   private openCompanionWindow(restore?: {
     tick?: number;
@@ -1206,19 +1097,12 @@ export class TsTuiMvpApp {
         saveWorkspace: () => this.saveWorkspace(),
         promptForWorkspaceSave: () => this.promptForWorkspaceSave(),
         promptForWorkspaceLoad: () => this.promptForWorkspaceLoad(),
-        openCommandPaletteWindow: () => this.openCommandPaletteWindow(),
+        openCommandPaletteWindow: () => this.openHostWindow("command-palette"),
       });
     });
   }
 
-  private openCommandPaletteWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("command-palette", () => {
-      openPaletteWindow({
-        windowManager: this.windowManager,
-        commands: this.commands.buildPalette(),
-      });
-    });
-  }
+  // openCommandPaletteWindow — inlined as openHostWindow("command-palette")
 
   private promptForPrimer(): void {
     promptForPrimerFile({
@@ -1479,18 +1363,18 @@ export class TsTuiMvpApp {
       openEditorWindow: (filePath, title, initial, restore) =>
         this.editor.openWindow(filePath, title, initial, restore),
       openBrowserReaderWindow: (filePath) =>
-        this.openBrowserReaderWindow(filePath),
+        this.openHostWindow("reader-viewer", { filePath }),
       openFigletWindow: (text, font) => {
         this.commands.runDynamic("microapp.wibwob.figlet.open", { text, font });
         return undefined; // microapp creates its own window
       },
       openPrimerGalleryWindow: (restore) =>
-        this.openPrimerGalleryWindow(restore),
+        this.openHostWindow("primer-gallery", restore as Record<string, unknown> | undefined),
       openPrimerBrowserWindow: (restore) =>
-        this.openPrimerBrowserWindow(restore),
-      openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
+        this.openHostWindow("primer-browser", restore as Record<string, unknown> | undefined),
+      openFileManagerWindow: (restore) => this.openHostWindow("file-manager", restore as Record<string, unknown> | undefined),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
-      openBackroomsLogBrowserWindow: () => this.openBackroomsLogBrowserWindow(),
+      openBackroomsLogBrowserWindow: () => this.openHostWindow("backrooms-log-browser"),
       openBackroomsPrimerPickerWindow: () =>
         this.openBackroomsPrimerPicker("liminal fluorescent maze", {
           theme: "liminal fluorescent maze",
@@ -1499,7 +1383,7 @@ export class TsTuiMvpApp {
           model: "sonnet",
         }),
       openChromeBrowserWindow: (restore) =>
-        this.openChromeBrowserWindow(restore?.url),
+        this.openHostWindow("web-reader", restore?.url ? { url: restore.url } : undefined),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
 
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
@@ -1532,235 +1416,31 @@ export class TsTuiMvpApp {
     this.flashWorkspaceResult("load", this.runtimeWorkspace.load(name));
   }
 
-  private resolveSmearSource(args?: Record<string, unknown>): {
-    sourcePath: string;
-    outputKind: "primer" | "reader";
-    sourceKind: WindowKind;
-  } | { error: string } {
-    const explicitFilePath =
-      typeof args?.filePath === "string" && args.filePath.trim()
-        ? args.filePath.trim()
-        : undefined;
-    const openAs =
-      args?.openAs === "primer" || args?.openAs === "reader"
-        ? args.openAs
-        : undefined;
+  // ── FX Pipeline (delegated to fx-pipeline.ts) ──────────────────────────────
 
-    if (explicitFilePath) {
-      return {
-        sourcePath: explicitFilePath,
-        outputKind: openAs ?? "reader",
-        sourceKind: openAs ?? "reader",
-      };
-    }
-
-    const focused = this.windowManager.getFocusedWindow();
-    if (!focused) {
-      return { error: "No focused window and no filePath provided." };
-    }
-    if (!focused.filePath) {
-      return { error: "Focused window is not file-backed. Pass filePath explicitly." };
-    }
-    if (focused.kind !== "primer" && focused.kind !== "reader" && focused.kind !== "editor") {
-      return { error: `Focused window kind "${focused.kind}" is not smearable.` };
-    }
+  private buildFxDeps(): FxPipelineDeps {
     return {
-      sourcePath: focused.filePath,
-      outputKind: openAs ?? (focused.kind === "primer" ? "primer" : "reader"),
-      sourceKind: focused.kind,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      openTextViewer: (title, content, kind, filePath, options) =>
+        this.openTextViewerWindow(title, content, kind, filePath, options),
+      openPrimer: (filePath) => this.openPrimerWindow(filePath),
     };
+  }
+
+  private resolveSmearSource(args?: Record<string, unknown>) {
+    return fxResolveSmearSource(this.windowManager, args);
   }
 
   private runFxScript(
     fx: "glitch" | "shear" | "breed" | "flip",
     args?: Record<string, unknown>,
-  ): { ok: true; filePath: string; windowId?: number } | { ok: false; error: string } {
-    const { execSync } = require("node:child_process");
-    const outDir = path.join(REPO_ROOT, "scratch", "generated", "fx");
-    fs.mkdirSync(outDir, { recursive: true });
-    const stamp = Date.now();
-    const outPath = path.join(outDir, `${fx}-${stamp}.txt`);
-
-    try {
-      let cmd: string;
-      const fxDir = path.join(REPO_ROOT, "scripts", "fx");
-
-      switch (fx) {
-        case "glitch": {
-          const filePath = String(args?.filePath ?? "");
-          if (!filePath) return { ok: false, error: "fx.glitch requires filePath" };
-          const intensity = Number(args?.intensity ?? 0.5);
-          const seed = args?.seed != null ? Number(args.seed) : Math.floor(Math.random() * 10000);
-          cmd = `cat "${filePath}" | "${fxDir}/glitch" ${intensity} ${seed} > "${outPath}"`;
-          break;
-        }
-        case "shear": {
-          const filePath = String(args?.filePath ?? "");
-          if (!filePath) return { ok: false, error: "fx.shear requires filePath" };
-          const skew = Number(args?.skew ?? 2);
-          cmd = `cat "${filePath}" | "${fxDir}/shear" ${skew} > "${outPath}"`;
-          break;
-        }
-        case "breed": {
-          const file1 = String(args?.file1 ?? "");
-          const file2 = String(args?.file2 ?? "");
-          if (!file1 || !file2) return { ok: false, error: "fx.breed requires file1 and file2" };
-          const mode = String(args?.mode ?? "xor");
-          const bias = Number(args?.bias ?? 0.5);
-          const seed = args?.seed != null ? Number(args.seed) : 42;
-          cmd = `python3 "${fxDir}/breed" "${file1}" "${file2}" --mode ${mode} --bias ${bias} --seed ${seed} --out "${outPath}"`;
-          break;
-        }
-        case "flip": {
-          const filePath = String(args?.filePath ?? "");
-          if (!filePath) return { ok: false, error: "fx.flip requires filePath" };
-          const direction = String(args?.direction ?? "v");
-          cmd = `cat "${filePath}" | "${fxDir}/flip" ${direction} > "${outPath}"`;
-          break;
-        }
-      }
-
-      execSync(cmd, { timeout: 10000 });
-
-      if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
-        return { ok: false, error: `FX ${fx} produced no output` };
-      }
-
-      // Open result as primer
-      const win = this.openPrimerWindow(outPath);
-      return { ok: true, filePath: outPath, windowId: win?.id };
-    } catch (err: unknown) {
-      return { ok: false, error: `FX ${fx} failed: ${err instanceof Error ? err.message : String(err)}` };
-    }
+  ) {
+    return fxRunFxScript(this.buildFxDeps(), fx, args);
   }
 
-  private smearTextSurface(args?: Record<string, unknown>): {
-    ok: true;
-    filePath: string;
-    windowId?: number;
-    sourcePath: string;
-    kind: "primer" | "reader";
-    mode: string;
-  } | {
-    ok: false;
-    error: string;
-  } {
-    const resolved = this.resolveSmearSource(args);
-    if ("error" in resolved) {
-      this.overlays.flash(resolved.error);
-      return { ok: false, error: resolved.error };
-    }
-
-    const { sourcePath, outputKind } = resolved;
-    if (!fs.existsSync(sourcePath)) {
-      const error = `File not found: ${sourcePath}`;
-      this.overlays.flash(error);
-      return { ok: false, error };
-    }
-
-    const scriptPath = path.join(REPO_ROOT, "scripts", "smear.py");
-    if (!fs.existsSync(scriptPath)) {
-      const error = `Smear script not found: ${scriptPath}`;
-      this.overlays.flash(error);
-      return { ok: false, error };
-    }
-
-    const allowedModes = new Set(["wipe", "shear", "glitch", "stretch", "frames"]);
-    const mode =
-      typeof args?.mode === "string" && allowedModes.has(args.mode)
-        ? args.mode
-        : "wipe";
-
-    const generatedDir = path.join(REPO_ROOT, "scratch", "generated", "smear");
-    fs.mkdirSync(generatedDir, { recursive: true });
-    const slug = path.basename(sourcePath, path.extname(sourcePath)).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const outputPath =
-      typeof args?.outPath === "string" && args.outPath.trim()
-        ? args.outPath.trim()
-        : path.join(generatedDir, `${slug}-${mode}-${Date.now()}.txt`);
-
-    const cmdArgs = [scriptPath, sourcePath, "--mode", mode, "--out", outputPath];
-    const numericArg = (name: string) =>
-      typeof args?.[name] === "number" && Number.isFinite(args[name] as number)
-        ? String(args[name])
-        : undefined;
-
-    const maybeWidth = numericArg("width");
-    const maybeAt = numericArg("at");
-    const maybeTile = numericArg("tile");
-    const maybeSkew = numericArg("skew");
-    const maybeSeed = numericArg("seed");
-    const maybeIntensity = numericArg("intensity");
-    const maybeFrom = numericArg("from");
-    const maybeTo = numericArg("to");
-    const maybeSteps = numericArg("steps");
-    const maybeOutdir =
-      typeof args?.outdir === "string" && args.outdir.trim()
-        ? args.outdir.trim()
-        : undefined;
-
-    if (maybeWidth) cmdArgs.push("--width", maybeWidth);
-    if (maybeAt) cmdArgs.push("--at", maybeAt);
-    if (maybeTile) cmdArgs.push("--tile", maybeTile);
-    if (maybeSkew) cmdArgs.push("--skew", maybeSkew);
-    if (maybeSeed) cmdArgs.push("--seed", maybeSeed);
-    if (maybeIntensity) cmdArgs.push("--intensity", maybeIntensity);
-    if (maybeFrom) cmdArgs.push("--from", maybeFrom);
-    if (maybeTo) cmdArgs.push("--to", maybeTo);
-    if (maybeSteps) cmdArgs.push("--steps", maybeSteps);
-    if (maybeOutdir) cmdArgs.push("--outdir", maybeOutdir);
-
-    try {
-      execFileSync("python3", cmdArgs, {
-        cwd: REPO_ROOT,
-        stdio: ["ignore", "pipe", "pipe"],
-        encoding: "utf8",
-      });
-    } catch (error) {
-      const stderr =
-        error instanceof Error && "stderr" in error && typeof error.stderr === "string"
-          ? error.stderr.trim()
-          : error instanceof Error
-            ? error.message
-            : String(error);
-      const message = `Smear failed: ${stderr || "unknown error"}`;
-      this.overlays.flash(message);
-      return { ok: false, error: message };
-    }
-
-    if (!fs.existsSync(outputPath)) {
-      const error = `Smear output missing: ${outputPath}`;
-      this.overlays.flash(error);
-      return { ok: false, error };
-    }
-
-    const title = path.basename(outputPath);
-    const rawContent = safeReadFile(outputPath) ?? "";
-    const opened = outputKind === "primer"
-      ? this.openTextViewerWindow(
-          title,
-          rawContent,
-          "primer",
-          outputPath,
-          { contentMeasurement: measurePrimerContent(rawContent).measurement },
-        )
-      : this.openTextViewerWindow(
-          title,
-          rawContent,
-          "reader",
-          outputPath,
-          { contentMeasurement: measurePlainTextContent(rawContent).measurement },
-        );
-
-    this.overlays.flash(`Smeared ${path.basename(sourcePath)} → ${path.basename(outputPath)}`);
-    return {
-      ok: true,
-      filePath: outputPath,
-      windowId: opened?.id,
-      sourcePath,
-      kind: outputKind,
-      mode,
-    };
+  private smearTextSurface(args?: Record<string, unknown>) {
+    return fxSmearTextSurface(this.buildFxDeps(), args);
   }
 
   /** Restore a workspace: apply theme, tear down existing windows, replay snapshots, restore focus. */
@@ -1771,8 +1451,8 @@ export class TsTuiMvpApp {
   /** Action bridge between the command catalog/registry and concrete controller behaviour. */
   private getAppMenuActions(): AppMenuActions {
     return {
-      browsePrimers: () => this.openPrimerBrowserWindow(),
-      openFileManager: () => this.openFileManagerWindow(),
+      browsePrimers: () => this.openHostWindow("primer-browser"),
+      openFileManager: () => this.openHostWindow("file-manager"),
       openPrimerPicker: () => this.openPrimerPicker(),
       openPrimerPrompt: (args) => {
         const filePath =
@@ -1872,7 +1552,7 @@ export class TsTuiMvpApp {
             : undefined;
         this.exportFocusedWindowText(id, name);
       },
-      openTerrainLab: () => this.openTerrainLabWindow(),
+      openTerrainLab: () => this.openHostWindow("terrain-lab"),
       openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
         const filePath =
@@ -2024,7 +1704,7 @@ export class TsTuiMvpApp {
         const info = this.overlays.getActiveOverlayInfo();
         return info ? { active: true, ...info } : { active: false };
       },
-      openBackroomsPrompt: () => this.promptForBackroomsTv(),
+      openBackroomsPrompt: () => this.openHostWindow("backrooms-primer-picker"),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =
           typeof args?.theme === "string" && args.theme.trim()
@@ -2046,7 +1726,7 @@ export class TsTuiMvpApp {
             : "auto";
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
-      openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
+      openBackroomsLogBrowser: () => this.openHostWindow("backrooms-log-browser"),
       backroomsPickerInfo: () => {
         const api = this.getBackroomsPickerApi();
         if (!api?.info) return { active: false, error: "Backrooms picker not active" };
@@ -2078,27 +1758,27 @@ export class TsTuiMvpApp {
         const target = byId ?? this.windowManager.getFocusedWindow();
         if (target) this.windowManager.toggleMaximize(target);
       },
-      openGallery: () => this.openPrimerGalleryWindow(),
+      openGallery: () => this.openHostWindow("primer-gallery"),
       openBrowserReader: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        this.openBrowserReaderWindow(filePath);
+        this.openHostWindow("reader-viewer", { filePath });
       },
       openChromeBrowser: (args) => {
         const url =
           typeof args?.url === "string" && args.url.trim()
             ? args.url.trim()
             : undefined;
-        this.openChromeBrowserWindow(url);
+        this.openHostWindow("web-reader", url ? { url } : undefined);
       },
       openMusicPlayer: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
             ? args.filePath.trim()
             : undefined;
-        this.openMusicPlayerWindow(filePath ? { filePath } : undefined);
+        this.openHostWindow("music-player", filePath ? { filePath } : undefined);
       },
       openSy2Chronicles: (args) => {
         const result = this.commands.runDynamic("microapp.wibwob.sy2chronicles.open", args);
@@ -2150,7 +1830,7 @@ export class TsTuiMvpApp {
         win?.writeInput?.("/meow");
       },
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
-      openCommandPalette: () => this.openCommandPaletteWindow(),
+      openCommandPalette: () => this.openHostWindow("command-palette"),
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: (args) => {
         const name =

@@ -374,9 +374,9 @@ export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Plasma engine
 /** @beta */
-export { createPlasmaPlayer, moodNames, RENDER_MODES, extractMoodFromText, getMood } from "./plasma-engine.js";
+// plasma-engine — moved to microapps/plasma/plasma-engine.ts (single consumer)
 /** @beta */
-export type { PlasmaModifiers, PlasmaRenderMode, PlasmaPlayer, PlasmaMood, MoodAnalysis } from "./plasma-engine.js";
+// plasma types — moved to microapps/plasma/plasma-engine.ts
 
 // Contour / terrain engine
 /** @beta */
