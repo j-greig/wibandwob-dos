@@ -136,8 +136,10 @@ function renderOverview(state: InspectorState): string {
 
   const lines: string[] = [];
 
-  // ── Figlet banner ──
-  const banner = renderFiglet("INSPECT", "small");
+  // ── Figlet banner (reactive to system state) ──
+  const bannerWord = s.stats.agent.active ? "ACTIVE" :
+    (s.stats.rssMb > 600 || s.stats.render.fps < 2) ? "ALERT" : "INSPECT";
+  const banner = renderFiglet(bannerWord, "small");
   if (banner) {
     for (const line of banner.split("\n")) {
       if (line.trim()) lines.push(`  ${line}`);
