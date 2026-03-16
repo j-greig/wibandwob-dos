@@ -1,9 +1,12 @@
 /**
  * wibwob-open — Route file/directory opens to WibWob-DOS if running.
  *
- * Registers a `wibwob_open` tool. If WibWob-DOS is alive on port 8099,
- * files open in the editor and directories navigate the file browser.
- * Falls back to macOS `open` if WibWob-DOS isn't running.
+ * Registers a `wibwob_open` tool that uses the WibWob Router for smart
+ * file-type → command mapping and instance discovery via unix sockets.
+ * Falls back to system `open` if WibWob-DOS isn't running.
+ *
+ * @see lib/wibwob-router.ts — shared routing logic
+ * @see .planning/epics/e046-deep-linking-into-wibwobdos/e046-brief.md
  */
 import { Type } from "@sinclair/typebox";
 
@@ -12,51 +15,60 @@ export default function register(pi: any) {
     name: "wibwob_open",
     description:
       "Open a file or directory in WibWob-DOS (if running) or the system default. " +
-      "Files open in the editor, directories open in the file browser.",
+      "Files route to the right app: .md → markdown viewer, code → editor, " +
+      "directories → file browser. Supports app hint override.",
     parameters: Type.Object({
       path: Type.String({ description: "Absolute path to file or directory" }),
+      app: Type.Optional(
+        Type.Union([
+          Type.Literal("editor"),
+          Type.Literal("finder"),
+          Type.Literal("markdown"),
+          Type.Literal("primer"),
+        ], { description: "Force a specific WibWob-DOS app instead of auto-detecting from extension" }),
+      ),
+      line: Type.Optional(
+        Type.Number({ description: "Line number to jump to (editor only)" }),
+      ),
     }),
-    execute: async (args: { path: string }) => {
-      const filePath = args.path;
+    execute: async (args: { path: string; app?: string; line?: number }) => {
+      const { route, discoverInstance, dispatch } = await import(
+        "../../../lib/wibwob-router.js"
+      );
 
-      // Check if WibWob-DOS is running
-      let wibwobAlive = false;
-      try {
-        const res = await fetch("http://127.0.0.1:8099/health", {
-          signal: AbortSignal.timeout(2000),
-        });
-        wibwobAlive = res.ok;
-      } catch {
-        wibwobAlive = false;
+      const result = route({
+        path: args.path,
+        app: args.app as "editor" | "finder" | "markdown" | "primer" | undefined,
+        line: args.line,
+      });
+
+      if (!result) {
+        return `Cannot route: ${args.path}`;
       }
 
-      if (wibwobAlive) {
-        // Determine if file or directory
-        const fs = await import("node:fs");
-        const isDir = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+      // Discover WibWob-DOS instance (sockets first, then port scan)
+      const path = await import("node:path");
+      const projectRoot = path.resolve(import.meta.dir, "../../..");
+      const instance = await discoverInstance(projectRoot);
 
-        const commandId = isDir ? "finder.open" : "editor.open";
-        const cmdArgs = isDir ? {} : { filePath };
-
-        try {
-          const res = await fetch("http://127.0.0.1:8099/commands/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: commandId, args: cmdArgs }),
-            signal: AbortSignal.timeout(5000),
-          });
-          const data = await res.json();
-          return `Opened in WibWob-DOS (${commandId}): ${filePath}\n${JSON.stringify(data)}`;
-        } catch (err) {
-          return `WibWob-DOS alive but command failed: ${err}. Falling back to system open.`;
+      if (instance) {
+        const ok = await dispatch(instance, result);
+        if (ok) {
+          const cmds = result.commands.map((c: { id: string }) => c.id).join(" → ");
+          return `Opened in WibWob-DOS (${cmds}): ${args.path}`;
         }
+        // Dispatch failed — fall through to system open
       }
 
       // Fallback: system open
       const { execSync } = await import("node:child_process");
       try {
-        execSync(`open ${JSON.stringify(filePath)}`);
-        return `Opened with system default: ${filePath}`;
+        if (process.platform === "darwin") {
+          execSync(`open ${JSON.stringify(args.path)}`);
+        } else {
+          execSync(`xdg-open ${JSON.stringify(args.path)} 2>/dev/null`);
+        }
+        return `Opened with system default: ${args.path}`;
       } catch (err) {
         return `Failed to open: ${err}`;
       }
