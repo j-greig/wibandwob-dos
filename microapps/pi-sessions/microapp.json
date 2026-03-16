@@ -1,0 +1,24 @@
+{
+  "name": "pi-sessions",
+  "version": "0.1.0",
+  "description": "Pi Sessions microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.pi-sessions.open"
+  },
+  "microapp": {
+    "id": "wibwob.pi-sessions",
+    "title": "Pi Sessions",
+    "description": "Discover and connect to live pi coding agent sessions via Unix sockets.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 90, "label": "Pi Sessions" }
+    ],
+    "palette": { "order": 90, "label": "Open Pi Sessions" },
+    "agent": true,
+    "api": true
+  }
+}
