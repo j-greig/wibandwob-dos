@@ -110,15 +110,15 @@ export async function dispatchSlashCommand(
   if (trimmed === "/state") {
     fetch(`${CONTROL_API_BASE_URL}/state`)
       .then((r) => r.json())
-      .then((d: any) => {
+      .then((d: Record<string, any>) => {
         const app = d.app ?? {};
         const scr = d.screen ?? {};
-        const wins: any[] = d.windows ?? [];
+        const wins = (d.windows ?? []) as Array<Record<string, any>>;
         const focusId = d.focus?.windowId;
         const lines = [
           `[desktop] ${app.theme ?? "?"}  ${scr.width}x${scr.height}  ${wins.length} windows  focus:${focusId ?? "none"}`,
         ];
-        for (const w of wins.sort((a: any, b: any) => a.id - b.id)) {
+        for (const w of wins.sort((a, b) => a.id - b.id)) {
           const marker = w.id === focusId ? " ◀" : "";
           lines.push(
             `  ${String(w.id).padStart(3)}  ${(w.appType ?? w.kind).padEnd(20)} ${w.title.slice(0, 24).padEnd(24)}  ${w.width}x${w.height}  @${w.left},${w.top}${marker}`

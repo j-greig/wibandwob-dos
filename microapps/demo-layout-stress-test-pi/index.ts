@@ -133,10 +133,12 @@ export default function setup(host: MicroappHost) {
         parent: win.body, top: 0, left: 0, width: 0, height: 1,
         style: { fg: "white", bg: "blue" },
       });
+      const headerPart = createNodePart(headerBox);
       const footerBox = blessed.box({
         parent: win.body, top: 0, left: 0, width: 0, height: 1,
         style: { fg: "white", bg: "blue" },
       });
+      const footerPart = createNodePart(footerBox);
 
       // ── Scrollable viewport (between header and footer) ────────
       const viewport = blessed.box({
@@ -150,11 +152,13 @@ export default function setup(host: MicroappHost) {
         scrollbar: createScrollbar(),
         style: scrollableStyle(host.theme().body),
       });
+      const viewportPart = createNodePart(viewport);
       const content = blessed.box({
         parent: viewport,
         top: 0, left: 0, width: 0, height: 0,
         style: host.theme().body,
       });
+      const contentPart = createNodePart(content);
 
       // ── Panel A: Contrib grid inside flex ──────────────────────
       const panelA = panel(content, "A: CONTRIB + FLEX", "green");
@@ -185,13 +189,15 @@ export default function setup(host: MicroappHost) {
       const figletContainer = blessed.box({
         parent: panelB.node, top: 1, left: 1, width: 0, height: 0,
       });
+      const figletContainerPart = createNodePart(figletContainer);
       const figletChips = FIGLET_WORDS.map((word, i) => {
         const chipNode = blessed.box({
           parent: figletContainer, top: 0, left: 0, width: 0, height: 0,
           border: { type: "line" },
           style: { fg: "yellow", border: { fg: ["yellow","magenta","cyan","green"][i % 4] } },
         });
-        return { word, node: chipNode };
+        const chipPart = createNodePart(chipNode);
+        return { word, node: chipNode, part: chipPart };
       });
       let figletFont = "small";
       let figletRows = 0;
@@ -210,14 +216,16 @@ export default function setup(host: MicroappHost) {
       const tagContainer = blessed.box({
         parent: panelD.node, top: 0, left: 0, width: 0, height: 0,
       });
+      const tagContainerPart = createNodePart(tagContainer);
       const tagNodes = TAG_LABELS_D.map((label, i) => {
-        return blessed.box({
+        const node = blessed.box({
           parent: tagContainer, top: 0, left: 0, width: 6, height: 1,
           content: ` ${label} `,
           style: { fg: "white", bg: ["blue","green","cyan","red","magenta","yellow"][i % 6] },
         });
+        return createNodePart(node);
       });
-      const tagPart = createNodePart(tagContainer);
+      const tagPart = tagContainerPart;
 
       const level4 = createStack(panelD.node, [
         { key: "d4", basis: "1fr", part: d4.part },
@@ -399,7 +407,7 @@ export default function setup(host: MicroappHost) {
         d2.paint("L2 Stack");
         d3.paint("L3\nRow");
         d4.paint("L4 Stack");
-        tagRowsD = layoutWrapRow(tagNodes, Math.max(1, Number(tagContainer.width) || 1), 6, 1, 1);
+        tagRowsD = layoutWrapRow(tagNodes.map(t => t.node), Math.max(1, Number(tagContainer.width) || 1), 6, 1, 1);
 
         // Panel E: sparkline positioning
         sparkline.top = 1;

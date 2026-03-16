@@ -7,6 +7,7 @@
 
 import blessed from "blessed";
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import path from "node:path";
 
 import { theme } from "./theme/resolver.js";
@@ -776,7 +777,7 @@ export class OverlayManager {
         return;
       }
       try {
-        const content = fs.readFileSync(entry.value, "utf8");
+        const content = safeReadFile(entry.value) ?? "";
         const limit = options?.previewLimit ?? 4000;
         const clipped = content.length > limit ? `${content.slice(0, limit)}\n\n[preview truncated]` : content;
         preview.setContent(`${entry.value}\n\n${clipped}`);

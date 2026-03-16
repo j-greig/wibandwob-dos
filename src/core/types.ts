@@ -144,9 +144,7 @@ export type AppType = PersistableAppType | TransientAppType | (string & {});
  * Add entries HERE when a new generic factory produces a persistable appType.
  * Using these instead of template-literal casts gives real compile-time safety.
  */
-export const viewerAppType: Record<"primer", PersistableAppType> = {
-  primer: "primer-viewer",
-};
+// viewerAppType removed — unused (2026-03-15)
 
 export const animationAppType: Record<"pattern", string> = {
   pattern: "pattern-animation",
@@ -223,9 +221,7 @@ export interface DesktopState {
  * Common fields are required on every window. Kind-specific fields are
  * optional and only populated by the relevant window factory.
  *
- * Type guards below narrow to specific window capabilities:
- *   isEditorWindow(w)  — has editor state, filePath, dirty tracking
- *   isFinderWindow(w)  — has finder controller
+ * Check `w.kind` and optional fields (editor, finder, microappId) to narrow.
  */
 export interface WindowRecord {
   id: number;
@@ -261,6 +257,13 @@ export interface WindowRecord {
   // Maximize state (set by WindowManager on double-click titlebar)
   savedBounds?: { left: number; top: number; width: number; height: number };
 
+  // Chrome mode (set by WindowManager.setWindowChromeMode)
+  chromeless?: boolean;
+
+  // Music player public API (set by music-player-window.ts).
+  // Typed as unknown to avoid import cycle with windows/ — cast at call site.
+  musicPlayer?: unknown;
+
   // Cross-cutting hooks — any window type may set these
   writeInput?: (input: string, sender?: string) => void;
   cleanup?: () => void;
@@ -275,38 +278,9 @@ export interface WindowRecord {
 // Type guards — narrow WindowRecord to kind-specific capabilities.
 // ---------------------------------------------------------------------------
 
-/** Window with editor state, dirty tracking, and optional file path. */
-export interface EditorWindowRecord extends WindowRecord {
-  kind: "editor";
-  editor: EditorState;
-}
-
-/** Window with a FinderController for search/navigate/sort commands. */
-export interface FinderWindowRecord extends WindowRecord {
-  kind: "browser";
-  finder: FinderController;
-}
-
-/** Narrow to an editor window with guaranteed editor state. */
-export function isEditorWindow(w: WindowRecord): w is EditorWindowRecord {
-  return w.kind === "editor" && w.editor !== undefined;
-}
-
-/** Narrow to a finder window with guaranteed finder controller. */
-export function isFinderWindow(w: WindowRecord): w is FinderWindowRecord {
-  return w.kind === "browser" && w.finder !== undefined;
-}
-
-/** Window created by a microapp module. */
-export interface MicroappWindowRecord extends WindowRecord {
-  kind: "microapp";
-  microappId: string;
-}
-
-/** Narrow to a microapp window with guaranteed microappId. */
-export function isMicroappWindow(w: WindowRecord): w is MicroappWindowRecord {
-  return w.kind === "microapp" && typeof w.microappId === "string";
-}
+// EditorWindowRecord, FinderWindowRecord, MicroappWindowRecord and their
+// type guards removed — unused narrow interfaces (2026-03-15).
+// WindowRecord's union fields (editor, finder, microappId) suffice.
 
 /** Controller interface exposed by Finder windows for command dispatch. */
 export interface FinderController {

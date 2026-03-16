@@ -28,9 +28,10 @@
 // -------------------------------------------------------------------
 
 import fs from "node:fs";
+import { safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import type { BackroomsChannel } from "../core/types.js";
-import type { CommandSurface } from "../core/command-registry.js";
+import type { CommandListItem, CommandSurface } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
@@ -384,7 +385,10 @@ export class ControlApiService {
       });
       if (tierFilter) {
         const tiers = new Set(tierFilter.split(","));
-        commands = commands.filter((cmd: any) => tiers.has(cmd.tier) || (!cmd.tier && tiers.has("builtin")));
+        commands = commands.filter((cmd) => {
+          const tier = (cmd as CommandListItem & { tier?: string }).tier;
+          return tiers.has(tier ?? "builtin");
+        });
       }
       return Response.json({
         ok: true,
@@ -508,12 +512,12 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      const id = typeof body.id === "string" ? body.id : "";
       if (!id) {
         return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
-      const rawArgs = typeof (body as any).args === "object" && (body as any).args !== null
-        ? (body as any).args as Record<string, unknown>
+      const rawArgs = typeof body.args === "object" && body.args !== null
+        ? body.args as Record<string, unknown>
         : undefined;
       // Validate args against Zod schema if the command defines one
       let args = rawArgs;
@@ -524,11 +528,11 @@ export class ControlApiService {
           return Response.json({
             ok: false,
             error: "Invalid arguments",
-            details: result.error.issues.map((i: any) => ({
+            details: result.error.issues.map((i) => ({
               path: i.path.join("."),
               message: i.message,
-              expected: i.expected,
-              received: i.received,
+              ...("expected" in i ? { expected: i.expected } : {}),
+              ...("received" in i ? { received: i.received } : {}),
             })),
           }, { status: 400 });
         }
@@ -537,8 +541,8 @@ export class ControlApiService {
       try {
         const result = this.runApiCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
-      } catch (err: any) {
-        return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
+      } catch (err: unknown) {
+        return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined }, { status: 500 });
       }
     }
 
@@ -548,11 +552,11 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/figlet/open-default") {
-      const text = typeof (body as any).text === "string" && (body as any).text.trim()
-        ? (body as any).text.trim()
+      const text = typeof body.text === "string" && body.text.trim()
+        ? body.text.trim()
         : "WIB WOB";
-      const font = typeof (body as any).font === "string" && (body as any).font.trim()
-        ? (body as any).font.trim()
+      const font = typeof body.font === "string" && body.font.trim()
+        ? body.font.trim()
         : undefined;
       const result = this.runApiCommand(
         "figlet.open",
@@ -567,19 +571,20 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/zine/open") {
-      const filePath = typeof (body as any).filePath === "string" && (body as any).filePath.trim()
-        ? (body as any).filePath.trim()
+      const filePath = typeof body.filePath === "string" && body.filePath.trim()
+        ? body.filePath.trim()
         : undefined;
       let args: Record<string, unknown> | undefined;
       if (filePath) {
         args = { filePath };
-      } else if (typeof (body as any).index === "number") {
+      } else if (typeof body.index === "number") {
         const listed = this.runApiCommand("microapp.wibwob.zine.list-canvases");
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
         }
-        const files = (listed.result as any)?.files;
-        const picked = Array.isArray(files) ? files.find((f: any) => Number(f?.index) === Number((body as any).index)) : undefined;
+        const listResult = listed.result as { files?: { index?: number; filePath?: string }[] } | undefined;
+        const files = listResult?.files;
+        const picked = Array.isArray(files) ? files.find((f) => Number(f?.index) === Number(body.index)) : undefined;
         if (!picked?.filePath) {
           return Response.json({ ok: false, error: "Invalid zine canvas index" }, { status: 400 });
         }
@@ -593,7 +598,7 @@ export class ControlApiService {
 
     // ── View endpoints — all dispatch through command registry ──
     // Routes kept for backward compat; each is a thin shim over /commands/run.
-    const viewRoutes: Record<string, { id: string; argsMapper?: (b: any) => Record<string, unknown> | undefined }> = {
+    const viewRoutes: Record<string, { id: string; argsMapper?: (b: Record<string, unknown>) => Record<string, unknown> | undefined }> = {
       "/view/primer-browser/open":  { id: "primer.browse" },
       "/view/file-manager/open":    { id: "finder.open" },
       "/view/primer-gallery/open":  { id: "primer-gallery.open" },
@@ -634,17 +639,17 @@ export class ControlApiService {
       try {
         const result = this.runApiCommand(viewRoute.id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
-      } catch (err: any) {
-        return Response.json({ ok: false, error: err?.message ?? String(err) }, { status: 500 });
+      } catch (err: unknown) {
+        return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
       }
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
-        ok: this.deps.windows.focus(Number((body as any).id)),
+        ok: this.deps.windows.focus(Number(body.id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
-      const b = body as any;
+      const b = body as Record<string, unknown>;
       if (!Number.isFinite(Number(b.left)) || !Number.isFinite(Number(b.top))) {
         return Response.json(
           { ok: false, error: "left and top are required numbers" },
@@ -660,7 +665,7 @@ export class ControlApiService {
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
-      const b = body as any;
+      const b = body as Record<string, unknown>;
       if (!Number.isFinite(Number(b.width)) || !Number.isFinite(Number(b.height))) {
         return Response.json(
           { ok: false, error: "width and height are required numbers" },
@@ -677,20 +682,20 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
-        ok: this.deps.windows.close(Number((body as any).id)),
+        ok: this.deps.windows.close(Number(body.id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/maximize") {
       return Response.json({
-        ok: this.deps.windows.toggleMaximize(Number((body as any).id)),
+        ok: this.deps.windows.toggleMaximize(Number(body.id)),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/batch") {
       // Body: { ops: Array<{ id, left?, top?, width?, height?, close? }> }
       // Each op can move, resize, or close a window. All applied in order.
-      const ops = (body as any).ops as Array<{
+      const ops = body.ops as Array<{
         id: number;
         left?: number; top?: number;
         width?: number; height?: number;
@@ -739,17 +744,17 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
         ok: this.deps.windows.sendInput(
-          Number((body as any).id),
-          String((body as any).input ?? ""),
-          (body as any).sender ? String((body as any).sender) : undefined,
+          Number(body.id),
+          String(body.input ?? ""),
+          body.sender ? String(body.sender) : undefined,
         ),
       });
     }
     // Dedicated endpoint for session-to-agent messages — always requires sender
     if (request.method === "POST" && url.pathname === "/windows/agent-message") {
-      const sender = (body as any).sender ? String((body as any).sender) : undefined;
-      const text = String((body as any).text ?? (body as any).input ?? "");
-      const id = Number((body as any).id);
+      const sender = body.sender ? String(body.sender) : undefined;
+      const text = String(body.text ?? body.input ?? "");
+      const id = Number(body.id);
       return Response.json({
         ok: this.deps.windows.sendInput(id, text, sender),
       });
@@ -757,14 +762,14 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/editor/write") {
       return Response.json({
         ok: this.deps.windows.writeEditorText(
-          Number((body as any).id),
-          String((body as any).text ?? ""),
+          Number(body.id),
+          String(body.text ?? ""),
         ),
       });
     }
 
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
-      const id = Number((body as any).id);
+      const id = Number(body.id);
       const text = this.deps.windows.captureText(id);
       if (!text) return Response.json({ ok: false, path: null });
       // File export is a control-API concern, not a facade concern
@@ -772,13 +777,13 @@ export class ControlApiService {
         ? path.resolve(this.identity.capturesDir)
         : path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
-      const name = typeof (body as any).name === "string" ? (body as any).name
-        : typeof (body as any).label === "string" ? (body as any).label
+      const name = typeof body.name === "string" ? body.name
+        : typeof body.label === "string" ? body.label
         : `window-${id}`;
       const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
       const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
       const filePath = path.join(capturesDir, fileName);
-      fs.writeFileSync(filePath, `${text}\n`, "utf8");
+      safeWriteFile(filePath, `${text}\n`);
       return Response.json({ ok: true, path: filePath });
     }
     // ── Backrooms + workspace — also dispatch through command registry ──
@@ -797,7 +802,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/overlay/confirm") {
       const result = this.runApiCommand("overlay.confirm");
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { confirmed?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.confirmed) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
       }
@@ -805,32 +810,32 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/overlay/cancel") {
       const result = this.runApiCommand("overlay.cancel");
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { cancelled?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.cancelled) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
       }
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/overlay/select") {
-      const index = Number((body as any).index);
+      const index = Number(body.index);
       if (!Number.isFinite(index)) {
         return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
       }
       const result = this.runApiCommand("overlay.select", { index });
-      const inner = (result as any).result;
+      const inner = result.ok ? result.result as { selected?: boolean; error?: string } | undefined : undefined;
       if (inner && !inner.selected) {
         return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
       }
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
-      const rawName = (body as any).name;
+      const rawName = body.name;
       return Response.json(
         this.deps.workspace.save(typeof rawName === "string" ? rawName : undefined),
       );
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
-      const rawName = (body as any).name;
+      const rawName = body.name;
       return Response.json(
         this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
       );

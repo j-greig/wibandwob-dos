@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -31,7 +32,7 @@ export function promptForWorkspaceLoad(params: {
   const items = names.map((name) => ({
     label: `${name}${name === params.workspace.currentName ? " (current)" : ""}`,
     value: name,
-    preview: `${path.join(params.workspaceDir, `${name}.json`)}\n\n${fs.readFileSync(path.join(params.workspaceDir, `${name}.json`), "utf8")}`,
+    preview: `${path.join(params.workspaceDir, `${name}.json`)}\n\n${safeReadFile(path.join(params.workspaceDir, `${name}.json`)) ?? "(empty)"}`,
     searchText: name
   }));
   const initialIndex = Math.max(0, names.findIndex((name) => name === params.workspace.currentName));

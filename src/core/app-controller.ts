@@ -8,6 +8,7 @@
 import blessed from "blessed";
 import { patchBlessedUnicode } from "./unicode-patch.js";
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -109,6 +110,8 @@ import {
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/generative-windows.js";
+import { registerAllHostWindows } from "./host-window-registrations.js";
+import { getHostWindow, type HostWindowDeps } from "./host-window-registry.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -116,8 +119,8 @@ import {
 import { ScrambleBrain } from "../services/scramble-brain.js";
 
 
-import { openMusicPlayerWindow } from "../windows/music-player-window.js";
-import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
+// music-player-window — now registered via host-window-registry
+// terrain-lab-window — now registered via host-window-registry
 // Editor window factory now used via EditorCoordinator
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
@@ -155,7 +158,7 @@ import {
 } from "../runtime/runtime-node.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
-export const DEV_RELOAD_EXIT_CODE = 75;
+const DEV_RELOAD_EXIT_CODE = 75;
 
 /** Recursively collect .md file paths under root, skipping node_modules/.git/vendor. */
 function collectMarkdownFiles(root: string): string[] {
@@ -358,7 +361,7 @@ export class TsTuiMvpApp {
       getState: () => this.getDesktopState(),
       syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName: string) => this.getPrimerInfo(pathOrName),
-      screenshotText: () => (this.screen as any).screenshot() as string,
+      screenshotText: () => this.screen.screenshot(),
       getSnapshot: (): RuntimeInspectionSnapshot => {
         const blockers = this.getRuntimeUiBlockers();
         return {
@@ -451,6 +454,7 @@ export class TsTuiMvpApp {
 
     // Rebuild menus after microapps may have registered dynamic commands
     this.rebuildMenusFromCommands();
+    registerAllHostWindows();
 
     this.renderChrome();
     this.runtimeStats.init();
@@ -708,6 +712,43 @@ export class TsTuiMvpApp {
 
   /** Focus an existing window of appType, or create one. Single-instance by default.
    *  Returns undefined if the create function did not actually produce a new window. */
+  /** Build the standard deps object for host window factories. */
+  private buildHostWindowDeps(): HostWindowDeps {
+    return {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      content: this.content,
+      backrooms: this.backrooms,
+      editor: this.editor,
+      geometry: this.geometry,
+      runtimeNode: this.runtimeNode,
+      runtimeCommands: this.runtimeCommands,
+      runtimeInspection: this.runtimeInspection,
+      runtimeWindows: this.runtimeWindows,
+      runtimeWorkspace: this.runtimeWorkspace,
+      invalidation: this.invalidation,
+      commands: this.commands,
+      scrambleBrain: this.scrambleBrain,
+      onStateChanged: () => this.syncLiveState(),
+      openTextViewer: (title, content, kind, filePath) =>
+        this.openTextViewerWindow(title, content, kind, filePath),
+      openFile: (filePath) => this.editor.openFile(filePath),
+      flash: (msg) => this.overlays.flash(msg),
+    };
+  }
+
+  /**
+   * Open a host window via the declarative registry.
+   * Falls back to undefined if the appType is not registered.
+   */
+  openHostWindow(appType: string, restore?: Record<string, unknown>): WindowRecord | undefined {
+    const entry = getHostWindow(appType);
+    if (!entry) return undefined;
+    const deps = this.buildHostWindowDeps();
+    return this.focusOrCreate(appType as AppType, () => entry.factory(deps, restore), entry.multiInstance);
+  }
+
   private focusOrCreate(
     appType: AppType,
     createFn: () => void,
@@ -998,7 +1039,7 @@ export class TsTuiMvpApp {
           this.editor.openFile(filePath);
         },
         onViewFile: (filePath) => {
-          const content = fs.readFileSync(filePath, "utf8");
+          const content = safeReadFile(filePath) ?? "";
           this.openTextViewerWindow(
             path.basename(filePath),
             content,
@@ -1069,13 +1110,7 @@ export class TsTuiMvpApp {
   // openContourWindow — removed, migrated to microapp.wibwob.contour.open
 
   private openTerrainLabWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("terrain-lab", () => {
-      openTerrainLabStudioWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
+    return this.openHostWindow("terrain-lab");
   }
 
   // openPlasmaWindow — removed, migrated to microapp.wibwob.plasma.open
@@ -1107,17 +1142,7 @@ export class TsTuiMvpApp {
     filePath?: string;
     volume?: number;
   }): WindowRecord | undefined {
-    return this.focusOrCreate("music-player", () => {
-      openMusicPlayerWindow(
-        {
-          screen: this.screen,
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          onStateChanged: () => this.syncLiveState(),
-        },
-        restore,
-      );
-    });
+    return this.openHostWindow("music-player", restore);
   }
 
   private openCompanionWindow(restore?: {
@@ -1321,7 +1346,7 @@ export class TsTuiMvpApp {
       .slice(0, 40);
     const fileName = `${slug}_${Date.now()}.txt`;
     const filePath = path.join(capturesDir, fileName);
-    fs.writeFileSync(filePath, text, "utf8");
+    safeWriteFile(filePath, text);
     this.overlays.flash(`Exported to ${fileName}`);
   }
 
@@ -1604,8 +1629,8 @@ export class TsTuiMvpApp {
       // Open result as primer
       const win = this.openPrimerWindow(outPath);
       return { ok: true, filePath: outPath, windowId: win?.id };
-    } catch (err: any) {
-      return { ok: false, error: `FX ${fx} failed: ${err?.message ?? String(err)}` };
+    } catch (err: unknown) {
+      return { ok: false, error: `FX ${fx} failed: ${err instanceof Error ? err.message : String(err)}` };
     }
   }
 
@@ -1710,7 +1735,7 @@ export class TsTuiMvpApp {
     }
 
     const title = path.basename(outputPath);
-    const rawContent = fs.readFileSync(outputPath, "utf8");
+    const rawContent = safeReadFile(outputPath) ?? "";
     const opened = outputKind === "primer"
       ? this.openTextViewerWindow(
           title,
@@ -2251,8 +2276,7 @@ export class TsTuiMvpApp {
         try {
           const windows = this.windowManager.getWindows();
           const yaml = exportCanvasDocument(windows, this.windowManager, title);
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, yaml, "utf8");
+          safeWriteFile(filePath, yaml);
           this.overlays.flash(`Canvas exported: ${filePath}`);
         } catch (e) {
           this.overlays.flash(`Canvas export failed: ${e}`);

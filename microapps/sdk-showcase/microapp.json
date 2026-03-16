@@ -1,0 +1,20 @@
+{
+  "name": "sdk-showcase",
+  "version": "0.1.0",
+  "description": "Live showcase of all SDK Handle components — the terminal design kit.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.sdk-showcase",
+    "title": "SDK Showcase",
+    "description": "Interactive reference for all SDK composition helpers. Auto-generated from exports.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 170, "label": "SDK Showcase" }
+    ],
+    "palette": { "order": 220, "label": "SDK Showcase" },
+    "agent": true,
+    "api": true
+  }
+}

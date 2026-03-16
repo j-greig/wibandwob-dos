@@ -503,7 +503,7 @@ function generateOrderedFromHills(w: number, h: number, seed: number, hills: rea
   return canvas.map((row) => row.join(""));
 }
 
-export function generateOrdered(w: number, h: number, seed: number, terrainIdx: number): string[] {
+function generateOrdered(w: number, h: number, seed: number, terrainIdx: number): string[] {
   return generateOrderedFromHills(w, h, seed, generateTerrainHills(w, h, seed, terrainIdx));
 }
 
@@ -548,7 +548,7 @@ function generateHybridFromHills(
   return result.map((row) => row.join(""));
 }
 
-export function generateHybrid(
+function generateHybrid(
   w: number,
   h: number,
   nLevels: number,

@@ -1,4 +1,4 @@
-import blessed from "blessed";
+import type blessed from "blessed";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -21,6 +21,7 @@ import {
   createTimer,
   clearTimers,
   renderFiglet,
+  createCanvas,
 } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "LLM Orch Studio";
@@ -84,12 +85,8 @@ function openStudio(host: MicroappHost) {
   };
 
   // ── Figlet header ──────────────────────────────────────────────────
-  const headerBox = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, width: 0, height: 0,
-    tags: false,
-    style: { fg: host.theme().accent?.fg ?? host.theme().body.fg, bg: host.theme().body.bg, bold: true },
-  });
+  const headerBox = createCanvas(win.body, { tags: false }).element;
+  headerBox.style = { fg: host.theme().accent?.fg ?? host.theme().body.fg, bg: host.theme().body.bg, bold: true };
   function refreshHeader() {
     const w = Math.max(1, Number(win.body.width) || 0);
     const font = w >= 80 ? "slant" : undefined;
@@ -161,17 +158,13 @@ function openStudio(host: MicroappHost) {
   ], { gap: 1 });
 
   // ── Status banner ─────────────────────────────────────────────────
-  const statusBanner = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, width: 0, height: 1,
-    tags: false,
-    align: "center" as const,
-    style: {
-      fg: host.theme().body.bg,
-      bg: host.theme().accent?.fg ?? host.theme().body.fg,
-      bold: true,
-    },
-  });
+  const statusBanner = createCanvas(win.body, { tags: false }).element;
+  statusBanner.options.align = "center" as const;
+  statusBanner.style = {
+    fg: host.theme().body.bg,
+    bg: host.theme().accent?.fg ?? host.theme().body.fg,
+    bold: true,
+  };
   function refreshBanner() {
     const labels: Record<RunStatus, string> = {
       idle: " ○ READY ",
@@ -197,13 +190,9 @@ function openStudio(host: MicroappHost) {
   const stepsLog = createLogView({ border: true, label: "Steps / Stream", maxEntries: 800 });
 
   // ── Right column header ────────────────────────────────────────────
-  const rightHeaderBox = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, width: 0, height: 0,
-    tags: false,
-    align: "center" as const,
-    style: { fg: host.theme().muted?.fg ?? host.theme().body.fg, bg: host.theme().body.bg },
-  });
+  const rightHeaderBox = createCanvas(win.body, { tags: false }).element;
+  rightHeaderBox.options.align = "center" as const;
+  rightHeaderBox.style = { fg: host.theme().muted?.fg ?? host.theme().body.fg, bg: host.theme().body.bg };
   function refreshRightHeader() {
     try {
       const art = renderFiglet("STUDIO", "small");

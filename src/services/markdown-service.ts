@@ -16,8 +16,9 @@
  *   Default config matches prototype exactly.
  */
 
-import { marked, type Token } from "marked";
-import { readFileSync, statSync } from "node:fs";
+import { marked, type Token, type Tokens } from "marked";
+import { statSync } from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import { visibleWidth, wrapTextWithAnsi, padToWidth } from "../core/ansi-utils.js";
 import { highlightCode } from "./syntax-highlight.js";
 import { isFigletAvailable, tryFiglet as tryFigletRaw } from "./figlet-service.js";
@@ -151,24 +152,24 @@ function renderInline(tokens: Token[]): string {
   for (const t of tokens) {
     switch (t.type) {
       case "text":
-        out += (t as any).tokens?.length ? renderInline((t as any).tokens) : ((t as any).text ?? "");
+        out += ((t as Record<string, any>)).tokens?.length ? renderInline(((t as Record<string, any>)).tokens) : (((t as Record<string, any>)).text ?? "");
         break;
       case "paragraph":
-        out += renderInline((t as any).tokens ?? []);
+        out += renderInline(((t as Record<string, any>)).tokens ?? []);
         break;
       case "strong":
-        out += theme.bold(renderInline((t as any).tokens ?? []));
+        out += theme.bold(renderInline(((t as Record<string, any>)).tokens ?? []));
         break;
       case "em":
-        out += theme.italic(renderInline((t as any).tokens ?? []));
+        out += theme.italic(renderInline(((t as Record<string, any>)).tokens ?? []));
         break;
       case "codespan":
-        out += theme.code((t as any).text ?? "");
+        out += theme.code(((t as Record<string, any>)).text ?? "");
         break;
       case "link": {
-        const linkText = renderInline((t as any).tokens ?? []);
-        const href = (t as any).href ?? "";
-        const text = (t as any).text ?? "";
+        const linkText = renderInline(((t as Record<string, any>)).tokens ?? []);
+        const href = ((t as Record<string, any>)).href ?? "";
+        const text = ((t as Record<string, any>)).text ?? "";
         const hrefComp = href.startsWith("mailto:") ? href.slice(7) : href;
         // Show link text underlined; only show URL for bare-URL links
         // or external links that differ substantially from the text.
@@ -186,9 +187,9 @@ function renderInline(tokens: Token[]): string {
         break;
       }
       case "br": out += "\n"; break;
-      case "del": out += theme.strikethrough(renderInline((t as any).tokens ?? [])); break;
-      case "html": out += (t as any).raw ?? ""; break;
-      default: if ((t as any).text) out += (t as any).text;
+      case "del": out += theme.strikethrough(renderInline(((t as Record<string, any>)).tokens ?? [])); break;
+      case "html": out += ((t as Record<string, any>)).raw ?? ""; break;
+      default: if (((t as Record<string, any>)).text) out += ((t as Record<string, any>)).text;
     }
   }
   return out;
@@ -199,12 +200,13 @@ function renderInline(tokens: Token[]): string {
 function renderListItem(tokens: Token[], parentDepth: number): string[] {
   const lines: string[] = [];
   for (const token of tokens) {
-    const t = token as any;
-    if (t.type === "list") {
-      lines.push(...renderList(t, parentDepth + 1));
-    } else if (t.type === "text") {
+    if (token.type === "list") {
+      lines.push(...renderList(token as Tokens.List, parentDepth + 1));
+    } else if (token.type === "text") {
+      const t = token as Tokens.Text;
       lines.push(t.tokens?.length ? renderInline(t.tokens) : (t.text ?? ""));
-    } else if (t.type === "paragraph") {
+    } else if (token.type === "paragraph") {
+      const t = token as Tokens.Paragraph;
       lines.push(renderInline(t.tokens ?? []));
     } else {
       const rendered = renderInline([token]);
@@ -214,10 +216,10 @@ function renderListItem(tokens: Token[], parentDepth: number): string[] {
   return lines;
 }
 
-function renderList(token: any, depth: number): string[] {
+function renderList(token: Tokens.List, depth: number): string[] {
   const lines: string[] = [];
   const indent = "  ".repeat(depth);
-  const start = token.start ?? 1;
+  const start = Number(token.start ?? 1);
   for (let i = 0; i < token.items.length; i++) {
     const item = token.items[i];
     const bullet = token.ordered ? `${start + i}. ` : "- ";
@@ -243,7 +245,7 @@ function wrapCell(text: string, w: number): string[] {
   return wrapped.map(l => padToWidth(l, w));
 }
 
-function renderTable(token: any, available: number): string[] {
+function renderTable(token: Tokens.Table, available: number): string[] {
   const numCols = token.header?.length ?? 0;
   if (numCols === 0) return token.raw ? wrapTextWithAnsi(token.raw, available) : [];
 
@@ -293,11 +295,11 @@ function renderTable(token: any, available: number): string[] {
 
   const lines: string[] = [];
   lines.push(theme.hr(rule("┌", "┬", "┐")));
-  lines.push(...renderRowLines(token.header.map((h: any, i: number) => wrapCell(renderInline(h.tokens ?? []), colWidths[i]!)), true));
+  lines.push(...renderRowLines(token.header.map((h, i) => wrapCell(renderInline(h.tokens ?? []), colWidths[i]!)), true));
   lines.push(theme.hr(rule("├", "┼", "┤")));
   for (let ri = 0; ri < token.rows.length; ri++) {
     const row = token.rows[ri];
-    lines.push(...renderRowLines(row.map((c: any, i: number) => wrapCell(renderInline(c.tokens ?? []), colWidths[i]!))));
+    lines.push(...renderRowLines(row.map((c, i) => wrapCell(renderInline(c.tokens ?? []), colWidths[i]!))));
     if (ri < token.rows.length - 1) lines.push(theme.hr(rule("├", "┼", "┤")));
   }
   lines.push(theme.hr(rule("└", "┴", "┘")));
@@ -307,7 +309,7 @@ function renderTable(token: any, available: number): string[] {
 
 // ── Code block renderer ───────────────────────────────────────────────────────
 
-function renderCodeBlock(token: any, width: number): string[] {
+function renderCodeBlock(token: Tokens.Code, width: number): string[] {
   const lang   = (token.lang ?? "").toLowerCase();
   const bgWidth = Math.min(width, 88);
   const indent  = "  ";
@@ -333,30 +335,30 @@ function renderToken(
   const lines: string[] = [];
   switch (token.type) {
     case "heading": {
-      const t = token as any;
+      const t = token as Tokens.Heading;
       const headingText = renderInline(t.tokens ?? []);
       lines.push(...renderFigletHeading(headingText, t.depth, width, config));
       lines.push("");
       break;
     }
     case "paragraph": {
-      const t = token as any;
+      const t = token as Tokens.Paragraph;
       lines.push(renderInline(t.tokens ?? []));
       if (nextType && nextType !== "list" && nextType !== "space") lines.push("");
       break;
     }
     case "code":
-      lines.push(...renderCodeBlock(token as any, width));
+      lines.push(...renderCodeBlock(token as Tokens.Code, width));
       break;
     case "list":
-      lines.push(...renderList(token as any, 0));
+      lines.push(...renderList(token as Tokens.List, 0));
       lines.push("");
       break;
     case "table":
-      lines.push(...renderTable(token as any, width));
+      lines.push(...renderTable(token as Tokens.Table, width));
       break;
     case "blockquote": {
-      const t = token as any;
+      const t = token as Tokens.Blockquote;
       const quoteW = Math.max(1, width - 2);
       const quoteLines: string[] = [];
       const subTokens: Token[] = t.tokens ?? [];
@@ -378,7 +380,7 @@ function renderToken(
       break;
     case "html": break; // skip badges, img tags
     case "space": lines.push(""); break;
-    default: if ((token as any).text) lines.push((token as any).text);
+    default: if ("text" in token && typeof token.text === "string") lines.push(token.text);
   }
   return lines;
 }
@@ -424,7 +426,8 @@ export function renderMarkdown(text: string, width: number, opts: RenderMarkdown
  * Render a markdown file to ANSI lines. Throws if file cannot be read.
  */
 export function renderMarkdownFile(filePath: string, width: number, opts: RenderMarkdownOptions = {}): string[] {
-  const text = readFileSync(filePath, "utf8");
+  const text = safeReadFile(filePath);
+  if (!text) throw new Error(`Cannot read markdown file: ${filePath}`);
   return renderMarkdown(text, width, opts);
 }
 

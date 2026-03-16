@@ -356,29 +356,29 @@ export class WindowManager implements WindowFacade {
       if (record.closeHint) { record.closeHint.hide(); }
       if (record.resizeGrip) { record.resizeGrip.hide(); }
       // Remove border, expand body
-      (record.frame as any).border = undefined;
-      record.frame.style = { ...(record.frame.style as any), border: undefined };
+      record.frame.border = undefined as unknown as blessed.Widgets.Border;
+      record.frame.style = { ...record.frame.style, border: undefined };
       record.body.top = 0;
       record.body.left = 0;
       record.body.right = 0;
       record.body.bottom = 0;
-      (record as any).chromeless = true;
+      record.chromeless = true;
     } else {
       // Restore chrome
       if (record.shadow) { record.shadow.show(); }
       if (record.titleBar) { record.titleBar.show(); }
       if (record.closeHint) { record.closeHint.show(); }
       if (record.resizeGrip) { record.resizeGrip.show(); }
-      (record.frame as any).border = "line";
+      record.frame.border = { type: "line" };
       record.frame.style = {
-        ...(record.frame.style as any),
+        ...record.frame.style,
         border: theme().windowBorderUnfocused
       };
       record.body.top = 1;
       record.body.left = 2;
       record.body.right = 2;
       record.body.bottom = 1;
-      (record as any).chromeless = false;
+      record.chromeless = false;
     }
 
     record.refresh?.();

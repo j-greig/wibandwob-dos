@@ -4,7 +4,7 @@
  * Consume via microapp-sdk.ts.
  */
 import type { MonsterCamFrame } from "./monster-cam-service.js";
-import { renderSkeletonAt } from "../core/skeleton-renderer.js";
+import { renderSkeletonAt, type WebcamCell } from "../core/skeleton-renderer.js";
 
 const RAMP     = " .:-=+*#%@";
 const RAMP_LEN = RAMP.length;
@@ -66,10 +66,8 @@ function padCenter(s: string, width: number): string {
 }
 
 /** @primitive */
-export interface WebcamCell {
-  ch: string;
-  color?: string;
-}
+// WebcamCell canonical source is now skeleton-renderer.ts (broke circular dep)
+export type { WebcamCell } from "../core/skeleton-renderer.js";
 
 /** @primitive */
 export interface WebcamRenderOptions {

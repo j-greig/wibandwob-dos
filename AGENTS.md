@@ -73,17 +73,22 @@ Full lens model + script mapping: `.agents/agent-master-plan.md`
 - `src/core/window-facade.ts` — 11-method window interface
 - `src/core/window-chrome.ts` — chrome sizing math
 - `src/core/microapp-registry.ts` — tier classification
+- `src/core/safe-fs.ts` — filesystem wrapper (safeReadFile, safeWriteFile, etc.)
+- `src/ui/` — terminal design system (layout, chrome, containers, forms, feedback, data, patterns)
+- `src/sdk/composition-helpers.ts` — SDK handle-based UI helpers for microapps
 - `src/services/control-api.ts` — HTTP surface (port 8099)
 - `src/services/state-service.ts` — live desktop state
 - `src/services/microapp-loader.ts` — microapp discovery + host creation
-- `src/services/microapp-sdk.ts` — SDK export surface
+- `src/services/microapp-sdk.ts` — SDK export surface (only import path for microapps)
 
 Full index: `.agents/shell-dev/architecture.md`
 
 ## Quick Commands
 
 ```bash
-bun run typecheck                      # minimum gate before any commit
+bun run test                           # unit tests (always green)
+bun run typecheck                      # type check
+bun run health                         # tests + typecheck + COAT + 0 circular deps
 bun run check-coat                     # COAT enforcement (6 checks)
 bash scripts/ensure-running.sh         # idempotent start (--direct default)
 bash scripts/restart.sh                # stop → relaunch → verify
@@ -153,7 +158,10 @@ Full invariants: `.agents/shell-dev/invariants.md`
 ## Verification
 
 ```bash
-bun run typecheck        # minimum bar
+bun run health           # full gate: tests + typecheck + COAT + 0 circular deps
+bun run test             # unit tests only (always green, no app needed)
+bun run test:integration # integration tests (needs running app)
+bun run typecheck        # type check only
 bun run check-themes     # after theme changes
 bun run check-coat       # after migrations
 ```
@@ -164,8 +172,14 @@ The human must see the running TUI. Ensure tmux session exists, tell human to at
 ## Agent Tooling
 
 **Discovery:** `bash scripts/discover.sh` — organized by lens.
-**Devlog:** `.agents/shell-dev/devlogs/W{nn}.md` — weekly, new file each Monday.
-**Standing notes:** `.agents/shell-dev/devlogs/standing.md` — rolling, prune when items land.
+**Devlog:** `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/W{nn}.md` — weekly, new file each Monday.
+**Standing notes:** `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/standing.md` — rolling, prune when items land.
+
+**You are encouraged to write to the devlog during any session.** Don't wait to be asked.
+Good devlog entries: process friction you noticed, skills or scripts that could be better,
+patterns that caused confusion, things that worked surprisingly well, ideas for improving
+the dev loop. This is meta — observations about how we work, not just what we shipped.
+Find or create `W{nn}.md` for the current week (ISO week number, Monday start).
 
 When agent tooling causes friction — improve it, don't work around it.
 

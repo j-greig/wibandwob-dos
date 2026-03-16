@@ -98,6 +98,20 @@ even though the broader god-file decomposition and deeper type-system work remai
    default (scroll, focus, input, resize, tags)
 6. **Design system completeness** — standard UI components that every desktop app
    needs: panel chrome, tabbed container, split pane, toolbar, status bar, modal
+
+## Execution Buckets (2026-03-15)
+
+Five stackable autoresearch buckets. Strict ordering for B1→B2→B3. B4 parallelises with B2–B3. B5 goes last.
+
+| Bucket | Brief | Autoresearch | Sessions | Depends |
+|---|---|---|---|---|
+| B1 Dead Code + Cycles | `e042-bucket-1-dead-code.md` | `autoresearch/dead-code/` | 1 | — |
+| B2 SDK Primitives | `e042-bucket-2-sdk.md` | `autoresearch/sdk-primitives/` | 1–2 | B1 |
+| B3 Hero 7 | `e042-bucket-3-hero-apps.md` | `autoresearch/hero-apps/` | 1–2 | B2 |
+| B4 Infra Wrappers | `e042-bucket-4-wrappers.md` | `autoresearch/infra-wrappers/` | 1 | B1 |
+| B5 Test Harness | `e042-bucket-5-tests.md` | `autoresearch/test-harness/` | 1 | B1–B3 |
+
+Full analysis: `.planning/state-of-the-codebase-2026-03-15.md`
    dialog, toast notification, form controls, data table, tree view, context menu
 7. **Single-responsibility functions** — extract multi-purpose functions into
    focused units with clear contracts

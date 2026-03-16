@@ -42,9 +42,14 @@ Full lens model + script mapping: `agent-master-plan.md`
 
 ## Devlog
 
-Write to this week's file: `.agents/shell-dev/devlogs/W{nn}.md`
+Write to this week's file: `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/W{nn}.md`
 Pattern: `## YYYY-MM-DD — Title` then bullet observations.
-Standing notes (not weekly): `devlogs/standing.md` — prune when items land.
+Standing notes (not weekly): `/Users/james/Repos/wibandwob-dos/.agents/shell-dev/devlogs/standing.md` — prune when items land.
+
+**You are encouraged to write to the devlog during any session.** Don't wait to be asked.
+Good entries: process friction, skills or scripts that could be better, patterns that
+caused confusion, things that worked well, ideas for improving the dev loop.
+This is meta — observations about how we work, not just what we shipped.
 
 ## Script rules
 

@@ -1,8 +1,11 @@
-import blessed from "blessed";
+import type blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,
+  createCanvas,
+  createStatusBar,
+  createRule,
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════
@@ -636,29 +639,14 @@ function openAsciicker(host: MicroappHost) {
   const win = host.createWindow({ title: "Asciicker", width: 80, height: 32 });
   const timers = new Set<ReturnType<typeof setInterval>>();
 
-  const canvas = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 2,
-    style: host.theme().body,
-    tags: false,
-  });
+  const canvasHandle = createCanvas(win.body, { bottomOffset: 2, tags: false });
+  const canvas = canvasHandle.element;
 
-  const status = blessed.box({
-    parent: win.body,
-    bottom: 0, left: 0, right: 0, height: 1,
-    style: host.theme().muted
-      ? { fg: host.theme().muted.fg, bg: host.theme().body.bg }
-      : { fg: "grey", bg: host.theme().body.bg },
-    tags: false,
-  });
+  const sepHandle = createRule(win.body);
+  (sepHandle.element as any).bottom = 1;
+  const sep = sepHandle.element;
 
-  const sep = blessed.box({
-    parent: win.body,
-    bottom: 1, left: 0, right: 0, height: 1,
-    content: "",
-    style: host.theme().body,
-    tags: false,
-  });
+  const statusHandle = createStatusBar(win.body);
 
   // World generation
   const worldSeed = Math.floor(Math.random() * 100000);
@@ -737,11 +725,11 @@ function openAsciicker(host: MicroappHost) {
     const biomeName = cell ? biomeNames[cell.biome] : "???";
     const alt = cell ? Math.floor(cell.height / 2.55) : 0;
     const yawStr = `${Math.floor(cam.yaw)}°`;
-    status.setContent(
+    statusHandle.update({ left: 
       ` ⊕${Math.floor(playerX)},${Math.floor(playerY)}  ▲${alt}m  ${biomeName}  ` +
       `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ` +
       `WASD:move Q/E:rotate +/-:zoom`
-    );
+    });
 
     host.screen.render();
     tick++;
@@ -790,7 +778,7 @@ function openAsciicker(host: MicroappHost) {
   win.onRestyle(() => {
     const t = host.theme();
     canvas.style = { ...t.body };
-    status.style = t.muted ? { fg: t.muted.fg, bg: t.body.bg } : { fg: "grey", bg: t.body.bg };
+    statusHandle.update({});
     sep.style = { ...t.body };
     host.screen.render();
   });

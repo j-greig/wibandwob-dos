@@ -19,8 +19,10 @@ import {
   PLAIN_HEADING_CONFIG,
   type PanelDef,
 } from "../../src/services/microapp-sdk.js";
+import type { PanelType, CEPanelDef } from "../../src/services/microapp-sdk.js";
 
-export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam" | "animated-text";
+// Re-export so existing consumers don't break
+export type { PanelType, CEPanelDef };
 
 /** Display prefix per panel type — glyph for dense view, label for readable view. */
 export const PANEL_TYPE_PREFIX: Record<PanelType, { glyph: string; label: string }> = {
@@ -48,26 +50,7 @@ export function prefixedTitle(type: PanelType, title: string): string {
   return prefixMode === "glyph" ? `${p.glyph} ${title}` : `${p.label}: ${title}`;
 }
 
-export interface CEPanelDef {
-  id: string;
-  type: PanelType;
-  title: string;
-  w: number;          // width in chars (including border)
-  h: number;          // height in rows (including border)
-  col: 0 | 1 | 2;     // column hint for layout
-  live?: boolean;     // animates on tick
-  // Type-specific content:
-  text?: string;                        // for "text" type
-  figletText?: string;                  // for "figlet" type
-  figletFont?: string;                  // optional font override
-  asciiArt?: string;                    // inline ASCII for "ascii-art"
-  asciiFile?: string;                   // path to primer file
-  pixelData?: string[];                 // rows of pixel chars for "pixel"
-  markdown?: string;                    // for "markdown" type
-  content?: (tick: number, w: number, h: number) => string; // for "mixed"/"infographic"
-  webcamMonster?: boolean; // for "webcam" — enable monster face overlays
-  frames?: string[];       // for "animated-text" — text frames cycled on tick
-}
+// CEPanelDef interface now lives in src/core/canvas-types.ts (canonical owner)
 
 /**
  * Convert CEPanelDef to the PanelDef format layoutPanels expects.

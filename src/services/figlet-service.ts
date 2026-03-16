@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -47,7 +48,7 @@ export function getFigletCatalogue(): FigletCatalogue {
     return catalogueCache;
   }
 
-  const raw = fs.readFileSync(resolveFontJsonPath(), "utf8");
+  const raw = safeReadFile(resolveFontJsonPath()) ?? "[]";
   const parsed = JSON.parse(raw) as {
     categories?: Array<{ id?: string; name?: string; description?: string; fonts?: string[] }>;
     favourites?: string[];

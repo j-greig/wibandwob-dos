@@ -35,6 +35,7 @@ import {
 import { log } from "./app-logger.js";
 import { sharedPlayer, fmtTime, findAudioFiles, COMPOSITIONS_DIR } from "./audio-player-controller.js";
 import fs from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import nodePath from "node:path";
 import { access, readFile, writeFile, mkdir } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -240,13 +241,13 @@ function loadBasePrompt(): string {
       .sort();
     if (files.length === 0) throw new Error("no prompt files");
     return files
-      .map(f => fs.readFileSync(nodePath.join(promptsDir, f), "utf8").trim())
+      .map(f => safeReadFile(nodePath.join(promptsDir, f))?.trim() ?? "")
       .filter(Boolean)
       .join("\n\n");
   } catch {
     // Fallback to the legacy single-file path
     try {
-      return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
+      return safeReadFile(SPIKE_PI_APPEND_SYSTEM_PATH)?.trim() ?? "";
     } catch {
       return [
         "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",

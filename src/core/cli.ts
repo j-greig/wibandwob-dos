@@ -64,7 +64,7 @@ export function printHelp(): void {
   for (const [name, def] of Object.entries(FLAG_DEFS)) {
     const short = "short" in def ? `-${def.short}, ` : "    ";
     const dflt = "default" in def && def.default ? " (default: on)" : "";
-    console.log(`  ${short}--${name.padEnd(18)} ${(def as any).description}${dflt}`);
+    console.log(`  ${short}--${name.padEnd(18)} ${(def as { description: string }).description}${dflt}`);
   }
   console.log("");
 }

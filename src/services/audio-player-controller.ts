@@ -21,7 +21,7 @@ export const COMPOSITIONS_DIR = path.join(REPO_ROOT, "scratch", "compositions");
 export const BUNDLED_MUSIC_DIR = path.join(REPO_ROOT, "content", "music");
 const AUDIO_FILE_PATTERN = /\.(mp3|wav|m4a|ogg|flac)$/i;
 const SCRUB_SECONDS = 5;
-export const VOLUME_STEP = 10;
+const VOLUME_STEP = 10;
 export const DEFAULT_VOLUME = 80;
 
 export type PlayState = "stopped" | "playing" | "paused";

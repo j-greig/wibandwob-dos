@@ -7,6 +7,7 @@ import blessed from "blessed";
 import { execSync } from "node:child_process";
 import { copyToClipboard } from "../core/clipboard.js";
 import fs from "node:fs";
+import { safeReadFile } from "../core/safe-fs.js";
 import path from "node:path";
 
 import { theme } from "../core/theme/resolver.js";
@@ -287,7 +288,7 @@ export function openFileManagerWindow(params: {
   });
   const list = listHandle.node;
   // Enable blessed tags for coloured file type indicators
-  (list as any).parseTags = true;
+  list.parseTags = true;
 
   // Left pane: icon grid (icon view) — full width, toggled via hidden
   const iconGrid = blessed.box({
@@ -315,7 +316,7 @@ export function openFileManagerWindow(params: {
     left: `${PREVIEW_SPLIT_RATIO}%`,
     width: 1,
     bottom: 1,
-    style: { fg: (theme() as any).border?.fg || "gray", bg: theme().body?.bg },
+    style: { fg: theme().muted.fg || "gray", bg: theme().body.bg },
     content: "",
     hidden: viewMode === "icon"
   });
@@ -443,7 +444,7 @@ export function openFileManagerWindow(params: {
       if (untracked) parts.push(`${untracked}?`);
       gitSummary = parts.length ? ` git:${parts.join("/")}` : " git:clean";
     }
-    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search`);
+    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search q:close`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -716,7 +717,7 @@ export function openFileManagerWindow(params: {
     if (ext === ".json") {
       const escapeBraces = (s: string) => s.replace(/\{/g, "\\{");
       try {
-        const raw = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const raw = (safeReadFile(entry.fullPath) ?? "").slice(0, 8000);
         const parsed = JSON.parse(raw);
         const pretty = JSON.stringify(parsed, null, 2);
         const lines = pretty.split("\n");
@@ -730,7 +731,7 @@ export function openFileManagerWindow(params: {
         }).join("\n");
         previewRawContent = coloured;
       } catch {
-        const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const content = (safeReadFile(entry.fullPath) ?? "").slice(0, 8000);
         const lines = content.split("\n");
         const numbered = lines.map((ln: string, i: number) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBraces(ln)}`).join("\n");
         setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
@@ -744,7 +745,7 @@ export function openFileManagerWindow(params: {
     // Default: raw text with line numbers + file metadata header
     // Use syntax highlighting for supported languages
     try {
-      const content = fs.readFileSync(entry.fullPath, "utf8");
+      const content = safeReadFile(entry.fullPath) ?? "";
       const rawLines = content.slice(0, 8000).split("\n");
       const stat = fs.statSync(entry.fullPath);
       const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
@@ -780,7 +781,7 @@ export function openFileManagerWindow(params: {
 
   const updatePreviewForSearchResult = (result: { file: string; line: number; text: string }) => {
     try {
-      const content = fs.readFileSync(result.file, "utf8");
+      const content = safeReadFile(result.file) ?? "";
       const lines = content.split("\n");
       const startLine = Math.max(0, result.line - 5);
       const endLine = Math.min(lines.length, result.line + 20);
@@ -886,7 +887,7 @@ export function openFileManagerWindow(params: {
     frame.frame.setLabel(` \u2302 ${dirName}${branchTag} `);
     // Show breadcrumb with file type summary
     const bc = renderBreadcrumb();
-    pathLabel.setContent(` ${bc}`);
+    pathLabel.setContent(` 📁 File Manager │ ${bc}`);
     applyFilter(selectedIndex);
   };
 
@@ -1142,12 +1143,12 @@ export function openFileManagerWindow(params: {
       style: { ...theme().body, selected: theme().selected },
     });
 
-    menuList.on("select", (_item: any, index: number) => {
+    menuList.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => {
       closeContextMenu();
       items[index]?.action();
     });
 
-    menuList.on("keypress", (_ch: any, key: any) => {
+    menuList.on("keypress", (_ch: string, key: { name: string }) => {
       if (key.name === "escape" || key.name === "q") {
         closeContextMenu();
       }
@@ -1226,7 +1227,7 @@ export function openFileManagerWindow(params: {
   });
 
   // Right-click context menu on list items
-  list.on("element click", (_el: any, mouse: any) => {
+  list.on("element click", (_el: blessed.Widgets.BlessedElement, mouse: { button?: string | number; x?: number; y?: number }) => {
     if (mouse && (mouse.button === "right" || mouse.button === 2)) {
       const filePath = getEntryPath();
       if (filePath) {
@@ -1518,6 +1519,10 @@ export function openFileManagerWindow(params: {
   // ── Frame wiring ───────────────────────────────────────
 
   frame.kind = "browser";
+  frame.captureText = () => {
+    const lines = entries.map(e => e.label);
+    return `File Manager: ${currentPath}\n${lines.join("\n")}`;
+  };
   frame.describeState = () => ({
     appType: "file-manager",
     summary: `File manager at ${currentPath}` + (searchActive ? ` (searching: ${searchQuery})` : ""),

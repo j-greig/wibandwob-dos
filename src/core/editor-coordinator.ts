@@ -9,6 +9,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 
 import type { WindowManager } from "./window-manager.js";
 import type { RenderScheduler } from "./render-scheduler.js";
@@ -48,7 +49,7 @@ export class EditorCoordinator {
     if (initial === undefined) {
       const fileExists = fs.existsSync(filePath);
       try {
-        initial = fileExists ? fs.readFileSync(filePath, "utf8") : "";
+        initial = fileExists ? (safeReadFile(filePath) ?? "") : "";
       } catch {
         if (fileExists) {
           this.deps.overlays.flash(`Failed to read file: ${filePath}`);
@@ -126,11 +127,9 @@ export class EditorCoordinator {
       (value) => this.deps.content.completePath(value),
       (value) => {
         const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
-        try {
-          fs.mkdirSync(path.dirname(resolved), { recursive: true });
-          fs.writeFileSync(resolved, focused.editor!.value, "utf8");
-        } catch (err) {
-          this.deps.overlays.flash(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
+        const ok = safeWriteFile(resolved, focused.editor!.value);
+        if (!ok) {
+          this.deps.overlays.flash(`Save failed: could not write to ${resolved}`);
           return;
         }
         focused.filePath = resolved;

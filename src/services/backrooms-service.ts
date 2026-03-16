@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 
 import { REPO_ROOT, SPIKE_ROOT } from "../core/config.js";
@@ -194,7 +195,7 @@ export class BackroomsService {
         `+---------------- BACKROOMS ${count > 1 ? "SIMULATED" : "PLAYBACK"} ${index + 1}/${playbackFiles.length}: ${entry.label} ----------------+`,
         ""
       ];
-      return divider.concat(fs.readFileSync(entry.filePath, "utf8").split("\n"));
+      return divider.concat((safeReadFile(entry.filePath) ?? "").split("\n"));
     });
     return {
       labels: playbackFiles.map((entry) => entry.label),

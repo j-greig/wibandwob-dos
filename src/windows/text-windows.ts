@@ -13,7 +13,7 @@ import blessed from "blessed";
 
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
-import { createRestyleBundle } from "../core/ui-parts.js";
+import { createRestyleBundle, type RestyleEntry } from "../core/ui-parts.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowRecord } from "../core/types.js";
@@ -111,7 +111,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
         track:     { fg: theme().muted.fg, bg: theme().body.bg },
       },
       scrollbar: { ch: "│", track: { ch: "░" } },
-    } as any);
+    });
 
     statusBar = blessed.box({
       parent: frame.body,
@@ -170,9 +170,9 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
       });
       lastWidth = contentWidth;
       lastMtime = mtime;
-    } catch (err: any) {
-      overlays.flash(`Could not render ${filePath}: ${err?.message ?? err}`);
-      cachedLines = [`Error reading file: ${err?.message ?? err}`];
+    } catch (err: unknown) {
+      overlays.flash(`Could not render ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      cachedLines = [`Error reading file: ${err instanceof Error ? err.message : String(err)}`];
     }
     scrollBox.setContent(cachedLines.join("\n"));
     updateStatus();
@@ -182,7 +182,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
   function updateStatus(): void {
     if (!scrollBox || !statusBar) return;
     const total = cachedLines.length;
-    const scrollY = (scrollBox as any).childBase ?? 0;
+    const scrollY = scrollBox.childBase ?? 0;
     const viewH = Math.max(1, Number(scrollBox.height));
     const pct = total <= viewH ? 100 : Math.round(Math.min(100, ((scrollY + viewH) / total) * 100));
     const hint = ` j/k  d/u  g/G  h:figlet  e:edit  q:close `;
@@ -196,7 +196,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
 
   function scrollBy(delta: number): void {
     if (!scrollBox) return;
-    (scrollBox as any).scroll(delta);
+    scrollBox.scroll(delta);
     updateStatus();
     screen.render();
     onStateChanged?.();
@@ -210,15 +210,15 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
       widget.key(["k", "up"],      () => scrollBy(-1));
       widget.key(["d", "pagedown"],() => scrollBy(Math.floor(Number(scrollBox!.height) / 2)));
       widget.key(["u", "pageup"],  () => scrollBy(-Math.floor(Number(scrollBox!.height) / 2)));
-      widget.key(["g", "home"],    () => { (scrollBox as any).scrollTo(0); updateStatus(); screen.render(); });
-      widget.key(["G", "end"],     () => { (scrollBox as any).scrollTo(cachedLines.length); updateStatus(); screen.render(); });
+      widget.key(["g", "home"],    () => { scrollBox!.scrollTo(0); updateStatus(); screen.render(); });
+      widget.key(["G", "end"],     () => { scrollBox!.scrollTo(cachedLines.length); updateStatus(); screen.render(); });
       widget.key(["h"],            () => { figletEnabled = !figletEnabled; renderView(true); screen.render(); });
       widget.key(["e"],            () => applyMode("edit"));
       widget.key(["q", "escape"],  () => windowManager.closeWindow(frame.id));
 
       // y — copy nearest code block to clipboard
       widget.key(["y"], () => {
-        const scrollTop = (scrollBox as any).childBase ?? 0;
+        const scrollTop = scrollBox!.childBase ?? 0;
         const block = nearestCodeBlock(cachedLines, scrollTop);
         if (!block) { overlays.flash("No code block in view"); return; }
         const raw = block.map(stripAnsi).join("\n");
@@ -251,7 +251,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
     viewMode: currentMode,
     ...(currentMode === "view" && scrollBox
       ? {
-          scrollOffset: (scrollBox as any).getScroll?.() ?? 0,
+          scrollOffset: scrollBox?.getScroll?.() ?? 0,
           figlet: figletEnabled,
           rendererMode: figletEnabled ? "figlet" : "plain",
           lineCount: cachedLines.length,
@@ -294,15 +294,20 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
 
   // ── onRestyle ─────────────────────────────────────────────────────────────
 
-  frame.onRestyle = createRestyleBundle([
+  const restyleEntries: RestyleEntry[] = [
     [editorWidget, () => theme().body],
-    ...(scrollBox ? [[scrollBox, () => ({
+  ];
+  if (scrollBox) {
+    restyleEntries.push([scrollBox, () => ({
       ...theme().body,
       scrollbar: { fg: theme().muted.fg, bg: theme().body.bg },
       track:     { fg: theme().muted.fg, bg: theme().body.bg },
-    })]] : []) as any,
-    ...(statusBar ? [[statusBar, () => ({ fg: theme().muted.fg, bg: theme().body.bg })]] : []) as any,
-  ]).restyle;
+    })]);
+  }
+  if (statusBar) {
+    restyleEntries.push([statusBar, () => ({ fg: theme().muted.fg, bg: theme().body.bg })]);
+  }
+  frame.onRestyle = createRestyleBundle(restyleEntries).restyle;
 
   // ── cleanup ────────────────────────────────────────────────────────────────
 
@@ -323,7 +328,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
 
   if (startMode === "view" && restore?.scrollOffset && scrollBox) {
     setImmediate(() => {
-      (scrollBox as any).scrollTo(restore!.scrollOffset);
+      scrollBox!.scrollTo(restore!.scrollOffset ?? 0);
       updateStatus();
       screen.render();
     });

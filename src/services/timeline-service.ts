@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import { safeReadFile, safeReadJSON } from "../core/safe-fs.js";
 
 import type {
   TimelineFile,
@@ -49,7 +50,8 @@ export function parseTimeline(filePath: string): ParseResult {
     return { ok: false, errors: [`File not found: ${filePath}`] };
   }
 
-  const raw = fs.readFileSync(filePath, "utf8");
+  const raw = safeReadFile(filePath);
+  if (!raw) return { ok: false, errors: [`Cannot read: ${filePath}`] };
   let file: TimelineFile;
 
   try {
@@ -97,8 +99,9 @@ export function parseTimeline(filePath: string): ParseResult {
   let beatMap: BeatMap | undefined;
   if (typeof file.beatMap === "string") {
     const bmPath = path.resolve(path.dirname(filePath), file.beatMap);
-    if (fs.existsSync(bmPath)) {
-      beatMap = JSON.parse(fs.readFileSync(bmPath, "utf8"));
+    const bmData = safeReadJSON<BeatMap>(bmPath);
+    if (bmData) {
+      beatMap = bmData;
     } else {
       errors.push(`Beat map file not found: ${file.beatMap}`);
     }

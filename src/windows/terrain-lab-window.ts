@@ -23,7 +23,7 @@ import {
   createRow,
   createNodePart,
   createHeaderBar,
-  createStatusBar,
+  createLayoutStatusBar,
   createTextBlock,
   createRule,
 } from "../core/ui-parts.js";
@@ -33,6 +33,7 @@ import {
   terrainNames,
 } from "../services/contour-engine.js";
 import type { BaseWindowDeps } from "./generative-windows.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
 
@@ -65,7 +66,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
 
   const header = createHeaderBar(frame.body);
   const divider = createRule(frame.body, { axis: "vertical" });
-  const statusBar = createStatusBar(frame.body);
+  const statusBar = createLayoutStatusBar(frame.body);
 
   let infoText = "";
 
@@ -164,7 +165,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       ].join("\n");
 
       // Set content directly to preserve ANSI codes
-      (infoBlock.node as any).setContent(infoText);
+      infoBlock.node.setContent(infoText);
       statusBar.update({
         left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
         right: `${s.terrain} \u2502 ${s.mode} \u2502 L${s.levels} \u2502 #${s.seed}`,
@@ -206,7 +207,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     const dir = path.join(process.cwd(), "scratch", "captures");
     fs.mkdirSync(dir, { recursive: true });
     const name = `terrain_${player.mode}_${terrainNames[player.terrainIdx]}_${player.seed}_${Date.now()}.txt`;
-    fs.writeFileSync(path.join(dir, name), text, "utf8");
+    safeWriteFile(path.join(dir, name), text);
     statusBar.update({ left: `saved: ${name}` });
     deps.screen.render();
   };

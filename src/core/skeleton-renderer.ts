@@ -1,4 +1,8 @@
-import type { WebcamCell } from "../services/webcam-renderer.js";
+/** A single cell in the webcam ASCII grid. Shared with webcam-renderer. */
+export interface WebcamCell {
+  ch: string;
+  color?: string;
+}
 
 /** 33-point normalised pose — each coord is 0.0–1.0 of canvas size */
 export type NormalisedLandmarks = [number, number][];

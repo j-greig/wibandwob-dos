@@ -22,6 +22,7 @@ import { sharedPlayer, fmtTime } from "../services/audio-player-controller.js";
 import { findClaudeCodeJsonl, formatRelativeSessionTime, truncatePreview } from "../services/agent-session-helpers.js";
 import { dispatchSlashCommand } from "./agent-slash-commands.js";
 import { C, renderTranscript, buildTranscriptBlocks, type TranscriptBlock } from "./wibwob-agent-render.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
@@ -275,7 +276,7 @@ export function openWibWobAgentWindow(params: {
       filePath,
     });
     try {
-      const content = fs.readFileSync(filePath, "utf-8");
+      const content = safeReadFile(filePath) ?? "";
       edWin.body.setContent(content);
     } catch {
       edWin.body.setContent("(could not read file)");

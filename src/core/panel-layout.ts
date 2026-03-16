@@ -305,9 +305,9 @@ export function pointerToContent(
   screenX: number,
   screenY: number,
 ): { x: number; y: number } {
-  const ct = (canvas as any).atop ?? (canvas as any).lpos?.yi ?? 1;
-  const cl = (canvas as any).aleft ?? (canvas as any).lpos?.xi ?? 1;
-  const scrollY = (canvas as any).getScroll?.() ?? 0;
+  const ct = Number(canvas.atop ?? canvas.lpos?.yi ?? 1);
+  const cl = Number(canvas.aleft ?? canvas.lpos?.xi ?? 1);
+  const scrollY = canvas.getScroll?.() ?? 0;
   return { x: screenX - cl, y: screenY - ct + scrollY };
 }
 

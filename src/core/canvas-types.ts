@@ -5,7 +5,30 @@
  * microapp that consumes canvas documents.
  */
 
-import type { CEPanelDef } from "../../microapps/sy2-chronicles/panel-types.js";
+// ── Panel types (moved here from microapps/sy2-chronicles/panel-types.ts to break cycle) ──
+
+export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam" | "animated-text";
+
+export interface CEPanelDef {
+  id: string;
+  type: PanelType;
+  title: string;
+  w: number;          // width in chars (including border)
+  h: number;          // height in rows (including border)
+  col: 0 | 1 | 2;     // column hint for layout
+  live?: boolean;     // animates on tick
+  // Type-specific content:
+  text?: string;                        // for "text" type
+  figletText?: string;                  // for "figlet" type
+  figletFont?: string;                  // optional font override
+  asciiArt?: string;                    // inline ASCII for "ascii-art"
+  asciiFile?: string;                   // path to primer file
+  pixelData?: string[];                 // rows of pixel chars for "pixel"
+  markdown?: string;                    // for "markdown" type
+  content?: (tick: number, w: number, h: number) => string; // for "mixed"/"infographic"
+  webcamMonster?: boolean; // for "webcam" — enable monster face overlays
+  frames?: string[];       // for "animated-text" — text frames cycled on tick
+}
 
 // ── ZineItem: unified layout primitive ────────────────────────────────────
 

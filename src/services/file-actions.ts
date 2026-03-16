@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 
 import { measurePrimerContent, type ContentMeasurement } from "./content-measurement.js";
 import type { ContentService } from "./content-service.js";
@@ -29,11 +30,11 @@ export function promptForEditorFile(params: {
   onOpenEditor: (filePath: string, title: string, content: string) => void;
 }): void {
   params.overlays.openFileBrowserPrompt("Open Text File", params.startDir, (filePath) => {
-    try {
-      const content = fs.readFileSync(filePath, "utf8");
+    const content = safeReadFile(filePath);
+    if (content !== undefined) {
       params.onOpenEditor(filePath, path.basename(filePath), content);
-    } catch (error) {
-      params.overlays.flash(`Cannot open text file: ${error instanceof Error ? error.message : String(error)}`);
+    } else {
+      params.overlays.flash(`Cannot open text file: ${filePath}`);
     }
   }, {
     fileFilter: (filePath, isDirectory) => isDirectory || params.content.isTextLikeFile(path.basename(filePath)),
@@ -52,8 +53,12 @@ export function openPrimerFile(params: {
     options: { contentMeasurement: ContentMeasurement; frames?: string[][] }
   ) => void;
 }): void {
+  const rawContent = safeReadFile(params.filePath);
+  if (!rawContent) {
+    params.overlays.flash(`Cannot read: ${params.filePath}`);
+    return;
+  }
   try {
-    const rawContent = fs.readFileSync(params.filePath, "utf8");
     const measured = measurePrimerContent(rawContent);
     params.onOpenTextViewer(path.basename(params.filePath), measured.primaryFrameText, "primer", params.filePath, {
       contentMeasurement: measured.measurement,
@@ -106,10 +111,7 @@ function writeEditorWindow(window: WindowRecord): boolean {
   if (!window.editor || !window.filePath) {
     return false;
   }
-  try {
-    fs.mkdirSync(path.dirname(window.filePath), { recursive: true });
-    fs.writeFileSync(window.filePath, window.editor.value, "utf8");
-  } catch {
+  if (!safeWriteFile(window.filePath, window.editor.value)) {
     return false;
   }
   window.title = path.basename(window.filePath);

@@ -16,6 +16,7 @@
 
 import blessed from "blessed";
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { APP_ROOT } from "../core/config.js";
@@ -33,9 +34,9 @@ import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-
 import type { MenuPlacement, PalettePlacement } from "../domain/command-definition.js";
 import {
   createStack, createRow,
-  createHeaderBar, createStatusBar, createTextBlock,
+  createHeaderBar, createLayoutStatusBar, createTextBlock,
   createRule, createFigletDisplay, createAnimatedPanel,
-  createButtonBar, applyRect,
+  createLayoutButtonBar, applyRect,
 } from "../core/ui-parts.js";
 import type {
   MicroappHost,
@@ -160,6 +161,7 @@ function createMicroappHost(
           frame.focus();
         },
         close() { windowManager.closeWindow(frame.id); },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK widget may be any blessed element subtype
         setFocusTarget(widget) { frame.setFocusTarget(widget as any); },
         setTitle(title) {
           frame.title = title;
@@ -244,12 +246,14 @@ function createMicroappHost(
       createStack,
       createRow,
       createHeaderBar,
-      createStatusBar,
+      createLayoutStatusBar,
+      createStatusBar: createLayoutStatusBar,  // backward-compat alias
       createTextBlock,
       createRule,
       createFigletDisplay,
       createAnimatedPanel,
-      createButtonBar,
+      createLayoutButtonBar,
+      createButtonBar: createLayoutButtonBar,  // backward-compat alias
       applyRect,
     },
 
@@ -311,7 +315,8 @@ function discoverMicroapps(): DiscoveredMicroapp[] {
       if (!fs.existsSync(manifestPath)) continue;
 
       try {
-        const raw = fs.readFileSync(manifestPath, "utf8");
+        const raw = safeReadFile(manifestPath);
+        if (!raw) continue;
         const manifest = JSON.parse(raw) as MicroappManifest;
 
         if (!manifest.name || !manifest.type) {

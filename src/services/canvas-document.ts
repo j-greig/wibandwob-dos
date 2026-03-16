@@ -7,6 +7,7 @@
  */
 
 import fs from "node:fs";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import YAML from "yaml";
 import type { SnapshotRestoreActions } from "../core/snapshot-registry.js";
@@ -75,7 +76,8 @@ export function parseCanvasDocument(yamlStr: string): CanvasDocument {
 }
 
 export function loadCanvasFile(filePath: string): CanvasDocument {
-  const content = fs.readFileSync(filePath, "utf8");
+  const content = safeReadFile(filePath);
+  if (!content) throw new Error(`Cannot read canvas file: ${filePath}`);
   return parseCanvasDocument(content);
 }
 

@@ -1,9 +1,10 @@
 import fs from "node:fs";
+import { safeReadJSON } from "../core/safe-fs.js";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { BackroomsService } from "./backrooms-service.js";
-import { findChromeExecutablePath } from "./chrome-browser-service.js";
+import { findChromeExecutablePath } from "./chrome-path.js";
 
 export type CapabilityKey =
   | "bin.figlet"
@@ -42,7 +43,7 @@ function buildStatus(ok: boolean, reason?: string): CapabilityStatus {
   };
 }
 
-export class CapabilityService {
+class CapabilityService {
   private _snapshot: CapabilitySnapshot | null = null;
   private readonly backrooms = new BackroomsService();
 
@@ -139,8 +140,8 @@ export class CapabilityService {
     }
 
     try {
-      const raw = fs.readFileSync(profilePath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<CapabilityProfilePolicy>;
+      const parsed = safeReadJSON<Partial<CapabilityProfilePolicy>>(profilePath);
+      if (!parsed) throw new Error("parse failed");
       return {
         forceOff: this.filterCapabilityKeys(parsed.forceOff),
         forceOn: this.filterCapabilityKeys(parsed.forceOn),

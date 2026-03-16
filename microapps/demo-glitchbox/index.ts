@@ -11,6 +11,7 @@ import {
   landmarksFromPreset,
   tween,
   createButtonBar,
+  createCanvas,
   type MicroappHost,
   type NormalisedLandmarks,
   type WebcamCell,
@@ -272,16 +273,10 @@ export default function setup(host: MicroappHost) {
     });
 
     // Field background
-    const fieldLayer = blessed.box({
-      parent: root, top: 0, left: 0, right: 0, bottom: 3,
-      tags: false, style: host.theme().body,
-    });
+    const fieldLayer = createCanvas(root, { bottomOffset: 3, tags: false });
 
     // Skeleton foreground
-    const skeletonLayer = blessed.box({
-      parent: root, top: 0, left: 0, right: 0, bottom: 3,
-      tags: true, style: { ...host.theme().body, bg: "default", transparent: true },
-    });
+    const skeletonLayer = createCanvas(root, { bottomOffset: 3, tags: true });
 
     // Pose button bar  (row -3 from bottom)
     const poseBar = createButtonBar<PoseBtn>(
@@ -343,7 +338,7 @@ export default function setup(host: MicroappHost) {
       tags: false, style: host.theme().header,
     });
 
-    skeletonLayer.setFront();
+    skeletonLayer.element.setFront();
 
     // Wire layout
     poseBar.layout({ top: Number(win.body.height) - 3, left: 0, width: Number(win.body.width), height: 1 });
@@ -352,7 +347,7 @@ export default function setup(host: MicroappHost) {
     // ── Render ───────────────────────────────────────────────────────────────
 
     function canvasSize() {
-      const lpos = (fieldLayer as any).lpos;
+      const lpos = (fieldLayer.element as any).lpos;
       if (lpos && Number.isFinite(lpos.xi) && Number.isFinite(lpos.xl)) {
         return { w: Math.max(1, lpos.xl-lpos.xi), h: Math.max(1, lpos.yl-lpos.yi) };
       }
@@ -521,8 +516,8 @@ export default function setup(host: MicroappHost) {
 
     win.onRestyle(() => {
       root.style = host.theme().body;
-      fieldLayer.style = host.theme().body;
-      skeletonLayer.style = { ...host.theme().body, bg: "default", transparent: true };
+      fieldLayer.element.style = host.theme().body;
+      skeletonLayer.element.style = { ...host.theme().body, bg: "default", transparent: true };
       statusBar.style = host.theme().header;
       poseBar.restyle(); moodBar.restyle();
       renderAll();
