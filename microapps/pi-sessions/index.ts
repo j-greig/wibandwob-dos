@@ -280,9 +280,12 @@ function openSessionDetail(host: MicroappHost, session: DiscoveredSession) {
       // Get initial message
       const msg = await client.getLastMessage();
       if (msg.success && msg.data?.message) {
+        const text = typeof msg.data.message === "string"
+          ? msg.data.message
+          : (msg.data.message as { content?: string })?.content ?? JSON.stringify(msg.data.message);
         appendLog("");
         appendLog("─── Last assistant message ───", "cyan-fg");
-        appendLog(msg.data.message);
+        appendLog(text);
         appendLog("─────────────────────────────", "cyan-fg");
       }
 
@@ -290,8 +293,16 @@ function openSessionDetail(host: MicroappHost, session: DiscoveredSession) {
       unsubTurnEnd = client.onTurnEnd((data) => {
         appendLog("");
         appendLog(`─── Turn complete ───`, "cyan-fg");
-        if (data && typeof data === "object" && "message" in data) {
-          appendLog(String((data as { message: string }).message));
+        if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          const msg = d.message;
+          if (msg && typeof msg === "object" && "content" in (msg as object)) {
+            appendLog(String((msg as { content: string }).content));
+          } else if (typeof msg === "string") {
+            appendLog(msg);
+          } else {
+            appendLog(JSON.stringify(data, null, 2));
+          }
         } else {
           appendLog("[turn_end event received]", "gray-fg");
         }
