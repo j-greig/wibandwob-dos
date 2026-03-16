@@ -230,10 +230,14 @@ function renderOverview(state: InspectorState): string {
   const winCount = s.state.windows.length;
   const uptime = fmtUptime(s.stats.render.totalFrames, s.stats.render.fps);
   // Dynamic status pulse
+  // Dynamic status pulse with severity
   let pulse = "nominal";
-  if (s.stats.agent.active) pulse = "agent active";
-  else if (s.stats.rssMb > 600) pulse = "high memory";
-  else if (s.stats.render.fps < 2) pulse = "low fps";
+  const conditions: string[] = [];
+  if (s.stats.agent.active) conditions.push("agent active");
+  if (s.stats.rssMb > 600) conditions.push("high mem");
+  if (s.stats.render.fps < 2) conditions.push("low fps");
+  if (s.ui.blocked) conditions.push("blocked");
+  pulse = conditions.length > 0 ? conditions.slice(0, 2).join(" · ") : "nominal";
   lines.push(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
   lines.push(`  ${winCount} wins · ${state.commands.length} cmds · up ${uptime} · ${pulse} · ${state.updatedAt}`);
 
@@ -354,10 +358,12 @@ function renderStats(state: InspectorState): string {
   renderLines.push(sectionFooter(colW));
 
   const memLines: string[] = [];
+  const rssMax2 = Math.max(512, Math.ceil(s.stats.rssMb / 128) * 128);
+  const heapMax2 = Math.max(256, Math.ceil(s.stats.heapUsedMb / 64) * 64);
   memLines.push(sectionHeader("MEMORY", colW));
-  memLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}MB ${progressBar(s.stats.rssMb, 512, 18)}`, 12));
+  memLines.push(kvLine("rss", `${s.stats.rssMb.toFixed(0)}/${rssMax2}MB ${progressBar(s.stats.rssMb, rssMax2, 16)}`, 12));
   memLines.push(kvLine("rss trend", sparkline(rssVals), 12));
-  memLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}MB ${progressBar(s.stats.heapUsedMb, 256, 18)}`, 12));
+  memLines.push(kvLine("heap", `${s.stats.heapUsedMb.toFixed(0)}/${heapMax2}MB ${progressBar(s.stats.heapUsedMb, heapMax2, 16)}`, 12));
   memLines.push(kvLine("heap trend", sparkline(heapVals), 12));
   memLines.push(sectionFooter(colW));
 
