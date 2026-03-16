@@ -538,8 +538,8 @@ export class ControlApiService {
       try {
         const result = this.runApiCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
-      } catch (err: any) {
-        return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
+      } catch (err: unknown) {
+        return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined }, { status: 500 });
       }
     }
 
@@ -636,8 +636,8 @@ export class ControlApiService {
       try {
         const result = this.runApiCommand(viewRoute.id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
-      } catch (err: any) {
-        return Response.json({ ok: false, error: err?.message ?? String(err) }, { status: 500 });
+      } catch (err: unknown) {
+        return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
       }
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {

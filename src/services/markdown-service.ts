@@ -216,10 +216,10 @@ function renderListItem(tokens: Token[], parentDepth: number): string[] {
   return lines;
 }
 
-function renderList(token: any, depth: number): string[] {
+function renderList(token: Tokens.List, depth: number): string[] {
   const lines: string[] = [];
   const indent = "  ".repeat(depth);
-  const start = token.start ?? 1;
+  const start = Number(token.start ?? 1);
   for (let i = 0; i < token.items.length; i++) {
     const item = token.items[i];
     const bullet = token.ordered ? `${start + i}. ` : "- ";
@@ -245,7 +245,7 @@ function wrapCell(text: string, w: number): string[] {
   return wrapped.map(l => padToWidth(l, w));
 }
 
-function renderTable(token: any, available: number): string[] {
+function renderTable(token: Tokens.Table, available: number): string[] {
   const numCols = token.header?.length ?? 0;
   if (numCols === 0) return token.raw ? wrapTextWithAnsi(token.raw, available) : [];
 
@@ -295,11 +295,11 @@ function renderTable(token: any, available: number): string[] {
 
   const lines: string[] = [];
   lines.push(theme.hr(rule("┌", "┬", "┐")));
-  lines.push(...renderRowLines(token.header.map((h: any, i: number) => wrapCell(renderInline(h.tokens ?? []), colWidths[i]!)), true));
+  lines.push(...renderRowLines(token.header.map((h, i) => wrapCell(renderInline(h.tokens ?? []), colWidths[i]!)), true));
   lines.push(theme.hr(rule("├", "┼", "┤")));
   for (let ri = 0; ri < token.rows.length; ri++) {
     const row = token.rows[ri];
-    lines.push(...renderRowLines(row.map((c: any, i: number) => wrapCell(renderInline(c.tokens ?? []), colWidths[i]!))));
+    lines.push(...renderRowLines(row.map((c, i) => wrapCell(renderInline(c.tokens ?? []), colWidths[i]!))));
     if (ri < token.rows.length - 1) lines.push(theme.hr(rule("├", "┼", "┤")));
   }
   lines.push(theme.hr(rule("└", "┴", "┘")));
@@ -309,7 +309,7 @@ function renderTable(token: any, available: number): string[] {
 
 // ── Code block renderer ───────────────────────────────────────────────────────
 
-function renderCodeBlock(token: any, width: number): string[] {
+function renderCodeBlock(token: Tokens.Code, width: number): string[] {
   const lang   = (token.lang ?? "").toLowerCase();
   const bgWidth = Math.min(width, 88);
   const indent  = "  ";

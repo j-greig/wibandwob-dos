@@ -1629,8 +1629,8 @@ export class TsTuiMvpApp {
       // Open result as primer
       const win = this.openPrimerWindow(outPath);
       return { ok: true, filePath: outPath, windowId: win?.id };
-    } catch (err: any) {
-      return { ok: false, error: `FX ${fx} failed: ${err?.message ?? String(err)}` };
+    } catch (err: unknown) {
+      return { ok: false, error: `FX ${fx} failed: ${err instanceof Error ? err.message : String(err)}` };
     }
   }
 

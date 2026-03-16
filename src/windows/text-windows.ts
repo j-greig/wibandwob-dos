@@ -170,9 +170,9 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
       });
       lastWidth = contentWidth;
       lastMtime = mtime;
-    } catch (err: any) {
-      overlays.flash(`Could not render ${filePath}: ${err?.message ?? err}`);
-      cachedLines = [`Error reading file: ${err?.message ?? err}`];
+    } catch (err: unknown) {
+      overlays.flash(`Could not render ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      cachedLines = [`Error reading file: ${err instanceof Error ? err.message : String(err)}`];
     }
     scrollBox.setContent(cachedLines.join("\n"));
     updateStatus();
