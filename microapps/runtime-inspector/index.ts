@@ -551,7 +551,7 @@ function openRuntimeInspector(host: MicroappHost) {
       left: ` tab ${tabs.getActive() + 1}/${paneKeys.length} · ${tabName}`,
       right: state.error
         ? `error: ${clip(state.error, 60)} `
-        : "Tab/S-Tab switch · j/k scroll · r refresh ",
+        : "o/u/w/c/s jump · j/k scroll · r refresh ",
     });
   }
 
@@ -620,7 +620,17 @@ function openRuntimeInspector(host: MicroappHost) {
     });
   }
   win.body.key(["r"], () => void refresh());
-  // (fullscreen toggle removed — win.window API not guaranteed)
+  // Quick-jump keys: o=overview, u=ui, w=windows, c=commands, s=stats
+  const jumpMap: Record<string, number> = { o: 0, u: 1, w: 2, c: 3, s: 4 };
+  for (const [key, idx] of Object.entries(jumpMap)) {
+    win.body.key([key], () => {
+      tabs.update({ active: idx });
+      scroll.update({ content: paneContent.get(paneKeys[idx]!) ?? "" });
+      renderChrome();
+      renderTabRule();
+      host.screen.render();
+    });
+  }
   win.body.key(["j", "down"], () => scroll.scrollTo((scroll.element as any).childBase + 1));
   win.body.key(["k", "up"], () => scroll.scrollTo(Math.max(0, (scroll.element as any).childBase - 1)));
   win.body.key(["pagedown"], () => scroll.scrollTo((scroll.element as any).childBase + 12));
