@@ -33,6 +33,8 @@ export interface DiscoveredSession {
 const CONTROL_DIR = path.join(os.homedir(), ".pi", "session-control");
 const SOCK_EXT = ".sock";
 const ALIAS_EXT = ".alias";
+const PROBE_TIMEOUT_MS = 500; // Fast probe — just checks if socket accepts connections
+const PROBE_CONCURRENCY = 50; // Limit parallel probes to avoid fd exhaustion
 
 // ============================================================================
 // Implementation
@@ -42,7 +44,7 @@ const ALIAS_EXT = ".alias";
  * Check if a Unix socket is alive by attempting a brief connection.
  * Returns true if the socket accepts the connection, false otherwise.
  */
-function probeSocket(socketPath: string, timeoutMs = 1000): Promise<boolean> {
+function probeSocket(socketPath: string, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = net.createConnection(socketPath);
     const timer = setTimeout(() => {
@@ -100,29 +102,29 @@ export async function discoverPiSessions(): Promise<DiscoveredSession[]> {
     }
   }
 
-  // Collect sockets and probe them
+  // Collect sockets
   const sessions: DiscoveredSession[] = [];
-  const probePromises: Array<{ session: DiscoveredSession; probe: Promise<boolean> }> = [];
 
   for (const entry of entries) {
     if (!entry.name.endsWith(SOCK_EXT)) continue;
 
     const id = entry.name.slice(0, -SOCK_EXT.length);
     const socketPath = path.join(CONTROL_DIR, entry.name);
-    const session: DiscoveredSession = {
+    sessions.push({
       id,
       socketPath,
       alias: aliasMap.get(id),
       alive: false,
-    };
-    sessions.push(session);
-    probePromises.push({ session, probe: probeSocket(socketPath) });
+    });
   }
 
-  // Probe all sockets in parallel
-  const results = await Promise.all(probePromises.map((p) => p.probe));
-  for (let i = 0; i < probePromises.length; i++) {
-    probePromises[i].session.alive = results[i];
+  // Probe sockets in batches to avoid fd exhaustion (can be 1000+ sockets)
+  for (let i = 0; i < sessions.length; i += PROBE_CONCURRENCY) {
+    const batch = sessions.slice(i, i + PROBE_CONCURRENCY);
+    const results = await Promise.all(batch.map((s) => probeSocket(s.socketPath)));
+    for (let j = 0; j < batch.length; j++) {
+      batch[j].alive = results[j];
+    }
   }
 
   // Sort: alive first, then by display name
