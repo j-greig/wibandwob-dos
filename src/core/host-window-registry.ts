@@ -5,25 +5,41 @@
  * host windows register here. The controller dispatches via openHostWindow().
  */
 
+import type * as blessed from "blessed";
+import type { WindowManager } from "./window-manager.js";
+import type { OverlayManager } from "./overlay-manager.js";
+import type { ContentService } from "../services/content-service.js";
+import type { BackroomsService } from "../services/backrooms-service.js";
+import type { EditorCoordinator } from "./editor-coordinator.js";
+import type { DesktopGeometryService } from "./desktop-geometry.js";
+import type { RuntimeNodeDescriptor } from "../runtime/runtime-node.js";
+import type { RuntimeCommandService } from "../application/runtime-command-service.js";
+import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
+import type { RuntimeWindowService } from "../application/runtime-window-service.js";
+import type { RuntimeWorkspaceService } from "../application/runtime-workspace-service.js";
+import type { RenderScheduler } from "./render-scheduler.js";
+import type { CommandRegistry } from "./command-registry.js";
+import type { ScrambleBrain } from "../services/scramble-brain.js";
+
 /** Standard deps available to all host window factories. */
 export interface HostWindowDeps {
-  screen: any;
-  windowManager: any;
-  overlays: any;
-  content: any;
-  backrooms: any;
-  editor: any;
-  geometry: any;
-  runtimeNode: any;
-  runtimeCommands: any;
-  runtimeInspection: any;
-  runtimeWindows: any;
-  runtimeWorkspace: any;
-  invalidation: any;
-  commands: any;
-  scrambleBrain: any;
+  screen: blessed.Widgets.Screen;
+  windowManager: WindowManager;
+  overlays: OverlayManager;
+  content: ContentService;
+  backrooms: BackroomsService;
+  editor: EditorCoordinator;
+  geometry: DesktopGeometryService;
+  runtimeNode: RuntimeNodeDescriptor;
+  runtimeCommands: RuntimeCommandService;
+  runtimeInspection: RuntimeInspectionService;
+  runtimeWindows: RuntimeWindowService;
+  runtimeWorkspace: RuntimeWorkspaceService;
+  invalidation: RenderScheduler;
+  commands: CommandRegistry;
+  scrambleBrain: ScrambleBrain;
   onStateChanged: () => void;
-  openTextViewer: (title: string, content: string, kind: string, filePath?: string) => any;
+  openTextViewer: (title: string, content: string, kind: string, filePath?: string) => void;
   openFile: (filePath: string) => void;
   flash: (msg: string) => void;
 }

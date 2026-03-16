@@ -7,7 +7,7 @@
 import { registerHostWindow } from "./host-window-registry.js";
 import { openTerrainLabWindow } from "../windows/terrain-lab-window.js";
 import { openCompanionWindow } from "../windows/generative-windows.js";
-import { openMusicPlayerWindow } from "../windows/music-player-window.js";
+import { openMusicPlayerWindow, type MusicPlayerRestore } from "../windows/music-player-window.js";
 
 export function registerAllHostWindows(): void {
   registerHostWindow({
@@ -26,7 +26,7 @@ export function registerAllHostWindows(): void {
     factory: (deps, restore) => {
       openCompanionWindow(
         { screen: deps.screen, windowManager: deps.windowManager, onStateChanged: deps.onStateChanged },
-        restore as any,
+        restore as { tick?: number } | undefined,
       );
     },
   });
@@ -36,7 +36,7 @@ export function registerAllHostWindows(): void {
     factory: (deps, restore) => {
       openMusicPlayerWindow(
         { screen: deps.screen, windowManager: deps.windowManager, overlays: deps.overlays, onStateChanged: deps.onStateChanged },
-        restore as any,
+        restore as MusicPlayerRestore | undefined,
       );
     },
   });
