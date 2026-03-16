@@ -944,21 +944,18 @@ export class TsTuiMvpApp {
   }
 
   private openBackroomsLogBrowserWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("backrooms-log-browser", () => {
-      openBackroomsLogBrowserWindowFactory(this.getBackroomsWindowContext());
-    });
+    return this.openHostWindow("backrooms-log-browser");
   }
 
   private promptForBackroomsTv(): WindowRecord | undefined {
-    return this.focusOrCreate("backrooms-primer-picker", () => {
-      promptForBackroomsTvWindow(this.getBackroomsWindowContext());
-    });
+    return this.openHostWindow("backrooms-primer-picker");
   }
 
   private openBackroomsPrimerPicker(
     theme: string,
     defaults: BackroomsChannel,
   ): WindowRecord | undefined {
+    // Primer picker with specific theme/defaults uses its own context (not registry)
     return this.focusOrCreate("backrooms-primer-picker", () => {
       openBackroomsPrimerPickerWindow(
         this.getBackroomsWindowContext(),
@@ -982,13 +979,7 @@ export class TsTuiMvpApp {
   }
 
   openBackroomsTv(channel: BackroomsChannel): WindowRecord | undefined {
-    return this.focusOrCreate(
-      "backrooms-tv",
-      () => {
-        openBackroomsTvWindow(this.getBackroomsWindowContext(), channel);
-      },
-      true,
-    );
+    return this.openHostWindow("backrooms-tv", channel as unknown as Record<string, unknown>);
   }
 
   private openPrimerBrowserWindow(restore?: {
