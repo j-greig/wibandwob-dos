@@ -254,17 +254,50 @@ Pattern: call tools, process in JS, console.log() only the summary.
 - [ ] When-to-use heuristics in prompt (many tools → suggest PTC)
 - [ ] Examples in prompt showing the pattern
 
-### Phase 3 — Polish
+### Phase 3 — WibWob surface + polish
 
+- [ ] Typed `wibwob_*` stubs (state, cmd, open, close, move, screenshot) — thin wrappers over `bash({ command: 'wibwob ...' })`
 - [ ] Streaming progress via `onUpdate` during long executions
 - [ ] Dynamic tool discovery (stubs regenerated on tool add/remove)
-- [ ] `pi.setActiveTools()` to selectively expose tools to PTC
+- [ ] Add `execute_code` to subagent tools lists (`.pi/agents/*.md`)
 
 ### Phase 4 — Advanced (optional)
 
 - [ ] Shared state across turns (persistent sandbox context)
-- [ ] Subprocess isolation for untrusted code
+- [ ] `worker_threads` or `isolated-vm` for real sandboxing (note: `node:vm` is NOT a security boundary — same process, same memory, same fs access as pi. Fine for PTC since `bash()` is equally powerful, but document explicitly)
 - [ ] Token usage tracking (measure actual savings)
+
+---
+
+## Cross-Synthesis Notes
+
+> From planning session review, 2026-03-17
+
+### Adjacencies (no overlap, no rework risk)
+
+- **E047 S20-S22 (tool bridge spike)** — PTC's tool registry introspection could feed the WibWob→pi tool adapter someday. Same schema walking, different direction.
+- **E048 (unix CLI surface)** — PTC + `bash()` partially delivers E048's goal (agents composing wibwob commands in code) without a new CLI binary.
+- **Codex subagent extension** — Architecturally similar (one tool does compound work) but codex spawns subprocess; PTC runs in-process via `node:vm`.
+
+### Proving ground: the ops agent
+
+The ops agent (`.pi/agents/ops.md`) is the best first test case. Its workflows are highly sequential (health → state → commands → verify → screenshot = 5-8 tool calls). Its outputs are large (state JSON = 5-10KB). PTC should compress a typical ops workflow from ~50KB context to ~2KB.
+
+### Subagent gotcha
+
+Subagent definitions in `.pi/agents/*.md` have explicit `tools:` fields. If `execute_code` isn't listed, subagents won't see it. Phase 3 must add it to each agent definition.
+
+### Prompt injection ordering
+
+Both wwdos-state.ts and PTC inject via `before_agent_start`. Both append, so they compose. PTC tool docs should be stable (system prompt level); desktop state is already per-turn.
+
+### E001 retrieval scripts synergy
+
+E001's planned retrieval scripts (`list_subsystems`, `get_files_for_subsystem`) are exactly the multi-call workflows PTC accelerates. PTC + E001 = agents self-orient with minimal token cost.
+
+### `node:vm` is not a security boundary
+
+`node:vm` shares process, memory, filesystem with pi. The LLM's code can `process.exit()`, read env vars, access anything pi can. This is fine — the LLM already has `bash()` which is equally powerful. But document it so nobody mistakes it for isolation.
 
 ---
 

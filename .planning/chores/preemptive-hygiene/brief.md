@@ -93,7 +93,7 @@ Target AGENTS.md outline (17→9 sections):
 
 ### Phase 5b — Review adjacent work
 
-- [ ] Review E051 PTC — ping `ptc` session. Could hygiene scripts be PTC-native?
+- [x] Review E051 PTC — pinged `ptc` session. Verdict: scripts and PTC are complementary. Scripts = discoverable named primitives. PTC = glue that orchestrates them without burning tokens. Keep building scripts.
 - [ ] Review mitsuhiko/agent-stuff skills (cloned to tmp/vendor/agent-stuff). Relevant:
   - **commit** — conventional commits skill. Compare with our .planning/CONVENTIONS.md commit format. Consider adopting as skill.
   - **librarian** — caches remote repos under ~/.cache/checkouts/. We do ad-hoc clones to tmp/vendor/. Could formalise.
