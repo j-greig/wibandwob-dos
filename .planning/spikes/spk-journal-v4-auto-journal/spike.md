@@ -1,6 +1,10 @@
 # Journal v4 Spike — Agent Auto-Journal & Dual View
 
-## Status: SPIKE — capturing ideas before branching
+## Status: IN-PROGRESS — autoresearch loop on Feature 2 (JRN/LOG toggle)
+
+**Branch:** `spike/spk-journal-v4-auto-journal`
+**Worktree:** `~/Repos/wibandwob-dos-journal-v4`
+**Autoresearch:** `autoresearch/` — iterating on toggle UI quality
 
 ---
 

@@ -17,6 +17,7 @@ interface SessionSummary {
   sessionId: string;    // UUID prefix
   messageCount: number;
   firstUserMsg: string; // preview
+  model: string;        // e.g. "claude-opus-4-6"
 }
 
 interface SessionMessage {
@@ -151,6 +152,15 @@ function wrapText(text: string, width: number): string[] {
 
 function truncate(s: string, len: number): string {
   return s.length > len ? s.slice(0, len - 1) + "…" : s;
+}
+
+function dateGroup(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function peerColor(peer: Peer, th: any): string {
@@ -376,13 +386,37 @@ export default function setup(host: MicroappHost) {
     });
   }
 
+  host.registerCommand({
+    id: "toggle-view",
+    label: "Toggle Journal/Sessions View",
+    description: "Switch between journal entries and session log views.",
+    direct: true,
+    action: () => {
+      if (!_viewToggle) return { ok: false, error: "Journal window not open" };
+      const newMode = _viewToggle();
+      return { ok: true, viewMode: newMode };
+    },
+  });
+
+  host.registerCommand({
+    id: "filter-model",
+    label: "Filter Sessions by Model",
+    description: "Cycle model filter in session view. Args: { model? } — set specific model or omit to cycle.",
+    direct: true,
+    action: (args) => {
+      if (!_modelFilter) return { ok: false, error: "Journal window not open" };
+      const result = _modelFilter(args?.model as string | undefined);
+      return { ok: true, ...result };
+    },
+  });
+
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
       return { mode: state.mode, selectedId: state.selectedId, viewMode: state.viewMode };
     },
-    restore: (_snapshot, payload) => {
-      host.runCommand("open", payload);
+    restore: (snapshot, payload) => {
+      host.runCommand("open", { ...payload, viewMode: snapshot?.viewMode });
     },
   });
 }
@@ -411,15 +445,19 @@ function listSessions(limit = 50): SessionSummary[] {
     const date = match ? `${match[1]}T${match[2]}:${match[3]}:${match[4]}Z` : "";
     const sessionId = match ? match[5]!.slice(0, 8) : f.slice(0, 8);
 
-    // Count messages and get first user message (lazy — read line by line)
+    // Count messages, get first user message and model (lazy — read line by line)
     let msgCount = 0;
     let firstUserMsg = "";
+    let model = "";
     try {
       const content = readFileSync(join(dir, f), "utf-8");
       for (const line of content.split("\n")) {
         if (!line.trim()) continue;
         try {
           const d = JSON.parse(line);
+          if (d.type === "model_change" && !model) {
+            model = d.modelId || "";
+          }
           if (d.type === "message") {
             msgCount++;
             if (!firstUserMsg) {
@@ -435,7 +473,7 @@ function listSessions(limit = 50): SessionSummary[] {
       }
     } catch { /* skip unreadable file */ }
 
-    return { filename: f, date, sessionId, messageCount: msgCount, firstUserMsg };
+    return { filename: f, date, sessionId, messageCount: msgCount, firstUserMsg, model };
   });
 }
 
@@ -477,8 +515,10 @@ function readSession(filename: string): SessionMessage[] {
   return messages;
 }
 
-// ── Live refresh callback ───────────────────────────────────────
+// ── Live callbacks (wired by openJournal, cleared on cleanup) ───
 let _liveRefresh: (() => void) | null = null;
+let _viewToggle: (() => ViewMode) | null = null;
+let _modelFilter: ((model?: string) => { viewMode: ViewMode; modelFilter: string }) | null = null;
 
 // ── Window ──────────────────────────────────────────────────────
 function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
@@ -492,7 +532,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   });
 
   let mode: Mode = "list";
-  let viewMode: ViewMode = "journal";
+  let viewMode: ViewMode = args?.viewMode === "sessions" ? "sessions" : "journal";
   let entries: JournalEntry[] = [];
   let selectedIdx = 0;
   let sessions: SessionSummary[] = [];
@@ -510,6 +550,7 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   let sortBy: SortMode = "updatedAt";
   const SORT_CYCLE: SortMode[] = ["updatedAt", "createdAt", "title"];
   const SORT_LABEL: Record<SortMode, string> = { updatedAt: "↓updated", createdAt: "↓created", title: "↓title" };
+  let modelFilter = ""; // empty = all models
 
   // ── UI Elements ───────────────────────────────────────────────
   const headerBox = blessed.box({
@@ -517,6 +558,40 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     top: 0, left: 0, right: 0, height: 7,
     tags: true, style: t().body,
   });
+
+  // JRN / LOG toggle buttons (top-right of header)
+  function toggleToView(target: ViewMode) {
+    if (mode !== "list") return;
+    if (target === "sessions" && !PI_EXISTS) return;
+    if (viewMode === target) return;
+    viewMode = target;
+    if (target === "sessions") {
+      sessions = listSessions();
+      sessionIdx = 0;
+      sessionMessages = [];
+    }
+    refresh();
+    render();
+  }
+
+  // Toggle indicators — plain boxes (not SDK buttons) to avoid focus stealing
+  const btnJrn = blessed.box({
+    parent: win.body,
+    top: 0, right: 11, width: 9, height: 1,
+    tags: false, mouse: true,
+    focusable: false,
+    style: t().body,
+  });
+  const btnLog = blessed.box({
+    parent: win.body,
+    top: 0, right: 1, width: 9, height: 1,
+    tags: false, mouse: true,
+    focusable: false,
+    style: t().body,
+  });
+
+  btnJrn.on("click", () => { toggleToView("journal"); listBox.focus(); });
+  btnLog.on("click", () => { toggleToView("sessions"); listBox.focus(); });
 
   const sepBox = blessed.box({
     parent: win.body,
@@ -651,30 +726,54 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const accent = th.selected?.fg || "#b48ead";
     const w = (win.body as any).width || 80;
 
-    // Header
+    // Header — different figlet per view mode
     const font = w >= 80 ? "slant" : "small";
+    const headerWord = viewMode === "sessions" ? "LOGS" : "JRNL";
     let fig = "";
-    try { fig = renderFiglet("JRNL", font); } catch { fig = "JRNL"; }
+    try { fig = renderFiglet(headerWord, font); } catch { fig = headerWord; }
     const figLines = fig.split("\n").filter((l: string) => l.trim());
 
-    // Dynamic mood based on entry kinds
-    const questions = entries.filter(e => e.kind === "question").length;
-    const decisions = entries.filter(e => e.kind === "decision").length;
-    const discoveries = entries.filter(e => e.kind === "discovery").length;
-    const moodWord = questions > decisions && questions > discoveries ? "curious"
-      : discoveries > decisions ? "exploring"
-      : decisions > 0 ? "decisive"
-      : entries.length > 20 ? "productive"
-      : entries.length > 0 ? "beginning"
-      : "empty";
-    const humans = entries.filter(e => e.peer === "human").length;
-    const agents = entries.filter(e => e.peer === "agent").length;
-    const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
-
-    const tagline = viewMode === "sessions"
-      ? `{${muted}-fg}session archaeology // ${sessions.length} pi sessions · ${PI_EXISTS ? "~/.pi" : "no pi"}{/${muted}-fg}`
-      : `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
+    // Dynamic tagline per view
+    let tagline: string;
+    if (viewMode === "sessions") {
+      const modelCounts = sessions.reduce((acc, s) => {
+        const m = s.model ? s.model.replace(/^claude-/, "") : "unknown";
+        acc[m] = (acc[m] || 0) + 1; return acc;
+      }, {} as Record<string, number>);
+      const modelStr = Object.entries(modelCounts).map(([m, n]) => `${m}:${n}`).join(" · ");
+      tagline = `{${muted}-fg}session archaeology // ${sessions.length} sessions · ${modelStr}{/${muted}-fg}`;
+    } else {
+      const questions = entries.filter(e => e.kind === "question").length;
+      const decisions = entries.filter(e => e.kind === "decision").length;
+      const discoveries = entries.filter(e => e.kind === "discovery").length;
+      const moodWord = questions > decisions && questions > discoveries ? "curious"
+        : discoveries > decisions ? "exploring"
+        : decisions > 0 ? "decisive"
+        : entries.length > 20 ? "productive"
+        : entries.length > 0 ? "beginning"
+        : "empty";
+      const humans = entries.filter(e => e.peer === "human").length;
+      const agents = entries.filter(e => e.peer === "agent").length;
+      const ratio = humans > 0 && agents > 0 ? "symbient" : humans > 0 ? "human-led" : agents > 0 ? "agent-led" : "quiet";
+      tagline = `{${muted}-fg}symbient logbook // ${ratio} · mood: ${moodWord} · ${entries.length} entries{/${muted}-fg}`;
+    }
     headerBox.setContent([...figLines, "", tagline].join("\n"));
+
+    // Toggle indicators: active gets inverse styling, inactive gets muted
+    const th_ = t();
+    const activeBg = th_.selected?.fg || accent;
+    const activeFg = th_.body.bg || "#000";
+    const inactiveFg = th_.muted?.fg || "#555";
+    const inactiveBg = th_.body.bg || "#000";
+
+    btnJrn.style = viewMode === "journal"
+      ? { fg: activeFg, bg: activeBg, bold: true }
+      : { fg: inactiveFg, bg: inactiveBg };
+    btnLog.style = viewMode === "sessions"
+      ? { fg: activeFg, bg: activeBg, bold: true }
+      : { fg: inactiveFg, bg: inactiveBg };
+    btnJrn.setContent(viewMode === "journal" ? " ▪ JRN " : "   JRN ");
+    btnLog.setContent(viewMode === "sessions" ? " ▪ LOG " : "   LOG ");
 
     // Separator
     const sepW = Math.max(0, w - 4);
@@ -694,14 +793,20 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   function renderSessionList(muted: string, accent: string, w: number) {
     const twoPane = w >= 120;
 
+    // Apply model filter
+    const filtered = modelFilter
+      ? sessions.filter(s => s.model === modelFilter)
+      : sessions;
+
     // Build session list items with date group headers
     const items: string[] = [];
-    const sessionIndexMap: number[] = [];
+    const sessionIndexMap: number[] = []; // maps visual index → index in `sessions` array
     const maxW = twoPane ? Math.floor(w * 0.30) - 4 : w - 4;
     let lastDateGroup = "";
-    for (let i = 0; i < sessions.length; i++) {
-      const s = sessions[i]!;
-      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?";
+    for (let i = 0; i < filtered.length; i++) {
+      const s = filtered[i]!;
+      const realIdx = sessions.indexOf(s);
+      const dateStr = s.date ? dateGroup(s.date) : "?";
       if (dateStr !== lastDateGroup) {
         lastDateGroup = dateStr;
         items.push(`{${muted}-fg}─ ${dateStr} ─{/${muted}-fg}`);
@@ -709,9 +814,12 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
       }
       const timeStr = s.date ? new Date(s.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
       const msgCount = `${s.messageCount}m`;
-      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 18);
-      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} {${accent}-fg}${msgCount}{/${accent}-fg} ${preview}`);
-      sessionIndexMap.push(i);
+      // Short model label (strip "claude-" prefix)
+      const modelTag = s.model ? s.model.replace(/^claude-/, "") : "";
+      const modelStr = modelTag ? `{${muted}-fg}${modelTag}{/${muted}-fg} ` : "";
+      const preview = truncate(s.firstUserMsg || "(no user message)", maxW - 18 - modelTag.length - 1);
+      items.push(`{${muted}-fg}${timeStr}{/${muted}-fg} {${accent}-fg}${msgCount}{/${accent}-fg} ${modelStr}${preview}`);
+      sessionIndexMap.push(realIdx);
     }
     if (items.length === 0) {
       items.push(`{${muted}-fg}no pi sessions found{/${muted}-fg}`);
@@ -746,16 +854,34 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
           "",
         ];
 
-        for (const msg of sessionMessages.slice(0, 40)) {
-          const roleColor = msg.role === "user" ? hi : msg.role === "assistant" ? ANSI.fg(muted) : dim;
-          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+        // Show only human + assistant messages (skip toolResult noise)
+        let shownMsgs = 0;
+        for (const msg of sessionMessages) {
+          if (shownMsgs >= 30) break;
+          if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+          // Skip assistant messages that are only tool calls with no text
+          if (msg.role === "assistant" && !msg.text && msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+            continue;
+          }
+
           if (msg.text) {
+            const roleColor = msg.role === "user" ? hi : dim;
+            const roleLabel = msg.role === "user" ? "▸ human" : "▹ agent";
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
-            const bodyLines = renderBody(msg.text.slice(0, 800), previewW - 4);
+            // Truncate long messages to keep preview scannable
+            const maxChars = msg.role === "user" ? 200 : 400;
+            const truncatedText = msg.text.length > maxChars
+              ? msg.text.slice(0, maxChars) + "…"
+              : msg.text;
+            const bodyLines = renderBody(truncatedText, previewW - 4);
             lines.push(...bodyLines);
             lines.push("");
+            shownMsgs++;
           }
-          if (msg.toolCalls.length > 0) {
+
+          if (msg.role === "assistant" && msg.toolCalls.length > 0) {
             lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
           }
         }
@@ -768,11 +894,13 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     // Status + command bars for session mode
     const selSession = sessions[sessionIdx];
     const sessionInfo = selSession ? `  ${selSession.sessionId} · ${selSession.messageCount} msgs` : "";
+    const modelHint = modelFilter ? `  model:${modelFilter.replace(/^claude-/, "")}` : "";
+    const filteredCount = modelFilter ? filtered.length : sessions.length;
     statusBar.setContent(
-      `{${muted}-fg} [SESSIONS]  ${sessions.length} sessions${sessionInfo}{/${muted}-fg}`
+      `{${muted}-fg} [SESSIONS]  ${filteredCount}/${sessions.length} sessions${sessionInfo}${modelHint}{/${muted}-fg}`
     );
     commandBar.setContent(
-      `{${muted}-fg} ${sessionIdx + 1}/${sessions.length}  Enter open  S journal  j/k nav  g/G jump{/${muted}-fg}`
+      `{${muted}-fg} ${sessionIdx + 1}/${filteredCount}  Enter open  S journal  m model  j/k nav  g/G jump{/${muted}-fg}`
     );
   }
 
@@ -830,16 +958,6 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     const entryIndexMap: number[] = []; // entryIndexMap[visualIdx] → entryIdx or -1 for headers
     const maxTitleW = twoPane ? Math.floor(w * 0.30) - 12 : w - 14;
 
-    function dateGroup(iso: string): string {
-      const d = new Date(iso);
-      const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffDays = Math.floor(diffMs / 86400000);
-      if (diffDays === 0) return "Today";
-      if (diffDays === 1) return "Yesterday";
-      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    }
-
     let lastGroup = "";
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i]!;
@@ -878,9 +996,21 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     // Preview pane (two-pane mode)
     if (twoPane && entries.length === 0) {
       const dim = ANSI.fg(muted);
-      detailBox.setContent(
-        `\n\n\n  ${dim}no entries yet\n\n  press n to create your first entry${ANSI.reset}`
-      );
+      const hi = ANSI.fg(accent);
+      detailBox.setContent([
+        "",
+        `  ${dim}┌─────────────────────────────┐${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   the journal is empty.     │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   press ${hi}n${ANSI.reset}${dim} to begin.        │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}│   ░ notes · ◊ observations  │${ANSI.reset}`,
+        `  ${dim}│   ■ decisions · ★ discovers │${ANSI.reset}`,
+        `  ${dim}│   ? questions               │${ANSI.reset}`,
+        `  ${dim}│                             │${ANSI.reset}`,
+        `  ${dim}└─────────────────────────────┘${ANSI.reset}`,
+      ].join("\n"));
     } else if (twoPane && entries.length > 0) {
       const e = entries[selectedIdx];
       if (e) {
@@ -1186,6 +1316,18 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     render();
   });
 
+  listBox.key(["m"], () => {
+    if (mode !== "list" || viewMode !== "sessions") return;
+    // Cycle through available models: "" (all) → model1 → model2 → ... → ""
+    const models = [...new Set(sessions.map(s => s.model).filter(Boolean))].sort();
+    if (models.length === 0) return;
+    const currentIdx = modelFilter ? models.indexOf(modelFilter) : -1;
+    modelFilter = currentIdx < models.length - 1 ? models[currentIdx + 1]! : "";
+    sessionIdx = 0;
+    sessionMessages = [];
+    render();
+  });
+
   listBox.key(["enter"], () => {
     if (mode !== "list") return;
     if (deleteConfirm) return;
@@ -1212,15 +1354,23 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         ];
 
         for (const msg of sessionMessages) {
-          const roleColor = msg.role === "user" ? hi : dim;
-          const roleLabel = msg.role === "user" ? "▸ human" : msg.role === "assistant" ? "▹ agent" : `· ${msg.role}`;
+          if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+          if (msg.role === "assistant" && !msg.text && msg.toolCalls.length > 0) {
+            lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
+            continue;
+          }
+
           if (msg.text) {
+            const roleColor = msg.role === "user" ? hi : dim;
+            const roleLabel = msg.role === "user" ? "▸ human" : "▹ agent";
             lines.push(`  ${roleColor}${roleLabel}${ANSI.reset}`);
             const bodyLines = renderBody(msg.text.slice(0, 2000), bodyW - 4);
             lines.push(...bodyLines);
             lines.push("");
           }
-          if (msg.toolCalls.length > 0) {
+
+          if (msg.role === "assistant" && msg.toolCalls.length > 0) {
             lines.push(`  ${dim}  🔧 ${msg.toolCalls.join(", ")}${ANSI.reset}`);
           }
         }
@@ -1371,9 +1521,9 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
     }
     const allTags = [...new Set(all.flatMap(e => e.tags))];
     return {
-      summary: `Journal — ${all.length} entries, mode: ${mode}, view: journal`,
+      summary: `Journal — ${all.length} entries, mode: ${mode}, view: ${viewMode}`,
       mode,
-      viewMode: "journal" as const,
+      viewMode,
       sortBy,
       entryCount: all.length,
       selectedId: selectedEntry?.id ?? entries[selectedIdx]?.id ?? null,
@@ -1393,9 +1543,14 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
         body: selectedEntry.body, peer: selectedEntry.peer,
         kind: selectedEntry.kind, tags: selectedEntry.tags,
       } : null,
+      // Session info when in LOG mode
+      sessionCount: viewMode === "sessions" ? sessions.length : undefined,
+      selectedSessionId: viewMode === "sessions" ? sessions[sessionIdx]?.sessionId ?? null : undefined,
+      modelFilter: viewMode === "sessions" ? (modelFilter || null) : undefined,
       availableCommands: [
         "journal.open", "journal.create", "journal.read",
         "journal.update", "journal.list", "journal.delete",
+        "journal.toggle-view", "journal.filter-model",
         "journal.export-markdown", "journal.import-legacy",
       ],
     };
@@ -1416,9 +1571,41 @@ function openJournal(host: MicroappHost, args?: Record<string, unknown>) {
   win.onResize(() => render());
 
   _liveRefresh = () => { refresh(); render(); };
-  win.onCleanup(() => { _liveRefresh = null; });
+
+  _viewToggle = () => {
+    if (viewMode === "journal") {
+      viewMode = "sessions";
+      sessions = listSessions();
+      sessionIdx = 0;
+      sessionMessages = [];
+    } else {
+      viewMode = "journal";
+    }
+    refresh();
+    render();
+    return viewMode;
+  };
+
+  _modelFilter = (model?: string) => {
+    if (model !== undefined) {
+      modelFilter = model;
+    } else {
+      const models = [...new Set(sessions.map(s => s.model).filter(Boolean))].sort();
+      const currentIdx = modelFilter ? models.indexOf(modelFilter) : -1;
+      modelFilter = currentIdx < models.length - 1 ? models[currentIdx + 1]! : "";
+    }
+    sessionIdx = 0;
+    sessionMessages = [];
+    render();
+    return { viewMode, modelFilter };
+  };
+
+  win.onCleanup(() => { _liveRefresh = null; _viewToggle = null; _modelFilter = null; });
 
   // ── Init ──────────────────────────────────────────────────────
+  if (viewMode === "sessions" && PI_EXISTS) {
+    sessions = listSessions();
+  }
   refresh();
   render();
   win.setFocusTarget(listBox);
