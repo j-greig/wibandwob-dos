@@ -35,6 +35,23 @@ if [ -f /app/scratch/workspaces/agent-welcome.json ]; then
   curl -sf -X POST http://127.0.0.1:8099/workspace/load \
     -H 'Content-Type: application/json' \
     -d '{"name":"agent-welcome"}' || echo "warning: workspace load failed"
+
+  # Wait for windows to open, then arrange by title → geometry mapping
+  sleep 3
+  echo "arranging windows..."
+  API=http://127.0.0.1:8099
+  # Build batch ops from live window IDs matched to expected titles
+  OPS=$(curl -s $API/state | jq -c '[
+    (.windows[] | select(.title | test("WIBWOB")) | {id, left:0, top:0, width:62, height:10}),
+    (.windows[] | select(.title | test("DOS"))    | {id, left:64, top:0, width:48, height:10}),
+    (.windows[] | select(.title | test("AGENTS")) | {id, left:0, top:11, width:54, height:10}),
+    (.windows[] | select(.title | test("FLY"))    | {id, left:56, top:11, width:56, height:7}),
+    (.windows[] | select(.title | test("README")) | {id, left:0, top:22, width:70, height:38}),
+    (.windows[] | select(.title | test("conscious")) | {id, left:72, top:19, width:40, height:41})
+  ]')
+  curl -sf -X POST $API/windows/batch \
+    -H 'Content-Type: application/json' \
+    -d "{\"ops\":$OPS}" || echo "warning: batch arrange failed"
 fi
 
 # Keep the container alive — follow tmux session
