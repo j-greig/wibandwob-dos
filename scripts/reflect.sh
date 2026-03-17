@@ -20,11 +20,12 @@ mkdir -p "$DEVLOG_DIR"
 # Create file if missing
 if [ ! -f "$FILE" ]; then
   cat > "$FILE" <<EOF
-# Devlog W${WEEK} (${YEAR})
-
-Week of $(date -v-monday +%Y-%m-%d 2>/dev/null || date -d "last monday" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
-
 ---
+week: ${YEAR}-W${WEEK}
+themes: 
+---
+
+# W${WEEK} — Week of $(date -v-monday +%Y-%m-%d 2>/dev/null || date -d "last monday" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
 
 EOF
   echo "Created $FILE"
