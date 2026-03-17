@@ -51,21 +51,36 @@ Philosophy: `PHILOSOPHY.md`
 
 ## Operating
 
+**`wibwob` is the command surface. Use it, not curl.**
+
+```bash
+wibwob help                            # full usage
+wibwob health                          # instance identity, uptime
+wibwob state                           # full desktop state JSON
+wibwob state | jq '.windows[]'         # window list
+wibwob map                             # spatial desktop minimap
+wibwob cmd figlet.open                 # run any command by ID
+wibwob cmd window.close --id 3         # close a window
+wibwob commands -q                     # list all command IDs
+wibwob read <id>                       # text from a window
+echo "hello" | wibwob write <id>       # text into a window
+wibwob plumb --from 3 --to 7           # route text between windows
+```
+
+The API exists at `http://127.0.0.1:8099` but **prefer `wibwob` over `curl`** —
+it handles socket discovery, JSON formatting, and error handling. `wibwob help`
+for the full surface.
+
 **Start fresh:** `bun install && bun run typecheck && bun run dev:world`
 **Restart:** `bash scripts/restart.sh`
 **Stop:** `kill $(cat scratch/wibwob.pid)` — SIGTERM, never -9
 **Reload microapp:** `bash scripts/reload-microapp.sh <id>`
-**Reload shell code:** `bash scripts/restart.sh`
-
-**CLI:** `wibwob` is the single command surface. `wibwob help` for full usage.
-**API:** `http://127.0.0.1:8099` — always `GET /state` first, use real window IDs.
 
 ```bash
 bun run health                         # full gate: tests + typecheck + COAT
 bun run typecheck                      # type check only
 bun run test                           # unit tests (always green)
 bash scripts/discover.sh               # discovery index
-bash scripts/list-scripts.sh           # all scripts
 bash scripts/git-census.sh             # branch/worktree health
 ```
 

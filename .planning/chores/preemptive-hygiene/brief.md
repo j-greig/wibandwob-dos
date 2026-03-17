@@ -22,6 +22,7 @@ Jubilee scripts: `.tmp/git-jubilee-2026-03-17/`
 
 ## Done criteria
 
+- Agents use `wibwob` CLI, not `curl` — CLI is prominent in AGENTS.md, child docs updated
 - `bun run typecheck` passes
 - No duplicate epic IDs
 - AGENTS.md under 150 lines, 9 sections, no COAT duplication
@@ -80,6 +81,7 @@ Target AGENTS.md outline (17→9 sections):
 - [ ] Trim PHILOSOPHY.md — keep north star, signpost AGENTS.md for COAT
 - [ ] `.agents/README.md` — strip COAT repetition, pure signpost
 - [ ] Restructure `.agents/` — promote devlogs, separate docs from artefacts
+- [ ] Replace `curl` examples in child docs with `wibwob` CLI equivalents (control-api.md, architecture.md, ops.md)
 
 ### Phase 5 — Process sustainability
 
