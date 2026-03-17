@@ -338,11 +338,11 @@ check "full parity: wibwob commands -q sorted == API sorted" \
 # ── 25. Figlet banner ───────────────────────────────────
 echo "--- figlet ---"
 $WIBWOB cmd figlet.open --text "HI" >/dev/null 2>&1; sleep 0.5
-FIG_WIN=$($WIBWOB windows | jq '[.[] | select(.kind=="figlet")] | length')
+FIG_WIN=$($WIBWOB windows | jq '[.[] | select(.appType=="wibwob.figlet")] | length')
 check "wibwob cmd figlet.open --text HI creates figlet window" \
   "$([ "$FIG_WIN" -ge 1 ] && echo PASS || echo "figlet_windows=$FIG_WIN")"
 # Close it
-$WIBWOB windows | jq -r '.[] | select(.kind=="figlet") | .id' | \
+$WIBWOB windows | jq -r '.[] | select(.appType=="wibwob.figlet") | .id' | \
   while read -r fid; do $WIBWOB window "$fid" close >/dev/null 2>&1; done
 sleep 0.3
 
