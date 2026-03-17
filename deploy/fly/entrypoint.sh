@@ -54,6 +54,10 @@ if [ -f /app/scratch/workspaces/agent-welcome.json ]; then
     -d "{\"ops\":$OPS}" || echo "warning: batch arrange failed"
 fi
 
+# ttyd — web terminal at :7681 (read-only view of the TUI)
+ttyd --port 7681 --readonly --max-clients 10 tmux attach -t wibwob -r &
+echo "ttyd web terminal started on :7681 (read-only)"
+
 # Screenshot logger — captures TUI state every 60s to persistent volume
 mkdir -p /data/logs/screenshots
 (

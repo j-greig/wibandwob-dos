@@ -366,6 +366,15 @@ export class ControlApiService {
   private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
+    // /tui — redirect to ttyd web terminal (port 7681 via Fly services)
+    if (request.method === "GET" && url.pathname === "/tui") {
+      const host = request.headers.get("host") || "wibwob-dos.fly.dev";
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `https://${host}:7681/` },
+      });
+    }
+
     // robots.txt — block all crawlers and AI training scrapers
     if (request.method === "GET" && url.pathname === "/robots.txt") {
       return new Response(

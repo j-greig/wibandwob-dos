@@ -24,6 +24,14 @@ primary_region = "ams"
     path = "/health"
     timeout = "5s"
 
+# ttyd web terminal — live read-only TUI in browser
+[[services]]
+  internal_port = 7681
+  protocol = "tcp"
+  [[services.ports]]
+    port = 7681
+    handlers = ["tls", "http"]
+
 [[vm]]
   memory = "512mb"
   cpu_kind = "shared"

@@ -1,6 +1,6 @@
 FROM oven/bun:1-debian
 
-# System deps for blessed TUI + figlet banners
+# System deps for blessed TUI + figlet banners + ttyd (web terminal)
 RUN apt-get update && apt-get install -y \
     figlet \
     curl \
@@ -8,6 +8,17 @@ RUN apt-get update && apt-get install -y \
     ncurses-term \
     jq \
     && rm -rf /var/lib/apt/lists/*
+
+# ttyd — streams tmux PTY to browser via xterm.js
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) TTYD_ARCH=x86_64 ;; \
+      arm64) TTYD_ARCH=aarch64 ;; \
+      *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}" \
+      -o /usr/local/bin/ttyd && \
+    chmod +x /usr/local/bin/ttyd
 
 WORKDIR /app
 
