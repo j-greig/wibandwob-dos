@@ -1,5 +1,9 @@
 #!/bin/bash
 # wibwob-url-handler.sh — Handle wibwob:// URIs and file paths
+# @name    wibwob-url-handler
+# @desc    Handle wibwob:// URIs and file paths via router (called by WibWob.app)
+# @name    wibwob-url-handler
+# @desc    Handle wibwob:// URIs and file paths via router (called by WibWob.app)
 #
 # Thin wrapper around `wibwob open` which uses lib/wibwob-router.ts
 # for smart file-type routing and instance discovery.

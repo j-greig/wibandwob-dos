@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+# @name    scaffold-autoresearch
+# @desc    Create autoresearch harness (brief, script, checks, ideas) in a subdir
+# @name    scaffold-autoresearch
+# @desc    Create autoresearch harness (brief, script, checks, ideas) in a subdir
 #
 # Scaffold a new autoresearch subdirectory with all starter files.
 #

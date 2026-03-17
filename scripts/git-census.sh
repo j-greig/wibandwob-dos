@@ -1,5 +1,7 @@
 #!/bin/bash
 # git-census.sh — unified branch/worktree/orphan audit
+# @name    git-census
+# @desc    Branch counts, worktree map, orphan check, staleness ranking
 # Usage: scripts/git-census.sh [--full]
 set -euo pipefail
 

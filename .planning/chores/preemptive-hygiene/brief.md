@@ -94,16 +94,19 @@ Target AGENTS.md outline (17→9 sections):
 
 ### Phase 5b — Review adjacent work
 
-- [x] Review E051 PTC — pinged `ptc` session. Verdict: scripts and PTC are complementary. Scripts = discoverable named primitives. PTC = glue that orchestrates them without burning tokens. Keep building scripts.
-- [ ] Review mitsuhiko/agent-stuff skills (cloned to tmp/vendor/agent-stuff). Relevant:
-  - **commit** — conventional commits skill. Compare with our .planning/CONVENTIONS.md commit format. Consider adopting as skill.
-  - **librarian** — caches remote repos under ~/.cache/checkouts/. We do ad-hoc clones to tmp/vendor/. Could formalise.
-  - **update-changelog** — changelog from git log. We don't have a CHANGELOG. Worth adding?
-  - **summarize** — `markitdown` for URL/PDF→markdown. We have youtube-transcript but not general doc conversion.
-  - **tmux** — isolated socket convention for agent tmux sessions. Our wibmux/ops scripts could adopt this pattern.
+- [x] Review E051 PTC — complementary, not competing. Scripts = discoverable primitives, PTC = glue.
+- [x] Review mitsuhiko/agent-stuff skills — adopted commit + librarian. Noted summarize, changelog, tmux for later.
+- [x] Script audit — categorised 38 scripts, added missing @desc tags, updated discover.sh for new paths
 
-### Phase 6 — Longer term
+### Phase 5c — Remaining script + doc cleanup
 
+- [ ] Replace `curl` examples in child docs with `wibwob` CLI equivalents (control-api.md, architecture.md)
+- [ ] Consider script subdirs (scripts/checks/, scripts/creative/, scripts/testing/) to reduce flat list
+- [ ] Consolidate overlapping test scripts (cli-parity-check vs ci-cli-test vs live-api-test-suite)
+
+### Phase 6 — Progressive disclosure + longer term
+
+- [ ] Progressive disclosure in planning dirs (README per multi-file dir)
 - [ ] Auto-generate INTEGRATION_SURFACE.md from command-catalog.ts
 - [ ] Session-start drift detection (from E001)
 - [ ] Session-archaeology as input to spec creation

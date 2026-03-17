@@ -1,5 +1,7 @@
 #!/bin/bash
 # planning-close.sh — move epic/spike/idea to .done/
+# @name    planning-close
+# @desc    Move epic/spike/idea to .done/ (usage: planning-close.sh e042)
 # Usage:
 #   scripts/planning-close.sh e042           # moves epic e042-* to .done/
 #   scripts/planning-close.sh spk-wibmux     # moves spike spk-wibmux to .done/

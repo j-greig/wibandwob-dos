@@ -1,5 +1,9 @@
 #!/bin/bash
 # create-wibwob-app.sh — Generate a macOS .app for wibwob:// URL scheme
+# @name    create-wibwob-app
+# @desc    Generate macOS .app for wibwob:// URL scheme (E046 deep linking)
+# @name    create-wibwob-app
+# @desc    Generate macOS .app for wibwob:// URL scheme (E046 deep linking)
 #
 # WHY: macOS only routes custom URL schemes (wibwob://...) to .app bundles
 # that declare CFBundleURLSchemes in Info.plist. A raw bun script can't

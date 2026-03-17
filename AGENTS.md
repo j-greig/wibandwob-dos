@@ -95,6 +95,13 @@ bash scripts/git-census.sh             # branch/worktree health
 - **haiku / sonnet / opus** — model-tier delegation
 - **codex-standard / codex-heavy** — OpenAI Codex (ask before using)
 
+**PTC (Programmatic Tool Calling)** — `.pi/extensions/ptc.ts` registers an
+`execute_code` tool. Write JS that calls pi tools as async functions inside a
+sandbox — only `console.log()` returns to context. Use when chaining 3+ tool
+calls, especially non-bash tools (`todo`, `send_to_session`, `read` where you
+only need a slice). Don't bother for tasks a single bash pipeline can handle.
+Spec: `.planning/epics/e051-programmatic-tool-calling/README.md`
+
 **Devlog** — `scripts/devlog.sh "your note"` appends to this week's devlog.
 Write friction you notice, patterns that confused, things that worked.
 Devlogs: `.agents/reflections/2026-W{nn}.md`

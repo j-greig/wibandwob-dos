@@ -1,5 +1,7 @@
 #!/bin/bash
 # list-docs.sh — generated index of all agent/dev-facing docs
+# @name    list-docs
+# @desc    Generated index of all agent/dev docs with staleness flags
 # Usage: scripts/list-docs.sh [--stale N]  (flag files unmodified for N+ days, default 30)
 set -euo pipefail
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 /**
+// @name    export-pi-theme
+// @desc    Export current WibWob theme as a pi-compatible theme file
  * Convert a WibWob-DOS ThemeVariant to a pi agent theme JSON.
  *
  * Usage:
