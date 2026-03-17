@@ -29,6 +29,10 @@ primary_region = "ams"
   cpu_kind = "shared"
   cpus = 1
 
+[mounts]
+  source = "wibwob_logs"
+  destination = "/data/logs"
+
 # Environment variables (non-secret — secrets via `fly secrets set`)
 [env]
   WIBWOB_INSTANCE_LABEL = "fly-disposable"

@@ -54,6 +54,17 @@ if [ -f /app/scratch/workspaces/agent-welcome.json ]; then
     -d "{\"ops\":$OPS}" || echo "warning: batch arrange failed"
 fi
 
+# Screenshot logger — captures TUI state every 60s to persistent volume
+mkdir -p /data/logs/screenshots
+(
+  while true; do
+    sleep 60
+    TS=$(date -u +%Y-%m-%dT%H%M%SZ)
+    curl -sf http://127.0.0.1:8099/screenshot/text > "/data/logs/screenshots/${TS}.txt" 2>/dev/null
+  done
+) &
+echo "screenshot logger started (every 60s → /data/logs/screenshots/)"
+
 # Keep the container alive — follow tmux session
 # If the app crashes, tmux session ends, wait-for unblocks, container exits,
 # Fly restarts it automatically.
