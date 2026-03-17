@@ -95,34 +95,8 @@ CLI commands.
 
 ## 3. Runtime-Centric Principle (COAT)
 
-> **COAT — Command Once, Adapt Thin.**
-> "Would this work if I deleted the TUI and only had the API?"
-
-Every interface is just another client of the runtime. Do not frame the system as
-a one-way frontend → backend → adapter stack. The platform is a **shared semantic
-runtime** with multiple peer interfaces:
-
-- **TUI** — blessed terminal interface
-- **CLI** — `wibwob` command surface
-- **API** — HTTP control surface (port 8099)
-
-The runtime owns four explicit seams:
-
-| Seam | What | Owner |
-|------|------|-------|
-| **command** | one catalog, one dispatch path, one discovery surface | `command-catalog.ts` → `command-registry.ts` |
-| **inspection** | one snapshot shape, one access path | `state-service.ts` |
-| **window** | one facade, one lifecycle | `window-facade.ts` |
-| **workspace** | one save/restore path | `workspace-service.ts` |
-
-TUI, CLI, API, agent, and microapps are **thin adapters** over these seams.
-No adapter owns semantics. No adapter invents its own command/control path.
-
-### Status: ✅ Landed
-
-COAT is enforced by `bun run check-coat` (6 automated checks, 0 violations).
-All commands defined once in `command-catalog.ts`. All window operations through
-`window-facade.ts`. All state through `state-service.ts`.
+See `AGENTS.md` § Principles for the canonical COAT definition and seams.
+Enforced by `bun run check-coat` (6 automated checks). ✅ Landed.
 
 ---
 
