@@ -56,20 +56,17 @@ If no — the semantics are in the wrong place.
 
 **Say "COAT" to invoke this principle.**
 
-## Six Lenses
+## Subagents
 
-Agents aren't departments — they're lenses. Same tools, same API, different focus.
+Specialist agents in `.pi/agents/` — use via `subagent` tool:
 
-| # | Lens | Focus |
-|---|------|-------|
-| 0 | **shell-architect** | Host runtime, TypeScript, COAT integrity |
-| 1 | **microapp-builder** | Build & migrate microapps |
-| 2 | **ops** | Process lifecycle, health, screenshots |
-| 3 | **quality** | Tests, parity, verification |
-| 4 | **creative** | Visual composition, art, music |
-| 5 | **planner** | Planning docs, epics, what's next |
-
-Full lens model + script mapping: `.agents/agent-master-plan.md`
+- **ops** — process lifecycle, health, debugging, screenshots
+- **arch-reviewer** — architecture review, COAT compliance
+- **coat-reviewer** — COAT seam enforcement
+- **code-reviewer** — code quality, type safety, patterns
+- **pi-bridge** — pi session integration
+- **haiku / sonnet / opus** — model-tier agents for delegation
+- **codex-standard / codex-heavy** — OpenAI Codex (budget-limited, ask first)
 
 ## Key Files
 
