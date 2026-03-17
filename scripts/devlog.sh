@@ -53,8 +53,9 @@ if [ -z "$MSG" ]; then
   exit 1
 fi
 
-# Append timestamped entry
+# Append timestamped entry with breathing room
 TIMESTAMP=$(date "+%H:%M")
+echo "" >> "$FILE"
 echo "- **${TIMESTAMP}** — ${MSG}" >> "$FILE"
 echo "✏️  W${WEEK} devlog ← ${MSG}"
 
