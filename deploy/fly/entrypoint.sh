@@ -29,6 +29,14 @@ done
 # Health check result
 curl -s http://127.0.0.1:8099/health | jq . 2>/dev/null || echo "warning: health check failed"
 
+# Load pre-seeded workspace (agent-welcome layout with figlets + cheatsheet)
+if [ -f /app/scratch/workspaces/agent-welcome.json ]; then
+  echo "loading agent-welcome workspace..."
+  curl -sf -X POST http://127.0.0.1:8099/workspace/load \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"agent-welcome"}' || echo "warning: workspace load failed"
+fi
+
 # Keep the container alive — follow tmux session
 # If the app crashes, tmux session ends, wait-for unblocks, container exits,
 # Fly restarts it automatically.

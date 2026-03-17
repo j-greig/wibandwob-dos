@@ -27,7 +27,10 @@ COPY tsconfig.json ./
 COPY WELCOME.m[d] ./
 
 # Scratch dir (ephemeral — lost on redeploy, that's the point)
-RUN mkdir -p scratch
+RUN mkdir -p scratch/workspaces
+
+# Pre-seed default workspace (restored on boot)
+COPY deploy/fly/agent-welcome-workspace.json scratch/workspaces/agent-welcome.json
 
 # Control API on 8099, exposed to Fly's internal network
 EXPOSE 8099
