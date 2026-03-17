@@ -367,6 +367,40 @@ Total: ~170 lines of functional code. One PR. 1–2 days.
   first command if unsure which instance is targeted"
 - `.agents/guides/shell/control-api.md`: document socket-first resolution
 
+## All lifecycle in TypeScript, not bash
+
+The app creates sockets, the app cleans them up. No bash scripts for
+lifecycle management. Everything runs in Bun/TypeScript:
+
+**On startup (app-controller.ts):**
+1. Scan `scratch/instances/` for existing `.pid` files
+2. For each, `kill(pid, 0)` — dead PID → delete socket + pid file
+3. Check screen dimensions — below 40×10 → skip socket registration
+4. Create socket + write `.pid` sidecar
+
+**On clean shutdown (app-controller.ts / control-api.ts):**
+1. Delete own socket file
+2. Delete own `.pid` sidecar
+3. Already partially exists but not reliable — make it a `process.on('exit')` + `process.on('SIGTERM')` guarantee
+
+**On screen resize (app-controller.ts):**
+1. Below 40×10 → `controlApi.deregisterSocket()` (delete socket + pid)
+2. Back above threshold → `controlApi.registerSocket()` (recreate both)
+
+**On crash (best-effort):**
+- `process.on('uncaughtException')` and `process.on('SIGINT')` attempt
+  socket cleanup before exit
+- If cleanup fails (kill -9, power loss), the PID-based scan on next
+  startup handles it — dead PID = safe to delete
+
+**CLI resolution (wibwob.ts):**
+- Socket scan + PID check — all TypeScript, all Bun
+- No bash wrappers, no shell scripts in the resolution path
+
+Bash is ONLY the launcher: `bun run dev`. Everything else is TypeScript
+owning its own lifecycle. The process that creates the socket is
+responsible for the socket.
+
 ## Future (park, don't design)
 
 - **Named instance groups** — `wibwob -i cinema,gallery cmd theme.set`
