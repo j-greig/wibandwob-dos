@@ -4,7 +4,13 @@ WibWob-DOS is a terminal-native TypeScript desktop shell.
 Runtime: Bun. Renderer: blessed. Entry: `src/app.ts`.
 Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 
-**Discovery:** `bash scripts/discover.sh` — scripts, skills, and docs organized by lens.
+## Where to look
+
+- **Building a microapp?** → next section, then `docs/building-custom-microapps.md`
+- **Shell internals?** → `.agents/shell-dev/architecture.md`, `invariants.md`, `control-api.md`
+- **Planning & commits?** → `.planning/CONVENTIONS.md`
+- **Running the app?** → Quick Commands below, or `.pi/skills/ww-ops/SKILL.md`
+- **Everything at once?** → `bash scripts/discover.sh`
 
 ---
 
@@ -105,43 +111,11 @@ Always `GET /state` first — use real window ids, never guessed ones.
 
 ## App Lifecycle
 
-### Process modes: --direct (default) vs --tmux
-
-OPS scripts support two modes via `scripts/lib/process-manager.sh`:
-
-| Mode | Flag | How it works |
-|------|------|-------------|
-| **direct** (default) | `--direct` or omit | PTY via `script`, background process, log at `scratch/wibwob.log` |
-| **tmux** | `--tmux` | Named tmux session, `send-keys` launch (legacy) |
-
-All modes use the same HTTP API for health checks, state queries, and command dispatch.
-Set `export WW_MODE="tmux"` in `~/.wibwob` to default to tmux mode.
-
-Shell aliases (from `~/.wibwob`):
-```bash
-ww-start                    # ensure-running (direct)
-ww-restart                  # restart (direct)
-ww-attach                   # status + tail log (direct) or tmux attach (--tmux)
-ww-alt                      # second instance on port 8098
-```
-
-| Script | What |
-|--------|------|
-| `bun run start` | Launch (no dev mode) |
-| `bun run dev` | Dev mode (Ctrl+R reload) |
-| `bun run dev:world` | Dev + IRC + label `main` |
-| `bun run dev:world:alt` | Second instance (port 8098, label `zuk`) |
-
 **Start fresh:** `bun install && bun run typecheck && bun run dev:world`
 **Restart:** `bash scripts/restart.sh` (SIGTERM → relaunch → poll `/health`)
 **Stop:** `kill $(cat scratch/wibwob.pid)` — always SIGTERM, never `kill -9`.
-
-### Reload vs restart
-
-| Changed | Action |
-|---------|--------|
-| `microapps/*/` | `bash scripts/reload-microapp.sh <id>` |
-| `src/`, themes, package.json | `bash scripts/restart.sh` |
+**Reload microapp only:** `bash scripts/reload-microapp.sh <id>`
+**Reload shell code:** `bash scripts/restart.sh`
 
 ## Canon
 
@@ -196,32 +170,10 @@ Full guide: `.planning/CONVENTIONS.md` — hierarchy, naming, commits, ACs, merg
 Branch naming: `epic/e0NN-slug`, `spike/spk-slug`, `fix/slug`, `feat/slug`.
 Never commit directly to `main`. Run `git status` first.
 
-### Worktrees (mandatory for epics)
+## Worktrees
 
-Every epic/spike branch gets its own **git worktree** at `~/Repos/`.
-This prevents concurrent agents from stomping each other's working trees.
-
-```bash
-# Create: branch from main, worktree at ~/Repos/<short-name>
-git branch epic/e0NN-slug main
-git worktree add ~/Repos/wibwob-<short-name> epic/e0NN-slug
-
-# Work exclusively in the worktree directory
-cd ~/Repos/wibwob-<short-name>
-
-# When done: merge to main from the main worktree, then prune
-cd ~/Repos/wibandwob-dos-cinema   # or wherever main is checked out
-git merge epic/e0NN-slug --no-edit
-git worktree remove ~/Repos/wibwob-<short-name>
-```
-
-**Rules:**
-- Set `cwd` to the worktree path for all subagents and ralph loops
-- Never `git checkout` a branch that's checked out in another worktree
-- `git worktree list` to see all active worktrees before creating a new one
-- Naming: `~/Repos/wibwob-<slug>` (e.g. `wibwob-pi`, `wibwob-layout-sdk`)
-
-Checkbox: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
+Epic/spike branches get a **git worktree** at `~/Repos/wibwob-<slug>`.
+`git worktree list` before creating. Never checkout a branch that's in another worktree.
 
 ## Constraints
 
