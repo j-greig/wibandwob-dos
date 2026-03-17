@@ -459,8 +459,15 @@ takes microseconds even with 100 stale sockets.
   the SSH invocation pattern proves too verbose.
 - **PID + instance ID in TUI chrome** — show `bk7 (60177)` in the
   top-right status area so screenshots and text dumps immediately
-  identify which process you're looking at. Tiny change, big debug
-  value. (Sidecar question sent to wwdos1.)
+  identify which process you're looking at. ✅ Done (2026-03-17).
+- **Global `wibwob` install via npm/bun.** Currently `wibwob` requires
+  `bun run wibwob` from the repo, or a manual wrapper script in
+  `~/.local/bin/`. A proper `package.json` `bin` field would let
+  `bun install -g wibwob-dos` (or `npm install -g`) put `wibwob` on
+  PATH automatically. The bin entry needs a shebang'd runner that
+  resolves the repo root (or bundles the CLI). This also fixes pi
+  agents running in `/bin/bash` subshells where zsh aliases don't
+  exist.
 
 ---
 
