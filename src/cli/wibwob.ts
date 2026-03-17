@@ -144,7 +144,18 @@ async function api(apiPath: string, method = "GET", body?: unknown): Promise<unk
   if (body !== undefined) reqInit.body = JSON.stringify(body);
   const [url, opts] = socketFetchArgs(apiPath, reqInit);
 
-  const res = await fetch(url, opts);
+  let res: Response;
+  try {
+    res = await fetch(url, opts);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ECONNREFUSED") || msg.includes("Connection refused")) {
+      process.stderr.write("Instance found but not responding — it may be starting up. Retry in a moment.\n");
+    } else {
+      process.stderr.write(`Connection failed: ${msg}\n`);
+    }
+    process.exit(1);
+  }
   if (!res.ok) {
     const text = await res.text();
     let parsed: unknown;
@@ -677,43 +688,37 @@ async function cmdAttach() {
 }
 
 async function cmdInstances() {
-  const instancesDir = path.join(SCRATCH_BASE, "instances");
-  if (!fs.existsSync(instancesDir)) {
-    process.stderr.write("No instances directory found\n");
+  const alive = findAliveInstances();
+  if (alive.length === 0) {
+    process.stderr.write("No instances running\n");
     process.exit(1);
-  }
-  const socks = fs.readdirSync(instancesDir).filter((f: string) => f.endsWith(".sock"));
-  if (socks.length === 0) {
-    process.stderr.write("No instances running (no .sock files)\n");
-    process.exit(1);
-  }
-
-  const results: Array<Record<string, unknown>> = [];
-  for (const sock of socks) {
-    const sockPath = path.join(instancesDir, sock);
-    const label = sock.replace(/\.sock$/, "");
-    try {
-      const res = await fetch("http://localhost/health", unixFetchOpts(sockPath));
-      if (res.ok) {
-        const health = await res.json() as Record<string, unknown>;
-        results.push({ label, socket: sockPath, ...health });
-      } else {
-        results.push({ label, socket: sockPath, ok: false, error: `HTTP ${res.status}` });
-      }
-    } catch {
-      // Dead socket — clean it up
-      try { fs.unlinkSync(sockPath); } catch {}
-      results.push({ label, socket: sockPath, ok: false, error: "dead (cleaned)" });
-    }
   }
 
   if (QUIET) {
-    for (const r of results) {
-      if (r.ok) process.stdout.write(`${r.label}\n`);
-    }
-  } else {
-    out(results);
+    for (const inst of alive) process.stdout.write(`${inst.label}\n`);
+    return;
   }
+
+  // Enrich with health probe (200ms timeout — don't block on hung instances)
+  const results: Array<Record<string, unknown>> = [];
+  for (const inst of alive) {
+    try {
+      const res = await fetch("http://localhost/health", {
+        ...unixFetchOpts(inst.socketPath),
+        signal: AbortSignal.timeout(200),
+      } as any);
+      if (res.ok) {
+        const health = await res.json() as Record<string, unknown>;
+        results.push({ label: inst.label, socket: inst.socketPath, ...health });
+      } else {
+        results.push({ label: inst.label, socket: inst.socketPath, ok: true, error: `HTTP ${res.status}` });
+      }
+    } catch {
+      // PID alive but not responding — probably starting up
+      results.push({ label: inst.label, socket: inst.socketPath, ok: true, status: "starting" });
+    }
+  }
+  out(results);
 }
 
 async function cmdCompletions() {
@@ -846,7 +851,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "plumb",       args: "--from <id> --to <id>", desc: "Route text from one window to another", fn: (a) => cmdPlumb(a) },
   { name: "start",       desc: "Start instance (idempotent if already running)",  fn: (a) => cmdStart(a) },
   { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
-  { name: "instances",   desc: "List running instances (via sockets)",             fn: () => cmdInstances() },
+  { name: "instances",   aliases: ["list", "ls"], desc: "List running instances (PID-checked)",   fn: () => cmdInstances() },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
   { name: "open",        args: "<path|url> [--app A] [--line N]", desc: "Open file/dir/URL in WibWob-DOS (fallback: system)", fn: (a) => cmdOpen(a) },
   { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },
