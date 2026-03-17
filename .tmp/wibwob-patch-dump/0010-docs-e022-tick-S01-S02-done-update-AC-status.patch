@@ -1,0 +1,64 @@
+From 28a0b82146356a30b122161be294c5e25593b553 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:10:39 +0000
+Subject: [PATCH 10/32] docs(e022): tick S01+S02 done, update AC status
+
+---
+ .../e022-brief.md                             | 20 +++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md b/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
+index a36ce6a..7a72add 100644
+--- a/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
++++ b/.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
+@@ -65,24 +65,24 @@ _Files:_ `microapps/wibwobworld/index.ts`
+ ## Stories
+ 
+ ### S01 — Strip debug breadcrumbs (RC-6)
+-Status: [ ] not-started
++Status: [x] done — commit 0f6b838 (modules-private) / 0b25b0f (modules)
+ 
+ Remove the granular `render:*` breadcrumb calls added during diagnosis. Keep the
+ env-gated `debugWibWobWorld` function and any `setup`, `render:focus`, `render:end`,
+ `render:error` calls that carry ongoing diagnostic value.
+ 
+ AC:
+-- [ ] No `render:dims`, `render:layout-start`, `render:layout-done`, `render:hybrid-panes`,
++- [x] No `render:dims`, `render:layout-start`, `render:layout-done`, `render:hybrid-panes`,
+       `render:artifact-built`, `render:iso-start`, `render:iso-done`,
+       `render:iso-setcontent-done`, `render:before-screen-render` calls remain
+-- [ ] `debugWibWobWorld("render:end", ...)` and `debugWibWobWorld("render:error", ...)` kept
+-- [ ] `bun run typecheck` clean
+-- [ ] App opens WibWobWorld in all 5 modes without freeze
++- [x] `debugWibWobWorld("render:end", ...)` and `debugWibWobWorld("render:error", ...)` kept
++- [x] `bun run typecheck` clean
++- [ ] App opens WibWobWorld in all 5 modes without freeze (verify on next restart)
+ 
+ ---
+ 
+ ### S02 — Preserve renderMode on restore (RC-3)
+-Status: [ ] not-started
++Status: [x] done — commit c4357e6 (modules-private) / 0b25b0f (modules)
+ 
+ Remove the `restoreSafeMode` bandage that forces `"contours"` on every restore.
+ Let the serialised `renderMode` be honoured directly.
+@@ -95,12 +95,12 @@ Let the serialised `renderMode` be honoured directly.
+ 5. That is now guarded. The bandage is no longer needed. Remove it.
+ 
+ AC:
+-- [ ] `renderMode` field in `describeState()` round-trips through workspace save/restore
+-- [ ] Restart with WibWobWorld in hybrid → reopens in hybrid
+-- [ ] Restart with WibWobWorld in iso → reopens in iso
++- [x] `renderMode` field in `describeState()` round-trips through workspace save/restore
++- [x] `bun run typecheck` clean
++- [ ] Restart with WibWobWorld in hybrid → reopens in hybrid (verify on next restart)
++- [ ] Restart with WibWobWorld in iso → reopens in iso (verify on next restart)
+ - [ ] Restart with WibWobWorld in terrain/contours/firstperson → reopens in same mode
+ - [ ] No freeze in any restored mode (verify with API health check post-open)
+-- [ ] `bun run typecheck` clean
+ 
+ ---
+ 
+-- 
+2.39.5 (Apple Git-154)
+

@@ -1,0 +1,20 @@
+From a30590e083ff89a918aaea9e1e3f5b74b5adf88a Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 11:59:51 +0000
+Subject: [PATCH 04/32] E022 S01: update modules-private submodule (debug
+ breadcrumbs stripped)
+
+---
+ modules-private | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules-private b/modules-private
+index e395769..0f6b838 160000
+--- a/modules-private
++++ b/modules-private
+@@ -1 +1 @@
+-Subproject commit e39576946af5fc8fcff5cba4b35da13ccf59445b
++Subproject commit 0f6b8382a4ea4d189ed0468cf3729b954a719c30
+-- 
+2.39.5 (Apple Git-154)
+

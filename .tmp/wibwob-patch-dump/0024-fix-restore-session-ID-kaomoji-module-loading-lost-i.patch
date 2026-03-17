@@ -1,0 +1,277 @@
+From c6482a0baa49d85dc33235a484f2dc5f0f9d0209 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 13:12:25 +0000
+Subject: [PATCH 24/32] fix: restore session ID, kaomoji, module loading lost
+ in merge 4e2500b
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- src/app.ts: restore parseAppFlags, session ID, instance label,
+  process title, PID file lifecycle — TsTuiMvpApp({ instanceLabel, sessionId })
+- app-controller.ts: constructor opts, menus field, statusKaomoji,
+  statusIdentity, kaomojiBlink blink timer, renderTopIdentity,
+  renderTopKaomoji, getInstanceDisplayLabel — kaomoji top-right restored
+- app-controller.ts: run() uses loadMicroapps + in-place menus mutation
+  (menus.length=0; menus.push(...buildMenus())) so all 6 microapps
+  register into the Applications menu after load
+- menu-overlay-manager.ts: revert to static menus[] ref (mutation approach)
+  instead of lazy getter — matches loadMicroapps mutation pattern
+---
+ src/app.ts                 |  37 ++++++++++-
+ src/core/app-controller.ts | 133 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 166 insertions(+), 4 deletions(-)
+
+diff --git a/src/app.ts b/src/app.ts
+index bb084a1..ce5bc87 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,10 +1,45 @@
+ import os from "node:os";
++import { parseAppFlags, printHelp } from "./core/cli.js";
+ 
+ if (!process.env.TERM || process.env.TERM.includes("ghostty")) {
+   process.env.TERM = "xterm-256color";
+ }
+ process.env.HOME = process.env.HOME || os.homedir();
+ 
++const flags = parseAppFlags();
++
++if (flags.help) {
++  printHelp();
++  process.exit(0);
++}
++
++function randomSessionId(): string {
++  return Math.random().toString(36).slice(2, 5).padEnd(3, "0");
++}
++
++const instanceLabel = process.env.WIBWOB_INSTANCE_LABEL?.trim() || undefined;
++const sessionId = randomSessionId();
++process.env.WIBWOB_SESSION_ID = sessionId;
++
++process.title = [
++  "wibwob-dos",
++  instanceLabel,
++  sessionId,
++].filter(Boolean).join("-");
++
++import fs from "node:fs";
++import path from "node:path";
++const scratchBase = process.env.SCRATCH_DIR
++  ? path.resolve(process.env.SCRATCH_DIR)
++  : path.join(process.cwd(), "scratch");
++const pidFile = path.join(scratchBase, "wibwob.pid");
++fs.mkdirSync(scratchBase, { recursive: true });
++fs.writeFileSync(pidFile, String(process.pid), "utf8");
++const removePid = () => { try { fs.unlinkSync(pidFile); } catch {} };
++process.once("exit", removePid);
++process.once("SIGTERM", () => { removePid(); process.exit(0); });
++process.once("SIGINT",  () => { removePid(); process.exit(0); });
++
+ const { TsTuiMvpApp } = await import("./core/app-controller.js");
+ 
+-new TsTuiMvpApp().run();
++await new TsTuiMvpApp({ instanceLabel, sessionId }).run();
+diff --git a/src/core/app-controller.ts b/src/core/app-controller.ts
+index 4753c80..23051aa 100644
+--- a/src/core/app-controller.ts
++++ b/src/core/app-controller.ts
+@@ -2,8 +2,10 @@ import blessed from "blessed";
+ import fs from "node:fs";
+ import os from "node:os";
+ import path from "node:path";
++import stringWidth from "string-width";
+ 
+ import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
++import { appFlags } from "./cli.js";
+ import type { AppMenuActions } from "./command-catalog.js";
+ import { CommandRegistry } from "./command-registry.js";
+ import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-items.js";
+@@ -38,6 +40,7 @@ import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measure
+ import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
+ import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
+ import { StateService } from "../services/state-service.js";
++import { loadMicroapps, type MicroappHostDeps } from "../services/microapp-loader.js";
+ import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
+ import { WorkspaceService } from "../services/workspace-service.js";
+ import {
+@@ -81,11 +84,17 @@ export class TsTuiMvpApp {
+   private readonly menuBar: Box;
+   private readonly desktop: Box;
+   private readonly statusLine: Box;
+-  private readonly menus: MenuConfig[];
+   private readonly commands: CommandRegistry;
++  private readonly menus: MenuConfig[];
+   private readonly menuUi: MenuOverlayManager;
+   private readonly windowManager: WindowManager;
+   private readonly overlays: OverlayManager;
++  private statusKaomoji?: Box;
++  private statusIdentity?: Box;
++  private kaomojiBlink = false;
++  private kaomojiTimer?: NodeJS.Timeout;
++  private readonly instanceLabel?: string;
++  private readonly sessionId: string;
+   private readonly backrooms = new BackroomsService();
+   private readonly content = new ContentService();
+   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
+@@ -93,7 +102,9 @@ export class TsTuiMvpApp {
+   private readonly state: StateService;
+   private readonly controlApi: ControlApiService;
+ 
+-  constructor() {
++  constructor(opts?: { instanceLabel?: string; sessionId?: string }) {
++    this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
++    this.sessionId = opts?.sessionId?.trim() || "???";
+     this.screen = blessed.screen({
+       smartCSR: true,
+       fullUnicode: true,
+@@ -193,7 +204,23 @@ export class TsTuiMvpApp {
+     );
+   }
+ 
+-  run(): void {
++  async run(): Promise<void> {
++    appFlags();
++    const microappDeps: MicroappHostDeps = {
++      screen: this.screen,
++      windowManager: this.windowManager,
++      commands: this.commands,
++      geometry: this.geometry.getGeometry(),
++      focusOrCreate: (appType, createFn, multiInstance) => {
++        this.focusOrCreate(appType, createFn, multiInstance);
++      },
++    };
++    await loadMicroapps(microappDeps);
++
++    // Rebuild menus in-place after microapps registered dynamic commands
++    this.menus.length = 0;
++    this.menus.push(...this.commands.buildMenus());
++
+     this.renderChrome();
+     this.bindGlobalKeys();
+     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
+@@ -223,13 +250,95 @@ export class TsTuiMvpApp {
+   private renderChrome(): void {
+     this.updateStatusLine();
+     this.repaintDesktop();
++    this.renderTopIdentity();
++    this.renderTopKaomoji();
++    this.startKaomojiBlink();
+     this.screen.on("resize", () => {
+       this.repaintDesktop();
++      this.renderTopIdentity();
++      this.renderTopKaomoji();
+       this.syncState();
+       this.screen.render();
+     });
+   }
+ 
++  private getInstanceDisplayLabel(): string {
++    return this.instanceLabel
++      ? `${this.instanceLabel} · ${this.sessionId}`
++      : this.sessionId;
++  }
++
++  private getStatusKaomoji(): string {
++    return this.kaomojiBlink ? "༼ﾂ-‿-‿-༽ﾂ" : "༼ﾂ◕‿◕‿◕༽ﾂ";
++  }
++
++  private startKaomojiBlink(): void {
++    if (this.kaomojiTimer) return;
++    const scheduleNext = () => {
++      const delay = 120_000 + Math.random() * 60_000;
++      this.kaomojiTimer = setTimeout(() => {
++        this.kaomojiBlink = true;
++        this.renderTopKaomoji();
++        this.screen.render();
++        setTimeout(() => {
++          this.kaomojiBlink = false;
++          this.renderTopKaomoji();
++          this.screen.render();
++          scheduleNext();
++        }, 250);
++      }, delay);
++    };
++    scheduleNext();
++  }
++
++  private renderTopKaomoji(): void {
++    const text = this.getStatusKaomoji();
++    const identityWidth = stringWidth(` ${this.getInstanceDisplayLabel()} `);
++    const baseOffset = 1;
++    const rightOffset = Math.max(0, baseOffset + identityWidth);
++    const width = Math.max(1, stringWidth(text));
++    if (!this.statusKaomoji) {
++      this.statusKaomoji = blessed.box({
++        parent: this.menuBar,
++        top: 0,
++        right: rightOffset,
++        height: 1,
++        width,
++        tags: true,
++        content: text,
++        style: theme().menuBar,
++      });
++      return;
++    }
++    this.statusKaomoji.right = rightOffset;
++    this.statusKaomoji.width = width;
++    this.statusKaomoji.setContent(text);
++    this.statusKaomoji.style = theme().menuBar;
++  }
++
++  private renderTopIdentity(): void {
++    const text = ` ${this.getInstanceDisplayLabel()} `;
++    const rightOffset = 1;
++    const width = Math.max(1, stringWidth(text));
++    if (!this.statusIdentity) {
++      this.statusIdentity = blessed.box({
++        parent: this.menuBar,
++        top: 0,
++        right: rightOffset,
++        height: 1,
++        width,
++        tags: true,
++        content: text,
++        style: theme().menuBar,
++      });
++      return;
++    }
++    this.statusIdentity.right = rightOffset;
++    this.statusIdentity.width = width;
++    this.statusIdentity.setContent(text);
++    this.statusIdentity.style = theme().menuBar;
++  }
++
+ 
+   private updateStatusLine(): void {
+     const current = this.state.sync();
+@@ -313,6 +422,24 @@ export class TsTuiMvpApp {
+     this.menuUi.closeMenus();
+   }
+ 
++  private focusOrCreate(appType: string, createFn: () => void, multiInstance = false): void {
++    if (!multiInstance) {
++      const existing = this.windowManager.getWindows().find((window) => {
++        try {
++          return (window.describeState?.() as { appType?: string })?.appType === appType;
++        } catch {
++          return false;
++        }
++      });
++      if (existing) {
++        this.windowManager.focusWindow(existing);
++        this.screen.render();
++        return;
++      }
++    }
++    createFn();
++  }
++
+   private openPopupMenu(items: Array<{ label: string; action: () => void }>, x?: number, y?: number): void {
+     this.menuUi.openPopupMenu(items, x, y);
+   }
+-- 
+2.39.5 (Apple Git-154)
+

@@ -1,0 +1,69 @@
+From 5b1e2557beff66ab6e04fe9bdd31f41f024c8c5f Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:18:28 +0000
+Subject: [PATCH 11/32] fix(e022-s03): iso serialises terrain params not
+ ephemeral file path
+
+---
+ microapps/wibwobworld-iso/index.ts | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
+
+diff --git a/microapps/wibwobworld-iso/index.ts b/microapps/wibwobworld-iso/index.ts
+index 4c676fa..833a246 100644
+--- a/microapps/wibwobworld-iso/index.ts
++++ b/microapps/wibwobworld-iso/index.ts
+@@ -250,15 +250,19 @@ export default function setup(host: MicroappHost) {
+           });
+ 
+           win.describeState(() => ({
+-            summary: `WibWobWorld Iso — ${artifact.map.terrainName}, ${path.basename(sourcePath)}`,
++            appType: "wibwobworld-iso",
++            summary: `WibWobWorld Iso — ${artifact.map.terrainName}, ${path.basename(sourcePath ?? "")}`,
+             contentPreview: lastText.split("\n").slice(0, 10).join("\n"),
+             sourcePath,
+             renderMode: "isometric",
+             sourceRenderMode: artifact.renderMode,
+             sourceLevels: artifact.levels,
+             terrain: artifact.map.terrainName,
++            // Terrain params — serialised as restore key (not the ephemeral file path)
+             seed: artifact.map.seed,
++            terrainIdx: artifact.map.terrainIdx,
+             seaLevel: artifact.map.seaLevel,
++            levels: artifact.levels,
+             viewportWidth: Math.max(12, innerW - 2),
+             viewportHeight: Math.max(6, innerH - 2),
+             focusX: artifact.focus.x,
+@@ -356,14 +360,26 @@ export default function setup(host: MicroappHost) {
+     serialize: (window) => {
+       const state = window.describeState?.() ?? {};
+       if (state.appType !== "wibwobworld-iso") return undefined;
++      // Serialise terrain params, not the ephemeral file path.
++      // sourcePath lives in scratch/captures/ and may be gone on restart.
+       return {
+-        path: state.sourcePath,
++        seed: state.seed,
++        terrainIdx: state.terrainIdx,
++        seaLevel: state.seaLevel,
++        levels: state.levels,
+       };
+     },
+     restore: (_snapshot, payload) => {
+-      const p = payload.path;
+-      if (typeof p !== "string" || !fs.existsSync(p)) return;
+-      host.runCommand("open", payload);
++      const { seed, terrainIdx, seaLevel, levels } = payload;
++      // If we have terrain params, pass them so the viewer can reopen correctly.
++      // openIso will fall back to latestTerrainExportPath() if the params
++      // don't resolve to a file — no fs.existsSync guard, no file-path dependency.
++      if (seed !== undefined || terrainIdx !== undefined) {
++        host.runCommand("open", { seed, terrainIdx, seaLevel, levels });
++      } else {
++        // Legacy snapshot missing params — open with defaults (latest export).
++        host.runCommand("open");
++      }
+     },
+   });
+ }
+-- 
+2.39.5 (Apple Git-154)
+

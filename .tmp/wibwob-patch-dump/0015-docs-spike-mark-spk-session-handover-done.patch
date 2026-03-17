@@ -1,0 +1,25 @@
+From a5395a34c71c55df83886e4beaef0f6dad70bb12 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:24:14 +0000
+Subject: [PATCH 15/32] docs(spike): mark spk-session-handover done
+
+---
+ .planning/spikes/spk-session-handover/spike-brief.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/.planning/spikes/spk-session-handover/spike-brief.md b/.planning/spikes/spk-session-handover/spike-brief.md
+index b7cf104..3753d9e 100644
+--- a/.planning/spikes/spk-session-handover/spike-brief.md
++++ b/.planning/spikes/spk-session-handover/spike-brief.md
+@@ -1,7 +1,7 @@
+ ---
+ id: spk-session-handover
+ title: Session Handover — auto-generated context doc
+-status: not-started
++status: done
+ ---
+ 
+ # Spike: Session Handover
+-- 
+2.39.5 (Apple Git-154)
+

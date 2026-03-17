@@ -1,0 +1,20 @@
+From 95f66a19f97a78f3f4c37c07936aa0d6fe1a4795 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:08:05 +0000
+Subject: [PATCH 07/32] migrate: update modules-private submodule ref (world
+ modules removed)
+
+---
+ modules-private | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules-private b/modules-private
+index c4357e6..90161d6 160000
+--- a/modules-private
++++ b/modules-private
+@@ -1 +1 @@
+-Subproject commit c4357e66bd8d8e9bff03f24e9be1ba0baf1b2ac9
++Subproject commit 90161d6dce663888dfb2320b82b6ca2e31f84ad2
+-- 
+2.39.5 (Apple Git-154)
+

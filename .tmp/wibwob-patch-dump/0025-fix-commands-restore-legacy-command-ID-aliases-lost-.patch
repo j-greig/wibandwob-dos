@@ -1,0 +1,101 @@
+From 36b20febfd2cce934ac17020c48c44ea5b1e7cea Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 13:17:21 +0000
+Subject: [PATCH 25/32] fix(commands): restore legacy command ID aliases lost
+ in merge 4e2500b
+
+---
+ src/core/command-registry.ts | 61 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 59 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/command-registry.ts b/src/core/command-registry.ts
+index c35881d..817f40d 100644
+--- a/src/core/command-registry.ts
++++ b/src/core/command-registry.ts
+@@ -35,6 +35,52 @@ export interface DynamicCommandDefinition {
+   agent?: boolean;
+ }
+ 
++/**
++ * Maps pre-4e2500b command IDs to their current equivalents.
++ * Agents and API callers using historic IDs continue to work after renames.
++ * OLD_ID → NEW_ID (new ID must exist in the current catalog or dynamic registry).
++ */
++const LEGACY_COMMAND_ALIASES: Record<string, string> = {
++  // primers
++  "primer.browse":               "file.browse_primers",
++  "primer.open":                 "file.open_primer_prompt",
++  "primer.list":                 "file.browse_primers",
++  // finder (all map to file manager — fine-grained finder ops not restored yet)
++  "finder.open":                 "file.open_file_manager",
++  "finder.search":               "file.open_file_manager",
++  "finder.navigate":             "file.open_file_manager",
++  "finder.toggle_view":          "file.open_file_manager",
++  "finder.advanced_search":      "file.open_file_manager",
++  "finder.bookmark_path":        "file.open_file_manager",
++  "finder.go_to_bookmark":       "file.open_file_manager",
++  "finder.new_folder":           "file.open_file_manager",
++  "finder.refresh":              "file.open_file_manager",
++  "finder.sort_by":              "file.open_file_manager",
++  // editor
++  "editor.open":                 "file.open_text_file_prompt",
++  "editor.new":                  "file.new_text_buffer",
++  "editor.save":                 "file.save",
++  "editor.save_as":              "file.save_as",
++  // workspace
++  "workspace.load_named":        "workspace.load",
++  "workspace.manage":            "workspace.open_manager",
++  // window ops
++  "window.copy_text":            "edit.copy_window_text",
++  "window.export_text":          "edit.export_window_text",
++  // apps
++  "chrome.open":                 "browser.open_chrome",
++  "agent.open":                  "agent.open_wibwob",
++  "agent.reload_prompt":         "agent.open_wibwob",
++  "art.open":                    "art.open_window",
++  "backrooms.run":               "backrooms.open",
++  "backrooms_logs.open":         "backrooms.log_browser",
++  "monster_cam.open":            "cam.open_monster_cam",
++  "document.open":               "reader.open",
++  "music-player.open":           "music.open_player",
++  // theme
++  "theme.cycle":                 "app.toggle_theme",
++};
++
+ export class CommandRegistry {
+   private readonly commands: AppCommandDescriptor[];
+   private readonly dynamicCommands: AppCommandDescriptor[] = [];
+@@ -93,17 +139,28 @@ export class CommandRegistry {
+   }
+ 
+   run(id: string, args?: Record<string, unknown>): { ok: true } | { ok: false; error: string } {
+-    const command = this.commands.find((candidate) => candidate.id === id);
++    // Resolve legacy IDs to current equivalents before dispatch.
++    const resolvedId = LEGACY_COMMAND_ALIASES[id] ?? id;
++
++    const command = this.commands.find((candidate) => candidate.id === resolvedId);
+     if (command) {
+       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
+       action(args);
+       return { ok: true };
+     }
+-    const dynamic = this.dynamicActions.get(id);
++    const dynamic = this.dynamicActions.get(resolvedId);
+     if (dynamic) {
+       dynamic(args);
+       return { ok: true };
+     }
++    // Also try dynamic by original id (for dynamic commands registered with old names)
++    if (resolvedId !== id) {
++      const dynamicOrig = this.dynamicActions.get(id);
++      if (dynamicOrig) {
++        dynamicOrig(args);
++        return { ok: true };
++      }
++    }
+     return { ok: false, error: `Unknown command: ${id}` };
+   }
+ 
+-- 
+2.39.5 (Apple Git-154)
+

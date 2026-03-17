@@ -1,0 +1,1137 @@
+From 186ed89c2df967f302136edbc06b86b5a6e6bb12 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 13:21:04 +0000
+Subject: [PATCH 30/32] =?UTF-8?q?chore:=20session=20state=20=E2=80=94=20to?=
+ =?UTF-8?q?dos,=20handover,=20new=20skill=20dir?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .pi/skills/creative-feedback-loop/SKILL.md    | 163 ++++++++
+ .../scripts/classify_pairs.py                 | 206 ++++++++++
+ .../scripts/extract_pairs.py                  | 149 +++++++
+ .pi/todos/011ca571.md                         |   9 +-
+ .pi/todos/22b43104.md                         |   7 +-
+ .pi/todos/4ce96f5e.md                         |   3 +-
+ .pi/todos/888b1f9f.md                         |   4 +-
+ .pi/todos/8eb8da84.md                         |   4 +-
+ .pi/todos/9b57d538.md                         |   2 +-
+ .pi/todos/b1738085.md                         |   2 +-
+ .pi/todos/d9502be7.md                         |   2 +-
+ .pi/todos/e94848c7.md                         |   4 +-
+ .pi/todos/f0ecfc54.md                         |  22 +
+ tmp/session-handover-2026-03-07.md            | 386 +++++++++++++-----
+ 14 files changed, 844 insertions(+), 119 deletions(-)
+
+diff --git a/.pi/skills/creative-feedback-loop/SKILL.md b/.pi/skills/creative-feedback-loop/SKILL.md
+new file mode 100644
+index 0000000..297e660
+--- /dev/null
++++ b/.pi/skills/creative-feedback-loop/SKILL.md
+@@ -0,0 +1,163 @@
++---
++name: creative-feedback-loop
++description: >
++  Two-step pipeline to extract Zilla's creative taste from session logs.
++  Step 1 (fast, no LLM): scan CC + Pi JSONL for ALL assistant→user pairs.
++  No regex, no word lists — just structural pair extraction. Step 2 (parallel
++  Haiku subagents via Claude Agent SDK): classify each pair for sentiment,
++  taste signal, and creative domain. Uses Claude Code's own auth — no API key
++  needed. Outputs a preference index that creative skills can query before
++  generating.
++---
++
++# Creative Feedback Loop
++
++Mine session logs for creative taste signals using Haiku subagents.
++No regex sentiment — every pair gets real LLM judgment.
++
++## When to use this
++
++- Before a creative session — warm up with recent taste signals
++- After a batch of sessions — rebuild the preference index
++- When output feels generic — check what Zilla actually liked/disliked
++- Debugging taste drift in autonomous sessions
++
++## Quick run
++
++### Full pipeline (extract + classify + summary)
++
++```bash
++python3 scripts/extract_pairs.py -o /tmp/creative-pairs.json
++python3 scripts/classify_pairs.py /tmp/creative-pairs.json --summary
++```
++
++### Filter to one project, last 14 days
++
++```bash
++python3 scripts/extract_pairs.py -p wibandwob-dos --recent 14 -o /tmp/pairs.json
++python3 scripts/classify_pairs.py /tmp/pairs.json --summary -o /tmp/taste-index.json
++```
++
++### Pipe mode (no intermediate file)
++
++```bash
++python3 scripts/extract_pairs.py -p wibandwob-dos --recent 7 | \
++  python3 scripts/classify_pairs.py --summary
++```
++
++## How it works
++
++### Step 1: extract_pairs.py (fast, no API calls, no word lists)
++
++Scans `~/.claude/projects/` (CC) and `~/.pi/agent/sessions/` (Pi) for
++ALL adjacent assistant→user message pairs. No regex filtering, no
++heuristic word arrays. Only structural filters:
++- Must be assistant followed by user
++- User message >8 chars (skip single-word acks)
++- Skip hook/system messages
++
++All creative vs engineering judgment is deferred to Haiku in step 2.
++
++Handles both JSONL formats transparently:
++- **CC:** `{type: "user"|"assistant", message: {content}}`
++- **Pi:** `{type: "message", message: {role, content}}`
++
++Output: JSON array of `{assistant_text, user_text, session_id, date, source, project}`
++
++### Step 2: classify_pairs.py (parallel Haiku calls)
++
++Sends each candidate pair to Claude Haiku with a classification prompt.
++Haiku returns structured judgment:
++
++```json
++{
++  "is_creative_reaction": true,
++  "sentiment": "redirect",
++  "taste_signal": "prefers asymmetric layouts, dislikes compressed arrangements",
++  "creative_domain": "layout",
++  "confidence": 0.85
++}
++```
++
++Key advantage over regex: Haiku understands that "the glitch effect is
++cooooool but the first cluster of vox is a bit much" is a REDIRECT, not
++positive. It also filters out non-reactions (engineering follow-ups,
++debugging, hook messages) that regex misclassifies.
++
++Uses Claude Agent SDK `query()` — shares Claude Code's subscription auth,
++no API key needed. Runs 10 concurrent queries by default.
++
++### Sentiment categories
++
++- **positive** — human liked it, wants more of this direction
++- **negative** — human disliked it, wants less of this
++- **redirect** — partially positive but wants specific changes
++- **neutral** — filtered out (acknowledged but no taste signal)
++- **not_a_reaction** — filtered out (engineering, debugging, etc.)
++
++### Taste signals
++
++The most valuable output. Not just positive/negative but WHY:
++- "prefers diagonal cascade layouts over grids"
++- "dislikes overly happy/cheesy chiptune, wants more variety and dynamics"
++- "liked the contour_map + orbit combo, wants more mixed generative types"
++- "concrete poetry arrangements with asymmetric figlet felt right"
++
++## Integration with creative skills
++
++Before generating, include recent taste signals in your prompt:
++
++```
++Recent taste signals (from creative-feedback-loop):
++[+] prefers asymmetric layouts over grid arrangements
++[+] diagonal cascade with mixed window sizes felt right
++[-] too-happy chiptune without dynamics
++[~] liked the glitch effect but vox cluster was too dense
++```
++
++## Options
++
++### extract_pairs.py
++
++```
++--cc-dir DIR       CC projects dir (default: ~/.claude/projects)
++--pi-dir DIR       Pi sessions dir (default: ~/.pi/agent/sessions)
++--project, -p STR  Filter to project slug (substring match)
++--recent N         Only process sessions from last N days
++--output, -o FILE  Output JSON file (default: stdout)
++```
++
++### classify_pairs.py
++
++```
++input              JSON file from extract_pairs (or - for stdin)
++--output, -o FILE  Output classified JSON file
++--summary          Print human-readable taste report
++--concurrency, -c  Max parallel Haiku calls (default: 15)
++--model MODEL      Classification model (default: claude-haiku-4-5-20251001)
++--min-confidence F Minimum confidence threshold (default: 0.4)
++```
++
++## Auth & Cost
++
++Uses `claude-agent-sdk` `query()` function — inherits Claude Code's
++subscription auth. No ANTHROPIC_API_KEY needed.
++
++Haiku classification: ~200 input tokens + ~80 output tokens per pair.
++Cheap enough to run on every session.
++
++## Files
++
++```
++scripts/
++  extract_pairs.py    # Step 1: JSONL -> candidate pairs (fast, no LLM)
++  classify_pairs.py   # Step 2: Haiku classification (parallel subagents)
++```
++
++## Future
++
++- Auto-run step 1 on session end (hook), batch classify nightly
++- Embedding similarity: "find taste signals for things LIKE this output"
++- Per-domain profiles: separate art/music/layout/typography taste
++- Conductor agent integration: taste index as generation constraint
++- Conductor self-assessment reactions flagged as source="conductor"
+diff --git a/.pi/skills/creative-feedback-loop/scripts/classify_pairs.py b/.pi/skills/creative-feedback-loop/scripts/classify_pairs.py
+new file mode 100644
+index 0000000..b038216
+--- /dev/null
++++ b/.pi/skills/creative-feedback-loop/scripts/classify_pairs.py
+@@ -0,0 +1,206 @@
++# /// script
++# requires-python = ">=3.10"
++# dependencies = ["claude-agent-sdk"]
++# ///
++"""
++Step 2: Classify candidate pairs using parallel Haiku subagent calls.
++
++Uses Claude Agent SDK's query() function — shares Claude Code's auth,
++no API key needed. Sends each candidate pair to Haiku for real LLM judgment
++on sentiment, taste signal, and creative domain.
++
++Runs N concurrent queries for speed.
++"""
++import asyncio
++import json
++import os
++import sys
++import argparse
++from pathlib import Path
++
++# Must unset before importing SDK so nested claude processes work
++os.environ.pop("CLAUDECODE", None)
++
++from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
++
++
++CLASSIFY_PROMPT = """\
++You are classifying a human's reaction to creative output from an AI agent.
++
++AGENT OUTPUT (what was made):
++{assistant_text}
++
++HUMAN REACTION (what they said next):
++{user_text}
++
++Classify this interaction. Respond with ONLY a JSON object, no markdown fences, no explanation:
++
++{{"is_creative_reaction": true/false, "sentiment": "positive"|"negative"|"redirect"|"neutral"|"not_a_reaction", "taste_signal": "one sentence summarizing what the human liked/disliked/wanted changed, or null if not a creative reaction", "creative_domain": "art"|"music"|"layout"|"typography"|"mixed"|"none", "confidence": 0.0-1.0}}
++
++Rules:
++- "not_a_reaction" = the human message is about something else entirely (engineering, debugging, next task, system hook)
++- "neutral" = acknowledging but no taste signal ("ok", "cool", "next")
++- "redirect" = partially positive but wants changes ("love it but make X more Y")
++- Only is_creative_reaction=true if the agent message was genuinely showing creative work AND the human is reacting to that creative work
++- taste_signal should capture the WHY not just positive/negative. e.g. "prefers asymmetric layouts over grids" not just "liked it"\
++"""
++
++
++async def classify_one(
++    pair: dict,
++    semaphore: asyncio.Semaphore,
++    model: str,
++    idx: int,
++    total: int,
++) -> dict | None:
++    """Classify a single pair via Agent SDK query()."""
++    prompt = CLASSIFY_PROMPT.format(
++        assistant_text=pair["assistant_text"][:600],
++        user_text=pair["user_text"][:300],
++    )
++
++    async with semaphore:
++        try:
++            opts = ClaudeAgentOptions(
++                model=model,
++                max_turns=1,
++                permission_mode="bypassPermissions",
++            )
++
++            text = ""
++            async for msg in query(prompt=prompt, options=opts):
++                if isinstance(msg, ResultMessage):
++                    # ResultMessage.result is the final text (string)
++                    if hasattr(msg, "result") and msg.result:
++                        text = msg.result
++
++            text = text.strip()
++
++            # Strip markdown fences if present
++            if text.startswith("```"):
++                lines = text.split("\n")
++                text = "\n".join(lines[1:])
++            if text.endswith("```"):
++                text = text[: text.rfind("```")]
++            text = text.strip()
++
++            result = json.loads(text)
++
++            if not result.get("is_creative_reaction"):
++                return None
++            if result.get("sentiment") in ("not_a_reaction", "neutral"):
++                return None
++
++            if (idx + 1) % 25 == 0:
++                print(f"  [{idx+1}/{total}] classified...", file=sys.stderr)
++
++            return {
++                "output_summary": pair["assistant_text"][:500],
++                "reaction_text": pair["user_text"][:300],
++                "sentiment": result["sentiment"],
++                "taste_signal": result.get("taste_signal"),
++                "creative_domain": result.get("creative_domain", "mixed"),
++                "confidence": result.get("confidence", 0.5),
++                "session_id": pair["session_id"],
++                "date": pair["date"],
++                "source": pair["source"],
++                "project": pair["project"],
++            }
++        except (json.JSONDecodeError, KeyError, IndexError) as e:
++            print(f"  [{idx+1}] parse error: {e}", file=sys.stderr)
++            return None
++        except Exception as e:
++            print(f"  [{idx+1}] error: {type(e).__name__}: {e}", file=sys.stderr)
++            return None
++
++
++async def classify_all(
++    pairs: list[dict],
++    concurrency: int,
++    model: str,
++) -> list[dict]:
++    """Classify all pairs with bounded concurrency."""
++    semaphore = asyncio.Semaphore(concurrency)
++    total = len(pairs)
++
++    tasks = [
++        classify_one(p, semaphore, model, i, total)
++        for i, p in enumerate(pairs)
++    ]
++    results = await asyncio.gather(*tasks)
++    return [r for r in results if r is not None]
++
++
++def print_summary(reactions: list[dict]):
++    pos = [r for r in reactions if r["sentiment"] == "positive"]
++    neg = [r for r in reactions if r["sentiment"] == "negative"]
++    red = [r for r in reactions if r["sentiment"] == "redirect"]
++
++    print("Creative Feedback Index (Haiku-classified)")
++    print("=" * 60)
++    print(f"Total: {len(reactions)} ({len(pos)} positive, {len(neg)} negative, {len(red)} redirect)")
++    print()
++
++    for label, icon, group in [
++        ("LIKED", "+", pos),
++        ("DISLIKED", "-", neg),
++        ("REDIRECTED", "~", red),
++    ]:
++        if not group:
++            continue
++        print(f"{label} ({len(group)}):")
++        for r in group[:20]:
++            taste = r.get("taste_signal", "")
++            domain = r.get("creative_domain", "?")
++            if taste:
++                print(f"  [{icon}] [{r['date']}] [{r['source']}] [{domain}] {taste}")
++            else:
++                react_short = r["reaction_text"][:70].replace("\n", " ")
++                print(f"  [{icon}] [{r['date']}] [{r['source']}] [{domain}] \"{react_short}\"")
++        print()
++
++
++def main():
++    parser = argparse.ArgumentParser(description="Classify creative pairs via Haiku subagents")
++    parser.add_argument("input", nargs="?", default="-", help="JSON from extract_pairs.py (default: stdin)")
++    parser.add_argument("--output", "-o", default=None, help="Output JSON file")
++    parser.add_argument("--summary", action="store_true", help="Print human-readable summary")
++    parser.add_argument("--concurrency", "-c", type=int, default=10, help="Max parallel queries (default: 10)")
++    parser.add_argument("--model", default="claude-haiku-4-5-20251001", help="Model for classification")
++    parser.add_argument("--min-confidence", type=float, default=0.4, help="Min confidence threshold")
++    parser.add_argument("--limit", type=int, default=0, help="Max pairs to classify (0=all)")
++    args = parser.parse_args()
++
++    # Read input
++    if args.input == "-":
++        pairs = json.load(sys.stdin)
++    else:
++        pairs = json.loads(Path(args.input).read_text())
++
++    if args.limit > 0:
++        pairs = pairs[:args.limit]
++
++    print(
++        f"Classifying {len(pairs)} pairs via Agent SDK query()"
++        f" model={args.model} concurrency={args.concurrency}...",
++        file=sys.stderr,
++    )
++
++    reactions = asyncio.run(classify_all(pairs, args.concurrency, args.model))
++    reactions = [r for r in reactions if r["confidence"] >= args.min_confidence]
++    reactions.sort(key=lambda r: (r["date"], r["confidence"]), reverse=True)
++
++    print(f"Found {len(reactions)} creative reactions", file=sys.stderr)
++
++    if args.summary:
++        print_summary(reactions)
++
++    if args.output:
++        Path(args.output).write_text(json.dumps(reactions, indent=2, ensure_ascii=False))
++        print(f"Wrote {len(reactions)} reactions -> {args.output}", file=sys.stderr)
++    elif not args.summary:
++        print(json.dumps(reactions, indent=2, ensure_ascii=False))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/.pi/skills/creative-feedback-loop/scripts/extract_pairs.py b/.pi/skills/creative-feedback-loop/scripts/extract_pairs.py
+new file mode 100644
+index 0000000..5163dab
+--- /dev/null
++++ b/.pi/skills/creative-feedback-loop/scripts/extract_pairs.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""
++Step 1: Extract ALL assistant->user message pairs from CC + Pi session logs.
++
++No filtering, no heuristics, no word lists. Extracts every adjacent
++assistant→user pair and lets classify_pairs.py (Haiku subagents) decide
++which ones are creative reactions.
++
++Only filters out: system/hook messages, very short replies, empty messages.
++
++Output: JSON array of {assistant_text, user_text, session_id, date, source, project}
++"""
++import json
++import os
++import sys
++import argparse
++from pathlib import Path
++from datetime import datetime
++
++
++def extract_text(content) -> str:
++    if isinstance(content, str):
++        return content.strip()
++    if isinstance(content, list):
++        parts = []
++        for c in content:
++            if isinstance(c, dict) and c.get("type") == "text":
++                parts.append(c.get("text", ""))
++        return "\n".join(parts).strip()
++    return ""
++
++
++def scan_session(path: Path, source: str, project: str) -> list[dict]:
++    """Extract assistant->user pairs from one JSONL session file."""
++    messages = []
++    with open(path) as f:
++        for line in f:
++            try:
++                obj = json.loads(line)
++            except (json.JSONDecodeError, UnicodeDecodeError):
++                continue
++
++            if source == "cc":
++                obj_type = obj.get("type", "")
++                if obj_type in ("user", "assistant"):
++                    msg = obj.get("message", {})
++                    text = extract_text(msg.get("content", ""))
++                    if text and not text.startswith("<"):
++                        messages.append((obj_type, text))
++            elif source == "pi":
++                if obj.get("type") == "message":
++                    msg = obj.get("message", {})
++                    role = msg.get("role", "")
++                    text = extract_text(msg.get("content", ""))
++                    if text and role in ("user", "assistant") and not text.startswith("<"):
++                        messages.append((role, text))
++
++    pairs = []
++    session_id = path.stem
++    dt = datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d")
++
++    for i in range(len(messages) - 1):
++        role_a, text_a = messages[i]
++        role_b, text_b = messages[i + 1]
++
++        if role_a != "assistant" or role_b != "user":
++            continue
++
++        # Skip very short user replies (single word acks)
++        if len(text_b.strip()) < 8:
++            continue
++
++        # Skip automated hook/system messages
++        stripped = text_b.strip()
++        if stripped.startswith("Stop hook") or stripped.startswith("[Request"):
++            continue
++
++        pairs.append({
++            "assistant_text": text_a[:800],
++            "user_text": text_b[:400],
++            "session_id": session_id,
++            "date": dt,
++            "source": source,
++            "project": project,
++        })
++
++    return pairs
++
++
++def main():
++    parser = argparse.ArgumentParser(
++        description="Extract all assistant->user pairs from session logs"
++    )
++    parser.add_argument("--cc-dir", default=str(Path.home() / ".claude/projects"))
++    parser.add_argument("--pi-dir", default=str(Path.home() / ".pi/agent/sessions"))
++    parser.add_argument("--project", "-p", default=None, help="Filter to project slug (substring)")
++    parser.add_argument("--recent", type=int, default=0, help="Only last N days")
++    parser.add_argument("--output", "-o", default=None, help="Output JSON file (default: stdout)")
++    args = parser.parse_args()
++
++    import time
++    cutoff = time.time() - (args.recent * 86400) if args.recent > 0 else 0
++
++    all_pairs = []
++
++    # Scan CC
++    cc_path = Path(args.cc_dir)
++    if cc_path.exists():
++        for proj_dir in cc_path.iterdir():
++            if not proj_dir.is_dir():
++                continue
++            if args.project and args.project not in proj_dir.name:
++                continue
++            for jf in proj_dir.glob("*.jsonl"):
++                if cutoff and os.path.getmtime(jf) < cutoff:
++                    continue
++                try:
++                    all_pairs.extend(scan_session(jf, "cc", proj_dir.name))
++                except Exception:
++                    pass
++
++    # Scan Pi
++    pi_path = Path(args.pi_dir)
++    if pi_path.exists():
++        for proj_dir in pi_path.iterdir():
++            if not proj_dir.is_dir():
++                continue
++            if args.project and args.project not in proj_dir.name:
++                continue
++            for jf in proj_dir.glob("*.jsonl"):
++                if cutoff and os.path.getmtime(jf) < cutoff:
++                    continue
++                try:
++                    all_pairs.extend(scan_session(jf, "pi", proj_dir.name))
++                except Exception:
++                    pass
++
++    all_pairs.sort(key=lambda p: p["date"], reverse=True)
++
++    text = json.dumps(all_pairs, indent=2, ensure_ascii=False)
++    if args.output:
++        Path(args.output).write_text(text)
++        print(f"Extracted {len(all_pairs)} pairs -> {args.output}", file=sys.stderr)
++    else:
++        print(text)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/.pi/todos/011ca571.md b/.pi/todos/011ca571.md
+index 79f985d..56fe6dd 100644
+--- a/.pi/todos/011ca571.md
++++ b/.pi/todos/011ca571.md
+@@ -11,11 +11,4 @@
+   "created_at": "2026-03-07T10:25:16.175Z"
+ }
+ 
+-Poetry Clock sentient/liminal/terrain modes require LLM inference. Docker smoke container has no ANTHROPIC_API_KEY — modes other than plain clock will silently fail or error.
+-
+-Options:
+-A) Graceful fallback — if no API key, force clock mode and show a status message instead of crashing
+-B) Pass ANTHROPIC_API_KEY into container at runtime via -e flag (leaks key into container)
+-C) Document that inference modes require key injection
+-
+-Prefer A: the clock should degrade gracefully to plain time display with a visible note.
++Fixed — commit 821a380. Token checked upfront before entering generating state. No-key path: sets noInferenceNote, forces clock mode, renders immediately. Status bar shows "Inference unavailable — no API key. Plain clock mode." Pressing [m] without token shows note instantly.
+diff --git a/.pi/todos/22b43104.md b/.pi/todos/22b43104.md
+index 724315e..3798076 100644
+--- a/.pi/todos/22b43104.md
++++ b/.pi/todos/22b43104.md
+@@ -5,9 +5,8 @@
+     "planning-infra",
+     "t2"
+   ],
+-  "status": "open",
+-  "created_at": "2026-03-07T11:12:59.931Z",
+-  "assigned_to_session": "453b2d93-1f61-4ab8-919e-8292e1aef9fb"
++  "status": "closed",
++  "created_at": "2026-03-07T11:12:59.931Z"
+ }
+ 
+-Create .pi/skills/planning-update/SKILL.md — trigger table for post-work updates, exact edit patterns for story/feature/epic closeout, definition of closeout pass, planning.sh sync instruction. Update AGENTS.md with planning section. Must land together — AGENTS.md references the skill.
++Shipped — planning-update skill exists at .pi/skills/planning-update/. Closing stale todo (was assigned to a dead session).
+diff --git a/.pi/todos/4ce96f5e.md b/.pi/todos/4ce96f5e.md
+index 08df6a2..d09c7d4 100644
+--- a/.pi/todos/4ce96f5e.md
++++ b/.pi/todos/4ce96f5e.md
+@@ -8,8 +8,7 @@
+     "composition"
+   ],
+   "status": "open",
+-  "created_at": "2026-03-03T23:11:05.193Z",
+-  "assigned_to_session": "a52ef15a-af6c-40b9-9ccc-54e9dde0ad55"
++  "created_at": "2026-03-03T23:11:05.193Z"
+ }
+ 
+ ## Brief
+diff --git a/.pi/todos/888b1f9f.md b/.pi/todos/888b1f9f.md
+index a58eaa3..cb2d997 100644
+--- a/.pi/todos/888b1f9f.md
++++ b/.pi/todos/888b1f9f.md
+@@ -5,8 +5,8 @@
+     "planning-infra",
+     "t3"
+   ],
+-  "status": "open",
++  "status": "closed",
+   "created_at": "2026-03-07T11:12:59.940Z"
+ }
+ 
+-Currently at .planning/epics/spk01-figlet-live-preview/ — wrong location. Create .planning/spikes/ dir, git mv the folder there.
++Done in previous session — commit ebc66a8. spk01 moved to .planning/spikes/.
+diff --git a/.pi/todos/8eb8da84.md b/.pi/todos/8eb8da84.md
+index 1c64849..c1221a1 100644
+--- a/.pi/todos/8eb8da84.md
++++ b/.pi/todos/8eb8da84.md
+@@ -1,11 +1,11 @@
+ {
+   "id": "8eb8da84",
+-  "title": "T4-A: Decide E001 fate",
++  "title": "T4-A: E001 fate decided — in-progress, scoped to S01+S02",
+   "tags": [
+     "planning-infra",
+     "t4"
+   ],
+-  "status": "open",
++  "status": "done",
+   "created_at": "2026-03-07T11:12:59.944Z"
+ }
+ 
+diff --git a/.pi/todos/9b57d538.md b/.pi/todos/9b57d538.md
+index c6b9771..5000904 100644
+--- a/.pi/todos/9b57d538.md
++++ b/.pi/todos/9b57d538.md
+@@ -9,4 +9,4 @@
+   "created_at": "2026-03-07T10:25:16.170Z"
+ }
+ 
+-Monster Cam crashes in Docker smoke environment. Root cause unknown — needs stderr log capture to diagnose. Possibly canvas/image dependency, missing CLI tool, or filesystem path issue.
++Fixed — commit ee30fae. Preflight check for assets/mediapipe-venv/bin/python before spawning worker. Absent venv emits clean "Monster Cam unavailable — no camera detected. Requires assets/mediapipe-venv/." worker.on('error') now guards on this.running before emitting.
+diff --git a/.pi/todos/b1738085.md b/.pi/todos/b1738085.md
+index d842762..f9a7cac 100644
+--- a/.pi/todos/b1738085.md
++++ b/.pi/todos/b1738085.md
+@@ -9,4 +9,4 @@
+   "created_at": "2026-03-07T11:12:59.943Z"
+ }
+ 
+-.planning/hybrid-iso-rebuild-plan.md, .planning/prd-hybrid-iso-mode.md, .planning/PARKED.md — none affiliated to an epic. Move to e022 dir or delete (hybrid/iso docs delivered). Check PARKED.md for anything still live.
++Done — commit 5e0e331. PARKED.md renamed to parking-lot.md. BUILD.md kept as live checklist.
+diff --git a/.pi/todos/d9502be7.md b/.pi/todos/d9502be7.md
+index 880ef0f..7c9bc76 100644
+--- a/.pi/todos/d9502be7.md
++++ b/.pi/todos/d9502be7.md
+@@ -9,4 +9,4 @@
+   "created_at": "2026-03-07T11:12:59.938Z"
+ }
+ 
+-Currently describes C++ engine project — wrong vocab (Engine, Registry, IPC, contracts), wrong test infra, wrong goals. Rewrite for TypeScript/Bun/Blessed. Must preserve sections simplify-planning skill reads as canon: checkbox format, status vocab, naming conventions, file hierarchy.
++Done — commit 26ccf8b. .planning/README.md rewritten for WibWob-DOS.
+diff --git a/.pi/todos/e94848c7.md b/.pi/todos/e94848c7.md
+index fa46ea3..62d889f 100644
+--- a/.pi/todos/e94848c7.md
++++ b/.pi/todos/e94848c7.md
+@@ -5,8 +5,8 @@
+     "planning-infra",
+     "t3"
+   ],
+-  "status": "open",
++  "status": "closed",
+   "created_at": "2026-03-07T11:12:59.942Z"
+ }
+ 
+-.planning/BUILD.md may be a DRY violation with epics (two progress trackers). But must read it first before deleting — 130 lines, 15 checkboxes. Verify all items covered by epic briefs, then delete.
++Done in previous session — commit 6559ce0. BUILD.md deleted, parked items moved to AGENTS.md.
+diff --git a/.pi/todos/f0ecfc54.md b/.pi/todos/f0ecfc54.md
+new file mode 100644
+index 0000000..9d8054a
+--- /dev/null
++++ b/.pi/todos/f0ecfc54.md
+@@ -0,0 +1,22 @@
++{
++  "id": "f0ecfc54",
++  "title": "Session control: pi-bitch available as subagent servant",
++  "tags": [
++    "session-control",
++    "workflow"
++  ],
++  "status": "open",
++  "created_at": "2026-03-07T12:03:32.212Z"
++}
++
++Session `pi-bitch` (UUID: 16508c33-581a-49b4-be93-65c4d1b30773) is a live pi session that can be delegated tasks via send_to_session.
++
++Usage pattern:
++- Send task: `send_to_session { sessionName: "pi-bitch", message: "...", wait_until: "turn_end" }`
++- Good for: parallel investigation, typecheck runs, file editing grunt work, migration steps
++- We are `pi-pimp` — orchestrate, don't grind
++
++Good candidates to delegate right now:
++- #112 investigation (read wibwob-agent-session.ts event flow, find the leak)
++- modules-private → modules migration file-copy steps
++- planning doc updates after stories land
+diff --git a/tmp/session-handover-2026-03-07.md b/tmp/session-handover-2026-03-07.md
+index f5dc88a..e901034 100644
+--- a/tmp/session-handover-2026-03-07.md
++++ b/tmp/session-handover-2026-03-07.md
+@@ -1,123 +1,317 @@
+ # Session Handover — 2026-03-07
+ 
+-Current state as of end of session. Branch: `main`.
++_Auto-generated by `scripts/handover.sh` at 12:39:57. Do not edit by hand._
+ 
+----
++## 1. Branch State
+ 
+-## Branch State
+-
+-Everything is on `main` now. The old working branch `codex/e002-root-migration`
+-and feature branches are merged and pushed. No open worktrees to care about.
+-
+-```bash
+-git log --oneline -5   # see recent commits
+-bun run typecheck      # must pass (was clean at EOD)
++**Working tree:**
++```
++ M .pi/todos/011ca571.md
++ M .pi/todos/22b43104.md
++ M .pi/todos/4ce96f5e.md
++ M .pi/todos/888b1f9f.md
++ M .pi/todos/9b57d538.md
++ M .pi/todos/b1738085.md
++ M .pi/todos/d9502be7.md
++ M .pi/todos/e94848c7.md
++ M .planning/epics/EPIC_STATUS.md
++ M scripts/handover.sh
++ M tmp/session-handover-2026-03-07.md
++?? .pi/todos/f0ecfc54.md
+ ```
+ 
+----
+-
+-## What Shipped This Session
+-
+-### Big merge — 496 commits onto main
+-- E014 theme system (highlight token added — warm pink for user/multi-agent labels)
+-- E015 microapps, E016 primitives, E018 WibWobWorld terrain + IRC + ISO/hybrid
+-- E020 IRC infrastructure, E023 capability-aware command registry
+-- scripts/restart.sh, window_maximize by ID, contour/ISO fill fixes
+-- All scratch work, vj sessions, compositions preserved
+-
+-### Planning infra overhaul (all merged)
+-- `planning-update` skill created — agents self-update planning without human
+-- `.planning/README.md` rewritten for WibWob-DOS (was C++ content)
+-- `BUILD.md` deleted — open items moved to AGENTS.md parking lot
+-- `spk01-figlet-live-preview` moved to `.planning/spikes/`
+-- All 14 epic briefs on canonical YAML frontmatter (`id/title/status/issue/pr/depends_on`)
+-- `bun run planning:status` clean — 7/14 done, no `?` entries
+-- E000 example epic deleted, E014 EPIC.md → e014-brief.md
+-
+-### README
+-Root README rewritten — features, controls, architecture, dev commands. No more
+-stale `docs/` paths.
+-
+----
+-
+-## Epic Status (7/14 done)
+-
++**Branches:**
+ ```
+-[ ] E001: Codified Context Infrastructure  not-started #106
+-[x] E002: TS TUI Root Migration            done
+-[ ] E003: Finder App                       not-started #104
+-[~] E004: Monster Cam                      in-progress #107
+-[x] E014: Theme System                     done
+-[x] E015: Microapp Module System           done
+-[x] E016: Microapp Primitives Library      done
+-[ ] E017: Scramble Brains                  not-started #115
+-[x] E018: WibWobWorld Terrain Foundation   done
+-[ ] E019: Rogue TUI Port                   not-started
+-[x] E020: IRC Infrastructure               done
+-[~] E021: VPS Multi-Agent World            in-progress
+-[~] E022: WibWobWorld Restore + Layout     in-progress #116
+-[x] E023: Capability-Aware Registry        done
++  codex/e002-root-migration
+++ codex/e023-capability-aware-command-registry
++  feat/agent-mailbox
++  feat/desktop-texture-gallery
+++ feat/e007-teleport-rooms
++  feat/e011-desktop-shell
++  feat/ts-tui-mvp
++  fix/command-surface-audit-p0p1p2
++  fix/parity-guardrails-v2
+++ fix/planning-infra
+++ last-days-of-tvision
++* main
++  spike/contour-map-view
++  spike/paint-figlet-stamp
++  spike/paint-save-load
++  spike/spk-808-drum-machine
++  spike/spk-auth-unification
++  spike/workspace-rename
++  remotes/origin/HEAD -> origin/main
++  remotes/origin/claude/add-tvterm-menu-option-BYRST
++  remotes/origin/claude/ai-coding-philosophy-docs-VLDKe
++  remotes/origin/claude/issue-38-20260215-2301
++  remotes/origin/claude/possible-ts-refactor
++  remotes/origin/codex/e002-root-migration
++  remotes/origin/copilot/fix-custom-title-display
++  remotes/origin/copilot/group-games-submenu
++  remotes/origin/copilot/review-epic-brief
++  remotes/origin/epic/e012-app-modularisation
++  remotes/origin/feat/agent-mailbox
++  remotes/origin/feat/backrooms-tv-view
++  remotes/origin/feat/desktop-texture-gallery
++  remotes/origin/feat/e002-browser-v0
++  remotes/origin/feat/e002-browser-window
++  remotes/origin/feat/e007-browser-hosted-deployment
++  remotes/origin/feat/e007-teleport-rooms-work
++  remotes/origin/feat/e008-multiplayer-partykit
++  remotes/origin/feat/e009-menu-system-redesign
++  remotes/origin/feat/e015-sprites-hosting
++  remotes/origin/feat/mailbox-reply-helper
++  remotes/origin/feat/scramble-visual-polish
++  remotes/origin/feat/ts-tui-mvp
++  remotes/origin/fix/parity-guardrails-v2
++  remotes/origin/fix/planning-infra
++  remotes/origin/fix/scramble-bg-and-toggle
++  remotes/origin/main
++  remotes/origin/mvp/mvp001-wibwobcity
++  remotes/origin/rescue/e002-slice-a-screenshot
++  remotes/origin/rescue/e002-slice-b-browser-copy
++  remotes/origin/rescue/e002-slice-c-backend
++  remotes/origin/spike/contour-map-view
++  remotes/origin/spike/paint-figlet-stamp
++  remotes/origin/spike/paint-save-load
++  remotes/origin/spike/spk-808-drum-machine
++  remotes/origin/spike/spk-auth-unification
++  remotes/origin/spike/workspace-rename
++  remotes/origin/spike/xterm-pty-validation
+ ```
+ 
+----
++**Recent commits (last 10):**
++```
++ee30fae fix(monster-cam): guard against missing camera/native deps
++821a380 fix(poetry-clock): graceful fallback to plain clock when no API key
++dad09f5 docs(e022): close S06 as superseded by S03, mark epic done
++83d6384 docs(e022): tick S05 done
++5e0e331 chore(planning): remove stale loose docs from root
++26ccf8b docs(planning): rewrite README for WibWob-DOS planning structure
++e3df956 fix(e022-s05): hybrid iso pane uses pane-sized world, not compressed contour world
++a5395a3 docs(spike): mark spk-session-handover done
++63de63a feat(handover): auto-generate session handover doc from live sources
++902e838 docs(e022): tick S03+S04 done
++```
+ 
+-## Open Todos (still live)
++## 2. What Shipped Today
+ 
+-### Bugs
+-- `TODO-9b57d538` — Monster Cam crash (Python/mediapipe, unrelated to Docker)
+-- `TODO-011ca571` — Poetry Clock: no inference in Docker (needs `ANTHROPIC_API_KEY` via `docker run -e`)
+-- GitHub #112 — agent tool call output leaking into transcript (nobody's looked)
++```
++ee30fae fix(monster-cam): guard against missing camera/native deps
++821a380 fix(poetry-clock): graceful fallback to plain clock when no API key
++dad09f5 docs(e022): close S06 as superseded by S03, mark epic done
++83d6384 docs(e022): tick S05 done
++5e0e331 chore(planning): remove stale loose docs from root
++26ccf8b docs(planning): rewrite README for WibWob-DOS planning structure
++e3df956 fix(e022-s05): hybrid iso pane uses pane-sized world, not compressed contour world
++a5395a3 docs(spike): mark spk-session-handover done
++63de63a feat(handover): auto-generate session handover doc from live sources
++902e838 docs(e022): tick S03+S04 done
++2cd1ad3 fix(e022-s04): microapp geometry restored on restart
++5b1e255 fix(e022-s03): iso serialises terrain params not ephemeral file path
++28a0b82 docs(e022): tick S01+S02 done, update AC status
++7e71056 docs: update module paths modules-private→modules in planning docs and gallery ext
++b0826fa fix(agent): clear assistant entry between turns, prevent transcript leak (#112)
++95f66a1 migrate: update modules-private submodule ref (world modules removed)
++0b25b0f migrate: move wibwobworld, wibwobworld-iso, world-chatroom from modules-private to modules
++51bcc2c E022 S02: update modules-private submodule (restoreSafeMode removed)
++a30590e E022 S01: update modules-private submodule (debug breadcrumbs stripped)
++fe8cfe8 docs(planning): spike — auto-generated session handover script
++a6e8a61 docs(planning): fix remaining ? epics, update handover — 7/14 clean
++7838db1 chore: session handover note — todos, GH issues, next steps
++6d52e96 docs: rewrite README — WibWob-DOS features, controls, architecture, dev commands
++4e2500b fix(types): merge type fixes + highlight semantic token for agent/multi-agent UX
++16e7b6a docs(planning): e023 done, planning:sync — 8/14 epics complete
++c19bc6d merge(e023): capability-aware command registry — closes #E023
++9985edf merge(planning): fix/planning-infra — T1-T3 planning infra overhaul complete
++6559ce0 docs(planning): T3-C/D — delete BUILD.md (parked items → AGENTS.md), move hybrid-iso docs to e022, spk01 to spikes/
++ebc66a8 fix(planning): move spk01 to .planning/spikes/ — was wrongly in epics/
++2f1b7ef feat(planning): planning-update skill + AGENTS.md planning section — agents can self-update planning without human
++4ef39c3 docs(planning): rewrite README for WibWob-DOS — remove C++ engine content, add lifecycle ceremony
++4e730f3 chore: e023 agent handover note in tmp/
++6e1a0a2 feat(planning): planning infra overhaul — T1+T2 complete
++1f95b9b fix(skills): YAML frontmatter fences for figlet-videographer and michel-gondry; fix port 8089→8099
++c890574 fix(planning): E017 status not-started; CLAUDE.md redirect to AGENTS.md
++6355895 fix(planning): commit-lint.sh scopes — replace C++ terms with WibWob-DOS domains
++5dc3f81 chore(planning): add planning:status and planning:sync to package.json
++cbd0c88 fix(planning): planning.sh brief filename — epic-brief.md → brief.md
++fa48a27 docs(planning): e001 canonical YAML frontmatter
++3417dcb docs(planning): e020 e021 e023 canonical YAML frontmatter
++74eab4d docs(planning): e019 canonical YAML frontmatter
++189fbd4 docs(planning): e018 canonical YAML frontmatter
++e00813f docs(planning): e003 canonical YAML frontmatter
++cc9a6fd docs(planning): e004 canonical YAML frontmatter
++3413a1f docs(planning): e014 canonical YAML frontmatter
++574dec2 docs(planning): e002 canonical YAML frontmatter
++ab6cf3e fix(planning): planning-context.sh — dynamic active epics from EPIC_STATUS.md, remove hardcoded E001/C++ goals
++28e20ff fix(planning): session-context.sh — remove C++ file naming rules, replace with TS/Bun conventions
++1c5c3ab chore(planning): planning infra todos — 15 items T1-T4, tracking in .pi/todos
++2122043 docs(e023): mark epic done, add implementation summary, update skill
++da941da feat(e023): capability-aware command registry — S00-S05 complete
++a157ffe planning: register e023 capability-aware command registry + finalise audit
++f72514c planning: full epic audit — 14 epics cross-checked vs git+code
++42428a2 plan(e023): capability-aware command registry epic
++53b48b0 planning: e022 WibWobWorld restore & layout fidelity — 6 root causes, S01-S06, links #116
++5263abb plan(e021): add runbook update step to next-session-plan
++65e6ced docs: AGENTS.md — merge Startup+Stopping into App Lifecycle, add restart.sh, fix dev command, refresh next steps
++e0fca87 fix: 3 Docker smoke bugs — backrooms crash, figlet missing, README missing
++aa59976 fix: bump submodule — hybrid left pane contour fill
++90c3fed fix: bump submodule — iso 0.99 fill
++f98bbfc fix: bump submodule — iso world fills canvas
++9dbf45e fix: bump submodule — iso scale uncapped
++fd87863 feat: scripts/restart.sh — agent-driven clean restart via tmux send-keys + PID SIGTERM
++c7eb200 fix: window.toggle_maximize accepts windowId arg — no focus required for agents
++abed74d fix: bump submodule — iso terrain sized to viewport
++16b25fd feat: wibwobdos skill v2 — world-class agent guide for live TypeScript instance
++761b37b fix: bump submodule — iso fills available space on resize
++d78433a fix+docs: WibWobWorld ISO working — two critical fixes, 5-whys in .agents/wibwobworld-iso-fix.md
++536a30d feat: discord-tui-share skill — PNG screenshot + ASCII minimap to Discord webhook
++a325fb2 fix: process title includes session ID — wibwob-dos-main-jp9 matches TUI top-right
++1119399 fix: process.title + PID file — clean kill via pkill wibwob-dos or kill $(cat scratch/wibwob.pid)
++c550086 feat(e021/S00): Docker VPS smoke — verified green
++d99c231 fix: bump submodule — infoBlock width guard
++c05503c feat: bump submodule — singular iso mode
++ca21271 debug: bump submodule with iso hang breadcrumbs
++9451913 feat: bump submodule — hybrid iso split from PRD rebuild
++6ef5426 planning: hybrid iso PRD + rebuild plan — codex builds from spec, not from broken history
++e6d90c9 revert: modules-private back to c6aae56 — pre-hybrid clean state, rebuild from PRD
++6ceb566 debug: bump submodule with render breadcrumbs
++a8b7364 fix: bump submodule — wibwobworld freeze on open
++2bb3628 fix: repoint submodule to 2690f0e — rotation commit broke wibwobworld render
++666c034 feat(wibwobworld): 4-way iso rotation in hybrid — , . keys, header label, status hint
++f218230 planning(e021): fresh-eyes review — fix systemd tmux restart loop, useradd -r, journald vs auth.log, S03 port 2849, tmux resize gotcha, add structural gaps section (seed determinism, single-tenant API, S04/S05 scope)
++c18cf43 planning(e021): Docker smoke section + address codex critique — fix Bun path, port binding contradiction, systemd/tmux model, identity overclaim, RAM estimates, su command, Dockerfile completeness
++e195566 feat(wibwobworld): hybrid mode — contour + iso side by side
++afcc1ae planning(e021): add hosting/devops section — wibwob1 Hetzner VPS context, Bun ARM64, systemd, SSH key model, port binding, RAM headroom
++1ac78f3 planning(e021): VPS multi-agent world — spatial filesystem + remote access epic brief
++3515fda close(e020): all stories complete — S01 server harden, S02 irc-framework, S04 dual-instance, S05 textual interop, S06 worldKey resize fix
++82661f9 ops: reliable dual-instance launch — script, correct tmux pattern, docs
++c7a8ea5 fix(irc-transport): 433 nick-in-use auto-suffix + effectiveNick tracking
++89566d4 ops: dual-instance isolation, tmux docs, operating posture
++7ebd80c fix(e018): bump modules-private — ISO restore skips missing sourcePath (#116)
++23d07eb docs(e018): WibWobWorld hybrid+ISO restore crash — bug report + codex review notes
++89e4897 feat(dev-irc-server): S01 harden — 433 nick collision, 001-004+MOTD welcome, QUIT relay, PART, DM, CAP/MODE/WHO silenced, no double QUIT
++9b0cacf fix(world-chat-service): ensureWorld — same worldKey resize reposition-only, no channel flush
++756250c docs(e020): S02 complete — reconnect verified, all gates passed
++8267ea5 fix(irc-transport): auto_reconnect_max_retries=9999 — default 3 caused silent stop after 3 failures
++3b81dd8 docs(e020): tick S02 verification items — transcript, screenshot, typecheck confirmed
++e4aef09 chore: bump modules-private (frame-based dimension fix)
++4e549b4 chore: bump debug2
++19b2f29 chore: bump modules-private (clean sidebar, fixed width 26)
++c9be6a8 chore: bump debug
++f7ed9a9 chore: bump submodule debug
++26f1ac6 chore: bump modules-private (fixed sidebar width)
++0c74245 chore: bump modules-private (chatroom absolute width fix)
++06f9b12 chore: bump modules-private (fix chatroom dimension caching)
++7d79464 chore: bump modules-private (fix chatroom inner dimensions)
++c3ec822 feat: dev-irc-bot-burst-active.sh auto-detects active channel; bump modules-private
++9cc1f79 feat: world-chat-status.sh quick summary script; fix chatroom sidebar event filter
++1dbe2a7 chore: bump modules-private (chatroom sidebar players+events)
++a3aec0d chore: bump modules-private (chatroom sidebar width)
++73050e3 feat(e020/S02): verified irc-framework client live
++04225bf feat(e020/S02): swap IrcWorldChatTransport to irc-framework
++d1b19c1 docs(e020): switch to irc-framework client plan, remove NNTP
++91ecf22 feat(e020): rewrite for NNTP, vendor pirc-extension as reference
++3c7e5c4 chore: update terminal recording cast
++0d97b8e docs(notes): refine prompting template — agent-discovers-instances pattern
++c8c7214 docs(e020): battle-tested checklist, S04 pre-ticked, verify steps per story
++4aabb14 chore: gitignore .claude/skills/
++b4ac794 chore: commit pre-existing agent session changes
++4bfed9b docs(e018): close F08 — cursor + tile inspect + movement cost shipped
++192aa6a chore: bump modules-private (F08 cursor + tile inspect)
++ba0086b feat: add dev:world script with IRC env vars
++c63b53e feat(scripts): overlap-check severity tiers, minimap inline hint
++7aab052 feat(microapp-loader): export MicroappSnapshotWindow; dedup SnapshotWindow across all microapps
++fa45ee9 chore: bump modules-private (microapp type deduplication)
++2157d94 chore: bump modules-private (chatroom bottom-anchor layout fix)
++3437228 chore: bump modules-private (remove applyRect duplicate)
++f032a1e planning(e018): tick C05 chatroom UX polish verified
++3609ef2 chore: bump modules-private (C05 chatroom UX polish)
++21b70d0 feat(ui-parts): createButtonBar + export applyRect — clickable mode bar primitive for all microapps
++6b3a88c planning(e018): tick F07 verified — mode switcher buttons live in TUI
++9e8a30e planning: tick C08 verified, note ensureWorld reset bug, add e020 S06
++c263a1b planning(e020): IRC infrastructure epic brief + sharpen agent descriptions
++612696b chore: bump modules-private (restore saved hint in mode bar)
++1ac61b4 chore: bump modules-private (mode button bar in WibWobWorld)
++2d6a570 planning(e018): verified IRC parity, uncheck C08, add F07 mode switcher, update handover
++51f2699 chore: bump modules-private (fpBox key trap fix in firstperson mode)
++6c6816a fix(world-chat): IRC reconnect on socket close, nick prefers INSTANCE_LABEL
++f59abd0 Merge branch 'codex/e002-root-migration' of https://github.com/j-greig/wibandwob-dos into codex/e002-root-migration
++34835b4 Add IRC parity handover note
++ff3142c fix bug where pressing C doesn’t open corect world chat room/channel
++073f672 working wibwobworld contour window WITH 3d view
++8a7b68a chore: advance modules-private (defer initial render, strip debug instrumentation)
++b3e5ea4 chore: advance modules-private (debounce resize render + remove firstperson restore bandage)
++ae0ad94 chore: advance modules-private (never restore into firstperson)
++c6e92b6 chore: advance modules-private submodule (compass arrow orbits avatar)
++162aad8 chore: bump deps, update e018 brief, advance modules-private submodule
++cd33378 feat(control-api): world-chat endpoints + identity fields in /health
++c5e451c feat(world-chat): IRC transport seam, message.kind field, log helpers, dev IRC server
++80d93ca feat: instance identity — sessionId + instanceLabel across app, logger, controller
++32b29d5 missing frontmatter
++08568cd fix: skip state persistence if screen dimensions are too small
++22732aa feat(e018/m02): export findTerrainPeak from terrain-render service
++8770672 feat(e018/m02): firstperson render mode in terrain-render service
++e1d970b Update E018 chatspots and IRC roadmap
++c29e2ee fix(e018/m02): restore far-to-near y-buffer, fix elevated camera renders
++1655d9b Add world chat MVP scaffolding and docs
++0f576bd feat(e018/m02): y-buffer voxel terrain renderer prototype
++```
+ 
+-### Planning infra (remaining)
+-- `T3-E` — pre-commit hook install (blocked: needs branching strategy)
+-- `T4-A` — E001 fate decision (reset brief to claim remaining deliverables?)
++## 3. Epic Status
+ 
+-### Creative / parked
+-- `TODO-76d08210` — ASCII music video for grime remix
+-- `TODO-01c0f123` — BPM-synced animation speed for primer frame rate
+-- `TODO-4ce96f5e` — Refine ambient-presence v3 chiptune
++| Epic | Title | Status |
++|------|-------|--------|
++| E001 | Codified Context Infrastructure | not-started |
++| E002 | TS TUI Root Migration | done |
++| E003 | Finder App | not-started |
++| E004 | Monster Cam | in-progress |
++| E014 | Theme System | done |
++| E015 | Microapp Module System + Poetry Clock | done |
++| E016 | Microapp Primitives Library | done |
++| E017 | Scramble Brains — LLM Companion Integration | not-started |
++| E018 | WibWobWorld Terrain Foundation | done |
++| E019 | Rogue TUI Port | not-started |
++| E020 | IRC Infrastructure | done |
++| E021 | VPS Multi-Agent World | in-progress |
++| E022 | WibWobWorld Restore & Layout Fidelity | done |
++| E023 | Capability-Aware Command Registry | done |
+ 
+----
++## 4. Open Todos
+ 
+-## Recommended Next Steps
++### Planning (2)
+ 
+-1. **E022 S01** — strip debug breadcrumbs from `microapps-private/wibwobworld/index.ts`
+-   (keep env-gated `debugWibWobWorld` calls, remove granular `render:*` labels)
++- TODO-8eb8da84: T4-A: Decide E001 fate  `open`
++- TODO-f9667622: T3-E: Fix and install pre-commit hook  `open`
+ 
+-2. **E022 S02** — remove `restoreSafeMode` bandage, preserve `renderMode` on restore
++### Creative (2)
+ 
+-3. **E021 VPS** — 9-step plan at `.planning/epics/e021-vps-multi-agent-world/next-session-plan.md`
+-   - Step 1: confirm SSH to `89.167.18.207:2849`
+-   - Docker-safe capability profile already done (E023)
++- TODO-4ce96f5e: Refine ambient-presence v3: composer-grade chiptune with Eno/Frahm influence  `open`
++- TODO-76d08210: ASCII music video for grime remix — Gondry/Shrigley/Cunningham directed  `open`
+ 
+-4. **Close #112** — agent transcript leak bug, quick win
++### Other (2)
+ 
+-5. **Spike: session handover format** — formalise the handover doc as a structured
+-   artifact (auto-generated, linked to todos/epics/issues). See below.
++- TODO-01c0f123: BPM-synced animation speed for primer frame rate  `open`
++- TODO-f0ecfc54: Session control: pi-bitch available as subagent servant  `open`
+ 
+----
++## 5. Open GitHub Issues
+ 
+-## Spike idea: session-handover
++```
++115	OPEN	E017 — Scramble Brains: give the companion cat an LLM	enhancement, epic	2026-03-05T11:54:27Z
++113	OPEN	Spike: TV→TS feature parity audit and porting plan	documentation, spike	2026-03-05T09:50:44Z
++107	OPEN	E004 Monster Cam — ASCII webcam window with face/hand detection		2026-03-02T15:26:54Z
++106	OPEN	E001 — Codified Context Infrastructure (three-tier project memory)		2026-03-02T07:32:34Z
++104	OPEN	E003 — Finder App (file browser + search for TS TUI)	epic	2026-03-02T07:24:08Z
++103	OPEN	E017: Backrooms TV — live ASCII art generator window	epic	2026-02-26T15:30:10Z
++78	OPEN	E011: Desktop Shell — Icons, Folders, Trash & App Launcher	epic	2026-02-21T08:52:58Z
++```
+ 
+-Currently handover docs are hand-written and go stale within a session.
+-Candidate for a `.planning/spikes/spk-session-handover/` spike:
++## 6. Recommended Next Steps
+ 
+-- Auto-generate from: git log since branch point, open todos, planning:status, open GH issues
+-- Structure: branch state / what shipped / epic status / open todos / next steps
+-- Hook into planning-update skill — write handover as part of closeout ceremony
+-- Script: `scripts/handover.sh` → writes `tmp/session-handover-$(date +%Y-%m-%d).md`
++### In-progress epics
+ 
+----
++- **E004** — Monster Cam  (issue: #107)
++- **E021** — VPS Multi-Agent World  (issue: #~)
+ 
+-## Key Paths
++### Open bug todos
+ 
+-```
+-App launch:    bun run start  |  bun run dev:world (IRC, port 8099)
+-Restart:       bash scripts/restart.sh
+-API:           http://127.0.0.1:8099/health
+-Typecheck:     bun run typecheck
+-Planning:      bun run planning:status  |  bun run planning:sync
+-VPS:           89.167.18.207, SSH port 2849, Ubuntu 24.04 ARM64
+-E021 plan:     .planning/epics/e021-vps-multi-agent-world/next-session-plan.md
+-E022 scope:    .planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md
+-```
+-- 
+2.39.5 (Apple Git-154)
+

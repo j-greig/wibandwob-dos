@@ -1,0 +1,26 @@
+From 26ccf8b73ca9e29fb5a9b8aef4d6fd90fe40d127 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:24:30 +0000
+Subject: [PATCH 17/32] docs(planning): rewrite README for WibWob-DOS planning
+ structure
+
+---
+ .pi/todos/d9502be7.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/.pi/todos/d9502be7.md b/.pi/todos/d9502be7.md
+index e58d16d..880ef0f 100644
+--- a/.pi/todos/d9502be7.md
++++ b/.pi/todos/d9502be7.md
+@@ -5,7 +5,7 @@
+     "planning-infra",
+     "t3"
+   ],
+-  "status": "open",
++  "status": "closed",
+   "created_at": "2026-03-07T11:12:59.938Z"
+ }
+ 
+-- 
+2.39.5 (Apple Git-154)
+
