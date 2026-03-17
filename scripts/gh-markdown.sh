@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# @name    gh-markdown
+# @desc    Post markdown to GitHub issues/PRs via gh CLI
 
 usage() {
   cat <<'USAGE'
