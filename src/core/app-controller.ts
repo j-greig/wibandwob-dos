@@ -568,9 +568,10 @@ export class TsTuiMvpApp {
   }
 
   private getInstanceDisplayLabel(): string {
+    const pid = process.pid;
     return this.instanceLabel
-      ? `${this.instanceLabel} · ${this.instanceId}`
-      : this.instanceId;
+      ? `${this.instanceLabel} · ${this.instanceId} · ${pid}`
+      : `${this.instanceId} · ${pid}`;
   }
 
   private toggleTheme(): void {
