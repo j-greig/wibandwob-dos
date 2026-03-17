@@ -71,7 +71,8 @@ function findAliveInstances(): AliveInstance[] {
   return alive;
 }
 
-function resolveBase(): string {
+/** Try to find a running instance. Returns base URL or null. */
+function tryResolveBase(): string | null {
   // 1. Explicit flag: --instance <label> or -i <label>
   const label = findFlag("--instance", "-i");
   if (label) {
@@ -80,7 +81,7 @@ function resolveBase(): string {
       return `unix://${sockPath}`;
     }
     process.stderr.write(`No socket for instance "${label}" at ${sockPath}\n`);
-    process.exit(1);
+    return null;
   }
 
   // Explicit API URL override (for testing / remote)
@@ -107,16 +108,38 @@ function resolveBase(): string {
     for (const inst of alive) {
       process.stderr.write(`  wibwob -i ${inst.label} <command>\n`);
     }
-    process.exit(1);
+    return null;
   }
 
-  // 0 alive — error, no silent fallback
+  // 0 alive
+  return null;
+}
+
+/** Resolve base URL, exiting with error if no instance found. */
+function resolveBase(): string {
+  const base = tryResolveBase();
+  if (base) return base;
   process.stderr.write(`No WibWob-DOS instances running.\nStart one with: bun run dev\n`);
   process.exit(1);
 }
 
-const BASE = resolveBase();
-const IS_SOCKET = BASE.startsWith("unix://");
+// Lazy resolution — only resolved when a command actually needs the API connection.
+// Local-only commands (clean, help, start, etc.) work fine with zero instances.
+let _resolvedBase: string | undefined;
+function getBase(): string {
+  if (!_resolvedBase) _resolvedBase = resolveBase();
+  return _resolvedBase;
+}
+function getIsSocket(): boolean {
+  return getBase().startsWith("unix://");
+}
+/** Try to get base URL without exiting (for commands that optionally use API). */
+function tryGetBase(): string | null {
+  if (_resolvedBase) return _resolvedBase;
+  const base = tryResolveBase();
+  if (base) _resolvedBase = base;
+  return base;
+}
 const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 
 // ── Helpers ──────────────────────────────────────────────
@@ -125,11 +148,11 @@ const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 function socketFetchArgs(apiPath: string, extraOpts?: RequestInit): [string, RequestInit] {
   const opts: RequestInit = { ...extraOpts };
   let url: string;
-  if (IS_SOCKET) {
-    (opts as any).unix = BASE.slice("unix://".length);
+  if (getIsSocket()) {
+    (opts as any).unix = getBase().slice("unix://".length);
     url = `http://localhost${apiPath}`;
   } else {
-    url = `${BASE}${apiPath}`;
+    url = `${getBase()}${apiPath}`;
   }
   return [url, opts];
 }
@@ -544,19 +567,29 @@ async function cmdStart(args: string[]) {
   const { spawnSync } = await import("node:child_process");
   const repoRoot = path.resolve(SCRATCH_BASE, "..");
 
-  // Check if already running
-  try {
-    const [healthUrl, healthOpts] = socketFetchArgs("/health");
-    const res = await fetch(healthUrl, healthOpts);
-    if (res.ok) {
-      const health = await res.json() as Record<string, unknown>;
-      process.stderr.write(
-        `Already running — instance=${health.instanceLabel ?? "?"} pid=${health.pid} uptime=${health.uptime}s\n`,
-      );
-      process.exit(0);
+  // Check if already running (use tryGetBase to avoid exit on no instance)
+  const base = tryGetBase();
+  if (base) {
+    try {
+      const opts: RequestInit = {};
+      let url: string;
+      if (base.startsWith("unix://")) {
+        (opts as any).unix = base.slice("unix://".length);
+        url = "http://localhost/health";
+      } else {
+        url = `${base}/health`;
+      }
+      const res = await fetch(url, opts);
+      if (res.ok) {
+        const health = await res.json() as Record<string, unknown>;
+        process.stderr.write(
+          `Already running — instance=${health.instanceLabel ?? "?"} pid=${health.pid} uptime=${health.uptime}s\n`,
+        );
+        process.exit(0);
+      }
+    } catch {
+      // Not responding — proceed to start
     }
-  } catch {
-    // Not running — proceed to start
   }
 
   // Pass through extra flags (--cmd, --port, etc.)
@@ -721,6 +754,247 @@ async function cmdInstances() {
   out(results);
 }
 
+// ── Clean (orphan process + stale file cleanup) ─────────
+
+interface CleanTarget {
+  pid: number;
+  cmd: string;
+  source: "pidfile" | "scan";
+  label?: string;
+}
+
+interface StaleFile {
+  path: string;
+  kind: "pid" | "socket" | "legacy";
+}
+
+/** Cross-platform: get the command line for a PID. */
+function getPsCmd(pid: number): string | null {
+  const { execSync } = require("node:child_process") as typeof import("node:child_process");
+  try {
+    // args= works on macOS, cmd= works on Linux — try args= first (works on both)
+    const result = execSync(`ps -p ${pid} -o args= 2>/dev/null || ps -p ${pid} -o cmd= 2>/dev/null`, {
+      encoding: "utf8",
+      timeout: 2000,
+    }).trim();
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if a process belongs to this WibWob-DOS repo. */
+function isOurProcess(pid: number, repoRoot: string): boolean {
+  const cmd = getPsCmd(pid);
+  if (!cmd) return false;
+  // Must match WibWob-DOS process patterns
+  const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)/;
+  if (!wwPattern.test(cmd)) return false;
+  // Prefer repo-root check via command line (works cross-platform)
+  if (cmd.includes(repoRoot)) return true;
+  // On Linux, check /proc/PID/cwd
+  try {
+    const cwd = fs.readlinkSync(`/proc/${pid}/cwd`);
+    if (cwd.startsWith(repoRoot)) return true;
+  } catch {
+    // Not on Linux or no permissions — that's fine
+  }
+  // If the command contains src/app.ts but no absolute path, it's likely
+  // running from this repo's cwd. Accept it (conservative: same machine).
+  return true;
+}
+
+function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; staleFiles: StaleFile[] } {
+  const instancesDir = path.join(repoRoot, "scratch", "instances");
+  const selfPid = process.pid;
+  const parentPid = process.ppid;
+  const seen = new Set<number>();
+  const processes: CleanTarget[] = [];
+  const staleFiles: StaleFile[] = [];
+
+  // Source 1: PID files from scratch/instances/
+  let pidFiles: string[] = [];
+  try { pidFiles = fs.readdirSync(instancesDir).filter(f => f.endsWith(".pid")); } catch { /* dir may not exist */ }
+
+  for (const file of pidFiles) {
+    const label = file.replace(".pid", "");
+    const pidFile = path.join(instancesDir, file);
+    const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+    if (isNaN(pid)) {
+      staleFiles.push({ path: pidFile, kind: "pid" });
+      continue;
+    }
+    if (pid === selfPid || pid === parentPid) continue;
+
+    let alive = false;
+    try { process.kill(pid, 0); alive = true; } catch { /* dead */ }
+
+    if (alive) {
+      const cmd = getPsCmd(pid) ?? "<unknown>";
+      processes.push({ pid, cmd, source: "pidfile", label });
+      seen.add(pid);
+    } else {
+      staleFiles.push({ path: pidFile, kind: "pid" });
+      const sockPath = path.join(instancesDir, `${label}.sock`);
+      if (fs.existsSync(sockPath)) staleFiles.push({ path: sockPath, kind: "socket" });
+    }
+  }
+
+  // Orphan sockets (socket exists but no matching PID file)
+  let sockFiles: string[] = [];
+  try { sockFiles = fs.readdirSync(instancesDir).filter(f => f.endsWith(".sock")); } catch { /* */ }
+  for (const file of sockFiles) {
+    const label = file.replace(".sock", "");
+    const pidFile = path.join(instancesDir, `${label}.pid`);
+    const sockPath = path.join(instancesDir, file);
+    if (!fs.existsSync(pidFile) && !staleFiles.some(s => s.path === sockPath)) {
+      staleFiles.push({ path: sockPath, kind: "socket" });
+    }
+  }
+
+  // Source 2: process scan for bun processes matching WibWob patterns
+  try {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const psOutput = execSync(
+      `ps -eo pid,args 2>/dev/null || ps -eo pid,cmd 2>/dev/null`,
+      { encoding: "utf8", timeout: 3000 }
+    );
+    const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)/;
+    for (const line of psOutput.split("\n")) {
+      if (!wwPattern.test(line)) continue;
+      const pid = Number(line.trim().split(/\s+/)[0]);
+      if (isNaN(pid) || pid === selfPid || pid === parentPid || seen.has(pid)) continue;
+      if (isOurProcess(pid, repoRoot)) {
+        const cmd = getPsCmd(pid) ?? "<unknown>";
+        processes.push({ pid, cmd, source: "scan" });
+        seen.add(pid);
+      }
+    }
+  } catch { /* ps may fail in some containers — that's ok */ }
+
+  // Legacy scratch/wibwob.pid
+  const legacyPidFile = path.join(repoRoot, "scratch", "wibwob.pid");
+  if (fs.existsSync(legacyPidFile)) {
+    const lpid = Number(fs.readFileSync(legacyPidFile, "utf8").trim());
+    let alive = false;
+    try { if (!isNaN(lpid)) process.kill(lpid, 0); alive = true; } catch { /* dead */ }
+    if (!alive) {
+      staleFiles.push({ path: legacyPidFile, kind: "legacy" });
+    }
+  }
+
+  return { processes, staleFiles };
+}
+
+async function cmdClean(args: string[]) {
+  const flags = parseFlags(args.slice(1));
+  const doKill = flags.kill === true || flags.force === true;
+  const doForce = flags.force === true;
+  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+
+  const { processes, staleFiles } = discoverCleanTargets(repoRoot);
+
+  // ── Report ──
+  process.stderr.write("WibWob-DOS Instance Cleanup\n");
+  process.stderr.write("===========================\n\n");
+
+  if (processes.length === 0 && staleFiles.length === 0) {
+    process.stderr.write("Clean — no orphans, no stale files.\n");
+    out({ clean: true, processes: 0, staleFiles: 0 });
+    return;
+  }
+
+  if (processes.length > 0) {
+    process.stderr.write(`Live processes (${processes.length}):\n`);
+    for (const p of processes) {
+      const src = p.label ? `[${p.label}]` : `[${p.source}]`;
+      process.stderr.write(`  PID ${p.pid}  ${src}  ${p.cmd}\n`);
+    }
+    process.stderr.write("\n");
+  }
+
+  if (staleFiles.length > 0) {
+    process.stderr.write(`Stale files (${staleFiles.length}):\n`);
+    for (const f of staleFiles) {
+      const tag = f.kind === "legacy" ? " (legacy)" : "";
+      process.stderr.write(`  ${f.path}${tag}\n`);
+    }
+    process.stderr.write("\n");
+  }
+
+  if (!doKill) {
+    process.stderr.write("Dry run — pass --kill to clean up, --force to SIGKILL.\n");
+    out({
+      dryRun: true,
+      processes: processes.map(p => ({ pid: p.pid, cmd: p.cmd, label: p.label })),
+      staleFiles: staleFiles.map(f => f.path),
+    });
+    return;
+  }
+
+  // ── Kill processes ──
+  const killed: number[] = [];
+  const survivors: number[] = [];
+
+  if (processes.length > 0) {
+    process.stderr.write(`Sending SIGTERM to ${processes.length} processes...\n`);
+    for (const p of processes) {
+      try {
+        process.kill(p.pid, "SIGTERM");
+        process.stderr.write(`  SIGTERM → PID ${p.pid}\n`);
+        killed.push(p.pid);
+      } catch {
+        process.stderr.write(`  PID ${p.pid} already dead\n`);
+      }
+    }
+
+    // Wait for graceful shutdown
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Check for survivors
+    for (const p of processes) {
+      let alive = false;
+      try { process.kill(p.pid, 0); alive = true; } catch { /* dead */ }
+      if (alive) {
+        if (doForce) {
+          try {
+            process.kill(p.pid, "SIGKILL");
+            process.stderr.write(`  PID ${p.pid} still alive — SIGKILL\n`);
+          } catch { /* */ }
+        } else {
+          survivors.push(p.pid);
+          process.stderr.write(`  ⚠ PID ${p.pid} still alive — use --force to SIGKILL\n`);
+        }
+      }
+    }
+  }
+
+  // ── Clean stale files ──
+  const removed: string[] = [];
+  for (const f of staleFiles) {
+    try {
+      fs.unlinkSync(f.path);
+      removed.push(f.path);
+      process.stderr.write(`  Removed ${f.path}\n`);
+    } catch { /* already gone */ }
+  }
+
+  // Also clean up PID/socket files for processes we just killed
+  const instancesDir = path.join(repoRoot, "scratch", "instances");
+  for (const p of processes) {
+    if (p.label) {
+      const pidPath = path.join(instancesDir, `${p.label}.pid`);
+      const sockPath = path.join(instancesDir, `${p.label}.sock`);
+      for (const fp of [pidPath, sockPath]) {
+        try { fs.unlinkSync(fp); removed.push(fp); } catch { /* */ }
+      }
+    }
+  }
+
+  process.stderr.write("\nDone.\n");
+  out({ killed, survivors, removed });
+}
+
 async function cmdCompletions() {
   // Fetch commands from the API to generate completions dynamically
   const data = (await api("/commands/list")) as { commands: Array<{ id: string; description?: string }> };
@@ -852,6 +1126,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "start",       desc: "Start instance (idempotent if already running)",  fn: (a) => cmdStart(a) },
   { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
   { name: "instances",   aliases: ["list", "ls"], desc: "List running instances (PID-checked)",   fn: () => cmdInstances() },
+  { name: "clean",       args: "[--kill] [--force]", desc: "Find orphan processes + stale files (dry run unless --kill)", fn: (a) => cmdClean(a) },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
   { name: "open",        args: "<path|url> [--app A] [--line N]", desc: "Open file/dir/URL in WibWob-DOS (fallback: system)", fn: (a) => cmdOpen(a) },
   { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },

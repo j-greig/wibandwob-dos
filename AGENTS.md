@@ -75,6 +75,7 @@ for the full surface.
 **Restart:** `bash scripts/restart.sh`
 **Stop:** `kill $(cat scratch/wibwob.pid)` — SIGTERM, never -9
 **Reload microapp:** `bash scripts/reload-microapp.sh <id>`
+**Clean orphans:** `wibwob clean` (dry run) or `wibwob clean --kill` (also: `bash scripts/clean-instances.sh`)
 
 ```bash
 bun run health                         # full gate: tests + typecheck + COAT
