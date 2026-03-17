@@ -1,0 +1,38 @@
+# Fly.io config for WibWob-DOS disposable testbed
+# Deploy: fly deploy --config deploy/fly/fly.toml
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "wibwob-dos"
+primary_region = "ams"
+
+[build]
+  dockerfile = "deploy/fly/Dockerfile"
+
+# Control API — the only service exposed
+[http_service]
+  internal_port = 8099
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  # Health check — Fly pings this to know the machine is alive
+  [http_service.checks]
+    [http_service.checks.health]
+      grace_period = "30s"
+      interval = "30s"
+      method = "GET"
+      path = "/health"
+      timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Environment variables (non-secret — secrets via `fly secrets set`)
+[env]
+  WIBWOB_INSTANCE_LABEL = "fly-disposable"
+  WIBWOB_CONTROL_HOST = "0.0.0.0"
+  CONTROL_API_PORT = "8099"
+  TERM = "xterm-256color"
