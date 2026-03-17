@@ -86,29 +86,44 @@ dirs or shallow hierarchies — just delete or move to scratch/.
 ### Phase 1 — Clear the deck
 1. ~~Create `chore/preemptive-hygiene` branch~~ ✅
 2. ~~Research best practices~~ ✅
-3. Move root clutter — stale root .md files to scratch/ or `.trash/` as appropriate
+3. Move root clutter — stale root .md files to scratch/ or `.trash/`
 4. Archive stale agent docs (agent-master-plan, reviews) → `.agents/.trash/`
 5. Clean stale references to "six lenses" across repo
+6. Triage `.fileme/` — capture wibwob-command-ideas, trash the session log
+7. Move `bug-sweep-march-16.md` from spikes/ to chores/
 
-### Phase 2 — Build tools
-6. Write `scripts/devlog.sh` — create/append weekly devlog, journal-compatible output
-7. Write `scripts/git-census.sh` — unified branch/worktree/orphan audit
-8. Write `scripts/planning-close.sh` — automate .done/ moves
-9. Write `scripts/list-docs.sh` — generated doc index
+### Phase 2 — Fix planning data
+8. Renumber duplicate epic IDs: e039-unix-cli→e048, e043-session-capture→e049, e047-file-manager-v3→e050
+9. Move done epics to .done/: e035-layout-sdk-buildout, e039-instance-lifecycle
+10. Create `spikes/.done/`, move 4 done spikes: agent-chat-tool-display, clean-screenshot, multi-instance-clarity, opentui-vs-blessed
+11. Move plan9-plumber.md to ideas/.done/ (implemented as `wibwob plumb`)
+12. Fix E046 status: not-started → in-progress (phase 1 shipped)
+13. Fix E028 dir name mismatch (responsive-column-layout → canvas-documents)
+14. Give e047-wibwob-pi.md its own directory
 
-### Phase 3 — Restructure docs
-10. Kill COAT duplication — one definition, signposts elsewhere
-11. Restructure `.agents/` — promote devlogs, separate docs from artefacts
-12. Restructure AGENTS.md — 9-section outline
-13. Trim PHILOSOPHY.md — signpost to AGENTS.md for COAT, keep only north star
+### Phase 3 — Build tools
+15. Write `scripts/devlog.sh` — create/append weekly devlog, journal-compatible output
+16. Write `scripts/git-census.sh` — unified branch/worktree/orphan audit
+17. Write `scripts/planning-close.sh` — automate .done/ moves
+18. Write `scripts/list-docs.sh` — generated doc index
 
-### Phase 4 — Process sustainability
-14. Review `.planning/` vs reality — crosscheck with gh issues, branches, actual use patterns
-15. Simplify `.planning/` if hierarchy is over-engineered for actual human behaviour
-16. Build `repo-hygiene` skill — monthly jubilee as repeatable skill
-17. Write devlog entry for this session
+### Phase 4 — Restructure docs
+19. Kill COAT duplication — one definition, signposts elsewhere
+20. Restructure `.agents/` — promote devlogs, separate docs from artefacts
+21. Restructure AGENTS.md — 9-section outline
+22. Trim PHILOSOPHY.md — signpost to AGENTS.md for COAT, keep only north star
 
-### Phase 5 — Longer term
-18. Make INTEGRATION_SURFACE.md auto-generated from command-catalog.ts
-19. Consider session-archaeology as input to spec creation (E001 reactive pattern)
-20. Review if `.agents/` subagents (arch-reviewer, coat-reviewer, code-reviewer) should merge or archive
+### Phase 5 — Process sustainability
+23. Review `.planning/` vs reality — crosscheck with gh issues, branches, actual use
+24. Apply progressive disclosure to planning dirs (README per multi-file dir, numeric prefixes)
+25. Simplify `.planning/` if hierarchy over-engineered for human behaviour
+26. Build `repo-hygiene` skill — monthly jubilee as repeatable skill
+27. Write devlog entry for this session
+
+### Phase 6 — Longer term
+28. Make INTEGRATION_SURFACE.md auto-generated from command-catalog.ts
+29. Session-start drift detection (from E001): warn if covered files changed since spec last reviewed
+30. Consider session-archaeology as input to spec creation (E001 reactive pattern)
+31. Review if `.agents/` subagents (arch-reviewer, coat-reviewer, code-reviewer) should merge or archive
+32. Close out refactor-docs/025 with pointer to E034/E035/E042
+33. Update E001 brief: note this chore delivered the practical foundation
