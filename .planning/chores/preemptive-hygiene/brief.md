@@ -100,19 +100,44 @@ Target AGENTS.md outline (17→9 sections):
 
 ### Phase 5c — Remaining script + doc cleanup
 
-- [ ] Replace `curl` examples in child docs with `wibwob` CLI equivalents (control-api.md, architecture.md)
-- [ ] Consider script subdirs (scripts/checks/, scripts/creative/, scripts/testing/) to reduce flat list
-- [ ] Consolidate overlapping test scripts (cli-parity-check vs ci-cli-test vs live-api-test-suite)
+- [x] Replace `curl` examples in child docs with `wibwob` CLI equivalents
+- [x] Script subdirs — checks/ (5) + testing/ (10) out of root, 38→23
+- [ ] Consolidate overlapping test scripts (cli-parity-check vs ci-cli-test vs live-api-test-suite) — low priority, they work
 
-### Phase 6 — Progressive disclosure + longer term
+### Phase 6 — Progressive disclosure + automation
 
-- [ ] Progressive disclosure in planning dirs (README per multi-file dir)
-- [ ] Auto-generate INTEGRATION_SURFACE.md from command-catalog.ts
-- [ ] Session-start drift detection (from E001)
-- [ ] Session-archaeology as input to spec creation
-- [ ] Review .pi/agents/ subagents — merge or archive arch/coat/code reviewers
-- [ ] Close refactor-docs/025 with pointer to E034/E035/E042
-- [ ] Update E001 brief: this chore delivered practical foundation
+**6a. Planning dirs progressive disclosure**
+- [ ] Add README.md to each multi-file epic dir (10 active epics) — one-liner saying what the epic is, status, key files. Agent scanning `.planning/epics/` sees dir names; agent entering a dir sees README before 5+ files.
+- [ ] Numeric prefixes on files within epic dirs where reading order matters (e.g. `01-brief.md`, `02-research.md`)
+- [ ] Consider: should `.planning/epics/.done/` dirs get stripped READMEs too, or is .done/ enough signal?
+
+**6b. Auto-generate integration surface**
+- [ ] Write `scripts/checks/gen-integration-surface.ts` — parse `command-catalog.ts` exports + `control-api.ts` routes → generate `.agents/reference/integration-surface.md`
+- [ ] Replace hand-maintained 1034-line doc with generated one
+- [ ] Add to `bun run health` gate or as pre-commit check
+- [ ] Principle: "generate, don't maintain" — this is the biggest hand-maintained doc
+
+**6c. Session-start drift detection (from E001)**
+- [ ] Write `scripts/checks/drift-check.ts` — given a spec in `.agents/specs/`, check if any files it covers have changed since the spec's last git modification date
+- [ ] Output: "⚠️ window-system.md covers src/core/window-facade.ts which changed 3 days ago" 
+- [ ] Suppression: warn N times then suppress until new commits (avoid noise)
+- [ ] Could integrate as pi extension that runs on session start, or just a script agents run
+
+**6d. Session archaeology → spec creation**
+- [ ] Use `session-archaeology` skill to mine recent session logs for repeated confusion patterns
+- [ ] For each pattern: check if a spec exists in `.agents/specs/`. If not, create one reactively (E001 principle: "when an agent gets confused, create the spec")
+- [ ] One-off audit, not a recurring process — run quarterly
+
+**6e. Subagent cleanup**
+- [ ] `arch-reviewer` + `coat-reviewer` — built for one-off pi-mono review. Merge into a single `reviewer` agent or archive to `.pi/agents/.archive/`
+- [ ] `code-reviewer` — 185 lines, useful but description references pi-mono. Update description, keep.
+- [ ] `pi-bridge` — 145 lines. Check if still accurate after E047 wibwob-pi merge.
+
+**6f. Housekeeping**
+- [ ] Close `.planning/refactor-docs/025-agent-friendly-microapp-dev-follow-on.md` with pointer to E034/E035/E042
+- [ ] Update E001 brief: note this chore delivered the practical foundation for tiers 1+3
+- [ ] Rename `.agents/` → explore better name (`.agent-docs/`? `.context/`?) — 80+ file refs, do as dedicated PR
+- [ ] Should agent-facing scripts live near agent docs? Explore co-location.
 
 ---
 
