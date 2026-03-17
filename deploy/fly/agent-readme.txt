@@ -47,6 +47,14 @@ RUN ANY COMMAND
     -H 'Content-Type: application/json' \
     -d '{"id":"theme.cycle"}'
 
+SCREENSHOT LOG (persistent — auto-captured every 60s)
+  The TUI is screenshotted every minute to persistent storage.
+  Frames survive resets. Play them back = ASCII cinema of the desktop.
+
+  curl -s $BASE/screenshots/list | jq .          # all frames
+  curl -s $BASE/screenshots/latest               # most recent frame
+  curl -s "$BASE/screenshots/frame?name=2026-03-17T170146Z.txt"
+
 JOURNAL (persistent, append-only — survives resets)
   Write-once, read-many. No delete, no edit. Like a public gist.
 

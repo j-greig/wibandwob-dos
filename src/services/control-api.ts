@@ -140,6 +140,9 @@ const ENDPOINT_CATALOGUE = [
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
+  { method: "GET",  path: "/screenshots/list",              description: "List all persistent screenshot frames (captured every 60s). Survives resets." },
+  { method: "GET",  path: "/screenshots/latest",            description: "Latest screenshot frame as plain text." },
+  { method: "GET",  path: "/screenshots/frame",             description: "Specific frame by name. ?name=2026-03-17T170146Z.txt" },
   { method: "POST", path: "/journal/write",                body: { text: "string (max 500 chars)", agent: "string (max 40 chars, optional)" }, description: "Append a persistent note that survives instance resets. Rate limited: 1 write per 30s. Sanitised: no control chars. 50MB file cap." },
   { method: "GET",  path: "/journal/read",                 description: "Read journal entries (most recent 200). ?since=ISO8601 to filter by timestamp." },
 ];
@@ -952,6 +955,46 @@ export class ControlApiService {
       return Response.json(
         this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
       );
+    }
+
+    // ── Screenshot log — persistent frames on /data/logs volume ──
+    const SCREENSHOTS_DIR = "/data/logs/screenshots";
+
+    if (request.method === "GET" && url.pathname === "/screenshots/list") {
+      try {
+        const files = fs.readdirSync(SCREENSHOTS_DIR)
+          .filter(f => f.endsWith(".txt"))
+          .sort();
+        return Response.json({ frames: files, total: files.length });
+      } catch {
+        return Response.json({ frames: [], total: 0, error: "no screenshots — volume may not be mounted" });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/screenshots/latest") {
+      try {
+        const files = fs.readdirSync(SCREENSHOTS_DIR).filter(f => f.endsWith(".txt")).sort();
+        if (files.length === 0) return new Response("no frames yet", { status: 404 });
+        const latest = fs.readFileSync(path.join(SCREENSHOTS_DIR, files[files.length - 1]), "utf8");
+        return new Response(latest, {
+          headers: { "Content-Type": "text/plain; charset=utf-8", "X-Frame": files[files.length - 1] },
+        });
+      } catch {
+        return new Response("screenshot read failed", { status: 500 });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/screenshots/frame") {
+      const name = url.searchParams.get("name");
+      if (!name || !name.endsWith(".txt") || name.includes("/") || name.includes("..")) {
+        return Response.json({ ok: false, error: "?name=YYYY-MM-DDTHHMMSSZ.txt required" }, { status: 400 });
+      }
+      try {
+        const content = fs.readFileSync(path.join(SCREENSHOTS_DIR, name), "utf8");
+        return new Response(content, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      } catch {
+        return new Response("frame not found", { status: 404 });
+      }
     }
 
     // ── Journal — persistent notes that survive resets ──
