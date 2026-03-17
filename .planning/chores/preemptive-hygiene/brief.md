@@ -89,6 +89,10 @@ Target AGENTS.md outline (17→9 sections):
 - [ ] Build `repo-hygiene` skill — monthly jubilee as repeatable process
 - [ ] Write devlog entry for this session
 
+### Phase 5b — Review adjacent work
+
+- [ ] Review E051 PTC (Programmatic Tool Calling) — `.planning/epics/e051-programmatic-tool-calling/README.md`. LLM writes code that calls tools instead of individual tool calls. 85%+ token reduction. Ping `ptc` session via session control for context. Assess overlap with hygiene tooling (could git-census, list-docs etc be PTC-native?)
+
 ### Phase 6 — Longer term
 
 - [ ] Auto-generate INTEGRATION_SURFACE.md from command-catalog.ts
