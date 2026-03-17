@@ -74,6 +74,7 @@ Target AGENTS.md outline (17→9 sections):
 ```
 
 - [ ] Review dir names as progressive disclosure (e.g. `.agents/` → `.agent-docs/`? explore during restructure)
+- [ ] Should agent-facing scripts live in `.agents/scripts/` (or new dir) rather than `scripts/`?
 - [ ] AGENTS.md → 9-section outline, under 150 lines
 - [ ] Kill COAT duplication — one definition in AGENTS.md, signposts elsewhere
 - [ ] Trim PHILOSOPHY.md — keep north star, signpost AGENTS.md for COAT
