@@ -249,18 +249,32 @@ export function openFileManagerV3(params: FileManagerParams): void {
       const removed = columnWidgets.pop()!;
       removed.destroy();
     }
+
+    if (entry.isDirectory && entry.label !== "../") {
+      // Finder behavior: selecting a directory immediately opens it as a new column
+      handleNavigateInto(columnIndex, entry.fullPath);
+      return;
+    }
+
     repositionColumns();
 
-    if (entry.isDirectory) {
-      const result = renderDirectoryPreview(entry.fullPath, Number(previewBox.height) || 20);
-      previewHeader.setContent(` ${result.header}`);
-      previewContent = result.content;
+    // File preview (or ../ parent entry — show empty)
+    try {
+      if (entry.label === "../") {
+        const empty = renderEmptyPreview();
+        previewHeader.setContent(` ${empty.header}`);
+        previewContent = empty.content;
+      } else {
+        const result = renderFilePreview(entry, Math.max(1, (Number(previewBox.width) || 40) - 2));
+        previewHeader.setContent(` ${result.header}`);
+        previewContent = result.content;
+      }
       setViewportContent(previewBox, previewContent);
-    } else {
-      const result = renderFilePreview(entry, Math.max(1, (Number(previewBox.width) || 40) - 2));
-      previewHeader.setContent(` ${result.header}`);
-      previewContent = result.content;
-      setViewportContent(previewBox, previewContent);
+    } catch (err) {
+      // Blessed can crash on malformed tags — catch and show plain error
+      previewHeader.setContent(` ${entry.label}`);
+      previewContent = `Preview error: ${err instanceof Error ? err.message : String(err)}`;
+      previewBox.setContent(previewContent);
     }
     updateBreadcrumb();
     updateStatusBar();

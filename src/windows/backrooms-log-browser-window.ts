@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createScrollbar } from "../core/ui-primitives.js";
+import { escapeBlessedTags } from "../core/blessed-escape.js";
 import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import { createFilePathMenuItems } from "../core/context-menu-items.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -178,7 +179,7 @@ export function openBackroomsLogBrowserWindow(params: {
     } catch {
       previewContent = "(could not read file)";
     }
-    preview.setContent(previewContent);
+    preview.setContent(escapeBlessedTags(previewContent));
 
     if (entry.live) {
       // Auto-scroll to bottom for live files

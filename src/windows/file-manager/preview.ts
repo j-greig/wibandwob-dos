@@ -212,7 +212,12 @@ function renderCodePreview(entry: FileEntry, ext: string): PreviewResult {
     let numbered: string;
     if (useHighlight) {
       const highlighted = highlightCode(rawLines.join("\n"), lang);
-      numbered = highlighted.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${ln}`).join("\n");
+      // highlightCode uses ANSI escapes (\x1b[...m), not blessed tags.
+      // Escape { in highlighted output so blessed doesn't try to parse them as tags.
+      numbered = highlighted.map((ln, i) => {
+        const safe = escapeBlessedTags(ln);
+        return `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${safe}`;
+      }).join("\n");
     } else {
       numbered = rawLines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBlessedTags(ln)}`).join("\n");
     }

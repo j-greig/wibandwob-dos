@@ -7,6 +7,7 @@ import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
+import { escapeBlessedTags } from "../core/blessed-escape.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
@@ -136,7 +137,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     }
     try {
       const content = safeReadFile(entry.filePath) ?? "";
-      preview.setContent(`${entry.label}\n${entry.filePath}\n\n${content}`);
+      preview.setContent(`${escapeBlessedTags(entry.label)}\n${entry.filePath}\n\n${escapeBlessedTags(content)}`);
     } catch (error) {
       preview.setContent(`Cannot preview primer.\n\n${error instanceof Error ? error.message : String(error)}`);
     }

@@ -60,8 +60,6 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1073741824).toFixed(1)}G`;
 }
 
-// ── Escaped label (blessed tags need { escaped) ──────────────────────────────
+// ── Blessed tag escaping — re-export from canonical owner ────────────────────
 
-export function escapeBlessedTags(s: string): string {
-  return s.replace(/\{/g, "\\{");
-}
+export { escapeBlessedTags } from "../core/blessed-escape.js";
