@@ -73,6 +73,7 @@ Target AGENTS.md outline (17→9 sections):
 9. Parking Lot
 ```
 
+- [ ] Question directory names as progressive disclosure (`.agents/` → `?`, `docs/` → `?`, etc.)
 - [ ] AGENTS.md → 9-section outline, under 150 lines
 - [ ] Kill COAT duplication — one definition in AGENTS.md, signposts elsewhere
 - [ ] Trim PHILOSOPHY.md — keep north star, signpost AGENTS.md for COAT
