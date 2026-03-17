@@ -58,5 +58,5 @@ bun run planning:status
 ## When done
 
 ```bash
-bash scripts/devlog.sh "repo hygiene: <summary of what you found and fixed>" --journal
+bash scripts/reflect.sh "repo hygiene: <summary of what you found and fixed>" --journal
 ```

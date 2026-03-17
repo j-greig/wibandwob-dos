@@ -26,7 +26,7 @@ Jubilee scripts: `.tmp/git-jubilee-2026-03-17/`
 - `bun run typecheck` passes
 - No duplicate epic IDs
 - AGENTS.md under 150 lines, 9 sections, no COAT duplication
-- `scripts/devlog.sh` and `scripts/git-census.sh` exist and work
+- `scripts/reflect.sh` and `scripts/git-census.sh` exist and work
 - Devlog entry written for this session
 - EPIC_STATUS.md matches reality
 
@@ -36,7 +36,7 @@ Jubilee scripts: `.tmp/git-jubilee-2026-03-17/`
 
 ### Phase 1 — Build tools first (so later phases use them)
 
-- [ ] `scripts/devlog.sh` — create/append weekly devlog, journal-compatible
+- [ ] `scripts/reflect.sh` — create/append weekly devlog, journal-compatible
 - [ ] `scripts/git-census.sh` — unified branch/worktree/orphan audit
 - [ ] `scripts/planning-close.sh` — automate epic/spike → .done/ moves
 - [ ] `scripts/list-docs.sh` — generated doc index
