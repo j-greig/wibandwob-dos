@@ -24,6 +24,10 @@ interface ToolCallRecord {
 }
 
 export default function ptcBench(pi: ExtensionAPI) {
+  // Only activate when PTC_BENCH_ID is set (via run-test.sh)
+  // Otherwise this extension bleeds into every pi session in the repo
+  if (!process.env.PTC_BENCH_ID) return;
+
   let toolCalls: ToolCallRecord[] = [];
   let turnCount = 0;
   let executeCodeCalls = 0;

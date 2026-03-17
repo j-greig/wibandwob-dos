@@ -22,6 +22,7 @@ if [ ! -f "$FILE" ]; then
   cat > "$FILE" <<EOF
 ---
 week: ${YEAR}-W${WEEK}
+purpose: agent self-reflection — friction, pains, failures, and ideas for fixing them via skills, scripts, process changes, or new tooling
 themes: 
 ---
 
