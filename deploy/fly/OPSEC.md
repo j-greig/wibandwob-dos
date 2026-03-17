@@ -13,10 +13,15 @@ Anyone who finds the URL can:
 - **Trigger LLM calls** via Scramble — `/scramble/say` (burns OpenRouter credits)
 - **Read the OpenAPI spec** — `/openapi.json` (full self-documenting attack surface)
 
+They **can also** (red team verified 2026-03-17):
+- **Read any file on the container** via `/view/editor/open` + `/windows/text?id=N` — including `/proc/self/environ` which leaks env vars
+- **Browse the filesystem** via file manager (`finder.open` command)
+- **Write files** via editor open → write → save chain
+- **Reload microapps** via `microapps.reload` — combined with file write, this is RCE
+
 They **cannot**:
-- Execute arbitrary shell commands (no exec endpoint)
-- Read/write arbitrary filesystem paths (no file API beyond editor buffers + primer paths)
-- Access Fly secrets (injected as env vars, not readable via API)
+- Execute arbitrary shell commands directly (no exec endpoint, but RCE chain exists via file write + reload)
+- Escape the container (Firecracker microVM isolation)
 - SSH into the machine (Fly WireGuard mesh only, no public SSH)
 - Pivot to other Fly apps or your account (machine isolation, scoped deploy token)
 - Access the host OS, other containers, or Fly infrastructure
@@ -25,7 +30,7 @@ They **cannot**:
 ## Why This Is Acceptable
 
 - **Disposable.** Machine resets every hour (GitHub Actions cron) and on every `fly deploy`. No state accumulates.
-- **No secrets at rest.** OpenRouter API key is in Fly secrets (encrypted, env-injected). Not in the image, not readable via API.
+- **No secrets set.** `OPENROUTER_API_KEY` is empty. **NEVER `fly secrets set` on this instance** — any env var is readable via the editor/environ exploit. Scramble is intentionally offline.
 - **Spend-capped.** OpenRouter key should have a hard $5/day limit. Worst case: someone spams `/scramble/say` and burns $5.
 - **No lateral movement.** The Fly machine is isolated. No Tailscale, no VPN, no connection to wibwob1 (Hetzner) or any other infra.
 - **Read-only harm ceiling.** An attacker can mess up the TUI layout and burn some API credits. That's it. Machine resets in ≤1 hour.
@@ -92,7 +97,7 @@ fly machine restart --app wibwob-dos         # manual reset if compromised
 | Concern | Status |
 |---------|--------|
 | Auth | ❌ None — intentional for disposable testbed |
-| Secrets at rest | ✅ None — Fly secrets only |
+| Secrets at rest | ✅ None — **do not `fly secrets set` anything** (env vars readable via editor) |
 | Lateral movement | ✅ Impossible — isolated machine |
 | Persistence | ✅ None — ephemeral rootfs |
 | Spend exposure | ⚠️ $5/day cap on OpenRouter key |
