@@ -3,7 +3,10 @@ import path from "node:path";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
 
-const CONTROL_API_BASE_URL = buildLocalControlApiBaseUrl();
+/** Lazy getter — port may not be known at module load time. */
+function getControlApiBaseUrl(): string {
+  return buildLocalControlApiBaseUrl();
+}
 
 const HELP_TEXT =
   "[commands]\n" +
@@ -97,7 +100,7 @@ export async function dispatchSlashCommand(
   }
 
   if (trimmed === "/dance") {
-    fetch(`${CONTROL_API_BASE_URL}/commands/run`, {
+    fetch(`${getControlApiBaseUrl()}/commands/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: "microapp.wibwob.glitchbox.glitchbox.open" }),
@@ -108,7 +111,7 @@ export async function dispatchSlashCommand(
   }
 
   if (trimmed === "/state") {
-    fetch(`${CONTROL_API_BASE_URL}/state`)
+    fetch(`${getControlApiBaseUrl()}/state`)
       .then((r) => r.json())
       .then((d: Record<string, any>) => {
         const app = d.app ?? {};

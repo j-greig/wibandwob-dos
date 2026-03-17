@@ -9,7 +9,7 @@
  * runtime behaviour). Add when a deterministic fake-live test mode
  * is available.
  *
- * Requires the app to be running on port 8099.
+ * Requires a running app. Set API_URL env to match your instance's port.
  */
 import { describe, test, expect, afterAll } from "bun:test";
 

@@ -2,7 +2,7 @@
  * Workspace appType round-trip hardening.
  *
  * Unit tests: registry restore, legacy remaps, unknown appTypes.
- * Live tests (requires app on port 8099): save → close → load → verify appType.
+ * Live tests (requires running app, set API_URL): save → close → load → verify appType.
  *
  * Ref: https://github.com/j-greig/wibandwob-dos/issues/108
  */
@@ -213,7 +213,7 @@ describe("snapshot restore edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Live round-trip tests — require app on port 8099
+// Live round-trip tests — require running app (set API_URL)
 // ---------------------------------------------------------------------------
 
 describe("live workspace appType round-trip", () => {

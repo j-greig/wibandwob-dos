@@ -36,6 +36,7 @@ import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
+import { setActualControlApiPort } from "../runtime/runtime-node.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
 import type { RuntimeWindowService } from "../application/runtime-window-service.js";
@@ -177,8 +178,10 @@ export class ControlApiService {
   private socketServer?: { stop: (closeActiveConnections?: boolean) => void };
   private actualPort?: number;
   private socketPath?: string;
+  private pidPath?: string;
   private readonly startedAt = Date.now();
   private enabled = false;
+  private getScreenSize?: () => { width: number; height: number };
 
   constructor(
     private readonly port: number,
@@ -186,7 +189,26 @@ export class ControlApiService {
     private readonly identity: RuntimeControlApiIdentity,
   ) {}
 
+  /** Inject screen size getter (set by app-controller after construction). */
+  setScreenSizeGetter(fn: () => { width: number; height: number }): void {
+    this.getScreenSize = fn;
+  }
+
+  /** Whether a socket is currently registered for discovery. */
+  hasSocket(): boolean {
+    return this.socketPath != null;
+  }
+
+  /** Start HTTP server + unix socket (normal startup). */
   start(): void {
+    this.startHttpOnly();
+    if (!this.enabled) return;
+    // ── Unix socket listener (local discovery + targeting) ──
+    this.registerSocket();
+  }
+
+  /** Start HTTP server only, skip socket registration (for headless/undersized screens). */
+  startHttpOnly(): void {
     const bunRuntime = (
       globalThis as {
         Bun?: {
@@ -222,6 +244,7 @@ export class ControlApiService {
         });
         this.actualPort = port;
         this.enabled = true;
+        setActualControlApiPort(port);
         log.app(`control API listening on port ${port}`);
         break;
       } catch {
@@ -235,37 +258,70 @@ export class ControlApiService {
       return;
     }
 
-    // ── Unix socket listener (local discovery + targeting) ──
+    // ── Clean shutdown: delete socket + PID sidecar ──
+    const cleanup = () => {
+      if (this.socketPath) {
+        try { fs.unlinkSync(this.socketPath); } catch {}
+      }
+      if (this.pidPath) {
+        try { fs.unlinkSync(this.pidPath); } catch {}
+      }
+    };
+    process.on("SIGTERM", cleanup);
+    process.on("SIGINT", cleanup);
+    process.on("exit", cleanup);
+  }
+
+  /** Register unix socket + PID sidecar for CLI discovery. */
+  registerSocket(): void {
+    if (this.socketServer) return; // already registered
     if (!this.identity.scratchBase) return;
+    const bunRuntime = (globalThis as any).Bun;
+    if (!bunRuntime) return;
     const label = this.identity.instanceLabel || this.identity.instanceId;
     const instancesDir = path.join(this.identity.scratchBase, "instances");
     const sockPath = path.join(instancesDir, `${label}.sock`);
+    const pidFilePath = path.join(instancesDir, `${label}.pid`);
     try {
       fs.mkdirSync(instancesDir, { recursive: true });
       // Clean stale socket from previous run
       try { fs.unlinkSync(sockPath); } catch {}
       this.socketServer = bunRuntime.serve({
         unix: sockPath,
-        fetch: async (request) => this.handleRequest(request),
+        fetch: async (request: Request) => this.handleRequest(request),
       });
       this.socketPath = sockPath;
-      log.app(`control API socket at ${sockPath}`);
+      // Write PID sidecar for CLI liveness checks
+      fs.writeFileSync(pidFilePath, String(process.pid));
+      this.pidPath = pidFilePath;
+      log.app(`control API socket at ${sockPath} (pid ${process.pid})`);
     } catch (err) {
       log.err(`control API socket failed: ${err}`);
       // HTTP still works — socket is best-effort
     }
   }
 
-  stop(): void {
-    this.server?.stop(true);
-    this.server = undefined;
-    this.socketServer?.stop(true);
-    this.socketServer = undefined;
-    // Clean up socket file
+  /** Deregister socket + PID sidecar (e.g. screen resize below threshold). */
+  deregisterSocket(): void {
+    if (this.socketServer) {
+      this.socketServer.stop(true);
+      this.socketServer = undefined;
+    }
     if (this.socketPath) {
       try { fs.unlinkSync(this.socketPath); } catch {}
       this.socketPath = undefined;
     }
+    if (this.pidPath) {
+      try { fs.unlinkSync(this.pidPath); } catch {}
+      this.pidPath = undefined;
+    }
+    log.app("control API socket deregistered");
+  }
+
+  stop(): void {
+    this.server?.stop(true);
+    this.server = undefined;
+    this.deregisterSocket();
     this.actualPort = undefined;
     this.enabled = false;
   }
@@ -327,6 +383,7 @@ export class ControlApiService {
       const h = Math.floor(uptimeSec / 3600);
       const m = Math.floor((uptimeSec % 3600) / 60);
       const uptime = h > 0 ? `${h}h ${m}m` : `${m}m`;
+      const screen = this.getScreenSize?.() ?? null;
       return Response.json({
         ok: true,
         instanceId: this.identity.instanceId,
@@ -337,6 +394,7 @@ export class ControlApiService {
         port: this.actualPort,
         host: this.identity.host,
         socketPath: this.socketPath ?? null,
+        screen: screen ? { width: screen.width, height: screen.height } : null,
       });
     }
 

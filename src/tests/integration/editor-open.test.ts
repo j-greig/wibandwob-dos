@@ -1,7 +1,7 @@
 /**
  * Editor open failure-path tests.
  * Tests EditorCoordinator.openFile behavior for edge cases.
- * Requires the app to be running on port 8099.
+ * Requires a running app. Set API_URL env to match your instance's port.
  */
 import { describe, test, expect } from "bun:test";
 import fs from "node:fs";

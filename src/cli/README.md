@@ -9,9 +9,9 @@ JSON to stdout, errors to stderr. Designed for `jq`, `xargs`, and shell scripts.
 
 ### Architecture: pure HTTP client, zero catalog import
 
-`wibwob.ts` is ~150 lines of TypeScript. It does NOT import the command
-catalog, the command registry, or any `src/core/` module. It is a pure
-HTTP client that talks to the control API on port 8099.
+`wibwob.ts` is a TypeScript CLI. It does NOT import the command catalog,
+the command registry, or any `src/core/` module. It is a pure HTTP client
+that talks to the control API via unix sockets (socket-first resolution).
 
 ```
 command-catalog.ts        Static command definitions (id, label, group, flags)
@@ -133,9 +133,9 @@ Saved recipes also live in `scripts/`:
 - `bash scripts/cli-batch-relayout.sh` — open a stable three-window scene and lay it out with one canonical batch op
 - `bash scripts/cli-text-loop.sh mask` — capture the desktop as text, transform it, and feed it back in as a primer
 
-These helper scripts are local-runtime-first. Override the target with
-`WIBWOB_SCRIPT_API=http://127.0.0.1:8098` when you intentionally want a
-different instance.
+These helper scripts use `wibwob` and auto-detect the instance via
+socket scan. Use `-i <label>` or `WIBWOB_INSTANCE=<label>` to target
+a specific instance.
 
 ## Agent workflows
 
@@ -154,15 +154,32 @@ wibwob inspection | jq '.snapshot.ui'  # is the desktop blocked?
 wibwob state | jq '.focus'             # what's focused?
 ```
 
+## Instance targeting
+
+```bash
+wibwob health                          # auto-detect sole instance via socket scan
+wibwob -i cinema health                # target by label
+WIBWOB_INSTANCE=cinema wibwob health   # same, via env var
+```
+
+Resolution order:
+1. `-i` / `--instance` flag or `$WIBWOB_INSTANCE` → named socket
+2. Socket scan: find sole alive instance via PID liveness check
+3. Error (no silent port fallback)
+
 ## Environment
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WW_API` | configured local control API | Base URL of the control API |
+| `WIBWOB_INSTANCE` | unset | Target instance label (connects via unix socket) |
+| `WW_API` | unset | Base URL override (bypasses socket scan) |
 | `WIBWOB_API` | unset | Alias for `WW_API` |
 
 ```bash
-# Talk to alt instance on port 8098
+# Target a specific instance by label
+WIBWOB_INSTANCE=cinema wibwob health
+
+# Override with explicit URL (for testing or cross-worktree)
 WW_API=http://127.0.0.1:8098 wibwob health
 ```
 

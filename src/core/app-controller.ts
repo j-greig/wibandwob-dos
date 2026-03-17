@@ -25,6 +25,7 @@ import {
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
+  SCRATCH_BASE,
   SPIKE_NOTES_PATH,
   SPIKE_ROOT,
 } from "./config.js";
@@ -465,7 +466,47 @@ export class TsTuiMvpApp {
     this.bindGlobalKeys();
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
     this.restoreDefaultWorkspace();
-    this.controlApi.start();
+
+    // ── Startup scan: clean stale sockets from crashed instances ──
+    this.cleanStaleSockets();
+
+    // ── Screen size guard: skip socket registration if below usable minimum ──
+    this.controlApi.setScreenSizeGetter(() => ({
+      width: this.screen.width as number,
+      height: this.screen.height as number,
+    }));
+    const sw = this.screen.width as number;
+    const sh = this.screen.height as number;
+    if (sw < 40 || sh < 10) {
+      log.app(`screen ${sw}×${sh} below minimum 40×10 — socket registration skipped`);
+      this.controlApi.startHttpOnly();
+    } else {
+      this.controlApi.start();
+    }
+
+    // ── Resize handler: deregister/reregister socket on threshold crossing ──
+    this.screen.on("resize", () => {
+      const w = this.screen.width as number;
+      const h = this.screen.height as number;
+      if (w < 40 || h < 10) {
+        if (this.controlApi.hasSocket()) {
+          log.app(`screen resized to ${w}×${h} — deregistering socket`);
+          this.controlApi.deregisterSocket();
+        }
+      } else {
+        if (!this.controlApi.hasSocket()) {
+          log.app(`screen resized to ${w}×${h} — re-registering socket`);
+          this.controlApi.registerSocket();
+        }
+      }
+    });
+
+    // Update env var with actual bound port (may differ from requested 8099)
+    const apiStatus = this.controlApi.getStatus();
+    if (apiStatus.baseUrl) {
+      process.env.WIBWOB_API_BASE_URL = apiStatus.baseUrl;
+    }
+
     this.persistState();
     this.screen.render();
     log.app(
@@ -2102,6 +2143,31 @@ export class TsTuiMvpApp {
   private persistState(): void {
     this.shellChrome.updateStatusLine();
     this.state.persistAndNotify();
+  }
+
+  /** Scan scratch/instances/ and delete stale sockets whose PID is dead. */
+  private cleanStaleSockets(): void {
+    const instancesDir = path.join(SCRATCH_BASE, "instances");
+    let entries: string[];
+    try { entries = fs.readdirSync(instancesDir); } catch { return; }
+    for (const file of entries) {
+      if (!file.endsWith(".pid")) continue;
+      const pidFile = path.join(instancesDir, file);
+      const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+      if (isNaN(pid)) {
+        try { fs.unlinkSync(pidFile); } catch {}
+        continue;
+      }
+      try {
+        process.kill(pid, 0); // alive — leave it
+      } catch {
+        // Dead process — clean up socket + pid sidecar
+        try { fs.unlinkSync(pidFile); } catch {}
+        const sockFile = path.join(instancesDir, file.replace(".pid", ".sock"));
+        try { fs.unlinkSync(sockFile); } catch {}
+        log.app(`cleaned stale socket for dead pid ${pid}: ${file.replace(".pid", "")}`);
+      }
+    }
   }
 
   private destroy(): void {

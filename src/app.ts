@@ -88,10 +88,9 @@ function deactivateGhosttyShader() {
 activateGhosttyShader();
 
 const removePid = () => { try { fs.unlinkSync(runtimeNode.pidPath); } catch {} };
-const removeSocket = () => {
-  try { fs.unlinkSync(path.join(runtimeNode.scratchBase, "instances", `${runtimeNode.instanceLabel}.sock`)); } catch {}
-};
-const cleanup = () => { removePid(); removeSocket(); deactivateGhosttyShader(); };
+// Socket + PID sidecar cleanup is handled by ControlApiService shutdown handlers.
+// app.ts only cleans the global wibwob.pid and ghostty shader.
+const cleanup = () => { removePid(); deactivateGhosttyShader(); };
 
 process.once("exit", cleanup);
 process.once("SIGTERM", () => { cleanup(); process.exit(0); });

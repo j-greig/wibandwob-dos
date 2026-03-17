@@ -19,11 +19,11 @@ Saved scripts for the patterns below:
 ## Setup
 
 ```bash
-alias wibwob="bun run src/cli/wibwob.ts"
 SMEAR="python3 .pi/skills/vj-timeline/scripts/smear.py"
 ```
 
 Ensure the app is running (`bun run dev:world` or `bash scripts/restart.sh`).
+The CLI auto-detects the instance via socket scan — no port needed.
 
 ---
 
@@ -84,30 +84,16 @@ Generate batch payloads instead of hand-writing JSON.
 ```bash
 # Stack all figlet windows down the left edge
 wibwob windows \
-  | jq '[
-      .[]
-      | select(.appType=="figlet-banner")
-      | .id
-    ]
-    | to_entries
-    | {
-        ops: [
-          .[] | {
-            id: .value,
-            width: 72,
-            height: 16,
-            left: 2,
-            top: (2 + (.key * 4))
-          }
-        ]
-      }' \
-  | curl -s -X POST http://127.0.0.1:8099/windows/batch \
-      -H 'Content-Type: application/json' \
-      -d @-
+  | jq -r '[.[] | select(.appType=="figlet-banner") | .id] | .[]' \
+  | while read -r id; do
+      wibwob window "$id" move --left 2 --top $((2 + n * 4))
+      wibwob window "$id" resize --width 72 --height 16
+      n=$((n + 1))
+    done
 ```
 
-When you need local shaping but still want the canonical CLI for the read side,
-this pattern is usually cleaner than a long shell loop.
+For batch geometry, loop over IDs from `wibwob windows` — keeps
+everything in the CLI surface instead of raw HTTP.
 
 ---
 
@@ -137,21 +123,14 @@ This is useful when an agent needs both evidence and a quick metric in one pass.
 For more complex command args, generate JSON with `jq -n` or a heredoc.
 
 ```bash
-# Open a figlet with a generated payload
-jq -n \
-  --arg text "PATCHBAY" \
-  --arg font "doom" \
-  '{id:"figlet.open", args:{text:$text, font:$font}}' \
-| curl -s -X POST http://127.0.0.1:8099/commands/run \
-    -H 'Content-Type: application/json' \
-    -d @-
+# Open a figlet with flags
+wibwob figlet.open --text "PATCHBAY" --font doom
 
-# Same idea with a heredoc
-cat <<'JSON' | curl -s -X POST http://127.0.0.1:8099/commands/run \
-  -H 'Content-Type: application/json' \
-  -d @-
-{"id":"theme.set","args":{"name":"wibwob-phosphor"}}
-JSON
+# Set theme
+wibwob theme.set --name wibwob-phosphor
+
+# For complex args, use the cmd form with flags
+wibwob cmd figlet.open --text "PATCHBAY" --font doom
 ```
 
 ---
@@ -207,26 +186,19 @@ This is a good default operator pattern before doing anything riskier.
 Use real state to compute a new arrangement.
 
 ```bash
-wibwob windows \
-  | jq '{
-      ops: [
-        .[]
-        | { id, width: 60, height: 14 }
-        + if .kind == "figlet" then
-            { left: 2, top: 2 }
-          elif .kind == "inspector" then
-            { left: 90, top: 2, width: 76, height: 24 }
-          else
-            { left: 4, top: 20 }
-          end
-      ]
-    }' \
-  | curl -s -X POST http://127.0.0.1:8099/windows/batch \
-      -H 'Content-Type: application/json' \
-      -d @-
+# Kind-based layout: figlets top-left, inspectors right, rest below
+wibwob windows | jq -r '.[] | "\(.id) \(.kind)"' | while read -r id kind; do
+  case "$kind" in
+    figlet)    wibwob window "$id" move --left 2 --top 2 ;;
+    inspector) wibwob window "$id" move --left 90 --top 2
+               wibwob window "$id" resize --width 76 --height 24 ;;
+    *)         wibwob window "$id" move --left 4 --top 20
+               wibwob window "$id" resize --width 60 --height 14 ;;
+  esac
+done
 ```
 
-For large mutations, `windows/batch` is preferable to repeated move/resize calls.
+Shell loops over `wibwob windows` output keep everything in the CLI surface.
 
 ---
 
