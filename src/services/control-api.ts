@@ -69,7 +69,8 @@ type RuntimeControlApiIdentity = Pick<
 const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/",                              description: "Service info + endpoint list (this response)" },
   { method: "GET",  path: "/help",                          description: "Alias for /" },
-  { method: "GET",  path: "/health",                        description: "Instance identity: id, label, pid, uptime, port, socketPath" },
+  { method: "GET",  path: "/readme",                        description: "Plain text agent cheatsheet — curl examples, philosophy, rules. Send this URL to onboard an agent." },
+  { method: "GET",  path: "/health",                        description: "Instance identity: id, label, pid, uptime, port, socketPath, ephemeral reset countdown" },
   { method: "GET",  path: "/config",                        description: "Instance config: paths (scratch, captures, workspaces, state)" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
@@ -377,6 +378,15 @@ export class ControlApiService {
       return new Response(scalarDocsHtml(port), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/readme") {
+      try {
+        const txt = fs.readFileSync("/app/agent-readme.txt", "utf8");
+        return new Response(txt, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      } catch {
+        return new Response("readme not found — running outside Fly?", { status: 404 });
+      }
     }
 
     if (request.method === "GET" && url.pathname === "/health") {

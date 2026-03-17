@@ -32,6 +32,9 @@ RUN mkdir -p scratch/workspaces
 # Pre-seed default workspace (restored on boot)
 COPY deploy/fly/agent-welcome-workspace.json scratch/workspaces/agent-welcome.json
 
+# Agent readme — served at /readme
+COPY deploy/fly/agent-readme.txt /app/agent-readme.txt
+
 # Control API on 8099, exposed to Fly's internal network
 EXPOSE 8099
 
