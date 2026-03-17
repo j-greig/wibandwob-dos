@@ -71,3 +71,9 @@ tests/tidepool-smoke/results/
 asciicker-gameplay-animted.gif
 scripts/lib/find-ghostty-window
 tmp/
+
+# Vendored binaries (downloaded at runtime)
+vendor/signls/signls
+vendor/signls/signls.tar.gz
+vendor/signls/config.json
+vendor/signls/debug.log
