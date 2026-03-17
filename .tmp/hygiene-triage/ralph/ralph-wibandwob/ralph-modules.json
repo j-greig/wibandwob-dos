@@ -1,0 +1,18 @@
+{
+  "enabled_modules": [],
+  "available_modules": [
+    "chaos-amplifier",
+    "structure-amplifier"
+  ],
+  "description": "Optional modifier modules for wibandwob. Edit 'enabled_modules' to activate.",
+  "usage": {
+    "enable_module": "Add module name to 'enabled_modules' array",
+    "disable_module": "Remove module name from 'enabled_modules' array",
+    "example_command": "jq '.enabled_modules += [\"chaos-amplifier\"]' ralph-modules.json > tmp.json && mv tmp.json ralph-modules.json"
+  },
+  "notes": [
+    "Modules are optional - base wibandwob prompt is complete without them",
+    "Use chaos-amplifier to increase Wib (chaotic/artistic) influence",
+    "Use structure-amplifier to increase Wob (geometric/precise) influence"
+  ]
+}

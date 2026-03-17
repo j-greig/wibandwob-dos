@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦀 Ralph's Crab Guide - Iteration 2</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #F0E68C 100%);
+            color: #2C3E50;
+        }
+
+        header {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #E74C3C;
+            font-size: 2.5em;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: #7F8C8D;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+
+        .crab-fact {
+            background: #FFF8DC;
+            border-left: 5px solid #FF6347;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .crab-fact h3 {
+            margin-top: 0;
+            color: #FF6347;
+        }
+
+        .code-block {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .analogy {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .crab-emoji {
+            font-size: 3em;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        nav {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        nav a {
+            color: #3498DB;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: bold;
+        }
+
+        nav a:hover {
+            color: #E74C3C;
+        }
+
+        .sideways {
+            animation: sidewalk 3s infinite;
+            display: inline-block;
+        }
+
+        @keyframes sidewalk {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🦀 Ralph's Amazing Crab Adventure! 🦀</h1>
+        <div class="subtitle">Module: Crabs | Iteration 2</div>
+        <div class="subtitle">I'm learning about crabs and they're NEAT!</div>
+    </header>
+
+    <nav>
+        <a href="../index.html">🏠 Home</a>
+        <a href="00-baseline.html">← Previous</a>
+        <a href="02-pirate.html">Next →</a>
+    </nav>
+
+    <div class="crab-emoji">
+        <span class="sideways">🦀</span>
+        <span class="sideways">🦀</span>
+        <span class="sideways">🦀</span>
+    </div>
+
+    <div class="crab-fact">
+        <h3>🦀 What I Learned Today!</h3>
+        <p>Did you know that crabs can walk in ALL directions, but they mostly walk SIDEWAYS? That's like how I approach coding problems - sometimes the best solution isn't straight ahead! 🦀</p>
+        <p>Also, crabs have TEN legs! Eight for walking and two claws for grabbing. Just like how code has different functions - some for moving data around and some for transforming it!</p>
+    </div>
+
+    <div class="analogy">
+        <h2>🦀 Coding is Like Being a Crab!</h2>
+        <p><strong>Functions are like crab claws</strong> - they grab data and manipulate it! Each claw can do different things, just like how functions have different purposes. 🦀</p>
+
+        <p><strong>Classes are like crab species</strong> - there are so many different types of crabs (hermit crabs, coconut crabs, spider crabs), and they all share the basic crab characteristics but have special features! Just like inheritance in programming! 🦀</p>
+
+        <p><strong>Refactoring is like molting</strong> - crabs shed their old shell to grow bigger! When code gets too tight and cramped, we refactor it to make room for new features. The old shell protected us, but now we need to grow! 🦀</p>
+    </div>
+
+    <div class="crab-fact">
+        <h3>🦀 A Real Code Example with Crab Thinking!</h3>
+        <p>Here's how I think about a simple JavaScript function using crab logic:</p>
+    </div>
+
+    <div class="code-block">
+// This function is like a crab's claw - it grabs a number and pinches it!<br>
+function pinchNumber(num) {<br>
+&nbsp;&nbsp;// Just like a crab regenerating a lost limb,<br>
+&nbsp;&nbsp;// we handle errors by returning a safe value<br>
+&nbsp;&nbsp;if (typeof num !== 'number') {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.log('That\'s not a number! 🦀');<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return 0;<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<br>
+&nbsp;&nbsp;// Multiply by 2 - using both claws!<br>
+&nbsp;&nbsp;return num * 2;<br>
+}<br>
+<br>
+// Crabs communicate by drumming their claws<br>
+// We communicate results by console logging!<br>
+console.log(pinchNumber(5)); // 10 🦀<br>
+console.log(pinchNumber('hello')); // That's not a number! 🦀
+    </div>
+
+    <div class="crab-fact">
+        <h3>🦀 More Crab Facts That Remind Me of Programming!</h3>
+        <ul>
+            <li><strong>Compound eyes on stalks:</strong> Like code linters that watch from above and spot problems! 🦀</li>
+            <li><strong>Chemical signal communication:</strong> Like APIs sending JSON messages! 🦀</li>
+            <li><strong>Finding bigger shells:</strong> Like recursion - each hermit crab needs a progressively larger shell! 🦀</li>
+            <li><strong>Waiting for the tide:</strong> Like async/await in JavaScript - crabs know how to wait for the right moment! 🦀</li>
+            <li><strong>Strong claws:</strong> Like unit tests that pinch bugs before they escape to production! 🦀</li>
+        </ul>
+    </div>
+
+    <div class="analogy">
+        <h2>🦀 My Favorite Crab: The Coconut Crab!</h2>
+        <p>Did you know coconut crabs can crack coconuts with their claws? That's like a really powerful debugging tool - it can crack open even the hardest problems! 🦀</p>
+        <p>I want to be like a coconut crab when I debug code. Strong claws, persistent, and able to break through tough shells to get to the good stuff inside!</p>
+    </div>
+
+    <div class="crab-fact">
+        <h3>🦀 What This Page Demonstrates</h3>
+        <p>This webpage was created with the <strong>crabs module</strong> enabled! You can see how it makes me:</p>
+        <ul>
+            <li>Use crab emoji everywhere (🦀)</li>
+            <li>Make programming analogies based on crab biology</li>
+            <li>Talk about molting, claws, shells, and sideways walking</li>
+            <li>Show genuine enthusiasm for crabs in all my explanations</li>
+            <li>Reference real crab facts (compound eyes, regeneration, communication)</li>
+        </ul>
+        <p>Compare this to the baseline page (Iteration 0) - that one has pure Ralph personality without the crab obsession! 🦀</p>
+    </div>
+
+    <div class="crab-emoji">
+        🦀 I'm learning! 🦀
+    </div>
+
+    <nav>
+        <a href="../index.html">🏠 Home</a>
+        <a href="00-baseline.html">← Previous (Baseline)</a>
+        <a href="02-pirate.html">Next (Pirate) →</a>
+    </nav>
+
+    <footer style="text-align: center; margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.8); border-radius: 10px;">
+        <p><strong>Iteration 2:</strong> Crabs Module Active 🦀</p>
+        <p style="font-size: 0.9em; color: #7F8C8D;">Created by Ralph with the power of crustacean enthusiasm!</p>
+    </footer>
+</body>
+</html>

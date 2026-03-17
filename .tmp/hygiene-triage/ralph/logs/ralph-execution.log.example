@@ -1,0 +1,20 @@
+# Ralph Execution Log Example
+# This file demonstrates the log format Ralph should use
+
+[2026-01-01 14:23] Iteration 1: Created basic Express server, added /health endpoint
+[2026-01-01 14:31] Iteration 2: Added 'tdd-strict' module → forces test-first development (task requires tests). Wrote 5 unit tests for /health
+[2026-01-01 14:38] Iteration 3: Fixed authentication bug (JWT expiry not checked), all tests pass
+[2026-01-01 14:45] Iteration 4: Added /login endpoint with bcrypt password hashing (security requirement)
+[2026-01-01 14:52] Iteration 5: npm install failed (network timeout), retrying with --verbose
+[2026-01-01 14:59] Iteration 6: Dependencies installed, added Redis client for sessions (chose Redis over memcached for persistence)
+[2026-01-01 15:06] Iteration 7: Session middleware configured, tested with curl - works!
+[2026-01-01 15:13] Iteration 8: Added 'api-docs' module → auto-generates OpenAPI spec (needed for frontend team). Created /api-docs endpoint
+[2026-01-01 15:20] Iteration 9: All requirements met, 23 tests passing, API documented. Task complete!
+
+# Format Guide:
+# [YYYY-MM-DD HH:MM] Iteration N: {concise summary}
+#
+# For modules: Added 'name' module → {why} ({how used})
+# For decisions: State what + (brief justification)
+# For blockers: What failed + action taken
+# For completions: What works + metrics (e.g., "23 tests passing")

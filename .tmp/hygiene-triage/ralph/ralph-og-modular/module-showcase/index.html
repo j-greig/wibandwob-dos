@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ralph's Module Showcase</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #48dbfb 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+        }
+        .page-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .page-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .page-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        .page-card .number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .page-card .module {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .about {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            color: #2c3e50;
+        }
+        .coming-soon {
+            opacity: 0.5;
+            background: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Ralph's Module Showcase 🎭</h1>
+        <p class="subtitle">Watch Ralph's personality evolve across different modules!</p>
+
+        <div class="about">
+            <h2>What's This?</h2>
+            <p>Each iteration, Ralph enables a different personality module and creates a webpage reflecting that module's style. This showcase demonstrates how the same AI can express different personas while maintaining the core Ralph personality!</p>
+            <p><strong>Goal:</strong> 10+ pages, 3+ custom modules</p>
+        </div>
+
+        <h2>📄 Pages</h2>
+        <div class="page-grid">
+            <a href="pages/00-baseline.html" class="page-card">
+                <div class="number">00</div>
+                <div class="module">Baseline Ralph</div>
+            </a>
+
+            <a href="pages/01-crabs.html" class="page-card">
+                <div class="number">01</div>
+                <div class="module">🦀 Crabs Module</div>
+            </a>
+
+            <a href="pages/02-pirate.html" class="page-card">
+                <div class="number">02</div>
+                <div class="module">☠️ Pirate Module</div>
+            </a>
+
+            <a href="pages/03-french.html" class="page-card">
+                <div class="number">03</div>
+                <div class="module">🇫🇷 French Module</div>
+            </a>
+
+            <div class="page-card coming-soon">
+                <div class="number">04</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">03</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">04</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">05</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">06</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">07</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">08</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">09</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+
+            <div class="page-card coming-soon">
+                <div class="number">10</div>
+                <div class="module">Coming Soon...</div>
+            </div>
+        </div>
+
+        <div class="about" style="margin-top: 30px;">
+            <h3>📊 Behind the Scenes</h3>
+            <p><a href="logs/action-log.md" style="color: #667eea;">View Action Log</a> - See detailed module configs and decisions</p>
+        </div>
+    </div>
+</body>
+</html>

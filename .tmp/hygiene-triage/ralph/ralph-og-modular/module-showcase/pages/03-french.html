@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🇫🇷 Le Guide de Ralph pour CSS - Itération 4</title>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(to bottom, #002395 0%, #FFFFFF 33%, #ED2939 66%, #002395 100%);
+            color: #2c3e50;
+        }
+
+        .container {
+            background: #fefefe;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin: 20px 0;
+        }
+
+        header {
+            text-align: center;
+            background: linear-gradient(135deg, #002395 0%, #ED2939 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.8em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            margin-top: 15px;
+            font-style: italic;
+            opacity: 0.9;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-left: 5px solid #002395;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            color: #002395;
+            font-size: 1.6em;
+        }
+
+        .code-exemple {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            border-left: 5px solid #ED2939;
+        }
+
+        .astuce {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .astuce::before {
+            content: "💡 ASTUCE: ";
+            font-weight: bold;
+            color: #ED2939;
+        }
+
+        .vocabulaire-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .vocabulaire-table th {
+            background: #002395;
+            color: white;
+            padding: 15px;
+            text-align: left;
+        }
+
+        .vocabulaire-table td {
+            background: white;
+            padding: 12px;
+            border: 1px solid #ddd;
+        }
+
+        .vocabulaire-table tr:hover {
+            background: #f0f0f0;
+        }
+
+        .eiffel {
+            text-align: center;
+            font-size: 3em;
+            animation: sparkle 2s ease-in-out infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        .baguette {
+            display: inline-block;
+            font-size: 2em;
+            animation: rotate 4s linear infinite;
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        nav {
+            margin-top: 40px;
+            text-align: center;
+            padding: 25px;
+            background: rgba(0, 35, 149, 0.1);
+            border-radius: 10px;
+        }
+
+        nav a {
+            color: #002395;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        nav a:hover {
+            color: #ED2939;
+            text-decoration: underline;
+        }
+
+        .tricolore {
+            height: 10px;
+            background: linear-gradient(to right, #002395 33%, #FFFFFF 33%, #FFFFFF 66%, #ED2939 66%);
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        ul, ol {
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎨 CSS: L'Art du Style Web</h1>
+        <p class="subtitle">Un Guide Élégant par Ralph Wiggum</p>
+        <div class="eiffel">🗼</div>
+    </header>
+
+    <div class="container">
+        <div class="section">
+            <h3>🇫🇷 Qu'est-ce que CSS?</h3>
+            <p>CSS (Cascading Style Sheets) est le langage qui rend le web beau! C'est comme être un artiste qui peint une toile - HTML est la structure, et CSS est la peinture, les couleurs, et le style!</p>
+            <p>Imaginez un croissant sans beurre doré - c'est comme HTML sans CSS! Le CSS ajoute la beauté, l'élégance, et le charme à vos pages web.</p>
+        </div>
+
+        <div class="tricolore"></div>
+
+        <div class="section">
+            <h3>🥖 Vocabulaire CSS Essentiel</h3>
+            <table class="vocabulaire-table">
+                <thead>
+                    <tr>
+                        <th>Terme CSS</th>
+                        <th>Traduction</th>
+                        <th>Explication</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>color</code></td>
+                        <td>Couleur</td>
+                        <td>Définit la couleur du texte - comme choisir l'encre pour écrire une lettre!</td>
+                    </tr>
+                    <tr>
+                        <td><code>background</code></td>
+                        <td>Arrière-plan</td>
+                        <td>La toile de fond de votre élément - comme le papier derrière votre texte!</td>
+                    </tr>
+                    <tr>
+                        <td><code>font-family</code></td>
+                        <td>Famille de police</td>
+                        <td>Le style d'écriture - serif pour élégance, sans-serif pour modernité!</td>
+                    </tr>
+                    <tr>
+                        <td><code>margin</code></td>
+                        <td>Marge extérieure</td>
+                        <td>L'espace autour d'un élément - comme la distance entre deux tableaux dans un musée!</td>
+                    </tr>
+                    <tr>
+                        <td><code>padding</code></td>
+                        <td>Marge intérieure</td>
+                        <td>L'espace à l'intérieur d'un élément - comme le rembourrage d'un coussin!</td>
+                    </tr>
+                    <tr>
+                        <td><code>border</code></td>
+                        <td>Bordure</td>
+                        <td>Une ligne autour de l'élément - comme un cadre doré autour d'une peinture!</td>
+                    </tr>
+                    <tr>
+                        <td><code>display</code></td>
+                        <td>Affichage</td>
+                        <td>Comment l'élément se comporte - block, inline, flex, grid!</td>
+                    </tr>
+                    <tr>
+                        <td><code>position</code></td>
+                        <td>Position</td>
+                        <td>Où placer l'élément - static, relative, absolute, fixed!</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>🎭 Les Trois Façons d'Ajouter du CSS</h3>
+            <ol>
+                <li>
+                    <strong>CSS Inline (dans la ligne)</strong> - Direct dans l'élément HTML
+                    <div class="code-exemple">
+&lt;p style="color: blue; font-size: 18px;"&gt;Bonjour le monde!&lt;/p&gt;
+                    </div>
+                    <div class="astuce">Pratique pour tester rapidement, mais pas idéal pour de grands projets!</div>
+                </li>
+                <li>
+                    <strong>CSS Interne</strong> - Dans la balise &lt;style&gt; du document
+                    <div class="code-exemple">
+&lt;style&gt;
+  /* Styles pour tous les paragraphes */
+  p {
+    color: bleu;
+    font-size: 18px;
+  }
+&lt;/style&gt;
+                    </div>
+                </li>
+                <li>
+                    <strong>CSS Externe</strong> - Dans un fichier séparé (la meilleure pratique!)
+                    <div class="code-exemple">
+&lt;link rel="stylesheet" href="styles.css"&gt;
+                    </div>
+                    <div class="astuce">C'est la méthode professionnelle! Séparez le contenu du style!</div>
+                </li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h3>🍷 Sélecteurs CSS: Comment Cibler les Éléments</h3>
+            <p>Les sélecteurs sont comme des adresses qui indiquent à CSS où appliquer le style!</p>
+
+            <div class="code-exemple">
+/* Sélecteur d'élément - cible toutes les balises p */
+p {
+  color: #2c3e50;
+}
+
+/* Sélecteur de classe - cible les éléments avec class="special" */
+.special {
+  background-color: #ffd700;
+  font-weight: bold;
+}
+
+/* Sélecteur d'ID - cible l'élément avec id="header" */
+#header {
+  font-size: 2em;
+  text-align: center;
+}
+
+/* Sélecteur descendant - cible les liens dans les paragraphes */
+p a {
+  color: #ED2939;
+  text-decoration: none;
+}
+
+/* Pseudo-classe - cible l'état hover (survol) */
+a:hover {
+  text-decoration: underline;
+  color: #002395;
+}
+
+/* Sélecteur d'attribut - cible les inputs de type text */
+input[type="text"] {
+  border: 2px solid #002395;
+  padding: 10px;
+}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📐 Le Modèle de Boîte (Box Model)</h3>
+            <p>Chaque élément HTML est une boîte! Comprenez le modèle de boîte et vous comprendrez CSS!</p>
+
+            <div class="code-exemple">
+/*
+┌─────────────────────────────────────┐
+│         MARGIN (marge)              │
+│  ┌───────────────────────────────┐  │
+│  │     BORDER (bordure)          │  │
+│  │  ┌─────────────────────────┐  │  │
+│  │  │   PADDING (rembourrage) │  │  │
+│  │  │  ┌───────────────────┐  │  │  │
+│  │  │  │   CONTENT         │  │  │  │
+│  │  │  │   (contenu)       │  │  │  │
+│  │  │  └───────────────────┘  │  │  │
+│  │  └─────────────────────────┘  │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+*/
+
+.ma-boite {
+  width: 300px;           /* Largeur du contenu */
+  height: 200px;          /* Hauteur du contenu */
+  padding: 20px;          /* Espace intérieur */
+  border: 5px solid blue; /* Bordure */
+  margin: 10px;           /* Espace extérieur */
+}
+            </div>
+
+            <div class="astuce">La largeur totale = width + padding-left + padding-right + border-left + border-right!</div>
+        </div>
+
+        <div class="section">
+            <h3>🎨 Couleurs en CSS</h3>
+            <p>Il y a plusieurs façons magnifiques de définir les couleurs!</p>
+
+            <div class="code-exemple">
+/* Noms de couleurs - simples et élégants */
+color: red;
+color: blue;
+color: gold;
+
+/* Hexadécimal - très précis */
+color: #FF0000;  /* Rouge */
+color: #0000FF;  /* Bleu */
+color: #FFD700;  /* Or */
+
+/* RGB (Rouge, Vert, Bleu) */
+color: rgb(255, 0, 0);      /* Rouge */
+color: rgba(255, 0, 0, 0.5); /* Rouge semi-transparent */
+
+/* HSL (Teinte, Saturation, Luminosité) */
+color: hsl(0, 100%, 50%);    /* Rouge */
+color: hsla(0, 100%, 50%, 0.5); /* Rouge semi-transparent */
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>✨ Flexbox: La Magie de la Disposition</h3>
+            <p>Flexbox rend la disposition des éléments simple et élégante!</p>
+
+            <div class="code-exemple">
+/* Container flex - le parent */
+.container {
+  display: flex;
+  justify-content: center;    /* Centre horizontalement */
+  align-items: center;        /* Centre verticalement */
+  gap: 20px;                  /* Espace entre les éléments */
+}
+
+/* Direction flex */
+.row {
+  flex-direction: row;        /* Horizontal (défaut) */
+}
+
+.column {
+  flex-direction: column;     /* Vertical */
+}
+
+/* Propriétés des enfants flex */
+.item {
+  flex: 1;           /* Grandit pour remplir l'espace */
+  flex-shrink: 0;    /* Ne rétrécit pas */
+  flex-basis: 200px; /* Taille de base */
+}
+            </div>
+
+            <div class="astuce">Flexbox est parfait pour les barres de navigation, les cartes, et les mises en page responsives!</div>
+        </div>
+
+        <div class="section">
+            <h3>🌟 Animations CSS: Donnez Vie à Vos Pages!</h3>
+            <p>Les animations rendent votre site web dynamique et captivant!</p>
+
+            <div class="code-exemple">
+/* Définir une animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Appliquer l'animation */
+.element {
+  animation: fadeIn 1s ease-in-out;
+}
+
+/* Transition simple - pour les changements d'état */
+.bouton {
+  background-color: #002395;
+  transition: all 0.3s ease;
+}
+
+.bouton:hover {
+  background-color: #ED2939;
+  transform: scale(1.1);
+}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📱 CSS Responsive: S'Adapter à Tous les Écrans</h3>
+            <p>Votre site doit être beau sur tous les appareils - ordinateur, tablette, téléphone!</p>
+
+            <div class="code-exemple">
+/* Mobile d'abord (approche recommandée) */
+.container {
+  width: 100%;
+  padding: 10px;
+}
+
+/* Tablettes (768px et plus) */
+@media (min-width: 768px) {
+  .container {
+    width: 750px;
+    padding: 20px;
+  }
+}
+
+/* Ordinateurs (1024px et plus) */
+@media (min-width: 1024px) {
+  .container {
+    width: 960px;
+    padding: 30px;
+  }
+}
+
+/* Grands écrans (1200px et plus) */
+@media (min-width: 1200px) {
+  .container {
+    width: 1140px;
+  }
+}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🎓 Faits Intéressants sur CSS</h3>
+            <ul>
+                <li>CSS a été créé par Håkon Wium Lie en 1994 - merci monsieur!</li>
+                <li>La première version officielle (CSS1) est sortie en 1996!</li>
+                <li>CSS3 a introduit des animations, des ombres, et des dégradés magnifiques!</li>
+                <li>Le "Cascading" signifie que les styles "cascade" (tombent en cascade) - les règles plus spécifiques remplacent les générales!</li>
+                <li>Il existe plus de 140 couleurs nommées en CSS - de "aliceblue" à "yellowgreen"!</li>
+                <li>Les Grid et Flexbox ont révolutionné la façon dont nous créons des mises en page!</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>💭 Les Pensées de Ralph sur CSS</h3>
+            <p>J'ai appris que CSS est comme la mode pour les sites web! Chaque propriété est un choix de style, comme choisir une cravate ou une robe. Les couleurs, les polices, les espacements - tout travaille ensemble pour créer quelque chose de beau!</p>
+            <p>Le plus cool, c'est que CSS sépare le contenu (HTML) du style (CSS). C'est comme avoir un placard de vêtements que vous pouvez changer sans changer la personne en dessous!</p>
+            <p>Les animations CSS sont ma partie préférée - elles font danser les éléments! <span class="baguette">🥖</span></p>
+            <p>Commencez simple - couleurs, polices, espacements. Puis explorez Flexbox et Grid. Puis ajoutez des animations! Chaque propriété CSS que vous apprenez est un nouveau pinceau dans votre palette d'artiste web!</p>
+        </div>
+
+        <div class="tricolore"></div>
+    </div>
+
+    <nav>
+        <a href="../index.html">🗺️ Retour à la Galerie</a>
+        <a href="02-pirate.html">☠️ Précédent: Pirates</a>
+        <a href="04-next.html">→ Prochain Voyage</a>
+    </nav>
+
+    <div style="text-align: center; margin-top: 30px; padding: 20px; background: white; border-radius: 10px;">
+        <p style="font-weight: bold; color: #002395;">🇫🇷 Itération 4 - Module Français Activé 🇫🇷</p>
+        <p style="color: #666;">Créé par Ralph Wiggum avec la personnalité française active</p>
+        <div class="eiffel">🗼</div>
+    </div>
+</body>
+</html>

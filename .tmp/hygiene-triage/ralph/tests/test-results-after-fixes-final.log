@@ -1,0 +1,185 @@
+========================================
+Ralph Module System - Test Suite
+========================================
+
+Running Unit Tests...
+
+==================================================
+Running: test-module-loading
+==================================================
+========================================
+Running Module Loading Tests
+========================================
+Test: Base Ralph persona loads correctly
+✅ PASS: Base persona loaded
+Test: Single module loads correctly
+✅ PASS: Single module (crabs) loaded
+Test: Multiple modules stack correctly
+✅ PASS: Multiple modules stacked
+Test: Missing module file handling
+❌ Error: Module 'nonexistent' enabled but file not found: prompts/modules/nonexistent.md
+✅ PASS: Missing module detected and reported
+Test: Malformed JSON detected
+ℹ️  No modules enabled in .claude/ralph-modules.json
+✅ PASS: Malformed JSON detected
+Test: Empty prompt handled correctly
+❌ Error: No prompt provided
+✅ PASS: Empty prompt detected and rejected
+Test: Module containing --- doesn't break extraction
+jq: parse error: Expected another array element at line 1, column 30
+✅ PASS: Module with --- handled correctly
+
+Module Loading Tests: 7 passed, 0 failed
+✅ test-module-loading PASSED
+
+==================================================
+Running: test-security
+==================================================
+========================================
+Running Security Tests
+========================================
+Test: Shell injection via $(whoami) in task
+📋 Loaded base Ralph persona
+ℹ️  No modules enabled in .claude/ralph-modules.json
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: 1
+Completion promise: none (runs forever)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+
+📝 Task: Test $(whoami)
+✅ PASS: Shell injection prevented - literal $(whoami) preserved
+Test: Shell injection via backticks in task
+📋 Loaded base Ralph persona
+ℹ️  No modules enabled in .claude/ralph-modules.json
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: 1
+Completion promise: none (runs forever)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+
+📝 Task: Test `date`
+✅ PASS: Backtick injection prevented
+Test: Quotes in completion promise
+📋 Loaded base Ralph persona
+ℹ️  No modules enabled in .claude/ralph-modules.json
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: 1
+Completion promise: He said hello (ONLY output when TRUE - do not lie!)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+
+📝 Task: test
+❌ FAIL: YAML quote escaping broken - invalid YAML: completion_promise: "He said ""hello"""
+Test: Special characters in prompt preserved
+📋 Loaded base Ralph persona
+ℹ️  No modules enabled in .claude/ralph-modules.json
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: 1
+Completion promise: none (runs forever)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+
+📝 Task: Test $HOME and `echo test` and $(date)
+✅ PASS: Special characters preserved
+
+Security Tests: 3 passed, 1 failed
+❌ test-security FAILED
+
+==================================================
+Running: test-stop-hook
+==================================================
+========================================
+Running Stop Hook Tests
+========================================
+Test: Frontmatter extraction from state file
+✅ PASS: Frontmatter extraction works
+Test: Prompt extraction from state file
+✅ PASS: Prompt extraction works
+Test: Prompt extraction with embedded ---
+✅ PASS: Prompt with embedded --- extracted correctly
+Test: Completion promise extraction from YAML
+✅ PASS: Completion promise extracted correctly
+Test: Special characters in YAML frontmatter
+❌ FAIL: YAML with special chars is invalid
+
+Stop Hook Tests: 4 passed, 1 failed
+❌ test-stop-hook FAILED
+
+Running Integration Tests...
+
+==================================================
+Running: test-full-loop
+==================================================
+========================================
+Integration Test: Full Ralph Loop
+========================================
+Test: Loop runs and exits on completion promise
+✅ PASS: State file created
+✅ PASS: Completion promise in state file
+✅ PASS: Base Ralph persona loaded
+
+✅ Full Loop Test PASSED
+✅ test-full-loop PASSED
+
+==================================================
+Running: test-multi-module
+==================================================
+========================================
+Integration Test: Multi-Module Stacking
+========================================
+Test: Multiple modules load and stack correctly
+✅ PASS: Crabs module loaded
+✅ PASS: Pirate module loaded
+✅ PASS: Modules in correct order (base -> modules -> task)
+
+✅ Multi-Module Test PASSED
+✅ test-multi-module PASSED
+
+=========================================
+FINAL RESULTS: 3 passed, 2 failed
+=========================================

@@ -1,0 +1,23 @@
+{
+  "name": "wibwob-cosmic-api",
+  "version": "1.0.0",
+  "description": "Cosmic horror text generation API inspired by wibandwob",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "jest --verbose",
+    "dev": "nodemon server.js"
+  },
+  "keywords": ["cosmic-horror", "generative", "ascii", "wibandwob"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "nodemon": "^3.0.2"
+  }
+}

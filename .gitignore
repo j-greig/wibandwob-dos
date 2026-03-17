@@ -77,3 +77,5 @@ vendor/signls/signls
 vendor/signls/signls.tar.gz
 vendor/signls/config.json
 vendor/signls/debug.log
+deploy/test_agent_key
+deploy/test_agent_key.pub

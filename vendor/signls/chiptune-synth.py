@@ -30,9 +30,9 @@ import mido
 
 # ── Audio engine constants ────────────────────────────────────────────────────
 
-SR = 44100  # Higher SR for real-time playback quality
-BLOCK_SIZE = 256  # ~5.8ms latency at 44100
-MAX_VOICES = 16
+SR = 48000  # Match default macOS output device
+BLOCK_SIZE = 512  # larger buffer = fewer underruns
+MAX_VOICES = 8
 VOICE_RELEASE = 0.15  # seconds of release tail after note-off
 
 # ── MIDI helpers ──────────────────────────────────────────────────────────────
@@ -141,41 +141,70 @@ class Voice:
         return samples
     
     def _compute_envelope(self, n_samples: int) -> np.ndarray:
-        """Generate per-sample ADSR envelope."""
-        envelope = np.zeros(n_samples)
+        """Generate per-sample ADSR envelope — vectorized for performance."""
+        envelope = np.empty(n_samples)
+        pos = 0
         
-        for i in range(n_samples):
+        while pos < n_samples:
+            remaining = n_samples - pos
+            
             if self.env_stage == 'attack':
-                if self.attack > 0:
-                    self.env_level += (1.0 / (self.attack * SR))
-                else:
+                if self.attack <= 0:
                     self.env_level = 1.0
+                    self.env_stage = 'decay'
+                    continue
+                rate = 1.0 / (self.attack * SR)
+                samples_to_peak = max(1, int((1.0 - self.env_level) / rate))
+                n = min(remaining, samples_to_peak)
+                envelope[pos:pos+n] = np.linspace(self.env_level, self.env_level + rate * n, n, endpoint=False)
+                self.env_level += rate * n
+                pos += n
                 if self.env_level >= 1.0:
                     self.env_level = 1.0
                     self.env_stage = 'decay'
             
             elif self.env_stage == 'decay':
-                if self.decay > 0:
-                    self.env_level -= ((1.0 - self.sustain) / (self.decay * SR))
-                else:
+                if self.decay <= 0:
                     self.env_level = self.sustain
+                    self.env_stage = 'sustain'
+                    continue
+                rate = (1.0 - self.sustain) / (self.decay * SR)
+                samples_to_sustain = max(1, int((self.env_level - self.sustain) / rate))
+                n = min(remaining, samples_to_sustain)
+                envelope[pos:pos+n] = np.linspace(self.env_level, self.env_level - rate * n, n, endpoint=False)
+                self.env_level -= rate * n
+                pos += n
                 if self.env_level <= self.sustain:
                     self.env_level = self.sustain
                     self.env_stage = 'sustain'
             
             elif self.env_stage == 'sustain':
-                self.env_level = self.sustain
+                envelope[pos:n_samples] = self.sustain
+                pos = n_samples
             
             elif self.env_stage == 'release':
-                if self.release > 0:
-                    self.env_level -= (self.sustain / (self.release * SR))
-                else:
+                if self.release <= 0:
                     self.env_level = 0.0
+                    self.active = False
+                    envelope[pos:n_samples] = 0.0
+                    pos = n_samples
+                    continue
+                rate = self.sustain / (self.release * SR)
+                if rate <= 0:
+                    self.active = False
+                    envelope[pos:n_samples] = 0.0
+                    pos = n_samples
+                    continue
+                samples_to_zero = max(1, int(self.env_level / rate))
+                n = min(remaining, samples_to_zero)
+                envelope[pos:pos+n] = np.linspace(self.env_level, max(0, self.env_level - rate * n), n, endpoint=False)
+                self.env_level = max(0, self.env_level - rate * n)
+                pos += n
                 if self.env_level <= 0.0:
                     self.env_level = 0.0
                     self.active = False
-            
-            envelope[i] = self.env_level
+                    envelope[pos:n_samples] = 0.0
+                    pos = n_samples
         
         return envelope
 
@@ -275,29 +304,26 @@ class ChiptuneSynth:
     
     def note_on(self, note: int, velocity: int):
         with self.lock:
-            # Kill any existing voice on this note
-            for v in self.voices:
-                if v.note == note and v.active:
-                    v.note_off()
+            # Kill ALL existing voices on this note immediately
+            self.voices = [v for v in self.voices if v.note != note]
             
             # Add new voice
             voice = Voice(note, velocity, self.preset)
             self.voices.append(voice)
             
-            # Voice stealing if too many
-            active = [v for v in self.voices if v.active]
-            if len(active) > MAX_VOICES:
-                # Kill oldest
-                active[0].active = False
+            # Voice stealing — hard kill oldest if too many
+            if len(self.voices) > MAX_VOICES:
+                self.voices = self.voices[-MAX_VOICES:]
             
-            print(f"  ♪ ON  {midi_to_name(note):>4s} vel={velocity:3d}")
+            print(f"  ♪ ON  {midi_to_name(note):>4s} vel={velocity:3d}  voices={len(self.voices)}")
     
     def note_off(self, note: int):
         with self.lock:
             for v in self.voices:
                 if v.note == note and v.active and not v.releasing:
                     v.note_off()
-                    break
+            # Also hard-kill any voice on this note that's been releasing too long
+            self.voices = [v for v in self.voices if not (v.note == note and not v.active)]
     
     def render(self, n_samples: int) -> np.ndarray:
         with self.lock:
@@ -312,7 +338,8 @@ class ChiptuneSynth:
             # Remove dead voices
             self.voices = [v for v in self.voices if v.active]
             
-            # Soft clip
+            # Mix down and soft clip — prevent distortion
+            output *= 0.4
             output = np.tanh(output)
             
             return output

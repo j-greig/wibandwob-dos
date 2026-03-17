@@ -1,0 +1,25 @@
+{
+  "enabled_modules": ["architect"],
+  "available_modules": [
+    "crabs",
+    "pirate",
+    "french",
+    "architect",
+    "bard",
+    "hacker",
+    "synesthete",
+    "time-traveller"
+  ],
+  "description": "Ralph module configuration for ralph-og-modular. Ralph can modify this file to enable/disable personality modules during loops.",
+  "usage": {
+    "enable_module": "Add module name to 'enabled_modules' array",
+    "disable_module": "Remove module name from 'enabled_modules' array",
+    "example_command": "jq '.enabled_modules += [\"crabs\"]' ralph-modules.json > tmp.json && mv tmp.json ralph-modules.json"
+  },
+  "notes": [
+    "Modules are reloaded EVERY iteration - changes take effect immediately!",
+    "Ralph can add/remove modules mid-loop by editing this file",
+    "Module files are in modules/*.md",
+    "Create your own modules by adding new .md files"
+  ]
+}

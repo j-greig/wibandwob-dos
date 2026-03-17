@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowLang Output</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <script>
+// FlowLang Runtime Initialization
+const FlowLang = {
+  elements: new Map(),
+  flows: new Map(),
+  timeline: [],
+  particles: new Map(),
+  easing: {
+    linear: t => t,
+    smooth: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+    bounce: t => {
+      const n1 = 7.5625, d1 = 2.75;
+      if (t < 1 / d1) return n1 * t * t;
+      if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+      if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+      return n1 * (t -= 2.625 / d1) * t + 0.984375;
+    },
+    elastic: (t, amplitude = 1, period = 0.3) => {
+      if (t === 0 || t === 1) return t;
+      const s = period / 4;
+      return amplitude * Math.pow(2, -10 * t) * Math.sin((t - s) * (2 * Math.PI) / period) + 1;
+    },
+    spring: (t, stiffness = 100, damping = 10) => {
+      const w = Math.sqrt(stiffness);
+      const z = damping / (2 * Math.sqrt(stiffness));
+      if (z < 1) {
+        const wd = w * Math.sqrt(1 - z * z);
+        return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+      }
+      return 1 - Math.exp(-w * t) * (1 + w * t);
+    }
+  }
+};
+
+// Particles: stars
+{
+  const particles = [];
+  const count = 100;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.style.position = 'absolute';
+    p.style.left = (Math.random() * (800 - 0) + 0) + 'px';
+    p.style.top = (Math.random() * (600 - 0) + 0) + 'px';
+    p.style.width = 2 + 'px';
+    p.style.height = 2 + 'px';
+    p.style.backgroundColor = '#ffffff';
+    p.style.opacity = (Math.random() * (1 - 0.3) + 0.3);
+    p.dataset.initial = JSON.stringify({ x: p.style.left, y: p.style.top });
+    document.body.appendChild(p);
+    particles.push(p);
+  }
+  FlowLang.particles.set('stars', particles);
+}
+window.addEventListener('DOMContentLoaded', () => {
+  // Spawn particles: stars
+});
+
+// FlowLang Animation Engine
+FlowLang.animate = function(flowName) {
+  const flow = FlowLang.flows.get(flowName);
+  if (!flow) {
+    console.error('Flow not found:', flowName);
+    return;
+  }
+
+  const targetData = FlowLang.elements.get(flow.target);
+  if (!targetData) {
+    console.error('Element not found:', flow.target);
+    return;
+  }
+
+  const el = targetData.el;
+  const keyframes = flow.keyframes;
+  const easeFn = FlowLang.easing[flow.ease] || FlowLang.easing.linear;
+
+  // Simple animation using Web Animations API
+  const cssKeyframes = [];
+
+  for (const kf of keyframes) {
+    const frame = {};
+    const offset = kf.time / Math.max(...keyframes.map(k => k.time));
+
+    for (const prop of kf.properties) {
+      const cssProperty = {
+        'opacity': 'opacity',
+        'x': 'left',
+        'y': 'top',
+        'rotation': 'transform',
+        'scale': 'transform'
+      }[prop.property] || prop.property;
+
+      if (cssProperty === 'left' || cssProperty === 'top') {
+        frame[cssProperty] = prop.value + 'px';
+      } else if (cssProperty === 'transform' && prop.property === 'rotation') {
+        frame[cssProperty] = `rotate(${prop.value}deg)`;
+      } else if (cssProperty === 'transform' && prop.property === 'scale') {
+        frame[cssProperty] = `scale(${prop.value})`;
+      } else {
+        frame[cssProperty] = prop.value;
+      }
+    }
+
+    frame.offset = offset;
+    cssKeyframes.push(frame);
+  }
+
+  const duration = Math.max(...keyframes.map(k => k.time));
+  const iterations = flow.repeat === -1 ? Infinity : flow.repeat;
+
+  el.animate(cssKeyframes, {
+    duration: duration,
+    iterations: iterations,
+    easing: flow.ease === 'smooth' ? 'ease-in-out' :
+            flow.ease === 'bounce' ? 'cubic-bezier(0.68, -0.55, 0.265, 1.55)' :
+            'linear',
+    delay: flow.delay || 0,
+    direction: flow.yoyo ? 'alternate' : 'normal',
+    fill: 'forwards'
+  });
+};
+  </script>
+</body>
+</html>
