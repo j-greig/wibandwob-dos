@@ -1,1 +1,0 @@
-.agents/shell-dev/agentic-devlog.md

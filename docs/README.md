@@ -8,7 +8,6 @@ Run `bash scripts/discover.sh` for a lens-organized index of scripts, skills, an
 Deeper agent docs live in `.agents/`:
 - `.agents/microapp-dev/` — build microapps (7 docs, start with `quick-start.md`)
 - `.agents/shell-dev/` — host runtime internals (specs, architecture, devlog)
-- `.agents/agent-master-plan.md` — COAT lenses, script mapping, vision
 
 ## For humans
 

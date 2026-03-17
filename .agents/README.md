@@ -25,13 +25,11 @@ Agents aren't departments — they're lenses. Same tools, same API, different fo
 | 4 | **creative** | Visual composition, art, music | replay-scpt, wibwob-record, ghostty-shader |
 | 5 | **planner** | Planning docs, epics, what's next | handover |
 
-Full lens model + script mapping: `agent-master-plan.md`
 
 ## Directory map
 
 ```
 .agents/
-  agent-master-plan.md        ← COAT lenses, script mapping, desktop.compose vision
   microapp-dev/               ← build microapps (7 docs, start: quick-start.md)
   shell-dev/                  ← host runtime (specs, architecture, devlog)
     devlogs/W{nn}.md          ← weekly devlog (new file each Monday)
