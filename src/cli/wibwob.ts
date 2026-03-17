@@ -84,11 +84,7 @@ function tryResolveBase(): string | null {
     return null;
   }
 
-  // Explicit API URL override (for testing / remote)
-  if (process.env.WW_API) return process.env.WW_API;
-  if (process.env.WIBWOB_API) return process.env.WIBWOB_API;
-
-  // 2. $WIBWOB_INSTANCE env var
+  // 2. $WIBWOB_INSTANCE env var — try named socket first
   if (process.env.WIBWOB_INSTANCE) {
     const envLabel = process.env.WIBWOB_INSTANCE;
     const sockPath = path.join(SCRATCH_BASE, "instances", `${envLabel}.sock`);
@@ -98,7 +94,7 @@ function tryResolveBase(): string | null {
     process.stderr.write(`⚠ WIBWOB_INSTANCE="${envLabel}" but no socket found — falling back to scan\n`);
   }
 
-  // 3. Socket scan — find alive instances via PID check
+  // 3. Socket scan — always wins for local instances (avoids stale WIBWOB_API env poisoning)
   const alive = findAliveInstances();
   if (alive.length === 1) {
     return `unix://${alive[0].socketPath}`;
@@ -110,6 +106,10 @@ function tryResolveBase(): string | null {
     }
     return null;
   }
+
+  // 4. Explicit API URL — last resort for remote / Docker / no-socket setups
+  if (process.env.WW_API) return process.env.WW_API;
+  if (process.env.WIBWOB_API) return process.env.WIBWOB_API;
 
   // 0 alive
   return null;
