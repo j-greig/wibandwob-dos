@@ -185,6 +185,8 @@ When agent tooling causes friction — improve it, don't work around it.
 
 ## Planning
 
+Full guide: `.planning/CONVENTIONS.md` — hierarchy, naming, commits, ACs, merge checks.
+
 | Tier | System | Lifetime |
 |------|--------|---------|
 | Capture | GitHub issues | One session: promote or close |

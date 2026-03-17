@@ -40,5 +40,5 @@ bun run planning:sync     # regenerate EPIC_STATUS.md
 bun run planning:inbox    # sweep GH issues + stale todos
 ```
 
-Full canon: `.planning/README.md`
+Full canon: `.planning/CONVENTIONS.md`
 Devlog: `.agents/shell-dev/agentic-devlog.md`
