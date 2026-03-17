@@ -423,6 +423,7 @@ export class ControlApiService {
         socketPath: this.socketPath ?? null,
         screen: screen ? { width: screen.width, height: screen.height } : null,
         ...(ephemeral ? { ephemeral } : {}),
+        readme: `http${request.url.startsWith("https") ? "s" : ""}://${request.headers.get("host") || "localhost"}/readme`,
       });
     }
 
