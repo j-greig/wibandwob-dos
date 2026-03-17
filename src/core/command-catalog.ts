@@ -121,6 +121,10 @@ export interface AppMenuActions {
   overlayCancel: () => unknown;
   overlaySelect: (args?: Record<string, unknown>) => unknown;
   overlayInfo: () => unknown;
+  // ── Ghostty ────────────────────────────────────────────
+  ghosttyShaderSet: (args?: Record<string, unknown>) => unknown;
+  ghosttyShaderList: () => unknown;
+  ghosttyShaderStatus: () => unknown;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -1155,6 +1159,41 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     palettePlacement: { order: 200 },
     api: true,
     agent: true
+  },
+
+  // ── Ghostty ──────────────────────────────────────────
+  {
+    id: "ghostty.shader.set",
+    label: "Set Ghostty Shader",
+    description: "Activate a Ghostty GPU shader by name, or 'off' to disable. Available: wibwob-crt, wibwob-glow, wibwob-nord-tint. Requires Ghostty terminal.",
+    group: "system",
+    actionKey: "ghosttyShaderSet",
+    params: z.object({
+      name: z.string().describe("Shader name (e.g. wibwob-crt, wibwob-glow) or 'off' to disable"),
+    }),
+    api: true,
+    agent: true,
+    returns: "json",
+  },
+  {
+    id: "ghostty.shader.list",
+    label: "List Ghostty Shaders",
+    description: "List available Ghostty shaders.",
+    group: "system",
+    actionKey: "ghosttyShaderList",
+    api: true,
+    agent: true,
+    returns: "json",
+  },
+  {
+    id: "ghostty.shader.status",
+    label: "Ghostty Shader Status",
+    description: "Show current Ghostty shader state.",
+    group: "system",
+    actionKey: "ghosttyShaderStatus",
+    api: true,
+    agent: true,
+    returns: "json",
   }
 ];
 
