@@ -75,6 +75,7 @@ Target AGENTS.md outline (17→9 sections):
 ```
 
 - [ ] Review dir names as progressive disclosure (e.g. `.agents/` → `.agent-docs/`? explore during restructure)
+- [ ] Rename devlog path — `.agents/shell-dev/devlogs/W12.md` says nothing about purpose. Path should signal "agent self-reflection on friction + improvement ideas". File name should include year. Candidates: `.agents/reflections/2026-W12.md`, `friction-log/`, `self-improve/`
 - [ ] Should agent-facing scripts live in `.agents/scripts/` (or new dir) rather than `scripts/`?
 - [ ] AGENTS.md → 9-section outline, under 150 lines
 - [ ] Kill COAT duplication — one definition in AGENTS.md, signposts elsewhere
