@@ -9,14 +9,6 @@ RUN apt-get update && apt-get install -y \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Extended figlet fonts (xero/figlet-fonts — 300+ fonts including doom, slant, etc.)
-RUN curl -fsSL "https://github.com/xero/figlet-fonts/archive/refs/heads/master.tar.gz" \
-      -o /tmp/figlet-fonts.tar.gz && \
-    mkdir -p /tmp/figlet-fonts && \
-    tar xzf /tmp/figlet-fonts.tar.gz -C /tmp/figlet-fonts --strip-components=1 && \
-    find /tmp/figlet-fonts -name '*.flf' -exec cp {} /usr/share/figlet/ \; && \
-    rm -rf /tmp/figlet-fonts /tmp/figlet-fonts.tar.gz
-
 # ttyd — streams tmux PTY to browser via xterm.js
 RUN ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
