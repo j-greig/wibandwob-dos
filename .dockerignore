@@ -7,6 +7,7 @@ scratch/
 art/
 vendor/
 microapps-private/.git/
+microapps-private/wibwob-prompts/
 deploy/test_agent_key
 *.log
 *.cast

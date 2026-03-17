@@ -13,14 +13,18 @@ WORKDIR /app
 
 # Deps layer (cached unless package files change)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+# --ignore-scripts: skip native builds (node-pty, canvas) — not needed
+# for headless control API operation. blessed is pure JS.
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Full source (microapps, docs, primers needed at runtime)
 COPY src ./src
 COPY microapps ./microapps
 COPY docs ./docs
 COPY tsconfig.json ./
-COPY WELCOME.md ./
+
+# WELCOME.md is optional — app runs fine without it
+COPY WELCOME.m[d] ./
 
 # Scratch dir (ephemeral — lost on redeploy, that's the point)
 RUN mkdir -p scratch

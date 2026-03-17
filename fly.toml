@@ -1,5 +1,5 @@
 # Fly.io config for WibWob-DOS disposable testbed
-# Deploy: fly deploy --config deploy/fly/fly.toml
+# Deploy: fly deploy (from repo root)
 # Docs: https://fly.io/docs/reference/configuration/
 
 app = "wibwob-dos"

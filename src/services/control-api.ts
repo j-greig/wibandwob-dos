@@ -36,7 +36,7 @@ import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
-import { setActualControlApiPort } from "../runtime/runtime-node.js";
+import { setActualControlApiPort, resolveConfiguredControlApiHost } from "../runtime/runtime-node.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
 import type { RuntimeWindowService } from "../application/runtime-window-service.js";
@@ -238,7 +238,7 @@ export class ControlApiService {
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
-          hostname: "127.0.0.1",
+          hostname: resolveConfiguredControlApiHost(),
           port,
           fetch: async (request) => this.handleRequest(request),
         });
@@ -327,7 +327,7 @@ export class ControlApiService {
   }
 
   getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string; socketPath?: string } {
-    const host = "127.0.0.1";
+    const host = resolveConfiguredControlApiHost();
     const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
       enabled: this.enabled,
