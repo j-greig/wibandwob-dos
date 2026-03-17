@@ -123,10 +123,11 @@ Target AGENTS.md outline (17→9 sections):
 - [ ] Suppression: warn N times then suppress until new commits (avoid noise)
 - [ ] Could integrate as pi extension that runs on session start, or just a script agents run
 
-**6d. Session archaeology → spec creation**
-- [ ] Use `session-archaeology` skill to mine recent session logs for repeated confusion patterns
-- [ ] For each pattern: check if a spec exists in `.agents/specs/`. If not, create one reactively (E001 principle: "when an agent gets confused, create the spec")
-- [ ] One-off audit, not a recurring process — run quarterly
+**6d. Session archaeology → spec creation** (separate session)
+- [ ] Use `session-archaeology` skill on `~/.pi/agent/sessions/` — mine for repeated confusion
+- [ ] Quick scan: 12 recent sessions, 5 mention instance/port/not-found confusion — confirms targeting spike priority
+- [ ] For each pattern: check if spec exists in `.agents/specs/`, create reactively if not
+- [ ] Run quarterly as part of repo-hygiene
 
 **6e. Subagent cleanup**
 - [ ] `arch-reviewer` + `coat-reviewer` — built for one-off pi-mono review. Merge into a single `reviewer` agent or archive to `.pi/agents/.archive/`

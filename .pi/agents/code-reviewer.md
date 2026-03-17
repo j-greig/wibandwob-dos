@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: TypeScript code style forensics agent. Produces quantified, file-cited reviews with strength/weakness balance, priority tiers, and cross-project recommendations. Battle-tested methodology from pi-mono analysis.
+description: TypeScript code style forensics agent. Produces quantified, file-cited reviews with strength/weakness balance, priority tiers, and cross-project recommendations. 
 tools: read, bash, grep, find, ls
 model: anthropic/claude-sonnet-4-6
 ---

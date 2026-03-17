@@ -1,7 +1,7 @@
 ---
 name: session-archaeology
 description: >
-  Mine Claude Code session logs to find which subsystems cause the most
+  Mine pi agent session logs (~/.pi/agent/sessions/) to find which subsystems cause the most
   agent confusion, regressions, and repeated human re-explanation. Three-step
   pipeline: extract JSONL to searchable markdown, regex-scan for quantitative
   trouble ranking, then LLM deep-analysis of worst sessions for semantic

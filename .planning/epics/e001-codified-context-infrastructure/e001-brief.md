@@ -270,3 +270,17 @@ single developer in constructing a 108,000-line distributed system in under
 Companion repository:
 https://github.com/arisvas4/codified-context-infrastructure
 </secondary>
+
+## 2026-03-17 — Practical foundation delivered via chore/preemptive-hygiene
+
+The `chore/preemptive-hygiene` branch delivered the practical infrastructure
+that E001 theorised about:
+
+- **Tier 1 (hot memory):** AGENTS.md rewritten to 121 lines, 9 sections, wibwob CLI front-and-centre
+- **Tier 3 (cold memory):** `.agents/specs/` with drift detection (`scripts/checks/drift-check.ts`)
+- **Self-updating:** `.agents/reflections/` with pain→why→fix format, TEMPLATE.md, frontmatter
+- **Auto-generation:** `scripts/checks/gen-integration-surface.ts` replaces 1034-line hand-maintained doc
+- **Reactive creation:** new specs to be created quarterly via session-archaeology when confusion signals warrant
+- **Tooling:** devlog.sh, git-census.sh, planning-close.sh, list-docs.sh, repo-hygiene skill
+
+E001's remaining ACs (drift detector as session-start hook, retrieval service, telemetry) are deferred.
