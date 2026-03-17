@@ -76,11 +76,18 @@ Branch: `chore/preemptive-hygiene`
 
 ## Execution plan
 
+### Convention: `.trash/` for soft deletes
+
+Use `.trash/` subdirs in key repo sections (`.agents/`, `.planning/`, root) to soft-delete
+niche/maybe items without losing them. Only where the parent dir is meaty enough to warrant it.
+Already used in `.planning/epics/.done/`, `.planning/.trash/`. Don't create `.trash/` in leaf
+dirs or shallow hierarchies — just delete or move to scratch/.
+
 ### Phase 1 — Clear the deck
 1. ~~Create `chore/preemptive-hygiene` branch~~ ✅
 2. ~~Research best practices~~ ✅
-3. Move root clutter to scratch/
-4. Archive stale agent docs (agent-master-plan, reviews)
+3. Move root clutter — stale root .md files to scratch/ or `.trash/` as appropriate
+4. Archive stale agent docs (agent-master-plan, reviews) → `.agents/.trash/`
 5. Clean stale references to "six lenses" across repo
 
 ### Phase 2 — Build tools
