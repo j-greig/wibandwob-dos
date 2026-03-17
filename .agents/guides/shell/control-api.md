@@ -100,14 +100,12 @@ POST /overlay/select              {"index":N} select item index in active browse
 
 Also available as commands: `overlay.info`, `overlay.confirm`, `overlay.cancel`, `menu.close`.
 
-Example — figlet flow entirely via API:
+Example — figlet flow:
 ```bash
-curl -s -X POST http://127.0.0.1:8099/commands/run -H "Content-Type: application/json" -d '{"id":"figlet.open"}'
-# overlay.info -> {"active":true,"type":"value"} (text prompt)
-curl -s -X POST http://127.0.0.1:8099/overlay/confirm
-# overlay.info -> {"active":true,"type":"browser"} (font picker)
-curl -s -X POST http://127.0.0.1:8099/overlay/confirm
-# -> banner window created
+bun run wibwob cmd figlet.open
+bun run wibwob cmd overlay.confirm    # advance text prompt
+bun run wibwob cmd overlay.confirm    # advance font picker
+# → banner window created
 ```
 
 ### Command Invocation Rules
@@ -186,14 +184,14 @@ menu.close                              {}   ← close any open dropdown/popup m
 
 ## Native Agent Debug Loop
 
-1. `bun run start` — launch the app
-2. `GET /health` — wait until this responds (`{"ok":true,"port":8099,"instanceId":"abc"}`)
-3. `POST /view/agent/open`
-4. `GET /state` — find the `wibwob-agent` window id
-5. `POST /windows/input` with `{"id":N,"input":"your text\r"}`
+1. `bash scripts/ensure-running.sh` — start the app
+2. `bun run wibwob health` — wait until this responds
+3. `bun run wibwob cmd view.agent.open`
+4. `bun run wibwob state | jq '.windows[]'` — find the agent window id
+5. `echo "your text" | bun run wibwob write <id>` — send input
 6. Wait for streaming to settle
-7. `POST /windows/text/export` — persist a text capture
-8. `GET /state` — inspect `messageCount`, `streaming`, `status`, `model`
+7. `bun run wibwob read <id>` — capture output
+8. `bun run wibwob state` — inspect messageCount, streaming, status
 9. Patch code and repeat
 
 ## Proactive Tool Use
@@ -235,17 +233,20 @@ Trust exported text snapshots and state captures over screenshots when debugging
 
 ## One-Liners
 
+**Prefer `wibwob` CLI over `curl`.** The CLI handles socket discovery, JSON formatting, and errors.
+
 ```bash
-curl -s http://127.0.0.1:8099/state | python3 -m json.tool
+bun run wibwob state                              # full desktop state
+bun run wibwob state | jq '.windows[]'            # window list
+bun run wibwob map                                # spatial minimap
+bun run wibwob read 5                             # text from window 5
+bun run wibwob cmd figlet.open-default -- --text "HELLO"
+bun run wibwob cmd window.move -- --id 4 --left 10 --top 5
+bun run wibwob cmd plasma.open -- --mood void
+```
+
+Raw API (only when CLI can't do it — e.g. `/runtime/inspection`, `/screenshot/ansi`):
+```bash
 curl -s http://127.0.0.1:8099/runtime/inspection | python3 -m json.tool
-curl -s http://127.0.0.1:8099/screenshot/text          # clean full-screen text
-curl -s http://127.0.0.1:8099/screenshot/text?id=5      # clean single window
-curl -s http://127.0.0.1:8099/screenshot/ansi           # raw ANSI (for colour-aware tools)
-curl -s http://127.0.0.1:8099/windows/text?id=5 | python3 -m json.tool  # semantic JSON
-curl -s -X POST http://127.0.0.1:8099/view/figlet/open \
-  -H "Content-Type: application/json" -d '{"text":"HELLO"}'
-curl -s -X POST http://127.0.0.1:8099/windows/move \
-  -H "Content-Type: application/json" -d '{"id":4,"left":10,"top":5}'
-curl -s -X POST http://127.0.0.1:8099/commands/run \
-  -H "Content-Type: application/json" -d '{"id":"plasma.open","args":{"mood":"void"}}'
+curl -s http://127.0.0.1:8099/screenshot/ansi
 ```

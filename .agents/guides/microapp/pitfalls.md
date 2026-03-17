@@ -87,7 +87,7 @@ a function call.
 
 | Mistake | Fix |
 |---------|-----|
-| Code changes have no effect after restart | The old process is still alive on the port. Check the session ID: `curl /health` — if it matches the old one, the kill didn't work. Use `kill -9 $(lsof -ti:8099)` as last resort, then `reset` the terminal. |
+| Code changes have no effect after restart | The old process is still alive on the port. Check the session ID: `bun run wibwob health` — if it matches the old one, the kill didn't work. Use `kill -9 $(lsof -ti:8099)` as last resort, then `reset` the terminal. |
 | `kill $(cat scratch/wibwob.pid)` and restart, but same session ID | PID file is stale or SIGTERM was ignored. Always verify the session ID changed after restart. |
 
 ## Input ownership

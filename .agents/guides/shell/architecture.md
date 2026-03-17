@@ -173,7 +173,7 @@ APP_PID=$(ps aux | grep "bun run src/app.ts" | grep -v grep | awk '{print $2}')
 kill $APP_PID          # SIGTERM — blessed cleanup runs
 sleep 3
 tmux send-keys -t wibwob 'bun run dev:world' Enter
-sleep 10 && curl -s http://127.0.0.1:8099/health
+sleep 10 && bun run wibwob health
 ```
 
 Use `kill -9` only as fallback. If terminal is left dirty after a hard kill, run
@@ -202,8 +202,8 @@ Running two WibWob-DOS instances on one machine requires three isolations:
 bash scripts/start-alt-instance.sh
 # → creates window, launches, polls /health, prints window index
 
-curl -s http://127.0.0.1:8099/health   # main
-curl -s http://127.0.0.1:8098/health   # alt
+bun run wibwob health                    # main
+bun run wibwob --instance zuk health     # alt
 ```
 
 **Window targeting pitfall:** `tmux new-window -n "alt"` names the window but

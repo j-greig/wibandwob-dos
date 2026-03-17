@@ -63,7 +63,7 @@ function openMyApp(host: MicroappHost) {
 ```bash
 bun run typecheck
 wibwob cmd microapps.reload
-curl -s http://127.0.0.1:8099/state | grep -i myapp
+bun run wibwob state | grep -i myapp
 ./scripts/screenshot-window.sh "My App"
 ```
 
