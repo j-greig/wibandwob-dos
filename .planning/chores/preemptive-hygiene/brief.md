@@ -85,15 +85,21 @@ Target AGENTS.md outline (17→9 sections):
 
 ### Phase 5 — Process sustainability
 
-- [ ] Review `.planning/` vs reality (crosscheck gh issues, branches)
+- [x] Review `.planning/` vs reality — 19→10 epics, 11→6 spikes, 3 GH issues closed
 - [ ] Progressive disclosure in planning dirs (README per multi-file dir)
-- [ ] Simplify `.planning/` hierarchy if over-engineered
-- [ ] Build `repo-hygiene` skill — monthly jubilee as repeatable process
-- [ ] Write devlog entry for this session
+- [x] Simplify `.planning/` — structure fine, was over-populated not over-engineered
+- [x] Build `repo-hygiene` skill — `.pi/skills/repo-hygiene/SKILL.md`
+- [x] Write devlog entry for this session
 
 ### Phase 5b — Review adjacent work
 
-- [ ] Review E051 PTC (Programmatic Tool Calling) — `.planning/epics/e051-programmatic-tool-calling/README.md`. LLM writes code that calls tools instead of individual tool calls. 85%+ token reduction. Ping `ptc` session via session control for context. Assess overlap with hygiene tooling (could git-census, list-docs etc be PTC-native?)
+- [ ] Review E051 PTC — ping `ptc` session. Could hygiene scripts be PTC-native?
+- [ ] Review mitsuhiko/agent-stuff skills (cloned to tmp/vendor/agent-stuff). Relevant:
+  - **commit** — conventional commits skill. Compare with our .planning/CONVENTIONS.md commit format. Consider adopting as skill.
+  - **librarian** — caches remote repos under ~/.cache/checkouts/. We do ad-hoc clones to tmp/vendor/. Could formalise.
+  - **update-changelog** — changelog from git log. We don't have a CHANGELOG. Worth adding?
+  - **summarize** — `markitdown` for URL/PDF→markdown. We have youtube-transcript but not general doc conversion.
+  - **tmux** — isolated socket convention for agent tmux sessions. Our wibmux/ops scripts could adopt this pattern.
 
 ### Phase 6 — Longer term
 
