@@ -788,7 +788,7 @@ function isOurProcess(pid: number, repoRoot: string): boolean {
   const cmd = getPsCmd(pid);
   if (!cmd) return false;
   // Must match WibWob-DOS process patterns
-  const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)/;
+  const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)|script.*bun.*dev/;
   if (!wwPattern.test(cmd)) return false;
   // Prefer repo-root check via command line (works cross-platform)
   if (cmd.includes(repoRoot)) return true;
@@ -799,8 +799,15 @@ function isOurProcess(pid: number, repoRoot: string): boolean {
   } catch {
     // Not on Linux or no permissions — that's fine
   }
-  // If the command contains src/app.ts but no absolute path, it's likely
-  // running from this repo's cwd. Accept it (conservative: same machine).
+  // Can't verify cwd — only accept if this is the only WibWob repo on the machine.
+  // On macOS, try lsof to check cwd.
+  try {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const lsofOut = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n.*cwd' || true`, {
+      encoding: "utf8", timeout: 2000,
+    }).trim();
+    if (lsofOut && !lsofOut.includes(repoRoot)) return false;
+  } catch { /* lsof unavailable — accept the match */ }
   return true;
 }
 
@@ -860,10 +867,10 @@ function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; sta
   try {
     const { execSync } = require("node:child_process") as typeof import("node:child_process");
     const psOutput = execSync(
-      `ps -eo pid,args 2>/dev/null || ps -eo pid,cmd 2>/dev/null`,
+      `ps -eo pid,args 2>/dev/null || ps -eo pid,cmd 2>/dev/null || ps -A 2>/dev/null`,
       { encoding: "utf8", timeout: 3000 }
     );
-    const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)/;
+    const wwPattern = /bun.*(dev:world|dev:alt|dev:world:alt|src\/app\.ts)|script.*bun.*dev/;
     for (const line of psOutput.split("\n")) {
       if (!wwPattern.test(line)) continue;
       const pid = Number(line.trim().split(/\s+/)[0]);
