@@ -1,5 +1,5 @@
 ---
-id: E039
+id: E048
 title: "Unix CLI Surface: Machine-Native Agent Control for WibWob-DOS"
 status: not-started
 issue: ~

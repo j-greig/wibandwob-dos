@@ -1,5 +1,5 @@
 ---
-id: E043
+id: E049
 title: "Session Capture & Playback: Record, Export, and Replay TUI Sessions"
 status: not-started
 issue: ~

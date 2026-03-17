@@ -1,5 +1,5 @@
 ---
-id: E047
+id: E050
 title: "File Manager v3: Column Browser & Architecture Rewrite"
 status: not-started
 depends_on: []

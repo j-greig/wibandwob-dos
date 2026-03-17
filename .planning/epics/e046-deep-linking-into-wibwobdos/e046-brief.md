@@ -1,7 +1,7 @@
 ---
 id: E046
 title: "Deep Linking: pi CLI + macOS → WibWob-DOS"
-status: not-started
+status: in-progress
 issue: ~
 pr: ~
 depends_on: []
