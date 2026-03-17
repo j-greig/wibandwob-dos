@@ -1,6 +1,6 @@
 /**
  * Workspace round-trip test.
- * Requires the app to be running on port 8099.
+ * Requires a running app. Set API_URL env to match your instance's port.
  *
  * Tests: save workspace → load workspace → verify windows match.
  */

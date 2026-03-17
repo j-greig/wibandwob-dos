@@ -1,7 +1,7 @@
 /**
  * Window control API smoke tests.
  * Verifies the shared runtime window service path behind /windows/*.
- * Requires the app to be running on port 8099.
+ * Requires a running app. Set API_URL env to match your instance's port.
  */
 import { afterAll, describe, expect, test } from "bun:test";
 
