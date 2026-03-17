@@ -486,3 +486,9 @@ takes microseconds even with 100 stale sockets.
 | Phase 1 + 2 + 3 roadmap | One PR, ~170 lines, 1–2 days | Honest estimate |
 | Screen check in control-api.ts | Screen check in app-controller.ts | Correct file |
 | No internal caller migration | Migrate buildLocalControlApiBaseUrl | Fix the hidden port-8099 refs |
+
+## Post-ship tasks
+
+- [ ] Update `wibwob help` output to show `-i` shorthand alongside `--instance`
+- [ ] Update help to reflect new resolution behavior (socket-first, no port fallback)
+- [ ] If `wibwob` with no args changes to show running instances (open question from v1), update help accordingly
