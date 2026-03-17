@@ -1,6 +1,7 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createContourPlayer,
+  createCanvas,
   readNodeViewport,
   terrainNames,
   createRow,
@@ -30,7 +31,12 @@ type TriptychState = {
   statusBar: LayoutPart<{ left?: string; right?: string }>;
   root: LayoutPart<void>;
   players: ContourPlayer[];
-  panelStates: Array<{ mode: ContourMode; terrain: string; seed: number; levels: number }>;
+  panelStates: Array<{
+    mode: ContourMode;
+    terrain: string;
+    seed: number;
+    levels: number;
+  }>;
 };
 
 function centeredLabel(width: number, label: string): string {
@@ -51,7 +57,8 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "Contour Studio",
-    description: "Open animated contour map studio. Three modes: chaos, order, hybrid.",
+    description:
+      "Open animated contour map studio. Three modes: chaos, order, hybrid.",
     action: () => openContour(),
     palette: { order: 55, label: "Contour Studio" },
     menu: [{ category: "applications", order: 85, label: "Contour Studio" }],
@@ -75,7 +82,7 @@ export default function setup(host: MicroappHost) {
 
     const updateSoloStatus = () => {
       status.setContent(
-        ` mode:${viewMode}  terrain:${terrainNames[player.terrainIdx]}  seed:${player.seed}  levels:${player.levels}  keys:m t r +/- s 3:triptych `
+        ` mode:${viewMode}  terrain:${terrainNames[player.terrainIdx]}  seed:${player.seed}  levels:${player.levels}  keys:m t r +/- s 3:triptych `,
       );
     };
 
@@ -83,7 +90,9 @@ export default function setup(host: MicroappHost) {
       if (!triptych) return;
       const width = Math.max(1, Number(win.body.width) || 0);
       triptych.header.update({ left: centeredLabel(width, HEADER_TITLE) });
-      triptych.statusBar.update({ left: " mode:triptych  r:reseed  m:mode  t:terrain  s:save  3:solo " });
+      triptych.statusBar.update({
+        left: " mode:triptych  r:reseed  m:mode  t:terrain  s:save  3:solo ",
+      });
     };
 
     const captureTriptychRows = (): string[] => {
@@ -110,9 +119,9 @@ export default function setup(host: MicroappHost) {
 
     const mountTriptych = () => {
       const panelCanvases = Array.from({ length: PANEL_COUNT }, () =>
-        createCanvas(win.body)
+        createCanvas(win.body),
       );
-      const panelBoxes = panelCanvases.map(c => c.element);
+      const panelBoxes = panelCanvases.map((c) => c.element);
 
       const header = createHeaderBar(win.body);
       const dividerA = createRule(win.body, { axis: "vertical" });
@@ -122,7 +131,8 @@ export default function setup(host: MicroappHost) {
       const terrainOrder = randomTerrainOrder(PANEL_COUNT);
       const panelStates = Array.from({ length: PANEL_COUNT }, (_, idx) => ({
         mode: MODE_ORDER[idx] ?? "chaos",
-        terrain: terrainNames[terrainOrder[idx] ?? 0] ?? terrainNames[0] ?? "unknown",
+        terrain:
+          terrainNames[terrainOrder[idx] ?? 0] ?? terrainNames[0] ?? "unknown",
         seed: 0,
         levels: 5,
       }));
@@ -132,7 +142,7 @@ export default function setup(host: MicroappHost) {
           restyle: () => {
             panelBox.style = host.theme().body;
           },
-        })
+        }),
       );
 
       const players = panelBoxes.map((panelBox, idx) =>
@@ -140,7 +150,8 @@ export default function setup(host: MicroappHost) {
           mode: MODE_ORDER[idx] ?? "chaos",
           terrainIdx: terrainOrder[idx] ?? 0,
           fps: 12,
-          getViewport: () => readNodeViewport(panelBox, { minWidth: 8, minHeight: 4 }),
+          getViewport: () =>
+            readNodeViewport(panelBox, { minWidth: 8, minHeight: 4 }),
           onFrame: (content) => {
             panelBox.setContent(content);
             host.screen.render();
@@ -148,7 +159,7 @@ export default function setup(host: MicroappHost) {
           onStatus: (state) => {
             panelStates[idx] = state;
           },
-        })
+        }),
       );
 
       const columns = createRow(win.body, [
@@ -193,7 +204,8 @@ export default function setup(host: MicroappHost) {
       mode: "chaos",
       terrainIdx: Math.max(0, terrainNames.indexOf("meadow")),
       fps: 12,
-      getViewport: () => readNodeViewport(canvas, { minWidth: 12, minHeight: 6 }),
+      getViewport: () =>
+        readNodeViewport(canvas, { minWidth: 12, minHeight: 6 }),
       onFrame: (content) => {
         canvas.setContent(content);
         host.screen.render();
@@ -207,12 +219,17 @@ export default function setup(host: MicroappHost) {
 
     const cycleMode = () => {
       if (viewMode === "solo") {
-        const next = MODE_ORDER[(MODE_ORDER.indexOf(player.mode) + 1) % MODE_ORDER.length] ?? "chaos";
+        const next =
+          MODE_ORDER[
+            (MODE_ORDER.indexOf(player.mode) + 1) % MODE_ORDER.length
+          ] ?? "chaos";
         player.setMode(next);
         return;
       }
       for (const p of triptych?.players ?? []) {
-        const next = MODE_ORDER[(MODE_ORDER.indexOf(p.mode) + 1) % MODE_ORDER.length] ?? "chaos";
+        const next =
+          MODE_ORDER[(MODE_ORDER.indexOf(p.mode) + 1) % MODE_ORDER.length] ??
+          "chaos";
         p.setMode(next);
       }
     };
@@ -316,7 +333,8 @@ export default function setup(host: MicroappHost) {
     win.describeState(() => {
       if (viewMode === "triptych") {
         return {
-          summary: "Contour Studio triptych view with three synchronized contour players.",
+          summary:
+            "Contour Studio triptych view with three synchronized contour players.",
           appType: "contour-studio",
           viewMode,
           panels: (triptych?.panelStates ?? []).map((s, idx) => ({
@@ -329,7 +347,8 @@ export default function setup(host: MicroappHost) {
         };
       }
       return {
-        summary: "Animated contour map studio with chaos, order, and hybrid terrain rendering.",
+        summary:
+          "Animated contour map studio with chaos, order, and hybrid terrain rendering.",
         appType: "contour-studio",
         contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n"),
         viewMode,
@@ -343,7 +362,7 @@ export default function setup(host: MicroappHost) {
     win.captureText(() =>
       viewMode === "triptych"
         ? `${captureTriptychRows().join("\n")}\n${triptych?.statusBar.node.getContent() ?? ""}`
-        : `${canvas.getContent()}\n${status.getContent()}`
+        : `${canvas.getContent()}\n${status.getContent()}`,
     );
 
     win.onResize(() => {
