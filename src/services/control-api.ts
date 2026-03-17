@@ -139,6 +139,8 @@ const ENDPOINT_CATALOGUE = [
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
+  { method: "POST", path: "/journal/write",                body: { text: "string", agent: "string (optional)" }, description: "Append a persistent note that survives instance resets. Stored on /data/logs volume." },
+  { method: "GET",  path: "/journal/read",                 description: "Read all journal entries. ?since=ISO8601 to filter." },
 ];
 
 function buildOpenApiSpec(port: number) {
@@ -384,6 +386,21 @@ export class ControlApiService {
       const m = Math.floor((uptimeSec % 3600) / 60);
       const uptime = h > 0 ? `${h}h ${m}m` : `${m}m`;
       const screen = this.getScreenSize?.() ?? null;
+      // Ephemeral reset awareness — agents should know the instance resets
+      const resetIntervalMins = Number(process.env.WIBWOB_RESET_INTERVAL_MINS || 0);
+      let ephemeral: Record<string, unknown> | undefined;
+      if (resetIntervalMins > 0) {
+        const startMs = this.startedAt;
+        const nextResetMs = startMs + resetIntervalMins * 60 * 1000;
+        const remainingMs = Math.max(0, nextResetMs - Date.now());
+        const remainingMins = Math.ceil(remainingMs / 60000);
+        ephemeral = {
+          resetIntervalMins,
+          nextReset: new Date(nextResetMs).toISOString(),
+          remainingMins,
+          warning: remainingMins <= 5 ? "reset imminent — save work to /journal/write" : undefined,
+        };
+      }
       return Response.json({
         ok: true,
         instanceId: this.identity.instanceId,
@@ -395,6 +412,7 @@ export class ControlApiService {
         host: this.identity.host,
         socketPath: this.socketPath ?? null,
         screen: screen ? { width: screen.width, height: screen.height } : null,
+        ...(ephemeral ? { ephemeral } : {}),
       });
     }
 
@@ -897,6 +915,45 @@ export class ControlApiService {
       return Response.json(
         this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
       );
+    }
+
+    // ── Journal — persistent notes that survive resets ──
+    const JOURNAL_PATH = "/data/logs/journal.jsonl";
+
+    if (request.method === "POST" && url.pathname === "/journal/write") {
+      const text = typeof body.text === "string" ? body.text.trim() : "";
+      const agent = typeof body.agent === "string" ? body.agent.trim() : "anonymous";
+      if (!text) return Response.json({ ok: false, error: "text required" }, { status: 400 });
+      try {
+        const entry = JSON.stringify({
+          ts: new Date().toISOString(),
+          agent,
+          text,
+          instanceId: this.identity.instanceId,
+        });
+        fs.appendFileSync(JOURNAL_PATH, entry + "\n");
+        return Response.json({ ok: true, persisted: true });
+      } catch (e) {
+        return Response.json({ ok: false, error: "journal write failed — /data/logs may not be mounted" }, { status: 500 });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/journal/read") {
+      try {
+        const raw = fs.readFileSync(JOURNAL_PATH, "utf8").trim();
+        if (!raw) return Response.json({ entries: [] });
+        const entries = raw.split("\n").map(line => {
+          try { return JSON.parse(line); } catch { return null; }
+        }).filter(Boolean);
+        const since = url.searchParams.get("since");
+        if (since) {
+          const sinceMs = new Date(since).getTime();
+          return Response.json({ entries: entries.filter((e: { ts: string }) => new Date(e.ts).getTime() >= sinceMs) });
+        }
+        return Response.json({ entries });
+      } catch {
+        return Response.json({ entries: [] });
+      }
     }
 
     return new Response("not found", { status: 404 });
