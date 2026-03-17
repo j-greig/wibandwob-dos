@@ -95,7 +95,7 @@ bash scripts/git-census.sh             # branch/worktree health
 - **haiku / sonnet / opus** — model-tier delegation
 - **codex-standard / codex-heavy** — OpenAI Codex (ask before using)
 
-**Devlog** — `scripts/reflect.sh "your note"` appends to this week's devlog.
+**Devlog** — `scripts/devlog.sh "your note"` appends to this week's devlog.
 Write friction you notice, patterns that confused, things that worked.
 Devlogs: `.agents/reflections/2026-W{nn}.md`
 
