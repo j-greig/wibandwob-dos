@@ -804,13 +804,14 @@ function isOurProcess(pid: number, repoRoot: string): boolean {
   return true;
 }
 
-function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; staleFiles: StaleFile[] } {
+function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; staleFiles: StaleFile[]; healthyPids: Set<number> } {
   const instancesDir = path.join(repoRoot, "scratch", "instances");
   const selfPid = process.pid;
   const parentPid = process.ppid;
   const seen = new Set<number>();
   const processes: CleanTarget[] = [];
   const staleFiles: StaleFile[] = [];
+  const healthyPids = new Set<number>(); // PIDs with live socket — these are real instances, not orphans
 
   // Source 1: PID files from scratch/instances/
   let pidFiles: string[] = [];
@@ -830,9 +831,12 @@ function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; sta
     try { process.kill(pid, 0); alive = true; } catch { /* dead */ }
 
     if (alive) {
+      const sockPath = path.join(instancesDir, `${label}.sock`);
+      const hasSocket = fs.existsSync(sockPath);
       const cmd = getPsCmd(pid) ?? "<unknown>";
       processes.push({ pid, cmd, source: "pidfile", label });
       seen.add(pid);
+      if (hasSocket) healthyPids.add(pid); // registered + socket = healthy, not an orphan
     } else {
       staleFiles.push({ path: pidFile, kind: "pid" });
       const sockPath = path.join(instancesDir, `${label}.sock`);
@@ -883,7 +887,7 @@ function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; sta
     }
   }
 
-  return { processes, staleFiles };
+  return { processes, staleFiles, healthyPids };
 }
 
 async function cmdClean(args: string[]) {
@@ -892,22 +896,41 @@ async function cmdClean(args: string[]) {
   const doForce = flags.force === true;
   const repoRoot = path.resolve(SCRATCH_BASE, "..");
 
-  const { processes, staleFiles } = discoverCleanTargets(repoRoot);
+  const { processes, staleFiles, healthyPids } = discoverCleanTargets(repoRoot);
+
+  // Separate healthy instances from orphans
+  const healthy = processes.filter(p => healthyPids.has(p.pid));
+  const orphans = processes.filter(p => !healthyPids.has(p.pid));
 
   // ── Report ──
   process.stderr.write("WibWob-DOS Instance Cleanup\n");
   process.stderr.write("===========================\n\n");
 
-  if (processes.length === 0 && staleFiles.length === 0) {
+  if (orphans.length === 0 && staleFiles.length === 0) {
+    if (healthy.length > 0) {
+      process.stderr.write(`Healthy instances (${healthy.length}) — will NOT touch:\n`);
+      for (const p of healthy) {
+        process.stderr.write(`  PID ${p.pid}  [${p.label}]  ${p.cmd}\n`);
+      }
+      process.stderr.write("\n");
+    }
     process.stderr.write("Clean — no orphans, no stale files.\n");
-    out({ clean: true, processes: 0, staleFiles: 0 });
+    out({ clean: true, healthy: healthy.length, orphans: 0, staleFiles: 0 });
     return;
   }
 
-  if (processes.length > 0) {
-    process.stderr.write(`Live processes (${processes.length}):\n`);
-    for (const p of processes) {
-      const src = p.label ? `[${p.label}]` : `[${p.source}]`;
+  if (healthy.length > 0) {
+    process.stderr.write(`Healthy instances (${healthy.length}) — will NOT touch:\n`);
+    for (const p of healthy) {
+      process.stderr.write(`  PID ${p.pid}  [${p.label}]  ${p.cmd}  ✓\n`);
+    }
+    process.stderr.write("\n");
+  }
+
+  if (orphans.length > 0) {
+    process.stderr.write(`Orphan processes (${orphans.length}):\n`);
+    for (const p of orphans) {
+      const src = p.label ? `[${p.label}]` : `[scan]`;
       process.stderr.write(`  PID ${p.pid}  ${src}  ${p.cmd}\n`);
     }
     process.stderr.write("\n");
@@ -923,22 +946,23 @@ async function cmdClean(args: string[]) {
   }
 
   if (!doKill) {
-    process.stderr.write("Dry run — pass --kill to clean up, --force to SIGKILL.\n");
+    process.stderr.write("Dry run — pass --kill to clean orphans, --force to SIGKILL.\n");
     out({
       dryRun: true,
-      processes: processes.map(p => ({ pid: p.pid, cmd: p.cmd, label: p.label })),
+      healthy: healthy.map(p => ({ pid: p.pid, cmd: p.cmd, label: p.label })),
+      orphans: orphans.map(p => ({ pid: p.pid, cmd: p.cmd, label: p.label })),
       staleFiles: staleFiles.map(f => f.path),
     });
     return;
   }
 
-  // ── Kill processes ──
+  // ── Kill orphan processes only ──
   const killed: number[] = [];
   const survivors: number[] = [];
 
-  if (processes.length > 0) {
-    process.stderr.write(`Sending SIGTERM to ${processes.length} processes...\n`);
-    for (const p of processes) {
+  if (orphans.length > 0) {
+    process.stderr.write(`Sending SIGTERM to ${orphans.length} orphan processes...\n`);
+    for (const p of orphans) {
       try {
         process.kill(p.pid, "SIGTERM");
         process.stderr.write(`  SIGTERM → PID ${p.pid}\n`);
@@ -952,7 +976,7 @@ async function cmdClean(args: string[]) {
     await new Promise(r => setTimeout(r, 2000));
 
     // Check for survivors
-    for (const p of processes) {
+    for (const p of orphans) {
       let alive = false;
       try { process.kill(p.pid, 0); alive = true; } catch { /* dead */ }
       if (alive) {
@@ -979,9 +1003,9 @@ async function cmdClean(args: string[]) {
     } catch { /* already gone */ }
   }
 
-  // Also clean up PID/socket files for processes we just killed
+  // Also clean up PID/socket files for orphan processes we just killed
   const instancesDir = path.join(repoRoot, "scratch", "instances");
-  for (const p of processes) {
+  for (const p of orphans) {
     if (p.label) {
       const pidPath = path.join(instancesDir, `${p.label}.pid`);
       const sockPath = path.join(instancesDir, `${p.label}.sock`);
