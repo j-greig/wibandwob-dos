@@ -243,7 +243,7 @@ export class ControlApiService {
         this.server = bunRuntime.serve({
           hostname: resolveConfiguredControlApiHost(),
           port,
-          fetch: async (request) => this.handleRequest(request),
+          fetch: async (request) => this.wrapResponse(await this.handleRequest(request)),
         });
         this.actualPort = port;
         this.enabled = true;
@@ -291,7 +291,7 @@ export class ControlApiService {
       try { fs.unlinkSync(sockPath); } catch {}
       this.socketServer = bunRuntime.serve({
         unix: sockPath,
-        fetch: async (request: Request) => this.handleRequest(request),
+        fetch: async (request: Request) => this.wrapResponse(await this.handleRequest(request)),
       });
       this.socketPath = sockPath;
       // Write PID sidecar for CLI liveness checks
@@ -348,8 +348,34 @@ export class ControlApiService {
     });
   }
 
+  /** Apply security/anti-crawl headers to every response. Single choke point. */
+  private wrapResponse(response: Response): Response {
+    const headers = new Headers(response.headers);
+    headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
   private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // robots.txt — block all crawlers and AI training scrapers
+    if (request.method === "GET" && url.pathname === "/robots.txt") {
+      return new Response(
+        "User-agent: *\nDisallow: /\n\n" +
+        "User-agent: GPTBot\nDisallow: /\n\n" +
+        "User-agent: ChatGPT-User\nDisallow: /\n\n" +
+        "User-agent: Google-Extended\nDisallow: /\n\n" +
+        "User-agent: CCBot\nDisallow: /\n\n" +
+        "User-agent: anthropic-ai\nDisallow: /\n\n" +
+        "User-agent: ClaudeBot\nDisallow: /\n",
+        { headers: { "Content-Type": "text/plain" } },
+      );
+    }
 
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/help")) {
       return Response.json({
@@ -423,7 +449,7 @@ export class ControlApiService {
         socketPath: this.socketPath ?? null,
         screen: screen ? { width: screen.width, height: screen.height } : null,
         ...(ephemeral ? { ephemeral } : {}),
-        readme: `http${request.url.startsWith("https") ? "s" : ""}://${request.headers.get("host") || "localhost"}/readme`,
+        readme: `https://${request.headers.get("host") || "localhost"}/readme`,
       });
     }
 
