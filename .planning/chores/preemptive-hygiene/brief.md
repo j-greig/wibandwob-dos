@@ -139,8 +139,13 @@ Target AGENTS.md outline (17→9 sections):
 - [ ] Rename `.agents/` → explore better name (`.agent-docs/`? `.context/`?) — 80+ file refs, do as dedicated PR
 - [ ] Should agent-facing scripts live near agent docs? Explore co-location.
 
-**6g. Ops review**
-- [ ] Send detailed summary of 6a–6f to ops agent (`.pi/agents/ops.md`) for constructive crit — are the scripts discoverable? Do the paths make sense for daily ops? Any gaps in the hygiene process?
+**6g. Ops review** ✅
+- [x] Ops review complete. Key feedback:
+  - scripts/README.md added (filesystem signpost)
+  - 6b should integrate into `bun run health`, not be a standalone command
+  - 6c should be script output + devlog, NOT a pi extension
+  - 3 gaps identified: script autopsy (quarterly rot check), deprecation lifecycle (.archive/ with expiry dates), command parity audit (scripts that should be wibwob subcommands)
+  - Numeric prefixes in testing/ for scan order (low priority)
 
 ---
 
