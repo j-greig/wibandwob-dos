@@ -34,6 +34,7 @@ export function openTextViewerWindow(params: {
     mouse: true, keys: true, vi: true,
     scrollable: true, alwaysScroll: true,
     scrollbar: createScrollbar(),
+    tags: true,
     content: "",
     style: theme().body
   });

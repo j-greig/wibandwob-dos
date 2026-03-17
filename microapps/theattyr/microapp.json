@@ -1,0 +1,35 @@
+{
+  "name": "theattyr",
+  "version": "1.0.0",
+  "description": "VT100 terminal theater \u2014 plays 93+ classic ANSI art animations from the 1960s\u20131990s.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": [
+      "index.ts",
+      "vt100-parser.ts",
+      "microapp.json"
+    ],
+    "reopenCommand": "microapp.wibwob.theattyr.open"
+  },
+  "microapp": {
+    "id": "wibwob.theattyr",
+    "title": "Theater",
+    "description": "VT100 terminal theater \u2014 plays 93+ classic ANSI art animations from the 1960s\u20131990s. Includes sidebar browser, playback controls, ANSI color support, and a DVD screensaver.",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [
+      {
+        "category": "applications",
+        "order": 160,
+        "label": "Theater \ud83c\udfa5"
+      }
+    ],
+    "palette": {
+      "order": 160,
+      "label": "Open Theater \ud83c\udfa5"
+    },
+    "agent": true,
+    "api": true
+  }
+}
