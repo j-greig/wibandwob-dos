@@ -9,6 +9,12 @@ RUN apt-get update && apt-get install -y \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
+# Extended figlet fonts (contrib collection — includes doom, slant, etc.)
+RUN curl -fsSL "http://ftp.figlet.org/pub/figlet/fonts/contributed.tar.gz" \
+      -o /tmp/figlet-contrib.tar.gz && \
+    tar xzf /tmp/figlet-contrib.tar.gz -C /usr/share/figlet/ --strip-components=1 && \
+    rm /tmp/figlet-contrib.tar.gz
+
 # ttyd — streams tmux PTY to browser via xterm.js
 RUN ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
