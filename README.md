@@ -1,4 +1,4 @@
-![WibWob-DOS desktop with overlapping windows showing ASCII art, generative patterns, and text interfaces](screenshots/wibwobdos-UI-collage.png)
+![WibWob-DOS desktop with overlapping windows showing ASCII art, generative patterns, and text interfaces](scratch/screenshots/wibwobdos-UI-collage.png)
 
 # WibWob-DOS
 
@@ -36,55 +36,55 @@ It runs in any terminal that supports 256 colours and mouse events. No Electron.
 
 Mountains made of punctuation. Procedural topographic landscapes rendered entirely in Unicode box-drawing characters — peaks, valleys, ridges, saddle passes. Reseed for a new world. Hit `3` for a triptych.
 
-![Contour Studio — generative topographic terrain in box-drawing characters](screenshots/apps/contour-studio.png)
+![Contour Studio — generative topographic terrain in box-drawing characters](scratch/screenshots/apps/contour-studio.png)
 
 ### Code Editor
 
 A proper text editor that lives inside the shell. Syntax highlighting, file tree, line numbers, find/replace, undo/redo. Opens anything in the repo. Not a toy — it's what the AI agent uses to write code.
 
-![Code Editor — syntax highlighting, file explorer, status bar](screenshots/apps/code-editor.png)
+![Code Editor — syntax highlighting, file explorer, status bar](scratch/screenshots/apps/code-editor.png)
 
 ### Plasma
 
 Colour fields that breathe. A real-time animation engine with moods — aurora, circuit, void, chaos, deep-space, chrome. Switch render modes between plain ASCII, emoji, and raw ANSI. Crank the smear. Let it run.
 
-![Plasma — procedural colour-field animation with aurora mood](screenshots/apps/plasma.png)
+![Plasma — procedural colour-field animation with aurora mood](scratch/screenshots/apps/plasma.png)
 
 ### TR-808 Rhythm Composer
 
 A drum machine in your terminal. 16 steps, 16 instruments, per-step accents, pattern banks. Load classic house, electro, trap, or bossa presets. Bounce to WAV. Yes, it plays actual audio.
 
-![TR-808 — 16-step drum machine with step sequencer grid](screenshots/apps/tr808.png)
+![TR-808 — 16-step drum machine with step sequencer grid](scratch/screenshots/apps/tr808.png)
 
 ### Terrain Lab
 
 Procedural worlds with five ways to look at them — flat heightmap, contour lines, isometric, hybrid, and first-person 3D. Diamond-square generation with trees, houses, boats placed by biome rules. WASD to walk around.
 
-![Terrain Lab — procedural terrain with contour lines and sidebar controls](screenshots/apps/terrain-lab.png)
+![Terrain Lab — procedural terrain with contour lines and sidebar controls](scratch/screenshots/apps/terrain-lab.png)
 
 ### Antopolis
 
 A civilisation of ants. They build farms, drill for crystals, elect colony councils, promote soldiers and scientists. The queen settles into the Royal Nest and the log fills with tiny dramas. All in text. All simulated.
 
-![Antopolis — ant colony simulation with colony log](screenshots/apps/antopolis.png)
+![Antopolis — ant colony simulation with colony log](scratch/screenshots/apps/antopolis.png)
 
 ### File Manager
 
 Fuzzy-search the entire codebase. Dual panes — file list on the left, syntax-highlighted preview on the right. Grep across thousands of files, jump to results, open in the editor.
 
-![File Manager — dual-pane browser with fuzzy search results](screenshots/apps/file-manager.png)
+![File Manager — dual-pane browser with fuzzy search results](scratch/screenshots/apps/file-manager.png)
 
 ### Music Player
 
 Plays MP3s with real-time visualisation driven by actual FFT analysis — not fake random bars. Four modes: waveform, spectrum, concentric rings, and particle field. Idle animations bloom when nothing's playing.
 
-![Music Player — playlist and ring visualisation](screenshots/apps/music-player.png)
+![Music Player — playlist and ring visualisation](scratch/screenshots/apps/music-player.png)
 
 ### Wiretext
 
 Draw UI mockups in the terminal. Boxes, text labels, lines, arrows, connectors, tables, modals — all placed with keyboard shortcuts on an infinite ASCII canvas. Export and share.
 
-![Wiretext — TUI wireframing tool with component palette](screenshots/apps/wiretext.png)
+![Wiretext — TUI wireframing tool with component palette](scratch/screenshots/apps/wiretext.png)
 
 ### And the rest
 

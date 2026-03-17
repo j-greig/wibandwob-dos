@@ -95,7 +95,7 @@ export default function setup(host: MicroappHost) {
     // If no path given, find canvas files and show a picker
     if (!filePath) {
       const candidates = [
-        ...findCanvasFiles(path.join(REPO_ROOT, "content")),
+        ...findCanvasFiles(path.join(REPO_ROOT, "assets")),
         ...findCanvasFiles(path.join(REPO_ROOT, "scratch")).filter(f => f.endsWith(".canvas.yaml")),
       ];
       if (candidates.length === 0) return;
@@ -174,7 +174,7 @@ export default function setup(host: MicroappHost) {
     // ── Sidebar state ───────────────────────────────────────────────
     const SIDEBAR_WIDTH = 26;
     let activeFilePath = filePath;
-    const contentDir = path.join(REPO_ROOT, "content");
+    const contentDir = path.join(REPO_ROOT, "assets");
     // Declared here so loadFile (defined below) can reassign it before watcher init
     let watcher!: ReturnType<typeof fs.watch>;
 
@@ -1032,7 +1032,7 @@ export default function setup(host: MicroappHost) {
     label: "List Zine Canvases",
     description: "List discoverable .canvas.yaml files for Zine picker automation.",
     action: () => {
-      const contentDir = path.join(REPO_ROOT, "content");
+      const contentDir = path.join(REPO_ROOT, "assets");
       const files = findCanvasFiles(contentDir).filter((fp) => {
         try {
           return !!loadCanvas(fp);

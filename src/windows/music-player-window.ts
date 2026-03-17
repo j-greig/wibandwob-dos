@@ -43,7 +43,7 @@ const PCM_CHUNK_FRAMES = 256;           // samples per analysis frame
 const PCM_BYTES        = PCM_CHUNK_FRAMES * 2;  // s16le = 2 bytes/sample
 const VIZ_BANDS        = 24;            // output frequency bands
 
-function getMusicDir() { return path.join(process.cwd(), "content/music"); }
+function getMusicDir() { return path.join(process.cwd(), "assets/music"); }
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

@@ -21,7 +21,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SHADER_DIR="$REPO_ROOT/shaders"
+SHADER_DIR="$REPO_ROOT/assets/shaders"
 ACTIVE_CONFIG="$REPO_ROOT/scratch/.ghostty-shaders"
 GHOSTTY_CONFIG="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
 

@@ -18,7 +18,7 @@ import * as path from "node:path";
 import { REPO_ROOT } from "../core/config.js";
 
 export const COMPOSITIONS_DIR = path.join(REPO_ROOT, "scratch", "compositions");
-export const BUNDLED_MUSIC_DIR = path.join(REPO_ROOT, "content", "music");
+export const BUNDLED_MUSIC_DIR = path.join(REPO_ROOT, "assets", "music");
 const AUDIO_FILE_PATTERN = /\.(mp3|wav|m4a|ogg|flac)$/i;
 const SCRUB_SECONDS = 5;
 const VOLUME_STEP = 10;
@@ -254,7 +254,7 @@ export class AudioPlayerController {
   }
 
   private refreshFiles(): void {
-    // Merge bundled tracks (content/music/) with scratch compositions.
+    // Merge bundled tracks (assets/music/) with scratch compositions.
     // Bundled tracks come first; scratch tracks with the same filename win (override).
     const bundled = fs.existsSync(BUNDLED_MUSIC_DIR) ? findAudioFiles(BUNDLED_MUSIC_DIR) : [];
     const local = fs.existsSync(COMPOSITIONS_DIR) ? findAudioFiles(COMPOSITIONS_DIR) : [];

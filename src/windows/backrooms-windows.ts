@@ -27,7 +27,7 @@ export interface BackroomsWindowContext {
 }
 
 export function openBackroomsLogBrowserWindow(context: BackroomsWindowContext): void {
-  const logsDir = path.join(REPO_ROOT, "logs", "backrooms-tv");
+  const logsDir = path.join(REPO_ROOT, "scratch", "logs", "backrooms-tv");
   openBackroomsLogBrowser({
     screen: context.screen,
     windowManager: context.windowManager,

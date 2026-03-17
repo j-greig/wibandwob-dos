@@ -53,7 +53,7 @@ import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
 import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONTENT_DIR = path.resolve(__dirname, "../../content/sy2-chronicles/panels");
+const CONTENT_DIR = path.resolve(__dirname, "../../assets/sy2-chronicles/panels");
 
 // ── MODULE-LEVEL WEBCAM SERVICE ───────────────────────────────────────────────
 // Shared across window opens to avoid multiple camera starts

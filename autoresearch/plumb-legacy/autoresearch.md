@@ -1,1 +1,0 @@
-autoresearch/plumb/autoresearch.md
