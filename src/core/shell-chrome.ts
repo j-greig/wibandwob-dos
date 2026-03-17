@@ -14,7 +14,7 @@ interface ShellChromeDeps {
   getDesktopState: () => DesktopState;
   getScrambleFace: () => string;
   onResize: () => void;
-  onRestart: () => void;
+  onReloadMicroapps: () => void;
 }
 
 /**

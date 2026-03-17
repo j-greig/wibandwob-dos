@@ -139,6 +139,9 @@ Target AGENTS.md outline (17→9 sections):
 - [ ] Rename `.agents/` → explore better name (`.agent-docs/`? `.context/`?) — 80+ file refs, do as dedicated PR
 - [ ] Should agent-facing scripts live near agent docs? Explore co-location.
 
+**6g. Ops review**
+- [ ] Send detailed summary of 6a–6f to ops agent (`.pi/agents/ops.md`) for constructive crit — are the scripts discoverable? Do the paths make sense for daily ops? Any gaps in the hygiene process?
+
 ---
 
 ## Research (reference only — read principles above first)
