@@ -2,6 +2,14 @@
 
 Branch: `chore/preemptive-hygiene`
 
+## Key takeaways
+
+1. **Docs are infrastructure.** Stale spec = silent wrong code. Monthly hygiene, not annual jubilee.
+2. **Token cost is the constraint.** Every line in AGENTS.md competes with conversation. Ruthless curation.
+3. **Reactive creation > upfront design.** Don't write specs until an agent gets confused. Then write it.
+4. **Devlogs are cross-session memory.** Closest thing to persistent learning. Make them zero-friction.
+5. **Generate, don't maintain.** Lists of files, commands, agents — generate from source, don't hand-write.
+
 ---
 
 ## Research synthesis
