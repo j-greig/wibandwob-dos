@@ -2,8 +2,9 @@
 /**
  * wibwob — Unix CLI for WibWob-DOS
  *
- * Thin HTTP client that talks to the control API (default port 8099).
- * All output is JSON to stdout, errors to stderr. Designed for jq piping.
+ * Thin HTTP client that talks to the control API via unix sockets.
+ * Socket-first resolution: scans scratch/instances/ for alive PIDs.
+ * No port 8099 fallback — that silent default was the original bug.
  *
  * Usage:
  *   wibwob state                        # GET /state
@@ -12,29 +13,67 @@
  *   wibwob commands                     # GET /commands/list
  *   wibwob <noun>.<verb> [--key val]    # POST /commands/run
  *   wibwob cmd <id> [--key val]         # POST /commands/run (explicit)
+ *   wibwob -i <label> health            # target a specific instance
  *   wibwob help                         # show usage
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { buildLocalControlApiBaseUrl } from "../runtime/runtime-node.js";
 import { SCRATCH_BASE } from "../core/config.js";
 
 // ── Instance targeting ───────────────────────────────────
-// --instance <label> connects via unix socket: scratch/instances/<label>.sock
-// Falls back to env vars, then default HTTP port.
+// Resolution: --instance/-i flag → $WIBWOB_INSTANCE env → socket scan → error
+// No port 8099 fallback. Socket-first, PID-based liveness.
 
-function findFlag(flag: string): string | undefined {
+/** Find a CLI flag value, checking both long and short forms. */
+function findFlag(...flags: string[]): string | undefined {
   for (let i = 0; i < process.argv.length; i++) {
-    if (process.argv[i] === flag && process.argv[i + 1]) return process.argv[i + 1];
-    if (process.argv[i].startsWith(`${flag}=`)) return process.argv[i].slice(flag.length + 1);
+    for (const flag of flags) {
+      if (process.argv[i] === flag && process.argv[i + 1]) return process.argv[i + 1];
+      if (process.argv[i].startsWith(`${flag}=`)) return process.argv[i].slice(flag.length + 1);
+    }
   }
   return undefined;
 }
 
+interface AliveInstance {
+  label: string;
+  socketPath: string;
+}
+
+/** Scan scratch/instances/ for alive instances via PID sidecar liveness check. */
+function findAliveInstances(): AliveInstance[] {
+  const dir = path.join(SCRATCH_BASE, "instances");
+  const alive: AliveInstance[] = [];
+  let entries: string[];
+  try { entries = fs.readdirSync(dir); } catch { return alive; }
+  for (const file of entries) {
+    if (!file.endsWith(".pid")) continue;
+    const label = file.replace(".pid", "");
+    const pidFile = path.join(dir, file);
+    const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+    if (isNaN(pid)) {
+      try { fs.unlinkSync(pidFile); } catch {}
+      continue;
+    }
+    try {
+      process.kill(pid, 0); // alive — include it
+      const sockPath = path.join(dir, `${label}.sock`);
+      if (fs.existsSync(sockPath)) {
+        alive.push({ label, socketPath: sockPath });
+      }
+    } catch {
+      // Dead process — clean up stale socket + pid
+      try { fs.unlinkSync(pidFile); } catch {}
+      try { fs.unlinkSync(path.join(dir, `${label}.sock`)); } catch {}
+    }
+  }
+  return alive;
+}
+
 function resolveBase(): string {
-  // --instance flag: highest priority (explicit targeting)
-  const label = findFlag("--instance");
+  // 1. Explicit flag: --instance <label> or -i <label>
+  const label = findFlag("--instance", "-i");
   if (label) {
     const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
     if (fs.existsSync(sockPath)) {
@@ -44,20 +83,36 @@ function resolveBase(): string {
     process.exit(1);
   }
 
-  // Explicit env override
+  // Explicit API URL override (for testing / remote)
   if (process.env.WW_API) return process.env.WW_API;
   if (process.env.WIBWOB_API) return process.env.WIBWOB_API;
 
-  // $WIBWOB_INSTANCE env var
+  // 2. $WIBWOB_INSTANCE env var
   if (process.env.WIBWOB_INSTANCE) {
-    const sockPath = path.join(SCRATCH_BASE, "instances", `${process.env.WIBWOB_INSTANCE}.sock`);
+    const envLabel = process.env.WIBWOB_INSTANCE;
+    const sockPath = path.join(SCRATCH_BASE, "instances", `${envLabel}.sock`);
     if (fs.existsSync(sockPath)) {
       return `unix://${sockPath}`;
     }
+    process.stderr.write(`⚠ WIBWOB_INSTANCE="${envLabel}" but no socket found — falling back to scan\n`);
   }
 
-  // Default: HTTP
-  return buildLocalControlApiBaseUrl();
+  // 3. Socket scan — find alive instances via PID check
+  const alive = findAliveInstances();
+  if (alive.length === 1) {
+    return `unix://${alive[0].socketPath}`;
+  }
+  if (alive.length > 1) {
+    process.stderr.write(`Multiple instances running — specify which one:\n`);
+    for (const inst of alive) {
+      process.stderr.write(`  wibwob -i ${inst.label} <command>\n`);
+    }
+    process.exit(1);
+  }
+
+  // 0 alive — error, no silent fallback
+  process.stderr.write(`No WibWob-DOS instances running.\nStart one with: bun run dev\n`);
+  process.exit(1);
 }
 
 const BASE = resolveBase();
@@ -168,7 +223,57 @@ async function cmdCommands() {
 }
 
 async function cmdHealth() {
-  out(await api("/health"));
+  const health = (await api("/health")) as {
+    instanceId?: string; instanceLabel?: string; pid?: number;
+    port?: number; uptime?: string; socketPath?: string;
+    screen?: { width: number; height: number } | null;
+  };
+
+  if (QUIET) {
+    out(health);
+    return;
+  }
+
+  // Human-readable health output
+  const label = health.instanceLabel ?? health.instanceId ?? "?";
+  const screenStr = health.screen ? `${health.screen.width}×${health.screen.height}` : "unknown";
+  const MIN_W = 40, MIN_H = 10;
+  const headless = health.screen && (health.screen.width < MIN_W || health.screen.height < MIN_H);
+  process.stderr.write(`instance: ${label}\n`);
+  process.stderr.write(`pid: ${health.pid ?? "?"}\n`);
+  process.stderr.write(`port: ${health.port ?? "?"}\n`);
+  process.stderr.write(`screen: ${screenStr}${headless ? "  ← HEADLESS (below 40×10 minimum)" : ""}\n`);
+  process.stderr.write(`uptime: ${health.uptime ?? "?"}\n`);
+
+  // Multi-instance warning: scan for other alive instances
+  const alive = findAliveInstances();
+  if (alive.length > 1) {
+    process.stderr.write(`\n⚠ ${alive.length} instances running:\n`);
+    for (const inst of alive) {
+      // Try to probe each for screen size (200ms timeout)
+      let extra = "";
+      try {
+        const res = await fetch(`http://localhost/health`, {
+          ...(unixFetchOpts(inst.socketPath)),
+          signal: AbortSignal.timeout(200),
+        } as any);
+        if (res.ok) {
+          const h = (await res.json()) as { screen?: { width: number; height: number } | null; pid?: number };
+          const sw = h.screen ? `screen=${h.screen.width}×${h.screen.height}` : "";
+          const pidStr = h.pid ? `pid=${h.pid}` : "";
+          const warn = h.screen && (h.screen.width < MIN_W || h.screen.height < MIN_H) ? "  ← HEADLESS" : "";
+          const here = inst.label === label ? "  ← you are here" : "";
+          extra = `  ${pidStr}  ${sw}${warn}${here}`;
+        }
+      } catch {
+        extra = "  (unresponsive)";
+      }
+      process.stderr.write(`  ${inst.label}${extra}\n`);
+    }
+  }
+
+  // Also output JSON to stdout for scripts
+  out(health);
 }
 
 async function cmdMinimap() {
@@ -477,7 +582,7 @@ async function cmdRestart(args: string[]) {
 
 async function cmdAttach() {
   const { spawnSync } = await import("node:child_process");
-  const label = findFlag("--instance") || process.env.WIBWOB_INSTANCE || "main";
+  const label = findFlag("--instance", "-i") || process.env.WIBWOB_INSTANCE || "main";
   const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
   const pidFile = path.join(SCRATCH_BASE, "wibwob.pid");
   const orphanWorkspace = `orphan-${label}`;
@@ -780,12 +885,17 @@ function usage() {
 
   lines.push("");
   lines.push("Flags:");
-  lines.push("  --instance <label>  Target instance by label (connects via unix socket)");
-  lines.push("  -q, --quiet         Output IDs only, one per line (for piping)");
+  lines.push("  -i, --instance <label>  Target instance by label (connects via unix socket)");
+  lines.push("  -q, --quiet             Output IDs only, one per line (for piping)");
+  lines.push("");
+  lines.push("Instance resolution (in order):");
+  lines.push("  1. -i / --instance flag or $WIBWOB_INSTANCE env var → named socket");
+  lines.push("  2. Socket scan: find sole alive instance via PID check");
+  lines.push("  3. Error (no silent port fallback)");
   lines.push("");
   lines.push("Environment:");
   lines.push("  WIBWOB_INSTANCE  Target instance label (same as --instance)");
-  lines.push("  WW_API           Base URL override (default: socket or port 8099)");
+  lines.push("  WW_API           Base URL override (explicit, bypasses socket scan)");
   lines.push("  WIBWOB_API       Alias for WW_API");
   lines.push("");
   lines.push("Output: JSON to stdout, errors to stderr. Pipe to jq.");
@@ -804,12 +914,12 @@ async function main() {
 
   const sub = args[0];
 
-  // Strip -q/--quiet and --instance <label> from args for dispatch (already captured)
+  // Strip -q/--quiet and --instance/-i <label> from args for dispatch (already captured)
   const filteredArgs: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-q" || args[i] === "--quiet") continue;
-    if (args[i] === "--instance") { i++; continue; }
-    if (args[i].startsWith("--instance=")) continue;
+    if (args[i] === "--instance" || args[i] === "-i") { i++; continue; }
+    if (args[i].startsWith("--instance=") || args[i].startsWith("-i=")) continue;
     filteredArgs.push(args[i]);
   }
   const cleanArgs = filteredArgs;

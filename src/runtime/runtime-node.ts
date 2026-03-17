@@ -35,8 +35,19 @@ export function resolveConfiguredControlApiHost(): string {
   return process.env.WIBWOB_CONTROL_HOST?.trim() || "127.0.0.1";
 }
 
+// ── Actual port tracking for in-process callers ──
+// The ControlApiService sets this after binding so internal callers
+// (scramble-brain, agent-session, slash-commands, SDK) use the real
+// port instead of defaulting to 8099 which may be a different instance.
+let _actualControlApiPort: number | undefined;
+
+/** Called by ControlApiService.start() after the HTTP server binds. */
+export function setActualControlApiPort(port: number): void {
+  _actualControlApiPort = port;
+}
+
 export function buildLocalControlApiBaseUrl(
-  port = CONTROL_API_PORT,
+  port = _actualControlApiPort ?? CONTROL_API_PORT,
   host = resolveConfiguredControlApiHost(),
 ): string {
   return `http://${host}:${port}`;
