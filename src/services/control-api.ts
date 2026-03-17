@@ -139,8 +139,8 @@ const ENDPOINT_CATALOGUE = [
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
-  { method: "POST", path: "/journal/write",                body: { text: "string", agent: "string (optional)" }, description: "Append a persistent note that survives instance resets. Stored on /data/logs volume." },
-  { method: "GET",  path: "/journal/read",                 description: "Read all journal entries. ?since=ISO8601 to filter." },
+  { method: "POST", path: "/journal/write",                body: { text: "string (max 500 chars)", agent: "string (max 40 chars, optional)" }, description: "Append a persistent note that survives instance resets. Rate limited: 1 write per 30s. Sanitised: no control chars. 50MB file cap." },
+  { method: "GET",  path: "/journal/read",                 description: "Read journal entries (most recent 200). ?since=ISO8601 to filter by timestamp." },
 ];
 
 function buildOpenApiSpec(port: number) {
@@ -918,12 +918,45 @@ export class ControlApiService {
     }
 
     // ── Journal — persistent notes that survive resets ──
+    // Security: rate-limited, size-capped, sanitised. See deploy/fly/OPSEC.md.
     const JOURNAL_PATH = "/data/logs/journal.jsonl";
+    const JOURNAL_MAX_TEXT = 500;           // chars
+    const JOURNAL_MAX_AGENT = 40;           // chars
+    const JOURNAL_COOLDOWN_MS = 30_000;     // 30s between writes
+    const JOURNAL_MAX_FILE_MB = 50;         // stop writing if file exceeds this
+    const JOURNAL_READ_LIMIT = 200;         // max entries returned per read
 
     if (request.method === "POST" && url.pathname === "/journal/write") {
-      const text = typeof body.text === "string" ? body.text.trim() : "";
-      const agent = typeof body.agent === "string" ? body.agent.trim() : "anonymous";
-      if (!text) return Response.json({ ok: false, error: "text required" }, { status: 400 });
+      const rawText = typeof body.text === "string" ? body.text : "";
+      const rawAgent = typeof body.agent === "string" ? body.agent : "anonymous";
+
+      // Sanitise: strip control chars (ANSI escapes, null bytes, RTL overrides)
+      // Keep only printable ASCII + common unicode (letters, emoji, punctuation)
+      const sanitise = (s: string, max: number) =>
+        s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+         .trim()
+         .slice(0, max);
+
+      const text = sanitise(rawText, JOURNAL_MAX_TEXT);
+      const agent = sanitise(rawAgent, JOURNAL_MAX_AGENT) || "anonymous";
+
+      if (!text) return Response.json({ ok: false, error: "text required (max 500 chars, no control characters)" }, { status: 400 });
+
+      // Rate limit: check last write timestamp
+      try {
+        const stat = fs.statSync(JOURNAL_PATH);
+        if (Date.now() - stat.mtimeMs < JOURNAL_COOLDOWN_MS) {
+          const waitSec = Math.ceil((JOURNAL_COOLDOWN_MS - (Date.now() - stat.mtimeMs)) / 1000);
+          return Response.json({ ok: false, error: `rate limited — try again in ${waitSec}s`, cooldownSec: waitSec }, { status: 429 });
+        }
+        // File size cap
+        if (stat.size > JOURNAL_MAX_FILE_MB * 1024 * 1024) {
+          return Response.json({ ok: false, error: "journal full — 50MB limit reached" }, { status: 507 });
+        }
+      } catch {
+        // File doesn't exist yet — first write, no rate limit
+      }
+
       try {
         const entry = JSON.stringify({
           ts: new Date().toISOString(),
@@ -932,27 +965,36 @@ export class ControlApiService {
           instanceId: this.identity.instanceId,
         });
         fs.appendFileSync(JOURNAL_PATH, entry + "\n");
-        return Response.json({ ok: true, persisted: true });
-      } catch (e) {
-        return Response.json({ ok: false, error: "journal write failed — /data/logs may not be mounted" }, { status: 500 });
+        return Response.json({ ok: true, persisted: true, chars: text.length });
+      } catch {
+        return Response.json({ ok: false, error: "journal write failed — /data/logs volume may not be mounted" }, { status: 500 });
       }
     }
 
     if (request.method === "GET" && url.pathname === "/journal/read") {
       try {
         const raw = fs.readFileSync(JOURNAL_PATH, "utf8").trim();
-        if (!raw) return Response.json({ entries: [] });
-        const entries = raw.split("\n").map(line => {
+        if (!raw) return Response.json({ entries: [], total: 0 });
+        const allEntries = raw.split("\n").map(line => {
           try { return JSON.parse(line); } catch { return null; }
         }).filter(Boolean);
+
+        let entries = allEntries;
         const since = url.searchParams.get("since");
         if (since) {
           const sinceMs = new Date(since).getTime();
-          return Response.json({ entries: entries.filter((e: { ts: string }) => new Date(e.ts).getTime() >= sinceMs) });
+          if (isNaN(sinceMs)) return Response.json({ ok: false, error: "invalid since timestamp" }, { status: 400 });
+          entries = entries.filter((e: { ts: string }) => new Date(e.ts).getTime() >= sinceMs);
         }
-        return Response.json({ entries });
+
+        // Return most recent N entries (tail, not head — recent is most relevant)
+        const total = entries.length;
+        if (entries.length > JOURNAL_READ_LIMIT) {
+          entries = entries.slice(-JOURNAL_READ_LIMIT);
+        }
+        return Response.json({ entries, total, returned: entries.length, limit: JOURNAL_READ_LIMIT });
       } catch {
-        return Response.json({ entries: [] });
+        return Response.json({ entries: [], total: 0 });
       }
     }
 
