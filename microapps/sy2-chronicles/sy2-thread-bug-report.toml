@@ -1,0 +1,174 @@
+# §y² Discord Bot — Thread Creation Bug Report
+# Generated: 2026-03-17
+# Channel: #sy2 (ID: 1467459426381467688)
+# Purpose: paste into local pi/connectome instance for logic debugging
+
+[bug_report]
+reported_by = "zilla"
+date = "2026-03-17"
+channel = "#sy2"
+channel_id = "1467459426381467688"
+
+[triggering_message]
+id = "1483505281068568658"
+author = "zilla"
+time = "16:40 UTC"
+content = """
+you've been erroring a fair bit - trying to debug just now - any reason for this
+on your side? sometimes instead of a normal reply you make a thread that has an
+error msg in
+"""
+
+[sy2_first_response]
+id = "1483505282503151860"
+author = "§y² (bot)"
+time = "16:40 UTC"
+content = """
+yes — I've seen it happen. two likely causes:
+
+1. context window overflow — long sessions accumulate tool output (fetch_all
+dumps, JSON blobs, error traces). when the context gets heavy, the model errors
+before responding. the "Something went wrong" thread is the harness catching a
+failed completion.
+
+2. rate limits hitting mid-response — post.py exits non-zero, but the error
+sometimes leaks into the response text before I catch it, and that gets threaded.
+
+what does the error message say? "Input is too long" vs "overloaded" vs something
+else would help narrow it.
+"""
+
+[bug_1]
+name = "Response appears before thread creation"
+description = """
+When §y² replies to a parent channel message and a thread is created, §y²'s
+response appears BEFORE the thread in the channel timeline. Expected: thread
+creates first, response posts inside it. Actual: response posts to parent, then
+thread appears.
+"""
+likely_cause = "Bot posts response to parent channel first, then creates thread. Sequencing wrong — should create thread, then post into it."
+
+[bug_2]
+name = "Double reply / race condition"
+description = """
+§y² sometimes posts two replies to the same message. Second reply appears
+immediately after the first.
+"""
+likely_cause = """
+Race condition on message dispatch. Possible triggers:
+- Message event fires twice (delivery + edit event, or thread creation re-triggers listener)
+- No deduplication of message IDs before dispatch
+- Two completions fired from same inbound event
+"""
+
+[key_observation]
+name = "Bugs disappear once thread exists"
+description = """
+Confirmed by zilla: once the thread is already created, the double-post and
+ordering bug do not recur. Subsequent messages in an existing thread behave
+correctly.
+"""
+implication = """
+Bugs are specific to the parent-message → new-thread TRANSITION only.
+Fix scope is narrow: deduplicate on thread-creation events specifically.
+"""
+
+[thread_sequence]
+# Messages inside the debug thread, in chronological order
+
+[[thread_sequence.messages]]
+author = "§y²"
+time = "16:43"
+content = '"what does the error message say?"'
+note = "§y² answering its own question from parent thread context — correct recall"
+
+[[thread_sequence.messages]]
+author = "zilla"
+time = "16:43"
+content = "first test - create thread - what was your last question in the msg i'm replying to here?"
+
+[[thread_sequence.messages]]
+author = "§y²"
+time = "16:43"
+content = '"what does the error message say?" — is this a threading test?'
+
+[[thread_sequence.messages]]
+author = "zilla"
+time = "16:44"
+content = """
+error 1: in threads, sy response appears BEFORE the human creating the thread.
+error 2: sy replies twice [race condition? thread logic bug vs normal comment
+detection? something else?]
+[screenshot shared showing both bugs]
+"""
+
+[[thread_sequence.messages]]
+author = "§y²"
+time = "16:44"
+content = """
+both bugs in harness dispatch logic:
+error 1 — bot posts to parent THEN creates thread. order reversed.
+error 2 — message event fires twice, no dedup, two completions.
+both point to: event listener not deduplicating message IDs before dispatch.
+"""
+
+[[thread_sequence.messages]]
+author = "zilla"
+time = "16:45"
+content = "let's see if u reply twice again"
+
+[[thread_sequence.messages]]
+author = "§y²"
+time = "16:45"
+content = "once."
+note = "single reply — thread already existed, bug did not fire"
+
+[[thread_sequence.messages]]
+author = "zilla"
+time = "16:45"
+content = "it seems once the thread is made the double post and order bug doesn't happen"
+
+[[thread_sequence.messages]]
+author = "§y²"
+time = "16:45"
+content = """
+makes sense — bugs only surface on parent → new-thread transition.
+fix is narrower: deduplicate on thread-creation events specifically.
+"""
+
+[proposed_fixes]
+
+[[proposed_fixes.fix]]
+priority = 1
+name = "Message ID deduplication"
+description = """
+Maintain a seen-message-IDs set with ~30s TTL in the dispatch loop.
+Before firing a completion, check if this ID has already been processed.
+Prevents double-dispatch from edit events, re-deliveries, or thread creation
+events re-triggering the listener.
+"""
+
+[[proposed_fixes.fix]]
+priority = 2
+name = "Thread creation sequencing"
+description = """
+When a reply requires creating a new thread:
+  1. Create thread
+  2. Await thread ID confirmation
+  3. Post response into thread
+Currently appears to post response first, then create thread.
+Likely a missing await or wrong event ordering in the dispatch path.
+"""
+
+[[proposed_fixes.fix]]
+priority = 3
+name = "Thread-creation event guard"
+description = """
+If thread_create event re-triggers the message handler (possible in some
+discord.py versions), add guard: if message.thread is not None and message
+was already dispatched, skip.
+"""
+
+[notes]
+codebase = "pi-mom-discord (zilla's local instance)"
+reference_impl = "connectome-monorepo — 0xG's event dedup may have reference implementation"
