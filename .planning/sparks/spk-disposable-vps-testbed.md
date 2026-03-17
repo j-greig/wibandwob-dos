@@ -317,13 +317,33 @@ The control API is public on `wibwob-dos.fly.dev`. No auth. Acceptable for a dis
 
 ---
 
-## Next Steps
+## API Keys & Spend Risk
 
-1. ~~Write deploy files~~ ✅ `deploy/fly/` created
-2. **Install `flyctl`** — `brew install flyctl`
-3. **`fly auth login`** — authenticate CLI
-4. **`fly apps create wibwob-dos`** — create the app
-5. **`fly secrets set ...`** — inject OpenRouter key
-6. **`fly deploy --config deploy/fly/fly.toml`** — ship it
-7. **Run the checklist** — verify every item above
-8. **Point a remote agent at it** — prove the COAT test passes over HTTPS
+The only API key is `OPENROUTER_API_KEY` — used by **Scramble** (the embedded AI companion cat). It calls LLMs via OpenRouter when someone hits `/scramble/say` or chats in the agent window.
+
+**For this testbed: the key is optional.** The purpose is testing remote window control, not LLM chat. Without it, Scramble shows an error on chat attempts. Everything else (figlets, primers, windows, layout, control API, workspace save/load) works fine with zero API keys.
+
+**If the key IS set:**
+- Set a **$5/day hard spend cap** on the OpenRouter dashboard
+- Anyone who finds the URL can spam `/scramble/say` and burn credits
+- The hourly reset doesn't help — spend accumulates on the OpenRouter account, not the instance
+
+**Recommendation:** Don't set `OPENROUTER_API_KEY` on the disposable instance:
+```bash
+fly secrets unset OPENROUTER_API_KEY --app wibwob-dos
+```
+
+If you want Scramble for demo purposes, use a dedicated disposable OpenRouter key with a hard cap. Never reuse your main key.
+
+---
+
+## Done ✅
+
+1. ~~Write deploy files~~ `deploy/fly/` created
+2. ~~Install flyctl~~ `brew install flyctl`
+3. ~~Create app~~ `fly apps create wibwob-dos`
+4. ~~Deploy~~ `fly deploy` — live at https://wibwob-dos.fly.dev
+5. ~~Workspace bake-in~~ agent-welcome layout survives redeploy
+6. ~~Hourly reset~~ `.github/workflows/reset-fly.yml`
+7. ~~OPSEC doc~~ `deploy/fly/OPSEC.md`
+8. ~~Control API fix~~ `WIBWOB_CONTROL_HOST` respected by Bun.serve
