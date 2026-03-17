@@ -15,7 +15,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/lib/runtime-env.sh"
-API="$(ww_api_base)"
 
 # Parse args
 OUTFILE=""
@@ -29,10 +28,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Health check
-curl -sf "$API/health" > /dev/null || { echo "ERROR: API not reachable at $API" >&2; exit 1; }
+ww_curl /health > /dev/null || { echo "ERROR: No WibWob-DOS instance found" >&2; exit 1; }
 
 # Fetch state and build workspace JSON (v2 format — matches WorkspaceService)
-RECIPE=$(curl -sf "$API/state" | python3 -c "
+RECIPE=$(ww_curl /state | python3 -c "
 import sys, json
 
 state = json.load(sys.stdin)

@@ -10,7 +10,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/lib/runtime-env.sh"
-API="$(ww_api_base)"
 
 PASS=0
 FAIL=0
@@ -32,9 +31,9 @@ echo "=============================="
 echo ""
 
 # ── 0. App running? ────────────────────────────────────────────────
-health=$(curl -s --max-time 2 "$API/health" 2>/dev/null || true)
+health=$(ww_curl /health 2>/dev/null || true)
 if ! echo "$health" | grep -q '"ok":true'; then
-  echo "✗ App not running on $API — cannot test" >&2
+  echo "✗ No WibWob-DOS instance found — cannot test" >&2
   exit 1
 fi
 id=$(echo "$health" | grep -o '"instanceId":"[^"]*"' | cut -d'"' -f4)
@@ -83,7 +82,7 @@ else
 fi
 
 # ── 5. /screenshot/ansi API ────────────────────────────────────────
-ANSI=$(curl -s --max-time 5 "$API/screenshot/ansi" 2>/dev/null)
+ANSI=$(ww_curl /screenshot/ansi 2>/dev/null)
 ANSI_LINES=$(echo "$ANSI" | wc -l | tr -d ' ')
 if [[ "$ANSI_LINES" -gt 5 ]]; then
   check "/screenshot/ansi API" 1 "${ANSI_LINES} lines"
@@ -93,7 +92,7 @@ fi
 
 # ── 6. screenshot-window.sh (text crop) ────────────────────────────
 # Get first window title from state
-FIRST_WIN=$(curl -s "$API/state" | python3 -c "
+FIRST_WIN=$(ww_curl /state 2>/dev/null | python3 -c "
 import sys,json
 ws = json.load(sys.stdin).get('windows',[])
 if ws: print(ws[0].get('title',''))

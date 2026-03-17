@@ -25,8 +25,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/lib/runtime-env.sh"
-API="$(ww_api_base)"
-CLI="bun run $ROOT/src/cli/wibwob.ts"
+CLI="wibwob"
 
 if [[ "${1:-}" == "--example" ]]; then
   cat <<'EOF'
@@ -57,8 +56,11 @@ CLEAR=$(python3 -c "import sys,json; d=json.load(open(sys.argv[1])); print(d.get
 THEME=$(python3 -c "import sys,json; d=json.load(open(sys.argv[1])); print(d.get('theme',''))" "$RECIPE")
 WINDOW_COUNT=$(python3 -c "import sys,json; d=json.load(open(sys.argv[1])); print(len(d.get('windows',[])))" "$RECIPE")
 
-# Health check
-curl -sf "$API/health" > /dev/null || { echo "ERROR: API not reachable at $API" >&2; exit 1; }
+# Health check + resolve TCP URL for Python urllib calls
+ww_curl /health > /dev/null || { echo "ERROR: No WibWob-DOS instance found" >&2; exit 1; }
+_health=$(ww_curl /health 2>/dev/null || true)
+API=$(echo "$_health" | python3 -c "import sys,json; h=json.load(sys.stdin); print(f'http://{h[\"host\"]}:{h[\"port\"]}')" 2>/dev/null) \
+  || { echo "Cannot parse API URL from health response" >&2; exit 1; }
 
 # Clear desktop
 if [[ "$CLEAR" == "True" ]]; then
@@ -74,7 +76,7 @@ if [[ -n "$THEME" ]]; then
 fi
 
 # Snapshot window ids before
-BEFORE=$(curl -sf "$API/state" | python3 -c "
+BEFORE=$(ww_curl /state 2>/dev/null | python3 -c "
 import sys,json
 print(','.join(str(w['id']) for w in json.load(sys.stdin)['windows']))
 " 2>/dev/null || echo "")
@@ -99,7 +101,7 @@ for i, w in enumerate(recipe.get('windows', [])):
 
 # Snapshot window ids after — diff to find new ones
 sleep 0.5
-AFTER=$(curl -sf "$API/state" | python3 -c "
+AFTER=$(ww_curl /state 2>/dev/null | python3 -c "
 import sys,json
 print(','.join(str(w['id']) for w in json.load(sys.stdin)['windows']))
 " 2>/dev/null || echo "")

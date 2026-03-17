@@ -11,7 +11,7 @@
 #   bash scripts/experimental/dvd-screensaver.sh "COAT" doom   # custom text + font
 #
 # Env:
-#   WIBWOB_API  — API base URL (default: http://127.0.0.1:8099)
+#   WIBWOB_API  — API base URL (auto-detected from running instance)
 #   FRAMES      — number of bounce frames (default: 80)
 #   SPEED       — sleep between frames in seconds (default: 0.1)
 #   WIN_W       — window width (default: 38)
@@ -22,7 +22,28 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-API="${WIBWOB_API:-http://127.0.0.1:8099}"
+# Auto-detect API from running instance socket
+if [ -z "${WIBWOB_API:-}" ]; then
+  _sock=""
+  for _pf in "$APP_ROOT"/scratch/instances/*.pid; do
+    [ -f "$_pf" ] || continue
+    _pid=$(cat "$_pf" 2>/dev/null) || continue
+    _label=$(basename "$_pf" .pid)
+    if kill -0 "$_pid" 2>/dev/null && [ -S "$APP_ROOT/scratch/instances/${_label}.sock" ]; then
+      _sock="$APP_ROOT/scratch/instances/${_label}.sock"
+      break
+    fi
+  done
+  if [ -n "$_sock" ]; then
+    # Get TCP URL from health endpoint via socket
+    _h=$(curl -sf --unix-socket "$_sock" "http://localhost/health" 2>/dev/null || true)
+    API=$(echo "$_h" | python3 -c "import sys,json; h=json.load(sys.stdin); print(f'http://{h[\"host\"]}:{h[\"port\"]}')" 2>/dev/null || echo "http://127.0.0.1:8099")
+  else
+    API="http://127.0.0.1:8099"
+  fi
+else
+  API="$WIBWOB_API"
+fi
 TEXT="${1:-DVD}"
 FONT="${2:-banner3}"
 FRAMES="${FRAMES:-80}"
@@ -30,8 +51,10 @@ SPEED="${SPEED:-0.1}"
 WIN_W="${WIN_W:-38}"
 WIN_H="${WIN_H:-12}"
 
-# ── Preflight ──
-curl -sf "$API/health" >/dev/null 2>&1 || { echo "WibWob-DOS not running on $API" >&2; exit 1; }
+# ── Preflight — detect screen size ──
+_health=$(curl -sf "$API/health" 2>/dev/null) || { echo "WibWob-DOS not running on $API" >&2; exit 1; }
+SCREEN_W=$(echo "$_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('screen',{}).get('width',205))" 2>/dev/null || echo 205)
+SCREEN_H=$(echo "$_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('screen',{}).get('height',52))" 2>/dev/null || echo 52)
 
 # ── Clear desktop ──
 curl -sf -X POST "$API/commands/run" \
@@ -40,14 +63,13 @@ curl -sf -X POST "$API/commands/run" \
 sleep 0.5
 
 # ── Open figlet ──
-curl -sf -X POST "$API/view/figlet/open-default" \
+curl -sf -X POST "$API/commands/run" \
   -H "Content-Type: application/json" \
-  -d "{\"text\":\"$TEXT\",\"font\":\"$FONT\"}" >/dev/null
+  -d "{\"id\":\"figlet.open\",\"args\":{\"text\":\"$TEXT\",\"font\":\"$FONT\"}}" >/dev/null
 sleep 0.8
 
-# ── Get window ID (last line from windows -q) ──
-W="$APP_ROOT/src/cli/wibwob.ts"
-FID=$("$W" windows -q 2>/dev/null | tail -1)
+# ── Get window ID (last opened) ──
+FID=$(wibwob windows -q 2>/dev/null | tail -1)
 
 if [ -z "$FID" ]; then
   echo "No window found" >&2
@@ -59,10 +81,10 @@ curl -sf -X POST "$API/windows/batch" \
   -H "Content-Type: application/json" \
   -d "{\"ops\":[{\"id\":$FID,\"width\":$WIN_W,\"height\":$WIN_H,\"left\":2,\"top\":2}]}" >/dev/null
 
-# ── Bounce ──
+# ── Bounce — adaptive to actual screen size ──
 X=2 Y=2 DX=5 DY=2
-MAX_X=$((130 - WIN_W - 2))
-MAX_Y=$((38 - WIN_H - 2))
+MAX_X=$((SCREEN_W - WIN_W - 2))
+MAX_Y=$((SCREEN_H - WIN_H - 2))
 
 echo "DVD screensaver: \"$TEXT\" ($FONT) — $FRAMES frames, ${SPEED}s interval"
 
