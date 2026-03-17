@@ -292,6 +292,7 @@ export class TsTuiMvpApp {
         : this.scrambleBrain.status === "offline" ? "(-.-)"
         : "(=^=)",
       onResize: () => this.syncLiveState(),
+      onReloadMicroapps: () => this.reloadMicroappsFromDisk(),
       onRestart: () => this.devRestart(),
     });
     this.runtimeStats = new RuntimeStatsController({

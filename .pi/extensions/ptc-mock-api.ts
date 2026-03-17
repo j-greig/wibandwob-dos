@@ -125,8 +125,15 @@ function generateCapacity(memberId: string): object {
 // Extension
 // ---------------------------------------------------------------------------
 
+// Initialise the global PTC tool executor registry
+if (!globalThis.__ptcToolExecutors) {
+  (globalThis as any).__ptcToolExecutors = {};
+}
+
 export default function mockApi(pi: ExtensionAPI) {
   if (!ACTIVE) return;
+
+  const PTC_ONLY_TOOLS = ["get_team_members", "get_task_history", "get_capacity"];
 
   pi.registerTool({
     name: "get_team_members",
@@ -173,4 +180,32 @@ export default function mockApi(pi: ExtensionAPI) {
       return { content: [{ type: "text", text: JSON.stringify(capacity, null, 2) }] };
     },
   });
+
+  // Store raw executors so ptc.ts can call them even when deactivated
+  const reg = (globalThis as any).__ptcToolExecutors;
+  reg["get_team_members"] = async (params: Record<string, unknown>) => {
+    const dept = (params.department as string || "").toLowerCase();
+    const members = (DEPARTMENTS as Record<string, object[]>)[dept];
+    if (!members) throw new Error(`Unknown department: ${dept}`);
+    return JSON.stringify(members, null, 2);
+  };
+  reg["get_task_history"] = async (params: Record<string, unknown>) => {
+    const tasks = generateTasks(params.member_id as string, params.sprint as string);
+    return JSON.stringify(tasks, null, 2);
+  };
+  reg["get_capacity"] = async (params: Record<string, unknown>) => {
+    const capacity = generateCapacity(params.member_id as string);
+    return JSON.stringify(capacity, null, 2);
+  };
+
+  // Hide PTC-only tools from the model's direct tool list.
+  // They remain in getAllTools() (so execute_code can call them)
+  // but are removed from getActiveTools() (so the model can't call them directly).
+  if (process.env.PTC_ONLY) {
+    pi.on("session_start", async () => {
+      const active = pi.getActiveTools();
+      const filtered = active.filter((name: string) => !PTC_ONLY_TOOLS.includes(name));
+      pi.setActiveTools(filtered);
+    });
+  }
 }

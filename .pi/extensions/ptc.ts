@@ -166,6 +166,13 @@ const DIRECT_TOOLS: Record<string, (params: Record<string, unknown>) => Promise<
   ls: directLs,
 };
 
+// Global registry for PTC-only tools (set by other extensions like ptc-mock-api.ts)
+// These tools are hidden from the model but callable inside execute_code.
+declare global {
+  // eslint-disable-next-line no-var
+  var __ptcToolExecutors: Record<string, (params: Record<string, unknown>) => Promise<string>> | undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Tool bridge — routes to direct implementations or extension tools
 // ---------------------------------------------------------------------------
@@ -184,6 +191,11 @@ function buildToolBridge(
     // Direct implementation — bypasses pi entirely, no events, no conversation
     if (DIRECT_TOOLS[name]) {
       return DIRECT_TOOLS[name](params);
+    }
+
+    // PTC-only tools — registered by other extensions, hidden from model
+    if (globalThis.__ptcToolExecutors?.[name]) {
+      return globalThis.__ptcToolExecutors[name](params);
     }
 
     // Extension tools — call execute() directly, bypasses pi's agent loop

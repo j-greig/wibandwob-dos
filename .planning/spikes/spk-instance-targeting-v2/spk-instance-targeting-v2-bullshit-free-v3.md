@@ -369,37 +369,83 @@ Total: ~170 lines of functional code. One PR. 1–2 days.
 
 ## All lifecycle in TypeScript, not bash
 
-The app creates sockets, the app cleans them up. No bash scripts for
-lifecycle management. Everything runs in Bun/TypeScript:
+The app creates sockets, the app cleans them up. No libraries needed —
+just `fs`, `process.pid`, `process.kill()`, `process.on()`. These are
+OS-level primitives available in every runtime. ~30 lines total.
 
-**On startup (app-controller.ts):**
-1. Scan `scratch/instances/` for existing `.pid` files
-2. For each, `kill(pid, 0)` — dead PID → delete socket + pid file
-3. Check screen dimensions — below 40×10 → skip socket registration
-4. Create socket + write `.pid` sidecar
+Bash is ONLY the launcher (`bun run dev`). Everything else is TypeScript
+owning its own lifecycle.
 
-**On clean shutdown (app-controller.ts / control-api.ts):**
-1. Delete own socket file
-2. Delete own `.pid` sidecar
-3. Already partially exists but not reliable — make it a `process.on('exit')` + `process.on('SIGTERM')` guarantee
+### Startup: scan and clean (app-controller.ts)
 
-**On screen resize (app-controller.ts):**
-1. Below 40×10 → `controlApi.deregisterSocket()` (delete socket + pid)
-2. Back above threshold → `controlApi.registerSocket()` (recreate both)
+```typescript
+// Before creating own socket, clean dead siblings
+for (const file of fs.readdirSync('scratch/instances/')) {
+  if (!file.endsWith('.pid')) continue;
+  const pid = Number(fs.readFileSync(`scratch/instances/${file}`, 'utf8'));
+  try { process.kill(pid, 0); }  // alive? leave it
+  catch {                         // dead → clean up
+    fs.unlinkSync(`scratch/instances/${file}`);
+    const sock = file.replace('.pid', '.sock');
+    try { fs.unlinkSync(`scratch/instances/${sock}`); } catch {}
+  }
+}
+```
 
-**On crash (best-effort):**
-- `process.on('uncaughtException')` and `process.on('SIGINT')` attempt
-  socket cleanup before exit
-- If cleanup fails (kill -9, power loss), the PID-based scan on next
-  startup handles it — dead PID = safe to delete
+`process.kill(pid, 0)` doesn't kill anything — signal 0 just asks
+"does this process exist?" Throws ESRCH if not. Instantaneous syscall,
+no network, no timeout.
 
-**CLI resolution (wibwob.ts):**
-- Socket scan + PID check — all TypeScript, all Bun
-- No bash wrappers, no shell scripts in the resolution path
+### Socket + PID creation (control-api.ts)
 
-Bash is ONLY the launcher: `bun run dev`. Everything else is TypeScript
-owning its own lifecycle. The process that creates the socket is
-responsible for the socket.
+```typescript
+// On socket creation, write sidecar PID file
+fs.writeFileSync(`scratch/instances/${label}.pid`, String(process.pid));
+```
+
+One line. The socket file is created by `Bun.serve({ unix: path })`.
+The PID file is our addition — it lets the CLI check liveness without
+connecting.
+
+### Clean shutdown (control-api.ts)
+
+```typescript
+for (const sig of ['SIGTERM', 'SIGINT', 'exit'] as const) {
+  process.on(sig, () => {
+    try { fs.unlinkSync(`scratch/instances/${label}.sock`); } catch {}
+    try { fs.unlinkSync(`scratch/instances/${label}.pid`); } catch {}
+  });
+}
+```
+
+Covers normal shutdown (SIGTERM), Ctrl-C (SIGINT), and process.exit().
+If the process is kill -9'd or the machine loses power, cleanup doesn't
+run — the startup scan on next boot handles it.
+
+### CLI: PID-based socket scan (wibwob.ts)
+
+```typescript
+function findAliveInstances(): Array<{ label: string; socketPath: string }> {
+  const dir = 'scratch/instances';
+  const alive: Array<{ label: string; socketPath: string }> = [];
+  for (const file of fs.readdirSync(dir)) {
+    if (!file.endsWith('.pid')) continue;
+    const label = file.replace('.pid', '');
+    const pid = Number(fs.readFileSync(`${dir}/${file}`, 'utf8'));
+    try {
+      process.kill(pid, 0);  // alive
+      alive.push({ label, socketPath: `${dir}/${label}.sock` });
+    } catch {                 // dead — clean up
+      try { fs.unlinkSync(`${dir}/${file}`); } catch {}
+      try { fs.unlinkSync(`${dir}/${label}.sock`); } catch {}
+    }
+  }
+  return alive;
+}
+```
+
+No HTTP probes, no timeouts, no race conditions. The entire scan
+takes microseconds even with 100 stale sockets.
 
 ## Future (park, don't design)
 
