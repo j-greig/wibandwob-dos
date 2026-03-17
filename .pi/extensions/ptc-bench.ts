@@ -12,6 +12,10 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+const BENCH_DIR = path.join(process.cwd(), "scratch", "ptc-bench", "runs");
 
 interface ToolCallRecord {
   name: string;
@@ -107,6 +111,31 @@ export default function ptcBench(pi: ExtensionAPI) {
     // Print to stderr so it doesn't pollute agent output
     for (const line of lines) {
       process.stderr.write(line + "\n");
+    }
+
+    // Write structured JSON to bench file for reproducibility
+    try {
+      fs.mkdirSync(BENCH_DIR, { recursive: true });
+      const benchId = process.env.PTC_BENCH_ID || `run-${Date.now()}`;
+      const benchFile = path.join(BENCH_DIR, `${benchId}.bench.json`);
+      const benchData = {
+        id: benchId,
+        timestamp: new Date().toISOString(),
+        elapsed,
+        turnCount,
+        totalCalls,
+        executeCodeCalls,
+        directCalls: directCalls.length,
+        totalResultBytes,
+        executeCodeOutputBytes,
+        directResultBytes,
+        byTool,
+        toolCalls: toolCalls.map(t => ({ name: t.name, bytes: t.resultBytes })),
+      };
+      fs.writeFileSync(benchFile, JSON.stringify(benchData, null, 2));
+      process.stderr.write(`\nBench data written to: ${benchFile}\n`);
+    } catch (e) {
+      process.stderr.write(`\nFailed to write bench file: ${e}\n`);
     }
   });
 }

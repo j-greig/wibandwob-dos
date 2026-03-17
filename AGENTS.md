@@ -7,7 +7,7 @@ Concept: human and AI share equal control of a terminal desktop.
 ## Where to look
 
 - **Building a microapp?** → next section, then `docs/building-custom-microapps.md`
-- **Shell internals?** → `.agents/shell-dev/architecture.md`, `invariants.md`, `control-api.md`
+- **Shell internals?** → `.agents/guides/shell/architecture.md`, `invariants.md`, `control-api.md`
 - **Planning & commits?** → `.planning/CONVENTIONS.md`
 - **Running the app?** → Quick Commands below, or `.pi/skills/ww-ops/SKILL.md`
 - **Everything at once?** → `bash scripts/discover.sh`
@@ -20,16 +20,16 @@ Concept: human and AI share equal control of a terminal desktop.
 2. Read `docs/building-custom-microapps.md`
 3. Edit the scaffold, `bun run typecheck`, restart app
 
-Full docs: `.agents/microapp-dev/` (7 docs). You don't need `.agents/shell-dev/`.
+Full docs: `.agents/guides/microapp/` (7 docs). You don't need `.agents/shell-dev/`.
 
 ## Shell Development
 
 Window manager, command registry, state service, control API, theme engine.
 
-- `.agents/shell-dev/architecture.md` — file index, subsystems
-- `.agents/shell-dev/invariants.md` — rules, anti-patterns
-- `.agents/shell-dev/control-api.md` — API reference
-- `.agents/shell-dev/specs/` — subsystem specs (read before touching listed files)
+- `.agents/guides/shell/architecture.md` — file index, subsystems
+- `.agents/guides/shell/invariants.md` — rules, anti-patterns
+- `.agents/guides/shell/control-api.md` — API reference
+- `.agents/specs/` — subsystem specs (read before touching listed files)
 
 ## Principles
 
@@ -46,7 +46,7 @@ agent, and microapps are thin adapters. No adapter owns semantics.
 - User-visible features must also be API-visible.
 - Add commands in `command-catalog.ts` first — never hand-wire.
 
-Full invariants: `.agents/shell-dev/invariants.md`
+Full invariants: `.agents/guides/shell/invariants.md`
 Philosophy: `PHILOSOPHY.md`
 
 ## Operating
@@ -97,7 +97,7 @@ bash scripts/git-census.sh             # branch/worktree health
 
 **Devlog** — `scripts/devlog.sh "your note"` appends to this week's devlog.
 Write friction you notice, patterns that confused, things that worked.
-Devlogs: `.agents/shell-dev/devlogs/W{nn}.md`
+Devlogs: `.agents/reflections/2026-W{nn}.md`
 
 **Discovery:** `bash scripts/discover.sh`
 

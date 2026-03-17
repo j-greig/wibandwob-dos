@@ -7,13 +7,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEVLOG_DIR="$REPO_ROOT/.agents/shell-dev/devlogs"
+DEVLOG_DIR="$REPO_ROOT/.agents/reflections"
 JOURNAL_DIR="$REPO_ROOT/scratch/journal"
 
 # ISO week number (Monday start)
 WEEK=$(date +%V)
 YEAR=$(date +%Y)
-FILE="$DEVLOG_DIR/W${WEEK}.md"
+FILE="$DEVLOG_DIR/${YEAR}-W${WEEK}.md"
 
 mkdir -p "$DEVLOG_DIR"
 

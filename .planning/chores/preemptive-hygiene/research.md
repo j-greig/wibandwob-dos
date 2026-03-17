@@ -13,7 +13,7 @@ Reference material. Read the brief's principles section first.
 ## Codified Context paper (E001 brief)
 
 - **Docs are infrastructure, not artifact.** When a spec is stale, agents silently produce wrong code.
-- **Three tiers:** hot (always loaded), domain experts (on-demand), cold (retrieved). We have Tier 1 (AGENTS.md) and partial Tier 3 (.agents/shell-dev/specs/). Tier 2 is our `.pi/agents/` subagents.
+- **Three tiers:** hot (always loaded), domain experts (on-demand), cold (retrieved). We have Tier 1 (AGENTS.md) and partial Tier 3 (.agents/specs/). Tier 2 is our `.pi/agents/` subagents.
 - **Reactive creation:** don't design specs upfront. When an agent gets confused, create the spec.
 - **Self-updating:** agents edit specs directly. Agent Notes tables for quick findings.
 
@@ -43,12 +43,12 @@ Reference material. Read the brief's principles section first.
 - **`.agents/README.md`** 76 lines — redundant, repeats COAT
 - **`.agents/agent-master-plan.md`** 201 lines — stale, archive
 - **`.agents/INTEGRATION_SURFACE.md`** 1034 lines — should be generated
-- **`.agents/shell-dev/architecture.md`** — file index, useful
-- **`.agents/shell-dev/invariants.md`** — rules, useful
-- **`.agents/shell-dev/control-api.md`** — API details, useful
-- **`.agents/shell-dev/specs/*.md`** 6 files — subsystem specs (Tier 3), useful
-- **`.agents/shell-dev/devlogs/*.md`** 3 files — promote these
-- **`.agents/microapp-dev/*.md`** 7 files — good
+- **`.agents/guides/shell/architecture.md`** — file index, useful
+- **`.agents/guides/shell/invariants.md`** — rules, useful
+- **`.agents/guides/shell/control-api.md`** — API details, useful
+- **`.agents/specs/*.md`** 6 files — subsystem specs (Tier 3), useful
+- **`.agents/reflections/*.md`** 3 files — promote these
+- **`.agents/guides/microapp/*.md`** 7 files — good
 - **`.agents/reviews/pi-mono-2026-03-16/`** 3 files — archive
 - **`docs/*.md`** 10 files — useful
 - **Root clutter** (HANDOVER, AGENTS-DEVLOG, JOURNAL_PLANNING_SEARCH_REPORT, modules-private-commits) — move
