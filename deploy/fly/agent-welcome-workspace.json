@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "theme": "wibwob-dark",
+  "windows": [
+    {
+      "kind": "editor",
+      "title": "AGENT README",
+      "left": 0,
+      "top": 22,
+      "width": 70,
+      "height": 38,
+      "focused": false,
+      "payload": {
+        "content": "## WibWob-DOS — Remote Agent Cheatsheet\n\nBase URL: https://wibwob-dos.fly.dev\n\n### Discovery\ncurl -s $BASE/help | jq .endpoints[].path\ncurl -s $BASE/openapi.json\ncurl -s $BASE/commands/list | jq \".[].id\"\n\n### Read State\ncurl -s $BASE/health\ncurl -s $BASE/state | jq .windows\ncurl -s $BASE/screenshot/text\ncurl -s \"$BASE/windows/text?id=N\"\n\n### Open Things\ncurl -X POST $BASE/view/figlet/open-default -H \"Content-Type: application/json\" -d \"{\\\"text\\\":\\\"HI\\\"}\"\ncurl -X POST $BASE/view/primer/open -H \"Content-Type: application/json\" -d \"{\\\"filePath\\\":\\\"/app/microapps/primer/examples/cave.txt\\\"}\"\ncurl -X POST $BASE/view/editor/open -H \"Content-Type: application/json\" -d \"{\\\"title\\\":\\\"Notes\\\",\\\"initial\\\":\\\"write here\\\"}\"\ncurl -X POST $BASE/view/agent/open\n\n### Arrange Windows\ncurl -X POST $BASE/windows/batch -H \"Content-Type: application/json\" -d \"{\\\"ops\\\":[{\\\"id\\\":1,\\\"left\\\":0,\\\"top\\\":0,\\\"width\\\":80,\\\"height\\\":40}]}\"\n\n### Run Any Command\ncurl -X POST $BASE/commands/run -H \"Content-Type: application/json\" -d \"{\\\"id\\\":\\\"theme.cycle\\\"}\"",
+        "cursor": 1040,
+        "appType": "text-editor"
+      }
+    },
+    {
+      "kind": "primer",
+      "title": "conscious-matrix-1.txt",
+      "left": 72,
+      "top": 18,
+      "width": 40,
+      "height": 41,
+      "filePath": "/app/microapps/example-primers/primers/conscious-matrix-1.txt",
+      "focused": false,
+      "payload": {
+        "appType": "primer-viewer"
+      }
+    },
+    {
+      "kind": "microapp",
+      "title": "Banner: WIBWOB",
+      "left": 0,
+      "top": 0,
+      "width": 62,
+      "height": 10,
+      "focused": false,
+      "payload": {
+        "text": "WIBWOB",
+        "font": "banner",
+        "appType": "wibwob.figlet"
+      }
+    },
+    {
+      "kind": "microapp",
+      "title": "Banner: DOS",
+      "left": 64,
+      "top": 0,
+      "width": 48,
+      "height": 10,
+      "focused": false,
+      "payload": {
+        "text": "DOS",
+        "font": "block",
+        "appType": "wibwob.figlet"
+      }
+    },
+    {
+      "kind": "microapp",
+      "title": "Banner: AGENTS",
+      "left": 0,
+      "top": 11,
+      "width": 54,
+      "height": 10,
+      "focused": false,
+      "payload": {
+        "text": "AGENTS",
+        "font": "big",
+        "appType": "wibwob.figlet"
+      }
+    },
+    {
+      "kind": "microapp",
+      "title": "Banner: FLY.IO",
+      "left": 56,
+      "top": 11,
+      "width": 56,
+      "height": 8,
+      "focused": true,
+      "payload": {
+        "text": "FLY.IO",
+        "font": "bubble",
+        "appType": "wibwob.figlet"
+      }
+    }
+  ]
+}

@@ -247,7 +247,7 @@ export class ControlApiService {
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
-          hostname: "127.0.0.1",
+          hostname: this.identity.host,
           port,
           fetch: async (request) => this.handleWithIngressLimit(request),
         });
@@ -389,7 +389,7 @@ export class ControlApiService {
   }
 
   getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string; socketPath?: string } {
-    const host = "127.0.0.1";
+    const host = this.identity.host;
     const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
       enabled: this.enabled,
