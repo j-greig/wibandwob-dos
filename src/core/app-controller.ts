@@ -214,6 +214,7 @@ export class TsTuiMvpApp {
   private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
+  private readonly instanceDisplayId: string;
   private readonly runtimeNode: RuntimeNodeDescriptor;
   private microappReloadEpoch = 0;
   private microappDeps?: MicroappHostDeps;
@@ -221,14 +222,17 @@ export class TsTuiMvpApp {
   constructor(opts?: {
     instanceLabel?: string;
     instanceId?: string;
+    instanceDisplayId?: string;
     runtimeNode?: RuntimeNodeDescriptor;
   }) {
     this.runtimeNode = opts?.runtimeNode ?? createRuntimeNode({
       instanceLabel: opts?.instanceLabel,
       instanceId: opts?.instanceId?.trim() || "???",
+      instanceDisplayId: opts?.instanceDisplayId || "???",
     });
     this.instanceLabel = this.runtimeNode.instanceLabel;
     this.instanceId = this.runtimeNode.instanceId;
+    this.instanceDisplayId = this.runtimeNode.instanceDisplayId;
     log.setIdentity(this.getInstanceDisplayLabel());
     patchBlessedUnicode();
     this.screen = blessed.screen({
@@ -571,7 +575,9 @@ export class TsTuiMvpApp {
     }
 
     // Auto-detect orphan workspace if no flag given
-    const orphanName = `orphan-${this.runtimeNode.instanceLabel}`;
+    // Use instanceLabel if set, otherwise instanceDisplayId, otherwise instanceId
+    const idForOrphan = this.instanceLabel ?? this.runtimeNode.instanceDisplayId ?? this.instanceId;
+    const orphanName = `orphan-${idForOrphan}`;
     const orphanPath = path.join(this.runtimeNode.workspacesDir, `${orphanName}.json`);
     if (fs.existsSync(orphanPath)) {
       log.app(`orphan workspace detected: ${orphanName}`);
@@ -611,9 +617,10 @@ export class TsTuiMvpApp {
 
   private getInstanceDisplayLabel(): string {
     const pid = process.pid;
+    // Use short display ID (3 chars) for TUI, full ID for machine contexts
     return this.instanceLabel
-      ? `${this.instanceLabel} · ${this.instanceId} · ${pid}`
-      : `${this.instanceId} · ${pid}`;
+      ? `${this.instanceLabel} · ${this.instanceDisplayId} · ${pid}`
+      : `${this.instanceDisplayId} · ${pid}`;
   }
 
   private toggleTheme(): void {

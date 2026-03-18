@@ -53,10 +53,14 @@ interface ControlApiDeps {
 type RuntimeControlApiIdentity = Pick<
   InstanceDescriptor,
   | "instanceId"
+  | "instanceDisplayId"
   | "instanceLabel"
   | "host"
   | "apiPort"
   | "scratchBase"
+  | "dataRoot"
+  | "instanceRoot"
+  | "exportsDir"
   | "capturesDir"
   | "workspacesDir"
   | "statePath"
@@ -387,6 +391,7 @@ export class ControlApiService {
       return Response.json({
         ok: true,
         instanceId: this.identity.instanceId,
+        instanceDisplayId: this.identity.instanceDisplayId,
         instanceLabel: this.identity.instanceLabel ?? null,
         pid: process.pid,
         startedAt: new Date(this.startedAt).toISOString(),
@@ -394,6 +399,8 @@ export class ControlApiService {
         port: this.actualPort,
         host: this.identity.host,
         socketPath: this.socketPath ?? null,
+        dataRoot: this.identity.dataRoot,
+        instanceRoot: this.identity.instanceRoot,
         screen: screen ? { width: screen.width, height: screen.height } : null,
       });
     }
@@ -403,6 +410,9 @@ export class ControlApiService {
         instanceId: this.identity.instanceId,
         requestedPort: this.identity.apiPort,
         scratchBase: this.identity.scratchBase,
+        dataRoot: this.identity.dataRoot,
+        instanceRoot: this.identity.instanceRoot,
+        exportsDir: this.identity.exportsDir,
         capturesDir: this.identity.capturesDir,
         workspacesDir: this.identity.workspacesDir,
         statePath: this.identity.statePath,

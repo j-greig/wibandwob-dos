@@ -4,11 +4,14 @@ import {
   APP_ROOT,
   CAPTURES_DIR,
   CONTROL_API_PORT,
+  DATA_ROOT,
   LOGS_DIR,
   REPO_ROOT,
   SCRATCH_BASE,
   STATE_PATH,
   WORKSPACES_DIR,
+  resolveInstancePaths,
+  ensureDirectoryExists,
 } from "../core/config.js";
 import type {
   InstanceDescriptor,
@@ -21,6 +24,14 @@ export interface RuntimeNodeDescriptor extends InstanceDescriptor {
   apiBaseUrl: string;
   requestedApiPort: number;
   scratchBase: string;
+  dataRoot: string;
+  // Two-level identity: canonical + display
+  instanceId: string;
+  instanceDisplayId: string;
+  // Instance-scoped paths (new - under DATA_ROOT/instances/{instance_id}/)
+  instanceRoot: string;
+  exportsDir: string;
+  // Legacy paths (still used, deprecated)
   capturesDir: string;
   workspacesDir: string;
   statePath: string;
@@ -55,24 +66,41 @@ export function buildLocalControlApiBaseUrl(
 
 export function createRuntimeNode(options: {
   instanceId: string;
+  instanceDisplayId: string;
   instanceLabel?: string;
   lifecycleMode?: RuntimeLifecycleMode;
 }): RuntimeNodeDescriptor {
   const host = resolveConfiguredControlApiHost();
   const requestedApiPort = CONTROL_API_PORT;
+  
+  // Resolve instance-scoped paths under DATA_ROOT
+  const instancePaths = resolveInstancePaths(options.instanceId.trim());
+  
+  // Ensure instance directories exist
+  ensureDirectoryExists(instancePaths.instanceRoot);
+  ensureDirectoryExists(instancePaths.workspacesDir);
+  ensureDirectoryExists(instancePaths.exportsDir);
+  ensureDirectoryExists(instancePaths.logsDir);
+  
   return {
     instanceId: options.instanceId.trim(),
+    instanceDisplayId: options.instanceDisplayId,
     instanceLabel: options.instanceLabel?.trim() || undefined,
     host,
     apiPort: requestedApiPort,
     apiBaseUrl: buildLocalControlApiBaseUrl(requestedApiPort, host),
     requestedApiPort,
     scratchBase: SCRATCH_BASE,
+    dataRoot: DATA_ROOT,
+    // Instance-scoped paths (new)
+    instanceRoot: instancePaths.instanceRoot,
+    exportsDir: instancePaths.exportsDir,
+    // Legacy paths (still populated for backward compat)
     capturesDir: CAPTURES_DIR,
-    workspacesDir: WORKSPACES_DIR,
-    statePath: STATE_PATH,
-    logsDir: LOGS_DIR,
-    pidPath: path.join(SCRATCH_BASE, "wibwob.pid"),
+    workspacesDir: instancePaths.workspacesDir,  // Prefer instance-scoped
+    statePath: instancePaths.statePath,           // Prefer instance-scoped
+    logsDir: instancePaths.logsDir,               // Prefer instance-scoped
+    pidPath: instancePaths.pidPath,               // Prefer instance-scoped
     appRoot: APP_ROOT,
     repoRoot: REPO_ROOT,
     lifecycleMode: options.lifecycleMode ?? "persistent-workspace",
