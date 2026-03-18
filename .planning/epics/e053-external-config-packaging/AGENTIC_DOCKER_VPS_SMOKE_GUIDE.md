@@ -88,6 +88,18 @@ Fix pattern:
 
 Use `--human-loop` to pause after readiness and inspect the live TUI in tmux before automated checks continue.
 
+For persistent operator variables (SSH key path, port, container id), use the helper:
+
+```bash
+bash scripts/devops/docker-human-view.sh start
+bash scripts/devops/docker-human-view.sh attach-cmd
+bash scripts/devops/docker-human-view.sh attach
+bash scripts/devops/docker-human-view.sh stop
+```
+
+State is stored at:
+- `scratch/devops/docker-human-view/latest.env`
+
 Attach command shown by the script:
 
 ```bash

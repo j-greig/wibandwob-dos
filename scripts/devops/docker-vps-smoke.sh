@@ -17,6 +17,8 @@ API_PORT=8099
 API_FALLBACK_PORT=8100
 TUNNEL_PORT=19099
 TUNNEL_FALLBACK_PORT=19100
+API_READY_FAILURE_TYPE=""
+REMEDIATION_ATTEMPTED=0
 DATA_ROOT_HOST="$OUT_DIR/data-root"
 DEVLOG_PATH="$ROOT/.planning/epics/e053-external-config-packaging/SMOKE_DEVLOG.md"
 TUNNEL_PID=""
@@ -60,6 +62,37 @@ md() {
 escape_md() {
   printf '%s' "$1" | sed 's/|/\\|/g' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-220
 }
+
+pick_free_port() {
+  local start="$1" end="$2" port
+  for port in $(seq "$start" "$end"); do
+    if ! lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "$port"
+      return 0
+    fi
+  done
+  return 1
+}
+
+container_api_ready() {
+  ssh -i "$SSH_KEY" -p "$SSH_PORT" \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    wibwob@127.0.0.1 "curl -sf http://127.0.0.1:${API_PORT}/health >/dev/null || curl -sf http://127.0.0.1:${API_FALLBACK_PORT}/health >/dev/null" >/dev/null 2>&1
+}
+
+restart_container_tmux_app() {
+  ssh -i "$SSH_KEY" -p "$SSH_PORT" \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    wibwob@127.0.0.1 "tmux kill-session -t wibwob >/dev/null 2>&1 || true; tmux new-session -d -s wibwob -x 220 -y 70 'cd /opt/wibwob-dos && TERM=xterm-256color WIBWOB_INSTANCE_LABEL=smoke WIBWOB_DATA_DIR=/home/wibwob/.wibwob bun run src/app.ts --dev'" >/dev/null 2>&1
+}
+
+SSH_PORT="$(pick_free_port 2849 2899 || true)"
+TUNNEL_PORT="$(pick_free_port 19099 19199 || true)"
+TUNNEL_FALLBACK_PORT="$(pick_free_port 19200 19300 || true)"
+if [[ -z "$SSH_PORT" || -z "$TUNNEL_PORT" || -z "$TUNNEL_FALLBACK_PORT" ]]; then
+  echo "Failed to allocate free local ports for smoke run" >&2
+  exit 1
+fi
 
 record_jsonl() {
   local name="$1" status="$2" rc="$3" mode="$4" cmd="$5" note="$6" severity="$7"
@@ -188,6 +221,7 @@ md ""
 md "- image: \`$IMAGE_TAG\`"
 md "- container: \`$CONTAINER_NAME\`"
 md "- ssh: \`127.0.0.1:$SSH_PORT\`"
+md "- tunnel ports: \`$TUNNEL_PORT,$TUNNEL_FALLBACK_PORT\`"
 md "- mounted data root: \`$DATA_ROOT_HOST\`"
 md "- human loop: \`$HUMAN_IN_LOOP\`"
 md "- keep container: \`$KEEP_CONTAINER\`"
@@ -203,7 +237,7 @@ PUBKEY="$(cat "$SSH_KEY.pub")"
 
 run_check "docker_build" "docker build -t $IMAGE_TAG -f deploy/Dockerfile.ssh-smoke --build-arg SSH_PUBKEY='$PUBKEY' ." local
 
-run_check "docker_run" "docker run -d --name $CONTAINER_NAME -p 127.0.0.1:$SSH_PORT:22 -p 127.0.0.1:${API_PORT}:${API_PORT} -p 127.0.0.1:${API_FALLBACK_PORT}:${API_FALLBACK_PORT} -v '$DATA_ROOT_HOST:/home/wibwob/.wibwob' $IMAGE_TAG" local
+run_check "docker_run" "docker run -d --name $CONTAINER_NAME -p 127.0.0.1:$SSH_PORT:22 -v '$DATA_ROOT_HOST:/home/wibwob/.wibwob' $IMAGE_TAG" local
 
 log "Waiting for SSH readiness"
 READY=0
@@ -239,13 +273,38 @@ for _ in $(seq 1 80); do
   sleep 1
 done
 if [[ -z "$API_BASE" ]]; then
-  md "| api_ready | FAIL | 1 | wait for /health | timeout |"
-  record_jsonl "api_ready" "FAIL" 1 "local" "wait for /health" "timeout" "critical"
+  API_READY_FAILURE_TYPE="tunnel_refused"
+  if container_api_ready; then
+    API_READY_FAILURE_TYPE="tunnel_refused"
+  else
+    API_READY_FAILURE_TYPE="app_not_ready"
+    REMEDIATION_ATTEMPTED=1
+    log "API not ready in container; attempting one tmux app restart remediation"
+    restart_container_tmux_app || true
+    sleep 3
+    start_tunnel
+    for _ in $(seq 1 40); do
+      API_BASE="$(find_api_base || true)"
+      if [[ -n "$API_BASE" ]]; then
+        API_READY_FAILURE_TYPE=""
+        break
+      fi
+      sleep 1
+    done
+    if [[ -n "$API_BASE" ]]; then
+      API_READY_FAILURE_TYPE=""
+    fi
+  fi
+fi
+
+if [[ -z "$API_BASE" ]]; then
+  md "| api_ready | FAIL | 1 | wait for /health | timeout ($API_READY_FAILURE_TYPE) |"
+  record_jsonl "api_ready" "FAIL" 1 "local" "wait for /health" "timeout;failureType=$API_READY_FAILURE_TYPE;remediationAttempted=$REMEDIATION_ATTEMPTED" "critical"
   run_check "container_logs_on_api_failure" "docker logs --tail 240 $CONTAINER_NAME" local || true
   exit 1
 else
   md "| api_ready | PASS | 0 | wait for /health | $API_BASE |"
-  record_jsonl "api_ready" "PASS" 0 "local" "wait for /health" "$API_BASE" "critical"
+  record_jsonl "api_ready" "PASS" 0 "local" "wait for /health" "$API_BASE;remediationAttempted=$REMEDIATION_ATTEMPTED" "critical"
 fi
 
 INSTANCE_SELECTOR=$(curl -sf "$API_BASE/health" | jq -r '.instanceId // .instanceLabel // "smoke"')
@@ -270,7 +329,7 @@ run_check "cli_health" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INST
 run_check "cli_state" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR state | jq -e '.app.instanceId,.screen.openWindowCount'" ssh || true
 run_check "cli_commands" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR commands -q | head -n 20" ssh || true
 run_check "cli_instances" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts instances" ssh informational || true
-run_check "cli_figlet_fonts" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR cmd figlet.fonts | jq -e '.ok, (.result.fonts|length // 0)'" ssh || true
+run_check "cli_figlet_fonts" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR cmd figlet.fonts | jq -e '.ok and ((.result.fonts|length // 0) >= 500)'" ssh || true
 run_check "cli_cmd_figlet_open" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR cmd figlet.open --text 'DOCKER SMOKE'" ssh || true
 run_check "cli_map" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR map" ssh || true
 run_check "cli_screenshot_text" "cd /opt/wibwob-dos && bun run src/cli/wibwob.ts -i $INSTANCE_SELECTOR screenshot | head -n 35" ssh || true

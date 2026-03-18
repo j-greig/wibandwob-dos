@@ -30,6 +30,7 @@ let figletAvailableCache: boolean | undefined;
 let figletFontDirCache: string | undefined;
 
 const FALLBACK_FONT = "standard";
+const FONT_FILE_RE = /\.(flf|tlf)$/i;
 
 function resolveFontJsonPath(): string {
   for (const candidate of [
@@ -43,19 +44,51 @@ function resolveFontJsonPath(): string {
   return path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json");
 }
 
+function parseFontHeightFromFile(fontPath: string): number {
+  try {
+    const raw = fs.readFileSync(fontPath, "utf8");
+    const firstLine = raw.split("\n", 1)[0] ?? "";
+    const parts = firstLine.trim().split(/\s+/u);
+    const height = Number(parts[1] ?? 0);
+    return Number.isFinite(height) ? height : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function discoverInstalledFigletFonts(): Array<{ name: string; height: number }> {
+  const fontDir = getFigletFontDir();
+  if (!fontDir || !fs.existsSync(fontDir)) return [];
+
+  const entries = fs.readdirSync(fontDir, { withFileTypes: true });
+  const fonts = entries
+    .filter((entry) => entry.isFile() && FONT_FILE_RE.test(entry.name))
+    .map((entry) => {
+      const name = entry.name.replace(FONT_FILE_RE, "");
+      return {
+        name,
+        height: parseFontHeightFromFile(path.join(fontDir, entry.name))
+      };
+    })
+    .filter((item) => item.name.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return fonts;
+}
+
 export function getFigletCatalogue(): FigletCatalogue {
   if (catalogueCache) {
     return catalogueCache;
   }
 
-  const raw = safeReadFile(resolveFontJsonPath()) ?? "[]";
+  const raw = safeReadFile(resolveFontJsonPath()) ?? "{}";
   const parsed = JSON.parse(raw) as {
     categories?: Array<{ id?: string; name?: string; description?: string; fonts?: string[] }>;
     favourites?: string[];
     font_metadata?: Record<string, { height?: number; width?: number }>;
   };
 
-  const fontMetadata = Object.fromEntries(
+  const fontMetadata: Record<string, FigletFontMeta> = Object.fromEntries(
     Object.entries(parsed.font_metadata ?? {}).map(([name, meta]) => [
       name,
       {
@@ -65,16 +98,55 @@ export function getFigletCatalogue(): FigletCatalogue {
     ])
   );
 
-  catalogueCache = {
-    categories: (parsed.categories ?? []).map((category) => ({
+  const discovered = discoverInstalledFigletFonts();
+  const installedSet = new Set(discovered.map((entry) => entry.name));
+  for (const { name, height } of discovered) {
+    if (!fontMetadata[name]) {
+      fontMetadata[name] = { height, width: 0 };
+    }
+  }
+
+  const allKnownFonts = Object.keys(fontMetadata).sort((a, b) => a.localeCompare(b));
+  const allFontsSorted = installedSet.size > 0
+    ? allKnownFonts.filter((font) => installedSet.has(font))
+    : allKnownFonts;
+
+  const categories = (parsed.categories ?? [])
+    .map((category) => ({
       id: category.id ?? "",
       name: category.name ?? "",
       description: category.description ?? "",
-      fonts: Array.isArray(category.fonts) ? [...category.fonts] : []
-    })),
-    favourites: Array.isArray(parsed.favourites) ? [...parsed.favourites] : [],
+      fonts: Array.isArray(category.fonts)
+        ? category.fonts.filter((font) => allFontsSorted.includes(font))
+        : []
+    }))
+    .filter((category) => category.fonts.length > 0);
+
+  if (categories.length === 0 && allFontsSorted.length > 0) {
+    categories.push({
+      id: "installed",
+      name: "Installed",
+      description: "Fonts discovered from local figlet installation",
+      fonts: [...allFontsSorted]
+    });
+  }
+
+  let favourites = Array.isArray(parsed.favourites)
+    ? parsed.favourites.filter((font) => allFontsSorted.includes(font))
+    : [];
+
+  if (favourites.length === 0 && allFontsSorted.includes(FALLBACK_FONT)) {
+    favourites = [FALLBACK_FONT];
+  }
+  if (favourites.length === 0 && allFontsSorted.length > 0) {
+    favourites = [allFontsSorted[0] ?? FALLBACK_FONT];
+  }
+
+  catalogueCache = {
+    categories,
+    favourites,
     fontMetadata,
-    allFontsSorted: Object.keys(fontMetadata).sort((a, b) => a.localeCompare(b))
+    allFontsSorted
   };
 
   return catalogueCache;

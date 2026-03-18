@@ -47,6 +47,7 @@ COPY tsconfig.json ./
 COPY README.md ./
 COPY AGENTS.md ./
 
+COPY deploy/figlet-fonts-extra/*.flf /usr/share/figlet/
 COPY deploy/ssh-smoke-entrypoint.sh /usr/local/bin/ssh-smoke-entrypoint.sh
 RUN chmod +x /usr/local/bin/ssh-smoke-entrypoint.sh
 

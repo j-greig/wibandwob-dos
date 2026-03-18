@@ -200,11 +200,16 @@ function findAliveInstances(): AliveInstance[] {
   const seenIdentity = new Set<string>();
 
   const pushIfNew = (inst: AliveInstance) => {
-    const identityKey = [inst.instanceId, inst.instanceLabel, inst.instanceDisplayId]
-      .filter(Boolean)
-      .join("|");
+    const canonicalIdentity =
+      inst.instanceId?.trim() ||
+      inst.instanceLabel?.trim() ||
+      inst.instanceDisplayId?.trim() ||
+      inst.label.trim();
+    const identityKey = canonicalIdentity ? `identity:${canonicalIdentity}` : "";
+
     if (seenSockets.has(inst.socketPath)) return;
     if (identityKey && seenIdentity.has(identityKey)) return;
+
     seenSockets.add(inst.socketPath);
     if (identityKey) seenIdentity.add(identityKey);
     alive.push(inst);
