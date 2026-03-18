@@ -1,11 +1,14 @@
 {
   "name": "wibwob-dos",
-  "private": true,
+  "private": false,
   "version": "0.2.0",
   "description": "WibWob-DOS — terminal-native TypeScript TUI shell",
   "type": "module",
   "bin": {
     "wibwob": "src/cli/wibwob.ts"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "bun run src/app.ts --dev",
