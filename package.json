@@ -38,6 +38,7 @@
     "@mediapipe/tasks-vision": "^0.10.32",
     "@mozilla/readability": "^0.6.0",
     "@skitee3000/bun-pty": "^0.3.3",
+    "@xterm/headless": "^6.0.0",
     "ascii-data-image": "^1.0.7852",
     "ascii-raytracer": "^0.0.154",
     "blessed": "^0.1.81",
