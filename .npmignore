@@ -3,6 +3,10 @@
 # VCS / CI
 .git/
 .github/
+.gitmodules
+.dockerignore
+.githooks/
+.claude/
 
 # Agent/planning/internal workspaces
 .agents/
@@ -31,6 +35,7 @@ microapps-private/
 .codex-logs/
 .ralph/
 *.tgz
+-D
 
 # Never publish local env files
 .env
