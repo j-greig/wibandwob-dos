@@ -31,3 +31,7 @@ microapps-private/
 .codex-logs/
 .ralph/
 *.tgz
+
+# Never publish local env files
+.env
+.env.*
