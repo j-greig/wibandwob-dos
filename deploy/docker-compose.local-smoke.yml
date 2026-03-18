@@ -1,0 +1,23 @@
+services:
+  ttyd:
+    environment:
+      - TERM=xterm-256color
+      - WIBWOB_DEPLOY_PROFILE=vps-small
+      - WIBWOB_RL_ENABLED=1
+      - WIBWOB_RL_ENFORCE=1
+      - WIBWOB_RL_INGRESS_BURST=20
+      - WIBWOB_RL_INGRESS_REFILL_PER_SEC=10
+      - WIBWOB_RL_INGRESS_MAX_CONCURRENT=6
+      - WIBWOB_RL_COMMAND_BURST=12
+      - WIBWOB_RL_COMMAND_REFILL_PER_SEC=6
+      - WIBWOB_RL_COMMAND_MAX_CONCURRENT=3
+
+  token-proxy:
+    env_file: []
+    environment:
+      - ADMIN_SECRET=local-dev-secret-change-me
+      - TTYD_URL=http://ttyd:7681
+      - TOKEN_TTL_MS=1800000
+      - PORT=8080
+    ports:
+      - "127.0.0.1:8088:8080"

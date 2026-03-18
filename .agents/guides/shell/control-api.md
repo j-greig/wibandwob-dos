@@ -35,12 +35,12 @@ GET /screenshot/ansi?id=…         raw ANSI crop of one window rect
   "port": 8099,
   "requestedPort": 8099,
   "host": "127.0.0.1",
-  "instanceId": "abc",
+  "instanceId": "abc12345",
+  "instanceDisplayId": "abc",
   "instanceLabel": "main",
-  "scratchBase": "/abs/.../scratch",
-  "capturesDir": "/abs/.../scratch/captures",
-  "workspacesDir": "/abs/.../scratch/workspaces",
-  "statePath": "/abs/.../scratch/app-state.json"
+  "dataRoot": "/abs/.../.wibwob",
+  "instanceRoot": "/abs/.../.wibwob/instances/abc12345",
+  "socketPath": "/abs/.../.wibwob/instances/abc12345/control.sock"
 }
 ```
 
@@ -225,11 +225,15 @@ bun run scripts/preview-scene.ts <timeline.json> <scene-name>
 
 Trust exported text snapshots and state captures over screenshots when debugging rendering/repaint issues.
 
-## Scratch Outputs
+## Runtime Outputs
 
-- Text captures: `scratch/captures/`
-- Desktop state JSON: `scratch/app-state.json`
-- Backrooms runs: `scratch/backrooms-runs/`
+Canonical runtime outputs live under `<DATA_ROOT>/instances/{instanceId}/...`.
+
+Typical paths:
+- Text captures: `<instanceRoot>/captures/` (or compatibility `scratch/captures/`)
+- Desktop state JSON: `<instanceRoot>/state.json`
+- Workspaces: `<instanceRoot>/workspaces/`
+- Logs: `<instanceRoot>/logs/`
 
 ## One-Liners
 

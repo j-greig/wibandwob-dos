@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "evals": [
+    {
+      "id": "E1",
+      "name": "docker_build_succeeds",
+      "question": "Did docker_build check pass?",
+      "pass": "docker_build status is PASS",
+      "fail": "docker_build is FAIL or missing"
+    },
+    {
+      "id": "E2",
+      "name": "ssh_ready",
+      "question": "Did ssh_ready check pass?",
+      "pass": "ssh tunnelable shell access works",
+      "fail": "SSH never becomes ready"
+    },
+    {
+      "id": "E3",
+      "name": "api_ready_via_tunnel",
+      "question": "Did api_ready check pass?",
+      "pass": "Control API responds through tunnel",
+      "fail": "No /health through tunnel"
+    },
+    {
+      "id": "E4",
+      "name": "cli_targeted_by_instance_id",
+      "question": "Do targeted CLI checks pass with -i <instanceId>?",
+      "pass": "cli_health/cli_state/cli_commands are PASS",
+      "fail": "Any targeted CLI check fails"
+    },
+    {
+      "id": "E5",
+      "name": "api_screenshot_signal",
+      "question": "Does screenshot text endpoint show expected smoke signal?",
+      "pass": "api_screenshot_contains_docker_smoke is PASS",
+      "fail": "No expected smoke text appears"
+    },
+    {
+      "id": "E6",
+      "name": "persistence_after_restart",
+      "question": "Does mounted data root retain state after restart?",
+      "pass": "persist_post_health and persist_expect_state_file are PASS",
+      "fail": "Post-restart health or state-file check fails"
+    }
+  ]
+}

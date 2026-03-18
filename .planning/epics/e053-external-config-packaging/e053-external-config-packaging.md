@@ -4,6 +4,25 @@ Implementation-oriented spec for a **deterministic config + discovery layer** th
 
 ---
 
+## Implementation Progress (reconciled 2026-03-18)
+
+- [x] Runtime data root + layered resolution (`DATA_ROOT`)
+- [x] Two-level instance identity (`instanceId` + UI `instanceDisplayId`)
+- [x] Instance-scoped core runtime paths wired via `runtime-node`
+- [x] `state-service.ts` writing to instance-scoped state path
+- [x] Migration of socket/discovery consumers (`control-api`, `wibwob` CLI, stale cleanup)
+- [~] Legacy compatibility retained but bounded (still present as temporary aliases/fallbacks)
+- [ ] Full removal of scratch-first runtime path assumptions
+- [ ] Integration tests for multi-instance isolation
+- [~] Core rate-limiting slice started (ingress + command gates wired, tuning/tests pending)
+
+Execution sequences:
+- `PART2_EXECUTION_CHECKLIST.md` (path/discovery migration)
+- `PART3_RATE_LIMITS_CHECKLIST.md` (core rate limiting across surfaces)
+- `AGENTIC_DOCKER_VPS_SMOKE_GUIDE.md` (Docker/VPS smoke operations + gotchas)
+
+---
+
 ## 0. Goals
 
 Support:

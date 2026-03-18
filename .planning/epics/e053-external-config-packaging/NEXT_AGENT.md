@@ -13,6 +13,7 @@
 > **Do not declare this area complete.** The following corrections must be applied:
 
 1. **world-chat-service.ts is a temporary stopgap** - Do not let leaf services guess between legacy and new paths. Centralize resolved instance-scoped paths in runtime/application state.
+   - **Status update (2026-03-18): parked to `.planning/parking-lot.md`** (pre-beta, non-critical for e053 core slice).
 
 2. **Keep migrating high-value consumers** - Priority:
    - `state-service.ts` → use `instanceStatePath`

@@ -1,0 +1,55 @@
+FROM oven/bun:1-debian
+
+ARG SSH_PUBKEY=""
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    figlet \
+    curl \
+    openssh-server \
+    tmux \
+    python3 \
+    make \
+    g++ \
+    jq \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/wibwob-dos
+
+RUN useradd -m -s /bin/bash wibwob \
+  && passwd -d wibwob \
+  && mkdir -p /home/wibwob/.ssh \
+  && chmod 700 /home/wibwob/.ssh
+
+RUN if [ -n "$SSH_PUBKEY" ]; then \
+      echo "$SSH_PUBKEY" > /home/wibwob/.ssh/authorized_keys; \
+      chmod 600 /home/wibwob/.ssh/authorized_keys; \
+      chown -R wibwob:wibwob /home/wibwob/.ssh; \
+    fi
+
+RUN printf '%s\n' \
+  'Port 22' \
+  'PermitRootLogin no' \
+  'PasswordAuthentication no' \
+  'PubkeyAuthentication yes' \
+  'ChallengeResponseAuthentication no' \
+  'UsePAM no' \
+  > /etc/ssh/sshd_config
+
+COPY package.json bun.lock ./
+# Smoke image: skip postinstall/native rebuild scripts to avoid node-pty toolchain friction in container builds.
+RUN bun install --frozen-lockfile --ignore-scripts
+
+COPY src ./src
+COPY microapps ./microapps
+COPY microapps-private ./microapps-private
+COPY scripts ./scripts
+COPY tsconfig.json ./
+COPY README.md ./
+COPY AGENTS.md ./
+
+COPY deploy/ssh-smoke-entrypoint.sh /usr/local/bin/ssh-smoke-entrypoint.sh
+RUN chmod +x /usr/local/bin/ssh-smoke-entrypoint.sh
+
+EXPOSE 22 8099 8100
+
+ENTRYPOINT ["/usr/local/bin/ssh-smoke-entrypoint.sh"]
