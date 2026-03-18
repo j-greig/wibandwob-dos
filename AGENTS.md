@@ -20,6 +20,8 @@ Concept: human and AI share equal control of a terminal desktop.
 2. Read `docs/building-custom-microapps.md`
 3. Edit the scaffold, `bun run typecheck`, restart app
 
+**New microapp not showing?** Add it to `src/core/microapp-registry.ts` → `REGISTRY` (tiers: core=menu+API, beta=API only).
+
 Full docs: `.agents/guides/microapp/` (7 docs). You don't need `.agents/shell-dev/`.
 
 ## Shell Development
