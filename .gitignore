@@ -79,3 +79,6 @@ vendor/signls/config.json
 vendor/signls/debug.log
 deploy/test_agent_key
 deploy/test_agent_key.pub
+
+# Legacy smoke shim transient artifacts
+.pi/skills/wibwob-vps-smoke/outpts/

@@ -1,0 +1,68 @@
+# TEMP SHIM README — wibwob-vps-smoke
+
+Status: **temporary compatibility shim**
+Date: 2026-03-18
+Owner intent: consolidate smoke skills under one canonical path while avoiding prompt/runbook breakage.
+
+## Why this exists
+
+Two skill dirs currently exist:
+
+- Canonical: `.pi/skills/wibwob-hosting-smoke`
+- Legacy: `.pi/skills/wibwob-vps-smoke`
+
+`wibwob-hosting-smoke` is the semantic superset (docker-vps, flyio, npm-global adapters).
+`wibwob-vps-smoke` is kept only to avoid breaking older prompts and docs while migration completes.
+
+## What changed in this shim
+
+- `SKILL.md` now marks this skill as deprecated.
+- `scripts/run-smoke.sh` now delegates to:
+  - `bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh docker-vps`
+- `scripts/summarize-latest-smoke.py` now delegates to hosting-smoke summarizer.
+
+This directory should no longer gain new feature logic.
+
+## Canonical usage (from now on)
+
+```bash
+bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh docker-vps
+bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh flyio
+bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh npm-global
+python3 .pi/skills/wibwob-hosting-smoke/scripts/summarize-latest-smoke.py
+```
+
+## Artifact policy
+
+- Runtime smoke artifacts: `scratch/captures/*`
+- Curated durable evidence: `.pi/skills/wibwob-hosting-smoke/references/evidence/*` (if needed)
+- **Do not write new transient files** into `.pi/skills/wibwob-vps-smoke/outpts`
+
+## Consolidation plan
+
+### Phase 1 (now) — canonical flip + deprecation
+- [x] Mark legacy skill deprecated
+- [x] Delegate legacy runners to hosting-smoke
+- [x] Add this README shim note
+
+### Phase 2 — artifact path normalization
+- [ ] Move/curate useful legacy `outpts/*` evidence
+- [ ] Keep transient evidence in `scratch/captures/*`
+
+### Phase 3 — reference migration + guardrails
+- [ ] Replace active doc references to `wibwob-vps-smoke` with `wibwob-hosting-smoke`
+- [ ] Add guardrail check to catch new writes to legacy `outpts`
+
+### Phase 4 — shim retirement
+Retire this directory after:
+- [ ] no active runbooks depend on it
+- [ ] two stable smoke cycles use hosting-smoke only
+- [ ] no unresolved operator confusion in devlog
+
+## Non-goals in shim
+
+- no new checks
+- no adapter logic additions
+- no duplicate eval model evolution
+
+All of that belongs in `wibwob-hosting-smoke`.

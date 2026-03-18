@@ -142,13 +142,21 @@ Results in `tests/agent-smoke/results/<timestamp>/`.
 
 ## 7. DOCKER SMOKE TEST
 
-Tests the Hetzner VPS deployment stack locally. Requires Docker with arm64 support.
+Tests the Hetzner/VPS deployment stack locally. Requires Docker with arm64 support.
+
+Canonical command (hosting-agnostic smoke skill):
 
 ```bash
-docker build --platform linux/arm64 -t wibwob-vps-smoke -f deploy/Dockerfile.smoke .
+bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh docker-vps
+```
+
+Manual image flow (fallback only):
+
+```bash
+docker build --platform linux/arm64 -t wibwob-smoke-image -f deploy/Dockerfile.smoke .
 docker run --platform linux/arm64 -t -d \
   -p 127.0.0.1:2849:22 -p 127.0.0.1:7681:7681 \
-  --name wibwob-smoke wibwob-vps-smoke
+  --name wibwob-smoke wibwob-smoke-image
 sleep 15 && curl -sf http://127.0.0.1:7681/ && echo "ttyd OK"
 # SSH: ssh -i deploy/test_agent_key -p 2849 -o StrictHostKeyChecking=no wibwob@127.0.0.1
 # Cleanup: docker stop wibwob-smoke && docker rm wibwob-smoke
