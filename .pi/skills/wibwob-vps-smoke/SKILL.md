@@ -27,6 +27,10 @@ This skill is optimized for:
 
 ```bash
 bash scripts/devops/docker-vps-smoke.sh
+# human-in-loop TUI pause (recommended for visual verification)
+bash scripts/devops/docker-vps-smoke.sh --human-loop
+# keep container alive after run for manual follow-up
+bash scripts/devops/docker-vps-smoke.sh --human-loop --keep-container
 ```
 
 Artifacts are produced under:

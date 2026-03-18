@@ -15,3 +15,17 @@
 - jsonl: /Users/james/Repos/wibandwob-dos/scratch/captures/docker-vps-smoke-20260318-211545/checks.jsonl
 - pass: 28, fail: 2
 - note: pipefail + instance-id targeting improvements applied
+## 20260318-213521 — docker-vps-smoke
+- report: /Users/james/Repos/wibandwob-dos/scratch/captures/docker-vps-smoke-20260318-213521/report.md
+- jsonl: /Users/james/Repos/wibandwob-dos/scratch/captures/docker-vps-smoke-20260318-213521/checks.jsonl
+- pass: 33, fail: 0
+- critical_fail: 0, informational_fail: 0
+- note: figlet font inventory check included (known VPS gotcha)
+
+## 20260318-213835 — docker-vps-smoke
+- report: /Users/james/Repos/wibandwob-dos/scratch/captures/docker-vps-smoke-20260318-213835/report.md
+- jsonl: /Users/james/Repos/wibandwob-dos/scratch/captures/docker-vps-smoke-20260318-213835/checks.jsonl
+- pass: 33, fail: 0
+- critical_fail: 0, informational_fail: 0
+- note: figlet font inventory check included (known VPS gotcha)
+

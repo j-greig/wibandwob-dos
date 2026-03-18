@@ -6,6 +6,8 @@ Purpose: run a pragmatic, repeatable smoke suite that validates WibWob-DOS from 
 
 ```bash
 bash scripts/devops/docker-vps-smoke.sh
+bash scripts/devops/docker-vps-smoke.sh --human-loop
+bash scripts/devops/docker-vps-smoke.sh --human-loop --keep-container
 ```
 
 Artifacts are written to:
@@ -82,11 +84,24 @@ Fix pattern:
 - execute checks under `bash -o pipefail -lc ...`
 - use `jq -e` for assertions.
 
+## Human-in-loop TUI verification
+
+Use `--human-loop` to pause after readiness and inspect the live TUI in tmux before automated checks continue.
+
+Attach command shown by the script:
+
+```bash
+ssh -i <run-key> -p 2849 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t wibwob@127.0.0.1 'tmux attach -t wibwob'
+```
+
+If you want to keep the environment running after checks for manual exploration, add `--keep-container`.
+
 ## Operating guidance for agents
 
 - Always derive `instanceId` from `/health` and target CLI with `-i <instanceId>`.
 - Prefer API assertions through tunnel over direct host-port assumptions.
 - Treat screenshot checks as first-class acceptance gates, not optional debug output.
+- Use `--human-loop` for visual verification and operator confidence.
 - Keep `checks.jsonl` machine-readable and reviewable by subagents.
 - When smoke fails, append root-cause + remediation to `SMOKE_DEVLOG.md` in same session.
 
