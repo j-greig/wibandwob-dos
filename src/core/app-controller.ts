@@ -22,6 +22,7 @@ import {
 
 import {
   CONTROL_API_PORT,
+  DATA_ROOT,
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
@@ -139,6 +140,10 @@ import {
   type RuntimeCommandService,
 } from "../application/runtime-command-service.js";
 import {
+  RateLimitService,
+  resolveRateLimitConfig,
+} from "../application/rate-limit-service.js";
+import {
   createRuntimeInspectionService,
   type RuntimeInspectionService,
 } from "../application/runtime-inspection-service.js";
@@ -207,6 +212,7 @@ export class TsTuiMvpApp {
   private readonly runtimeInspection: RuntimeInspectionService;
   private readonly runtimeWindows: RuntimeWindowService;
   private readonly runtimeWorkspace: RuntimeWorkspaceService;
+  private readonly rateLimiter: RateLimitService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
@@ -358,6 +364,7 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
+    this.rateLimiter = new RateLimitService(resolveRateLimitConfig());
     this.runtimeCommands = createRuntimeCommandService({
       listCommands: (
         surface?: CommandSurface,
@@ -365,6 +372,7 @@ export class TsTuiMvpApp {
       ) => this.commands.list(surface, opts),
       runCommand: (id: string, args?: Record<string, unknown>) =>
         this.commands.run(id, args),
+      rateLimiter: this.rateLimiter,
     });
     this.runtimeInspection = createRuntimeInspectionService({
       getState: () => this.getDesktopState(),
@@ -399,6 +407,7 @@ export class TsTuiMvpApp {
             content: m.content,
             timestamp: m.timestamp,
           })),
+          rateLimit: this.rateLimiter.snapshot(),
         };
       },
     });
@@ -424,6 +433,7 @@ export class TsTuiMvpApp {
         workspace: this.runtimeWorkspace,
       },
       this.runtimeNode,
+      this.rateLimiter,
     );
     this.state = new StateService(
       {
@@ -2152,27 +2162,70 @@ export class TsTuiMvpApp {
     this.state.persistAndNotify();
   }
 
-  /** Scan scratch/instances/ and delete stale sockets whose PID is dead. */
+  /** Scan instance discovery sockets and delete stale sidecars whose PID is dead.
+   * Checks new instance-scoped layout first, then legacy scratch layout. */
   private cleanStaleSockets(): void {
-    const instancesDir = path.join(SCRATCH_BASE, "instances");
-    let entries: string[];
-    try { entries = fs.readdirSync(instancesDir); } catch { return; }
-    for (const file of entries) {
-      if (!file.endsWith(".pid")) continue;
-      const pidFile = path.join(instancesDir, file);
-      const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
-      if (isNaN(pid)) {
-        try { fs.unlinkSync(pidFile); } catch {}
-        continue;
+    const roots = [
+      path.join(this.runtimeNode.dataRoot ?? DATA_ROOT, "instances"),
+      path.join(SCRATCH_BASE, "instances"), // legacy fallback
+    ];
+
+    for (const instancesDir of new Set(roots)) {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(instancesDir, { withFileTypes: true }); } catch { continue; }
+
+      // New layout: <instances>/<instanceId>/control.pid + control.sock
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const instanceRoot = path.join(instancesDir, entry.name);
+        const controlPidPath = path.join(instanceRoot, "control.pid");
+        const runtimePidPath = path.join(instanceRoot, "wibwob.pid");
+        const controlSockPath = path.join(instanceRoot, "control.sock");
+
+        if (!fs.existsSync(controlSockPath)) continue;
+
+        const controlPid = Number(fs.existsSync(controlPidPath)
+          ? fs.readFileSync(controlPidPath, "utf8").trim()
+          : "NaN");
+        const runtimePid = Number(fs.existsSync(runtimePidPath)
+          ? fs.readFileSync(runtimePidPath, "utf8").trim()
+          : "NaN");
+        const pid = Number.isFinite(controlPid) ? controlPid : runtimePid;
+
+        if (!Number.isFinite(pid)) {
+          try { fs.unlinkSync(controlSockPath); } catch {}
+          try { fs.unlinkSync(controlPidPath); } catch {}
+          try { fs.unlinkSync(path.join(instanceRoot, "discovery.json")); } catch {}
+          continue;
+        }
+
+        try {
+          process.kill(pid, 0); // alive — leave it
+        } catch {
+          try { fs.unlinkSync(controlSockPath); } catch {}
+          try { fs.unlinkSync(controlPidPath); } catch {}
+          try { fs.unlinkSync(path.join(instanceRoot, "discovery.json")); } catch {}
+          log.app(`cleaned stale control socket for dead pid ${pid}: ${entry.name}`);
+        }
       }
-      try {
-        process.kill(pid, 0); // alive — leave it
-      } catch {
-        // Dead process — clean up socket + pid sidecar
-        try { fs.unlinkSync(pidFile); } catch {}
-        const sockFile = path.join(instancesDir, file.replace(".pid", ".sock"));
-        try { fs.unlinkSync(sockFile); } catch {}
-        log.app(`cleaned stale socket for dead pid ${pid}: ${file.replace(".pid", "")}`);
+
+      // Legacy layout: <instances>/<label>.pid + <label>.sock
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".pid")) continue;
+        const pidFile = path.join(instancesDir, entry.name);
+        const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+        if (isNaN(pid)) {
+          try { fs.unlinkSync(pidFile); } catch {}
+          continue;
+        }
+        try {
+          process.kill(pid, 0); // alive — leave it
+        } catch {
+          try { fs.unlinkSync(pidFile); } catch {}
+          const sockFile = path.join(instancesDir, entry.name.replace(".pid", ".sock"));
+          try { fs.unlinkSync(sockFile); } catch {}
+          log.app(`cleaned stale legacy socket for dead pid ${pid}: ${entry.name.replace(".pid", "")}`);
+        }
       }
     }
   }

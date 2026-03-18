@@ -49,10 +49,21 @@ export interface RuntimeHistoryEntry {
   timestamp: number;
 }
 
+export interface RuntimeRateLimitInspection {
+  enabled: boolean;
+  enforce: boolean;
+  accepted: number;
+  denied: number;
+  wouldLimit: number;
+  activeLeases: number;
+  buckets: number;
+}
+
 export interface RuntimeInspectionSnapshot {
   state: DesktopState;
   stats: RuntimeStatsSnapshot;
   ui: RuntimeUiInspection;
   scramble: RuntimeScrambleInspection;
   history: RuntimeHistoryEntry[];
+  rateLimit?: RuntimeRateLimitInspection;
 }

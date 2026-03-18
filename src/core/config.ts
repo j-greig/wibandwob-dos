@@ -63,6 +63,18 @@ export function ensureDirectoryExists(dir: string): void {
     fs.mkdirSync(dir, { recursive: true });
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") {
+      // mkdir can throw EEXIST when path exists but is not a directory.
+      try {
+        if (fs.statSync(dir).isDirectory()) return;
+      } catch {
+        // fall through to explicit error below
+      }
+      throw new Error(
+        `Path exists but is not a directory: ${dir}\n` +
+        `Move/remove this path or set WIBWOB_DATA_DIR to a writable directory.`
+      );
+    }
     if (code === "EROFS") {
       throw new Error(
         `Directory is on read-only filesystem: ${dir}\n` +

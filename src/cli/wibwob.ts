@@ -19,11 +19,15 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { SCRATCH_BASE } from "../core/config.js";
+import { APP_ROOT, DATA_ROOT, SCRATCH_BASE } from "../core/config.js";
 
 // ── Instance targeting ───────────────────────────────────
 // Resolution: --instance/-i flag → $WIBWOB_INSTANCE env → socket scan → error
 // No port 8099 fallback. Socket-first, PID-based liveness.
+
+const NEW_CONTROL_SOCKET = "control.sock";
+const NEW_CONTROL_PID = "control.pid";
+const DISCOVERY_FILE = "discovery.json";
 
 /** Find a CLI flag value, checking both long and short forms. */
 function findFlag(...flags: string[]): string | undefined {
@@ -36,62 +40,244 @@ function findFlag(...flags: string[]): string | undefined {
   return undefined;
 }
 
+interface InstanceDiscoveryMetadata {
+  instanceId?: string;
+  instanceDisplayId?: string;
+  instanceLabel?: string;
+}
+
 interface AliveInstance {
   label: string;
   socketPath: string;
+  instanceId?: string;
+  instanceDisplayId?: string;
+  instanceLabel?: string;
 }
 
-/** Scan scratch/instances/ for alive instances via PID sidecar liveness check. */
-function findAliveInstances(): AliveInstance[] {
-  const dir = path.join(SCRATCH_BASE, "instances");
+function getInstanceRoots(): string[] {
+  const roots = [
+    path.join(DATA_ROOT, "instances"),
+    path.join(SCRATCH_BASE, "instances"),
+  ];
+  return [...new Set(roots)];
+}
+
+function safeUnlink(filePath: string): void {
+  try { fs.unlinkSync(filePath); } catch {}
+}
+
+function readPidFile(filePath: string): number | null {
+  try {
+    const pid = Number(fs.readFileSync(filePath, "utf8").trim());
+    return Number.isFinite(pid) ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readDiscoveryMeta(instanceRoot: string): InstanceDiscoveryMetadata {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(instanceRoot, DISCOVERY_FILE), "utf8"),
+    ) as InstanceDiscoveryMetadata;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function buildDiscoveryBySocketPath(): Map<string, InstanceDiscoveryMetadata> {
+  const bySocket = new Map<string, InstanceDiscoveryMetadata>();
+  const instancesRoot = path.join(DATA_ROOT, "instances");
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(instancesRoot, { withFileTypes: true }); } catch { return bySocket; }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const instanceRoot = path.join(instancesRoot, entry.name);
+    const discoveryPath = path.join(instanceRoot, DISCOVERY_FILE);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(discoveryPath, "utf8")) as InstanceDiscoveryMetadata & { socketPath?: string };
+      if (typeof parsed.socketPath === "string" && parsed.socketPath.length > 0) {
+        bySocket.set(parsed.socketPath, parsed);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return bySocket;
+}
+
+function scanNewLayoutInstances(instancesRoot: string): AliveInstance[] {
   const alive: AliveInstance[] = [];
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(instancesRoot, { withFileTypes: true }); } catch { return alive; }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const instanceRoot = path.join(instancesRoot, entry.name);
+    const socketPath = path.join(instanceRoot, NEW_CONTROL_SOCKET);
+    const controlPidPath = path.join(instanceRoot, NEW_CONTROL_PID);
+    const runtimePidPath = path.join(instanceRoot, "wibwob.pid");
+
+    if (!fs.existsSync(socketPath)) continue;
+
+    const pid = readPidFile(controlPidPath) ?? readPidFile(runtimePidPath);
+    if (!pid || !isPidAlive(pid)) {
+      safeUnlink(socketPath);
+      safeUnlink(controlPidPath);
+      safeUnlink(path.join(instanceRoot, DISCOVERY_FILE));
+      continue;
+    }
+
+    const meta = readDiscoveryMeta(instanceRoot);
+    const label =
+      meta.instanceLabel?.trim() ||
+      meta.instanceDisplayId?.trim() ||
+      meta.instanceId?.trim() ||
+      entry.name;
+
+    alive.push({
+      label,
+      socketPath,
+      instanceId: meta.instanceId ?? entry.name,
+      instanceDisplayId: meta.instanceDisplayId,
+      instanceLabel: meta.instanceLabel,
+    });
+  }
+
+  return alive;
+}
+
+function scanLegacyInstances(instancesRoot: string): AliveInstance[] {
+  const alive: AliveInstance[] = [];
+  const discoveryBySocket = buildDiscoveryBySocketPath();
   let entries: string[];
-  try { entries = fs.readdirSync(dir); } catch { return alive; }
+  try { entries = fs.readdirSync(instancesRoot); } catch { return alive; }
+
   for (const file of entries) {
     if (!file.endsWith(".pid")) continue;
     const label = file.replace(".pid", "");
-    const pidFile = path.join(dir, file);
-    const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
-    if (isNaN(pid)) {
-      try { fs.unlinkSync(pidFile); } catch {}
+    const pidFile = path.join(instancesRoot, file);
+    const sockPath = path.join(instancesRoot, `${label}.sock`);
+    const pid = readPidFile(pidFile);
+
+    if (!pid || !isPidAlive(pid)) {
+      safeUnlink(pidFile);
+      safeUnlink(sockPath);
       continue;
     }
-    try {
-      process.kill(pid, 0); // alive — include it
-      const sockPath = path.join(dir, `${label}.sock`);
-      if (fs.existsSync(sockPath)) {
-        alive.push({ label, socketPath: sockPath });
-      }
-    } catch {
-      // Dead process — clean up stale socket + pid
-      try { fs.unlinkSync(pidFile); } catch {}
-      try { fs.unlinkSync(path.join(dir, `${label}.sock`)); } catch {}
+
+    if (fs.existsSync(sockPath)) {
+      const meta = discoveryBySocket.get(sockPath);
+      alive.push({
+        label: meta?.instanceLabel?.trim() || meta?.instanceDisplayId?.trim() || label,
+        socketPath: sockPath,
+        instanceId: meta?.instanceId,
+        instanceDisplayId: meta?.instanceDisplayId,
+        instanceLabel: meta?.instanceLabel ?? label,
+      });
     }
   }
+
   return alive;
+}
+
+/** Scan for alive instances via instance-scoped layout first, legacy scratch layout second. */
+function findAliveInstances(): AliveInstance[] {
+  const alive: AliveInstance[] = [];
+  const seenSockets = new Set<string>();
+  const seenIdentity = new Set<string>();
+
+  const pushIfNew = (inst: AliveInstance) => {
+    const identityKey = [inst.instanceId, inst.instanceLabel, inst.instanceDisplayId]
+      .filter(Boolean)
+      .join("|");
+    if (seenSockets.has(inst.socketPath)) return;
+    if (identityKey && seenIdentity.has(identityKey)) return;
+    seenSockets.add(inst.socketPath);
+    if (identityKey) seenIdentity.add(identityKey);
+    alive.push(inst);
+  };
+
+  for (const instancesRoot of getInstanceRoots()) {
+    for (const inst of scanNewLayoutInstances(instancesRoot)) {
+      pushIfNew(inst);
+    }
+  }
+
+  const legacyRoot = path.join(SCRATCH_BASE, "instances");
+  for (const inst of scanLegacyInstances(legacyRoot)) {
+    pushIfNew(inst);
+  }
+
+  return alive;
+}
+
+function findAliveInstanceBySelector(selector: string): AliveInstance | null {
+  const directInstanceSocket = path.join(DATA_ROOT, "instances", selector, NEW_CONTROL_SOCKET);
+  if (fs.existsSync(directInstanceSocket)) {
+    return {
+      label: selector,
+      socketPath: directInstanceSocket,
+      instanceId: selector,
+    };
+  }
+
+  const legacyNamedSocket = path.join(SCRATCH_BASE, "instances", `${selector}.sock`);
+  if (fs.existsSync(legacyNamedSocket)) {
+    return {
+      label: selector,
+      socketPath: legacyNamedSocket,
+      instanceLabel: selector,
+    };
+  }
+
+  const alive = findAliveInstances();
+  const matched = alive.find((inst) => (
+    selector === inst.label ||
+    selector === inst.instanceLabel ||
+    selector === inst.instanceDisplayId ||
+    selector === inst.instanceId
+  ));
+  return matched ?? null;
+}
+
+function resolveSocketForSelector(selector: string): string | null {
+  return findAliveInstanceBySelector(selector)?.socketPath ?? null;
 }
 
 /** Try to find a running instance. Returns base URL or null. */
 function tryResolveBase(): string | null {
-  // 1. Explicit flag: --instance <label> or -i <label>
-  const label = findFlag("--instance", "-i");
-  if (label) {
-    const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
-    if (fs.existsSync(sockPath)) {
-      return `unix://${sockPath}`;
+  // 1. Explicit flag: --instance <label|id|display-id> or -i ...
+  const selector = findFlag("--instance", "-i");
+  if (selector) {
+    const socketPath = resolveSocketForSelector(selector);
+    if (socketPath) {
+      return `unix://${socketPath}`;
     }
-    process.stderr.write(`No socket for instance "${label}" at ${sockPath}\n`);
+    process.stderr.write(`No socket for instance selector "${selector}"\n`);
     return null;
   }
 
-  // 2. $WIBWOB_INSTANCE env var — try named socket first
+  // 2. $WIBWOB_INSTANCE env var — same selector semantics as --instance
   if (process.env.WIBWOB_INSTANCE) {
-    const envLabel = process.env.WIBWOB_INSTANCE;
-    const sockPath = path.join(SCRATCH_BASE, "instances", `${envLabel}.sock`);
-    if (fs.existsSync(sockPath)) {
-      return `unix://${sockPath}`;
+    const envSelector = process.env.WIBWOB_INSTANCE;
+    const socketPath = resolveSocketForSelector(envSelector);
+    if (socketPath) {
+      return `unix://${socketPath}`;
     }
-    process.stderr.write(`⚠ WIBWOB_INSTANCE="${envLabel}" but no socket found — falling back to scan\n`);
+    process.stderr.write(`⚠ WIBWOB_INSTANCE="${envSelector}" but no socket found — falling back to scan\n`);
   }
 
   // 3. Socket scan — always wins for local instances (avoids stale WIBWOB_API env poisoning)
@@ -100,9 +286,10 @@ function tryResolveBase(): string | null {
     return `unix://${alive[0].socketPath}`;
   }
   if (alive.length > 1) {
-    process.stderr.write(`Multiple instances running — specify which one:\n`);
+    process.stderr.write("Multiple instances running — specify which one:\n");
     for (const inst of alive) {
-      process.stderr.write(`  wibwob -i ${inst.label} <command>\n`);
+      const aliases = [inst.instanceId, inst.instanceDisplayId].filter(Boolean).join(", ");
+      process.stderr.write(`  wibwob -i ${inst.label} <command>${aliases ? `  # ${aliases}` : ""}\n`);
     }
     return null;
   }
@@ -565,7 +752,7 @@ async function cmdPlumb(args: string[]) {
 
 async function cmdStart(args: string[]) {
   const { spawnSync } = await import("node:child_process");
-  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+  const repoRoot = APP_ROOT;
 
   // Check if already running (use tryGetBase to avoid exit on no instance)
   const base = tryGetBase();
@@ -608,7 +795,7 @@ async function cmdStart(args: string[]) {
 
 async function cmdRestart(args: string[]) {
   const { spawnSync } = await import("node:child_process");
-  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+  const repoRoot = APP_ROOT;
 
   // Pass through extra flags (--force, --cmd, etc.)
   const passthrough = args.slice(1).filter(a => a !== "restart");
@@ -626,19 +813,19 @@ async function cmdRestart(args: string[]) {
 
 async function cmdAttach() {
   const { spawnSync } = await import("node:child_process");
-  const label = findFlag("--instance", "-i") || process.env.WIBWOB_INSTANCE || "main";
-  const sockPath = path.join(SCRATCH_BASE, "instances", `${label}.sock`);
-  const pidFile = path.join(SCRATCH_BASE, "wibwob.pid");
-  const orphanWorkspace = `orphan-${label}`;
-  const workspacesDir = path.join(SCRATCH_BASE, "workspaces");
-  const orphanFile = path.join(workspacesDir, `${orphanWorkspace}.json`);
-  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+  const selector = findFlag("--instance", "-i") || process.env.WIBWOB_INSTANCE || "main";
+  const repoRoot = APP_ROOT;
 
-  process.stderr.write(`[attach] looking for instance '${label}'...\n`);
+  process.stderr.write(`[attach] looking for instance '${selector}'...\n`);
+
+  const target = findAliveInstanceBySelector(selector);
+  const sockPath = target?.socketPath;
+  const attachLabel = target?.instanceLabel ?? target?.label ?? selector;
+  const orphanWorkspace = `orphan-${attachLabel}`;
 
   // 1. Check if instance is alive (headless orphan?)
   let alive = false;
-  if (fs.existsSync(sockPath)) {
+  if (sockPath && fs.existsSync(sockPath)) {
     try {
       const res = await fetch("http://localhost/health", unixFetchOpts(sockPath));
       alive = res.ok;
@@ -648,8 +835,8 @@ async function cmdAttach() {
   }
 
   // If alive, it's a headless orphan — kill it so we can take over the terminal
-  if (alive) {
-    process.stderr.write(`[attach] found headless instance — taking over\n`);
+  if (alive && sockPath) {
+    process.stderr.write("[attach] found headless instance — taking over\n");
     // Save its state first
     try {
       await fetch("http://localhost/workspace/save", {
@@ -660,7 +847,7 @@ async function cmdAttach() {
       });
       process.stderr.write(`[attach] saved workspace as ${orphanWorkspace}\n`);
     } catch {
-      process.stderr.write(`[attach] warning: could not save workspace\n`);
+      process.stderr.write("[attach] warning: could not save workspace\n");
     }
     // Kill it
     try {
@@ -671,52 +858,26 @@ async function cmdAttach() {
         process.stderr.write(`[attach] killed headless process ${health.pid}\n`);
       }
     } catch {}
-    // Wait for it to die
     await new Promise(r => setTimeout(r, 1500));
   }
 
-  // 2. Kill stale process if PID file exists
-  if (fs.existsSync(pidFile)) {
-    const stalePid = parseInt(fs.readFileSync(pidFile, "utf8").trim(), 10);
-    if (stalePid && !isNaN(stalePid)) {
-      try {
-        process.kill(stalePid, "SIGTERM");
-        process.stderr.write(`[attach] killed stale process ${stalePid}\n`);
-      } catch {
-        process.stderr.write(`[attach] stale PID ${stalePid} already dead\n`);
-      }
-      try { fs.unlinkSync(pidFile); } catch {}
-    }
-  }
-
-  // 3. Clean stale socket
-  if (fs.existsSync(sockPath)) {
+  // 2. Clean stale target socket if it still exists but is unresponsive
+  if (sockPath && fs.existsSync(sockPath) && !alive) {
     try { fs.unlinkSync(sockPath); } catch {}
-    process.stderr.write(`[attach] cleaned stale socket\n`);
+    process.stderr.write(`[attach] cleaned stale socket ${sockPath}\n`);
   }
 
-  // 4. Detect orphan workspace
-  const hasOrphan = fs.existsSync(orphanFile);
-  if (hasOrphan) {
-    process.stderr.write(`[attach] found orphan workspace: ${orphanWorkspace}\n`);
-  } else {
-    process.stderr.write(`[attach] no orphan workspace found, starting fresh\n`);
-  }
+  // 3. Launch TUI in THIS terminal. Always pass orphan workspace name;
+  // app restore logic falls back to default workspace if missing.
+  const startArgs = ["run", "src/app.ts", "--workspace", orphanWorkspace];
 
-  // 5. Start the TUI in THIS terminal — stdio: "inherit" so blessed gets the TTY
-  const startArgs = ["run", "src/app.ts"];
-  if (hasOrphan) {
-    startArgs.push("--workspace", orphanWorkspace);
-  }
-
-  process.stderr.write(`[attach] launching TUI...\n`);
+  process.stderr.write(`[attach] launching TUI (workspace=${orphanWorkspace})...\n`);
   const result = spawnSync("bun", startArgs, {
     cwd: repoRoot,
-    env: { ...process.env, WIBWOB_INSTANCE_LABEL: label },
+    env: { ...process.env, WIBWOB_INSTANCE_LABEL: attachLabel },
     stdio: "inherit",
   });
 
-  // TUI exited — pass through its exit code
   process.exit(result.status ?? 1);
 }
 
@@ -761,6 +922,8 @@ interface CleanTarget {
   cmd: string;
   source: "pidfile" | "scan";
   label?: string;
+  pidPath?: string;
+  socketPath?: string;
 }
 
 interface StaleFile {
@@ -812,7 +975,6 @@ function isOurProcess(pid: number, repoRoot: string): boolean {
 }
 
 function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; staleFiles: StaleFile[]; healthyPids: Set<number> } {
-  const instancesDir = path.join(repoRoot, "scratch", "instances");
   const selfPid = process.pid;
   const parentPid = process.ppid;
   const seen = new Set<number>();
@@ -820,44 +982,82 @@ function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; sta
   const staleFiles: StaleFile[] = [];
   const healthyPids = new Set<number>(); // PIDs with live socket — these are real instances, not orphans
 
-  // Source 1: PID files from scratch/instances/
+  // Source 1a: canonical instance-scoped control sidecars
+  const canonicalInstancesDir = path.join(DATA_ROOT, "instances");
+  let canonicalEntries: fs.Dirent[] = [];
+  try { canonicalEntries = fs.readdirSync(canonicalInstancesDir, { withFileTypes: true }); } catch { /* dir may not exist */ }
+  for (const entry of canonicalEntries) {
+    if (!entry.isDirectory()) continue;
+    const instanceRoot = path.join(canonicalInstancesDir, entry.name);
+    const controlPidPath = path.join(instanceRoot, "control.pid");
+    const runtimePidPath = path.join(instanceRoot, "wibwob.pid");
+    const sockPath = path.join(instanceRoot, "control.sock");
+    const pid = readPidFile(controlPidPath) ?? readPidFile(runtimePidPath);
+
+    if (!pid) {
+      if (fs.existsSync(controlPidPath)) staleFiles.push({ path: controlPidPath, kind: "pid" });
+      if (fs.existsSync(sockPath)) staleFiles.push({ path: sockPath, kind: "socket" });
+      continue;
+    }
+    if (pid === selfPid || pid === parentPid) continue;
+
+    const alive = isPidAlive(pid);
+    if (alive) {
+      const hasSocket = fs.existsSync(sockPath);
+      const cmd = getPsCmd(pid) ?? "<unknown>";
+      processes.push({
+        pid,
+        cmd,
+        source: "pidfile",
+        label: entry.name,
+        pidPath: controlPidPath,
+        socketPath: sockPath,
+      });
+      seen.add(pid);
+      if (hasSocket) healthyPids.add(pid);
+    } else {
+      if (fs.existsSync(controlPidPath)) staleFiles.push({ path: controlPidPath, kind: "pid" });
+      if (fs.existsSync(sockPath)) staleFiles.push({ path: sockPath, kind: "socket" });
+    }
+  }
+
+  // Source 1b: legacy scratch/instances sidecars
+  const legacyInstancesDir = path.join(SCRATCH_BASE, "instances");
   let pidFiles: string[] = [];
-  try { pidFiles = fs.readdirSync(instancesDir).filter(f => f.endsWith(".pid")); } catch { /* dir may not exist */ }
+  try { pidFiles = fs.readdirSync(legacyInstancesDir).filter(f => f.endsWith(".pid")); } catch { /* dir may not exist */ }
 
   for (const file of pidFiles) {
     const label = file.replace(".pid", "");
-    const pidFile = path.join(instancesDir, file);
-    const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
-    if (isNaN(pid)) {
+    const pidFile = path.join(legacyInstancesDir, file);
+    const pid = readPidFile(pidFile);
+    if (!pid) {
       staleFiles.push({ path: pidFile, kind: "pid" });
       continue;
     }
     if (pid === selfPid || pid === parentPid) continue;
 
-    let alive = false;
-    try { process.kill(pid, 0); alive = true; } catch { /* dead */ }
-
+    const alive = isPidAlive(pid);
     if (alive) {
-      const sockPath = path.join(instancesDir, `${label}.sock`);
+      const sockPath = path.join(legacyInstancesDir, `${label}.sock`);
       const hasSocket = fs.existsSync(sockPath);
       const cmd = getPsCmd(pid) ?? "<unknown>";
-      processes.push({ pid, cmd, source: "pidfile", label });
+      processes.push({ pid, cmd, source: "pidfile", label, pidPath: pidFile, socketPath: sockPath });
       seen.add(pid);
-      if (hasSocket) healthyPids.add(pid); // registered + socket = healthy, not an orphan
+      if (hasSocket) healthyPids.add(pid);
     } else {
       staleFiles.push({ path: pidFile, kind: "pid" });
-      const sockPath = path.join(instancesDir, `${label}.sock`);
+      const sockPath = path.join(legacyInstancesDir, `${label}.sock`);
       if (fs.existsSync(sockPath)) staleFiles.push({ path: sockPath, kind: "socket" });
     }
   }
 
-  // Orphan sockets (socket exists but no matching PID file)
+  // Orphan legacy sockets (socket exists but no matching PID file)
   let sockFiles: string[] = [];
-  try { sockFiles = fs.readdirSync(instancesDir).filter(f => f.endsWith(".sock")); } catch { /* */ }
+  try { sockFiles = fs.readdirSync(legacyInstancesDir).filter(f => f.endsWith(".sock")); } catch { /* */ }
   for (const file of sockFiles) {
     const label = file.replace(".sock", "");
-    const pidFile = path.join(instancesDir, `${label}.pid`);
-    const sockPath = path.join(instancesDir, file);
+    const pidFile = path.join(legacyInstancesDir, `${label}.pid`);
+    const sockPath = path.join(legacyInstancesDir, file);
     if (!fs.existsSync(pidFile) && !staleFiles.some(s => s.path === sockPath)) {
       staleFiles.push({ path: sockPath, kind: "socket" });
     }
@@ -884,11 +1084,10 @@ function discoverCleanTargets(repoRoot: string): { processes: CleanTarget[]; sta
   } catch { /* ps may fail in some containers — that's ok */ }
 
   // Legacy scratch/wibwob.pid
-  const legacyPidFile = path.join(repoRoot, "scratch", "wibwob.pid");
+  const legacyPidFile = path.join(SCRATCH_BASE, "wibwob.pid");
   if (fs.existsSync(legacyPidFile)) {
-    const lpid = Number(fs.readFileSync(legacyPidFile, "utf8").trim());
-    let alive = false;
-    try { if (!isNaN(lpid)) process.kill(lpid, 0); alive = true; } catch { /* dead */ }
+    const lpid = readPidFile(legacyPidFile);
+    const alive = lpid ? isPidAlive(lpid) : false;
     if (!alive) {
       staleFiles.push({ path: legacyPidFile, kind: "legacy" });
     }
@@ -901,7 +1100,7 @@ async function cmdClean(args: string[]) {
   const flags = parseFlags(args.slice(1));
   const doKill = flags.kill === true || flags.force === true;
   const doForce = flags.force === true;
-  const repoRoot = path.resolve(SCRATCH_BASE, "..");
+  const repoRoot = APP_ROOT;
 
   const { processes, staleFiles, healthyPids } = discoverCleanTargets(repoRoot);
 
@@ -1011,14 +1210,9 @@ async function cmdClean(args: string[]) {
   }
 
   // Also clean up PID/socket files for orphan processes we just killed
-  const instancesDir = path.join(repoRoot, "scratch", "instances");
   for (const p of orphans) {
-    if (p.label) {
-      const pidPath = path.join(instancesDir, `${p.label}.pid`);
-      const sockPath = path.join(instancesDir, `${p.label}.sock`);
-      for (const fp of [pidPath, sockPath]) {
-        try { fs.unlinkSync(fp); removed.push(fp); } catch { /* */ }
-      }
+    for (const fp of [p.pidPath, p.socketPath].filter(Boolean) as string[]) {
+      try { fs.unlinkSync(fp); removed.push(fp); } catch { /* */ }
     }
   }
 

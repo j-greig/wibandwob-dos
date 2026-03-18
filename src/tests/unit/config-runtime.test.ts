@@ -1,116 +1,123 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import {
+  DATA_ROOT,
+  ensureDirectoryExists,
+  resolveDataRoot,
+  resolveInstancePaths,
+} from "../../core/config.js";
 
-// Mock process.env before imports
 const originalEnv = { ...process.env };
+const originalCwd = process.cwd();
 
-describe("config resolution", () => {
+describe("config runtime", () => {
   beforeEach(() => {
-    // Reset env for each test
+    process.chdir(originalCwd);
     process.env = { ...originalEnv };
     delete process.env.WIBWOB_DATA_DIR;
     delete process.env.WIBWOB_PROJECT_MODE;
-    delete process.env.WIBWOB_INSTANCE_ID;
   });
 
-  test("resolves to global ~/.wibwob when no env set and no project .wibwob", () => {
-    // This test verifies the fallback behavior
-    // In practice, the actual resolution depends on where tests run
-    expect(process.env.WIBWOB_DATA_DIR).toBeUndefined();
+  test("resolveDataRoot: WIBWOB_DATA_DIR takes precedence", () => {
+    process.env.WIBWOB_DATA_DIR = "/tmp/custom-wibwob";
+    expect(resolveDataRoot()).toBe(path.resolve("/tmp/custom-wibwob"));
   });
 
-  test("WIBWOB_DATA_DIR takes precedence", () => {
-    process.env.WIBWOB_DATA_DIR = "/custom/data";
-    // Re-import to get fresh resolution
-    // Note: this is a unit test limitation - we're testing the logic, not re-importing
-    expect(process.env.WIBWOB_DATA_DIR).toBe("/custom/data");
-  });
-
-  test("WIBWOB_PROJECT_MODE forces project-local resolution", () => {
+  test("resolveDataRoot: WIBWOB_PROJECT_MODE=1 forces <cwd>/.wibwob", () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-project-mode-"));
+    process.chdir(temp);
     process.env.WIBWOB_PROJECT_MODE = "1";
-    expect(process.env.WIBWOB_PROJECT_MODE).toBe("1");
-  });
-});
-
-describe("instance ID validation", () => {
-  test("valid instance ID characters pass validation", () => {
-    const validIds = ["abc12345", "test-123", "INSTANCE1", "a-b-c"];
-    for (const id of validIds) {
-      const isValid = /^[a-zA-Z0-9-]+$/.test(id);
-      expect(isValid).toBe(true);
-    }
+    expect(resolveDataRoot()).toBe(path.join(process.cwd(), ".wibwob"));
   });
 
-  test("invalid characters are rejected", () => {
-    const invalidIds = ["bad id", "test@host", "has/slash", "has.dot"];
-    for (const id of invalidIds) {
-      const isValid = /^[a-zA-Z0-9-]+$/.test(id);
-      expect(isValid).toBe(false);
-    }
+  test("resolveDataRoot: existing .wibwob in cwd implies project-local mode", () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-project-dotdir-"));
+    process.chdir(temp);
+    fs.mkdirSync(path.join(process.cwd(), ".wibwob"), { recursive: true });
+    expect(resolveDataRoot()).toBe(path.join(process.cwd(), ".wibwob"));
   });
-});
 
-describe("display ID derivation", () => {
-  test("derives 3-char display ID from full instance ID", () => {
+  test("resolveDataRoot: fallback is ~/.wibwob", () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-global-fallback-"));
+    process.chdir(temp);
+    expect(resolveDataRoot()).toBe(path.join(os.homedir(), ".wibwob"));
+  });
+
+  test("resolveInstancePaths: returns canonical instance-scoped layout", () => {
     const instanceId = "abc12345";
-    const displayId = instanceId.slice(0, 3);
-    expect(displayId).toBe("abc");
+    const paths = resolveInstancePaths(instanceId);
+
+    expect(paths.instanceRoot).toBe(path.join(DATA_ROOT, "instances", instanceId));
+    expect(paths.workspacesDir).toBe(path.join(paths.instanceRoot, "workspaces"));
+    expect(paths.exportsDir).toBe(path.join(paths.instanceRoot, "exports"));
+    expect(paths.logsDir).toBe(path.join(paths.instanceRoot, "logs"));
+    expect(paths.statePath).toBe(path.join(paths.instanceRoot, "state.json"));
+    expect(paths.pidPath).toBe(path.join(paths.instanceRoot, "wibwob.pid"));
   });
 
-  test("handles short instance IDs gracefully", () => {
-    const instanceId = "ab";
-    const displayId = instanceId.slice(0, 3);
-    expect(displayId).toBe("ab");
-  });
-});
-
-describe("instance path resolution", () => {
-  test("instance paths follow expected layout", () => {
-    const dataRoot = "/home/user/.wibwob";
-    const instanceId = "test12345";
-    
-    const instanceRoot = path.join(dataRoot, "instances", instanceId);
-    const expected = "/home/user/.wibwob/instances/test12345";
-    expect(instanceRoot).toBe(expected);
+  test("ensureDirectoryExists: creates missing nested directories", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-mkdir-"));
+    const target = path.join(root, "a", "b", "c");
+    ensureDirectoryExists(target);
+    expect(fs.existsSync(target)).toBe(true);
+    expect(fs.statSync(target).isDirectory()).toBe(true);
   });
 
-  test("subdirectories are correctly nested", () => {
-    const dataRoot = "/home/user/.wibwob";
-    const instanceId = "test12345";
-    
-    const workspacesDir = path.join(dataRoot, "instances", instanceId, "workspaces");
-    const exportsDir = path.join(dataRoot, "instances", instanceId, "exports");
-    const logsDir = path.join(dataRoot, "instances", instanceId, "logs");
-    
-    expect(workspacesDir).toBe("/home/user/.wibwob/instances/test12345/workspaces");
-    expect(exportsDir).toBe("/home/user/.wibwob/instances/test12345/exports");
-    expect(logsDir).toBe("/home/user/.wibwob/instances/test12345/logs");
-  });
-});
+  test("ensureDirectoryExists: maps EROFS to actionable error", () => {
+    const original = fs.mkdirSync;
+    (fs as unknown as { mkdirSync: typeof fs.mkdirSync }).mkdirSync = (() => {
+      const err = Object.assign(new Error("read only"), { code: "EROFS" as const });
+      throw err;
+    }) as unknown as typeof fs.mkdirSync;
 
-describe("two-level identity model", () => {
-  test("canonical ID is full, display ID is short", () => {
-    const instanceId = "abc12345-def67890";
-    const displayId = instanceId.slice(0, 3);
-    
-    expect(instanceId.length).toBeGreaterThan(displayId.length);
-    expect(displayId.length).toBe(3);
+    try {
+      let message = "";
+      try {
+        ensureDirectoryExists("/readonly/path");
+      } catch (err) {
+        message = err instanceof Error ? err.message : String(err);
+      }
+      expect(message.includes("read-only filesystem")).toBe(true);
+    } finally {
+      (fs as unknown as { mkdirSync: typeof fs.mkdirSync }).mkdirSync = original;
+    }
   });
 
-  test("label takes precedence in display", () => {
-    const instanceLabel = "main";
-    const displayId = "abc";
-    const pid = 12345;
-    
-    // With label
-    const withLabel = `${instanceLabel} · ${displayId} · ${pid}`;
-    expect(withLabel).toBe("main · abc · 12345");
-    
-    // Without label
-    const withoutLabel = `${displayId} · ${pid}`;
-    expect(withoutLabel).toBe("abc · 12345");
+  test("ensureDirectoryExists: maps EACCES to actionable error", () => {
+    const original = fs.mkdirSync;
+    (fs as unknown as { mkdirSync: typeof fs.mkdirSync }).mkdirSync = (() => {
+      const err = Object.assign(new Error("permission denied"), { code: "EACCES" as const });
+      throw err;
+    }) as unknown as typeof fs.mkdirSync;
+
+    try {
+      let message = "";
+      try {
+        ensureDirectoryExists("/no-permission/path");
+      } catch (err) {
+        message = err instanceof Error ? err.message : String(err);
+      }
+      expect(message.includes("Permission denied")).toBe(true);
+    } finally {
+      (fs as unknown as { mkdirSync: typeof fs.mkdirSync }).mkdirSync = original;
+    }
+  });
+
+  test("ensureDirectoryExists: maps EEXIST non-directory to actionable error", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-exist-file-"));
+    const target = path.join(root, "not-a-dir");
+    fs.writeFileSync(target, "x");
+
+    let message = "";
+    try {
+      ensureDirectoryExists(target);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    expect(message.includes("not a directory")).toBe(true);
   });
 });

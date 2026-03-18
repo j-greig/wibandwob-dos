@@ -41,6 +41,7 @@ import type { RuntimeCommandService } from "../application/runtime-command-servi
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
 import type { RuntimeWindowService } from "../application/runtime-window-service.js";
 import type { RuntimeWorkspaceService } from "../application/runtime-workspace-service.js";
+import type { RateLimitService } from "../application/rate-limit-service.js";
 import type { InstanceDescriptor } from "../domain/instance-descriptor.js";
 
 interface ControlApiDeps {
@@ -183,6 +184,9 @@ export class ControlApiService {
   private actualPort?: number;
   private socketPath?: string;
   private pidPath?: string;
+  private discoveryPath?: string;
+  private legacySocketPath?: string;
+  private legacyPidPath?: string;
   private readonly startedAt = Date.now();
   private enabled = false;
   private getScreenSize?: () => { width: number; height: number };
@@ -191,6 +195,7 @@ export class ControlApiService {
     private readonly port: number,
     private readonly deps: ControlApiDeps,
     private readonly identity: RuntimeControlApiIdentity,
+    private readonly rateLimiter?: RateLimitService,
   ) {}
 
   /** Inject screen size getter (set by app-controller after construction). */
@@ -244,7 +249,7 @@ export class ControlApiService {
         this.server = bunRuntime.serve({
           hostname: "127.0.0.1",
           port,
-          fetch: async (request) => this.handleRequest(request),
+          fetch: async (request) => this.handleWithIngressLimit(request),
         });
         this.actualPort = port;
         this.enabled = true;
@@ -264,11 +269,15 @@ export class ControlApiService {
 
     // ── Clean shutdown: delete socket + PID sidecar ──
     const cleanup = () => {
-      if (this.socketPath) {
-        try { fs.unlinkSync(this.socketPath); } catch {}
-      }
-      if (this.pidPath) {
-        try { fs.unlinkSync(this.pidPath); } catch {}
+      for (const fp of [
+        this.socketPath,
+        this.pidPath,
+        this.discoveryPath,
+        this.legacySocketPath,
+        this.legacyPidPath,
+      ]) {
+        if (!fp) continue;
+        try { fs.unlinkSync(fp); } catch {}
       }
     };
     process.on("SIGTERM", cleanup);
@@ -279,26 +288,68 @@ export class ControlApiService {
   /** Register unix socket + PID sidecar for CLI discovery. */
   registerSocket(): void {
     if (this.socketServer) return; // already registered
-    if (!this.identity.scratchBase) return;
+    if (!this.identity.instanceRoot) return;
     const bunRuntime = (globalThis as any).Bun;
     if (!bunRuntime) return;
+
+    const instanceRoot = this.identity.instanceRoot;
+    const canonicalSockPath = path.join(instanceRoot, "control.sock");
+    const canonicalPidPath = path.join(instanceRoot, "control.pid");
+    const discoveryPath = path.join(instanceRoot, "discovery.json");
+
+    // Legacy compatibility aliases (temporary)
     const label = this.identity.instanceLabel || this.identity.instanceId;
-    const instancesDir = path.join(this.identity.scratchBase, "instances");
-    const sockPath = path.join(instancesDir, `${label}.sock`);
-    const pidFilePath = path.join(instancesDir, `${label}.pid`);
+    const legacyInstancesDir = this.identity.scratchBase
+      ? path.join(this.identity.scratchBase, "instances")
+      : undefined;
+    const legacySockPath = legacyInstancesDir
+      ? path.join(legacyInstancesDir, `${label}.sock`)
+      : undefined;
+    const legacyPidPath = legacyInstancesDir
+      ? path.join(legacyInstancesDir, `${label}.pid`)
+      : undefined;
+
     try {
-      fs.mkdirSync(instancesDir, { recursive: true });
-      // Clean stale socket from previous run
-      try { fs.unlinkSync(sockPath); } catch {}
+      fs.mkdirSync(instanceRoot, { recursive: true });
+      if (legacyInstancesDir) fs.mkdirSync(legacyInstancesDir, { recursive: true });
+
+      // Clean stale canonical socket from previous run
+      try { fs.unlinkSync(canonicalSockPath); } catch {}
+
       this.socketServer = bunRuntime.serve({
-        unix: sockPath,
-        fetch: async (request: Request) => this.handleRequest(request),
+        unix: canonicalSockPath,
+        fetch: async (request: Request) => this.handleWithIngressLimit(request),
       });
-      this.socketPath = sockPath;
-      // Write PID sidecar for CLI liveness checks
-      fs.writeFileSync(pidFilePath, String(process.pid));
-      this.pidPath = pidFilePath;
-      log.app(`control API socket at ${sockPath} (pid ${process.pid})`);
+
+      this.socketPath = canonicalSockPath;
+      this.pidPath = canonicalPidPath;
+      this.discoveryPath = discoveryPath;
+      this.legacySocketPath = legacySockPath;
+      this.legacyPidPath = legacyPidPath;
+
+      fs.writeFileSync(canonicalPidPath, String(process.pid));
+      fs.writeFileSync(
+        discoveryPath,
+        `${JSON.stringify({
+          instanceId: this.identity.instanceId,
+          instanceDisplayId: this.identity.instanceDisplayId,
+          instanceLabel: this.identity.instanceLabel ?? null,
+          socketPath: canonicalSockPath,
+          pid: process.pid,
+          updatedAt: new Date().toISOString(),
+        }, null, 2)}\n`,
+      );
+
+      // Legacy compatibility: alias socket path + pid file under scratch/instances.
+      if (legacySockPath && legacyPidPath) {
+        try { fs.unlinkSync(legacySockPath); } catch {}
+        try { fs.symlinkSync(canonicalSockPath, legacySockPath); } catch {
+          // symlink may fail on some systems; fallback to leaving no alias
+        }
+        try { fs.writeFileSync(legacyPidPath, String(process.pid)); } catch {}
+      }
+
+      log.app(`control API socket at ${canonicalSockPath} (pid ${process.pid})`);
     } catch (err) {
       log.err(`control API socket failed: ${err}`);
       // HTTP still works — socket is best-effort
@@ -311,14 +362,21 @@ export class ControlApiService {
       this.socketServer.stop(true);
       this.socketServer = undefined;
     }
-    if (this.socketPath) {
-      try { fs.unlinkSync(this.socketPath); } catch {}
-      this.socketPath = undefined;
+    for (const fp of [
+      this.socketPath,
+      this.pidPath,
+      this.discoveryPath,
+      this.legacySocketPath,
+      this.legacyPidPath,
+    ]) {
+      if (!fp) continue;
+      try { fs.unlinkSync(fp); } catch {}
     }
-    if (this.pidPath) {
-      try { fs.unlinkSync(this.pidPath); } catch {}
-      this.pidPath = undefined;
-    }
+    this.socketPath = undefined;
+    this.pidPath = undefined;
+    this.discoveryPath = undefined;
+    this.legacySocketPath = undefined;
+    this.legacyPidPath = undefined;
     log.app("control API socket deregistered");
   }
 
@@ -340,6 +398,36 @@ export class ControlApiService {
       baseUrl,
       socketPath: this.socketPath,
     };
+  }
+
+  private async handleWithIngressLimit(request: Request): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    const decision = this.rateLimiter?.ingress(request.method, pathname);
+    if (decision && !decision.allowed) {
+      const retrySeconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "rate_limited",
+          retryAfterMs: decision.retryAfterMs,
+          surface: "api",
+          path: pathname,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Retry-After": String(retrySeconds),
+          },
+        },
+      );
+    }
+
+    try {
+      return await this.handleRequest(request);
+    } finally {
+      decision?.lease?.release();
+    }
   }
 
   private runApiCommand(id: string, args?: Record<string, unknown>) {

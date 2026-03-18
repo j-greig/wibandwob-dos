@@ -3,6 +3,7 @@ import type {
   CommandRunResult,
   CommandSurface,
 } from "../core/command-registry.js";
+import type { RateLimitService } from "./rate-limit-service.js";
 
 export type RuntimeCommandSource = "api" | "agent" | "internal";
 
@@ -26,6 +27,7 @@ export interface RuntimeCommandService {
 export function createRuntimeCommandService(deps: {
   listCommands: RuntimeCommandService["list"];
   runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
+  rateLimiter?: RateLimitService;
 }): RuntimeCommandService {
   const prepareArgs = (
     args?: Record<string, unknown>,
@@ -47,6 +49,23 @@ export function createRuntimeCommandService(deps: {
 
   return {
     list: (surface, opts) => deps.listCommands(surface, opts),
-    run: (id, args, options) => deps.runCommand(id, prepareArgs(args, options)),
+    run: (id, args, options) => {
+      const source = options?.source ?? "internal";
+      const decision = deps.rateLimiter?.command(source);
+      if (decision && !decision.allowed) {
+        return {
+          ok: false,
+          error: "rate_limited",
+          retryAfterMs: decision.retryAfterMs,
+          source,
+        };
+      }
+
+      try {
+        return deps.runCommand(id, prepareArgs(args, options));
+      } finally {
+        decision?.lease?.release();
+      }
+    },
   };
 }
