@@ -1,9 +1,12 @@
 {
-  "name": "wibandwob-dos",
+  "name": "wibwob-dos",
   "private": true,
   "version": "0.2.0",
   "description": "WibWob-DOS — terminal-native TypeScript TUI shell",
   "type": "module",
+  "bin": {
+    "wibwob": "src/cli/wibwob.ts"
+  },
   "scripts": {
     "dev": "bun run src/app.ts --dev",
     "dev:world": "WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=main bun run src/app.ts --dev",
