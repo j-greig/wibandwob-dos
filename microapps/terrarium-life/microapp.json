@@ -1,0 +1,20 @@
+{
+  "name": "terrarium-life",
+  "version": "0.1.0",
+  "description": "A living ASCII ecosystem with four biomes, eight creature species, and migration corridors",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.terrarium-life",
+    "title": "Terrarium Life",
+    "description": "Four-biome ecosystem: Forest, Ocean, Cave, Sky. Eight creatures with distinct personalities, weather system, day/night cycle, dawn/dusk migration corridors.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 91, "label": "Terrarium Life" }
+    ],
+    "palette": { "order": 91, "label": "Open Terrarium Life" },
+    "agent": true,
+    "api": true
+  }
+}

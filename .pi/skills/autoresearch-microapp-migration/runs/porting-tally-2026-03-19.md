@@ -13,7 +13,8 @@ Loop rule:
 | demo-e026-demo | wibwob.example.e026 | promoted tier to core + fixed missing createCanvas import + verified menu/state | 1 | done | 6fb08f28 |
 | demo-hello-world | wibwob.example.hello | promoted tier to core + added explicit menu/palette command wiring + verified menu/state | 1 | done | e1f04468 |
 | demo-wibwob-poetry-clock | wibwob.poetry-clock | promoted tier to core + verified menu/state | 1 | done | 9b0e2d37 |
-| demo-wibwob-tidepool | wibwob.tidepool | promoted tier to core + verified menu/state + auto-pause after inactivity hardened | 2 | done | ac34bc4a, b113c9fc |
+| demo-wibwob-tidepool | wibwob.tidepool | promoted tier to core + verified menu/state + auto-pause after inactivity hardened | 2 | done | ac34bc4a, dbcc92db |
+| terrarium-life | wibwob.terrarium-life | migrated from .disabled + promoted tier to core + verified menu/state | 1 | done | pending |
 
 ## Parking Lot (attempts > 15 or blocked)
 
@@ -34,7 +35,6 @@ Loop rule:
 | demo-responsive-panels-demo-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-responsive-panels-demo-pi | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-symbient-twitter | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
-| terrarium-life | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 
 ## Next queued
 
