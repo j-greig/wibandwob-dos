@@ -451,3 +451,36 @@ WIBWOB_API=http://127.0.0.1:8100 python3 scripts/fx/diagonal-trail.py \
   --fps 8 \
   --bounce-count 0
 ```
+
+---
+
+## Flamingo V2 (ANSI colour layering) — Why / How / Gotchas
+
+### Why
+- Needed a stronger visual treatment: pink background + bounce-driven mood shift.
+- Required **temporal layering**: only text stamped *after* each bounce should darken.
+
+### How
+- Added `scripts/fx/flamingo-trail-v2.py`.
+- Uses ANSI truecolour in notepad write payload:
+  - background: fixed darker pink
+  - foreground: white → black in bounce buckets
+- Uses a **per-cell colour index grid** (`colour_idx`) parallel to the text canvas.
+  - On stamp: char is written + current bounce colour index assigned.
+  - On render: each non-space cell uses its stored colour index.
+- Reuses latest notepad by default (single evolving doc), optional `--new-window`.
+
+### Gotchas
+- If you recolour by frame (single global `fg_rgb`), the whole document repaints and looks like two different runs instead of one evolving layer.
+- Reusing/opening notepad inconsistently can make it look like colour isn't changing (you may be comparing separate windows).
+- ANSI rendering depends on notepad preserving escape sequences; if theme/parser changes, colour effect may degrade.
+
+### Repro command
+
+```bash
+WIBWOB_API=http://127.0.0.1:8100 python3 scripts/fx/flamingo-trail-v2.py \
+  --source flamingo-0000-2.txt \
+  --window-w 120 --window-h 60 \
+  --canvas-w 120 --canvas-h 60 \
+  --fps 10 --bounce-count 5 --steps 120
+```
