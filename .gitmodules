@@ -17,3 +17,6 @@
 [submodule "vendor/pi-mono"]
 	path = vendor/pi-mono
 	url = https://github.com/badlogic/pi-mono
+[submodule "vendor/agent-stuff"]
+	path = vendor/agent-stuff
+	url = https://github.com/mitsuhiko/agent-stuff.git
