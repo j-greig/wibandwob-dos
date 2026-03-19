@@ -45,6 +45,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.tidepool":           "core",
   "wibwob.glitchbox":          "core",
   "wibwob.patchbay":           "core",
+  "wibwob.forms-playground":   "core",
   "wibwob.slap-editor":        "beta",
   "wibwob.asciicker":          "beta",
   "wibwob.ansi-lab":           "core",
@@ -57,6 +58,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.theattyr":           "beta",
 
   // ── Internal: dev/demo/test only ───────────────────────────────────
+  "wibwob.demo-dashboards-v2":             "beta",
   "wibwob.layout-probe":                   "internal",
   "wibwob.heartbeat":                      "internal",
   "wibwob.file-manager":                     "core",

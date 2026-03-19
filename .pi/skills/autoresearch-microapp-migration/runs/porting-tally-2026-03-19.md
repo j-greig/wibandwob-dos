@@ -16,7 +16,8 @@ Loop rule:
 | demo-wibwob-tidepool | wibwob.tidepool | promoted tier to core + verified menu/state + auto-pause after inactivity hardened | 2 | done | ac34bc4a, dbcc92db |
 | terrarium-life | wibwob.terrarium-life | migrated from .disabled + promoted tier to core + verified menu/state | 1 | done | b0ee3569 |
 | demo-ansi-lab | wibwob.ansi-lab | migrated from .disabled + promoted to core/demos + verified menu/state/window-text | 1 | done | dc92b90d |
-| demo-patchbay-lab | wibwob.patchbay | migrated from .disabled + promoted to core/demos + verified menu/state | 1 | done | pending |
+| demo-patchbay-lab | wibwob.patchbay | migrated from .disabled + promoted to core/demos + verified menu/state | 1 | done | ca9f24ce |
+| demo-forms-playground | wibwob.forms-playground | migrated from .disabled + promoted to core/demos + verified menu/state | 1 | done | pending |
 
 ## Parking Lot (attempts > 15 or blocked)
 
@@ -30,7 +31,6 @@ Loop rule:
 | demo-flex-workbench-demo-pi | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-flex-wrap-demo-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-flex-wrap-demo-pi | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
-| demo-forms-playground | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-layout-stress-test-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-responsive-panels-demo-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-responsive-panels-demo-pi | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
