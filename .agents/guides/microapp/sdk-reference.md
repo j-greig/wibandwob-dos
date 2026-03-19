@@ -22,7 +22,27 @@ Naming policy:
 - Prefer composition helper names (`createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`) for microapp authoring.
 - `createLayout*` names are lower-level/host-centric compatibility surfaces.
 
+### Preferred names vs legacy aliases
+
+| Preferred | Legacy alias (compat only) |
+|---|---|
+| `createStatusBar` | `createLayoutStatusBar` |
+| `createButtonBar` | `createLayoutButtonBar` |
+| `createTabs` | `createLayoutTabs` |
+| `createInputLine` | `createLayoutInputLine` |
+| `createRule` | `createLayoutRule` |
+
+Use preferred names in new microapps and docs examples.
+
 All components follow the [component contract](component-contract.md).
+
+### Advanced/internal exports (use intentionally)
+
+The SDK also re-exports specialised internals (e.g. Monster Cam, skeleton renderers,
+terrain/contour internals) to avoid direct `src/core/*` imports in built-ins.
+
+For most third-party microapps, treat these as out-of-path unless you have a concrete
+runtime need and are ready to own added complexity.
 
 For the basics (manifest, skeleton, lifecycle hooks, verification):
 see `docs/building-custom-microapps.md`.

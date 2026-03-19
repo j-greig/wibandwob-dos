@@ -103,9 +103,9 @@ Pass criteria:
 
 ## Phase 5 — Crisp docs upgrades (priority)
 
-- [ ] P5.1 Quick-start reduced to shortest valid path.
-- [ ] P5.2 Task guides contain only operational guidance.
-- [~] P5.3 Reference owns full API contract; duplicates removed (animation helper docs updated; full dedupe pass pending).
+- [x] P5.1 Quick-start reduced to shortest valid path.
+- [x] P5.2 Task guides contain only operational guidance.
+- [x] P5.3 Reference owns full API contract; duplicates removed (naming/legacy and advanced-surface fences clarified).
 - [x] P5.4 Pitfalls synced to real failure evidence.
 
 Pass criteria:

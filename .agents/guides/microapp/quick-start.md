@@ -2,6 +2,11 @@
 
 Scaffold, edit, run. Under 60 seconds to a working microapp.
 
+Scope of this doc:
+- shortest path to first working microapp,
+- mandatory hooks and verification,
+- no exhaustive API reference (see `sdk-reference.md`).
+
 ## 1. Scaffold
 
 ```bash

@@ -17,6 +17,9 @@ Terminology:
 
 ## Quick start
 
+For the absolute shortest bootstrap path, use `.agents/guides/microapp/quick-start.md`.
+This document is the deeper build guide (structure, lifecycle, persistence, patterns).
+
 Use the scaffold script to create a new microapp package:
 
 ```bash
