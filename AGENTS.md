@@ -309,6 +309,29 @@ bash scripts/git-census.sh             # branch/worktree health
 - **haiku / sonnet / opus** — model-tier delegation
 - **codex-standard / codex-heavy** — OpenAI Codex (ask before using)
 
+### Microapp triad (default for SDK/component work)
+
+Use these three together when touching microapps, SDK, or microapp docs:
+- **microapp-product-owner** → picks scope, keep/cut calls, naming decisions
+- **microapp-developer** → implements smallest safe code slice
+- **microapp-doc-refiner** → updates canonical docs for that exact slice
+
+Execution order (always):
+1. **Product-owner first**
+   - define one slice only (goal, files, AC, keep/cut impact)
+2. **Developer second**
+   - implement only that slice
+   - run verification (`bun run typecheck`, relevant tests, `wibwob -i <id> ...`)
+3. **Doc refiner third**
+   - update owner docs only (no duplicate prose)
+4. **Optional arch-reviewer pass**
+   - run before merge when scope touches shell invariants/COAT seams
+
+Hard rules:
+- Do not let developer or doc-refiner expand scope without product-owner approval.
+- Every slice must produce binary evidence (pass/fail + artefact path).
+- Prefer 3 small slices over 1 large slice.
+
 **PTC (Programmatic Tool Calling)** — `.pi/extensions/ptc.ts` registers an
 `execute_code` tool. Write JS that calls pi tools as async functions inside a
 sandbox — only `console.log()` returns to context. Use when chaining 3+ tool

@@ -19,6 +19,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
+import { safeWriteFile } from "../core/safe-fs.js";
 import { APP_ROOT, DATA_ROOT, SCRATCH_BASE } from "../core/config.js";
 
 // ── Instance targeting ───────────────────────────────────
@@ -28,6 +30,7 @@ import { APP_ROOT, DATA_ROOT, SCRATCH_BASE } from "../core/config.js";
 const NEW_CONTROL_SOCKET = "control.sock";
 const NEW_CONTROL_PID = "control.pid";
 const DISCOVERY_FILE = "discovery.json";
+const RUNTIME_CONTROL_MANIFEST = path.join(DATA_ROOT, "runtime", "control-manifest.json");
 
 /** Find a CLI flag value, checking both long and short forms. */
 function findFlag(...flags: string[]): string | undefined {
@@ -52,6 +55,23 @@ interface AliveInstance {
   instanceId?: string;
   instanceDisplayId?: string;
   instanceLabel?: string;
+}
+
+interface RuntimeControlManifest {
+  instanceId?: string;
+  instanceDisplayId?: string;
+  instanceLabel?: string;
+  pid?: number;
+  socketPath?: string;
+  updatedAt?: string;
+}
+
+function readRuntimeControlManifest(): RuntimeControlManifest | null {
+  try {
+    return JSON.parse(fs.readFileSync(RUNTIME_CONTROL_MANIFEST, "utf8")) as RuntimeControlManifest;
+  } catch {
+    return null;
+  }
 }
 
 function getInstanceRoots(): string[] {
@@ -285,7 +305,16 @@ function tryResolveBase(): string | null {
     process.stderr.write(`⚠ WIBWOB_INSTANCE="${envSelector}" but no socket found — falling back to scan\n`);
   }
 
-  // 3. Socket scan — always wins for local instances (avoids stale WIBWOB_API env poisoning)
+  // 3. Runtime control manifest (canonical last-running instance snapshot)
+  const manifest = readRuntimeControlManifest();
+  if (manifest?.socketPath && fs.existsSync(manifest.socketPath)) {
+    const pidAlive = typeof manifest.pid === "number" ? isPidAlive(manifest.pid) : true;
+    if (pidAlive) {
+      return `unix://${manifest.socketPath}`;
+    }
+  }
+
+  // 4. Socket scan — always wins for local instances (avoids stale WIBWOB_API env poisoning)
   const alive = findAliveInstances();
   if (alive.length === 1) {
     return `unix://${alive[0].socketPath}`;
@@ -899,25 +928,156 @@ async function cmdInstances() {
   }
 
   // Enrich with health probe (200ms timeout — don't block on hung instances)
+  const manifest = readRuntimeControlManifest();
+  const canonicalSocket = manifest?.socketPath;
   const results: Array<Record<string, unknown>> = [];
+  const seenIdentity = new Set<string>();
+
   for (const inst of alive) {
     try {
       const res = await fetch("http://localhost/health", {
         ...unixFetchOpts(inst.socketPath),
         signal: AbortSignal.timeout(200),
       } as any);
-      if (res.ok) {
-        const health = await res.json() as Record<string, unknown>;
-        results.push({ label: inst.label, socket: inst.socketPath, ...health });
-      } else {
+
+      if (!res.ok) {
         results.push({ label: inst.label, socket: inst.socketPath, ok: true, error: `HTTP ${res.status}` });
+        continue;
       }
+
+      const health = await res.json() as Record<string, unknown>;
+      const identity = String(
+        health.instanceId ?? health.instanceLabel ?? health.instanceDisplayId ?? health.pid ?? inst.socketPath,
+      );
+      if (seenIdentity.has(identity)) continue;
+      seenIdentity.add(identity);
+
+      results.push({
+        label: inst.label,
+        socket: inst.socketPath,
+        canonical: canonicalSocket != null && canonicalSocket === inst.socketPath,
+        ...health,
+      });
     } catch {
       // PID alive but not responding — probably starting up
-      results.push({ label: inst.label, socket: inst.socketPath, ok: true, status: "starting" });
+      const identity = `starting:${inst.socketPath}`;
+      if (seenIdentity.has(identity)) continue;
+      seenIdentity.add(identity);
+      results.push({
+        label: inst.label,
+        socket: inst.socketPath,
+        canonical: canonicalSocket != null && canonicalSocket === inst.socketPath,
+        ok: true,
+        status: "starting",
+      });
     }
   }
+
   out(results);
+}
+
+async function readApiBestEffort(apiPath: string): Promise<unknown> {
+  try {
+    const [url, opts] = socketFetchArgs(apiPath, { method: "GET" });
+    const res = await fetch(url, opts as any);
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}`, path: apiPath };
+    }
+    return await res.json();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      path: apiPath,
+    };
+  }
+}
+
+function collectTmuxPaneTail(lines = 400): string | null {
+  try {
+    const escaped = Math.max(1, lines);
+    return execSync(`tmux capture-pane -p -t wibwob -S -${escaped}`, {
+      encoding: "utf8",
+      timeout: 2500,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function collectFileTail(filePath: string, maxBytes = 64 * 1024): string | null {
+  try {
+    const stat = fs.statSync(filePath);
+    const start = Math.max(0, stat.size - maxBytes);
+    const fd = fs.openSync(filePath, "r");
+    try {
+      const buf = Buffer.alloc(stat.size - start);
+      fs.readSync(fd, buf, 0, buf.length, start);
+      return buf.toString("utf8");
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function cmdCrashBundle(args: string[]) {
+  const flags = parseFlags(args.slice(1));
+  const outDir = typeof flags.out === "string"
+    ? String(flags.out)
+    : path.join(SCRATCH_BASE, "reports", "crash-bundles", new Date().toISOString().replace(/[:.]/g, "-"));
+
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const [health, instances, state, inspection] = await Promise.all([
+    readApiBestEffort("/health"),
+    (async () => {
+      try {
+        const alive = findAliveInstances();
+        return alive.map((a) => ({
+          label: a.label,
+          socketPath: a.socketPath,
+          instanceId: a.instanceId,
+          instanceDisplayId: a.instanceDisplayId,
+          instanceLabel: a.instanceLabel,
+        }));
+      } catch (error) {
+        return [{ error: error instanceof Error ? error.message : String(error) }];
+      }
+    })(),
+    readApiBestEffort("/state"),
+    readApiBestEffort("/runtime/inspection"),
+  ]);
+
+  const tmuxTail = collectTmuxPaneTail(500);
+  const paneLogTail = collectFileTail(path.join(SCRATCH_BASE, "logs", "wibwob-tmux-pane.log"), 96 * 1024);
+  const appLogTail = collectFileTail(path.join(SCRATCH_BASE, "wibwob.log"), 96 * 1024);
+  const manifest = readRuntimeControlManifest();
+
+  safeWriteFile(path.join(outDir, "health.json"), `${JSON.stringify(health, null, 2)}\n`);
+  safeWriteFile(path.join(outDir, "instances.json"), `${JSON.stringify(instances, null, 2)}\n`);
+  safeWriteFile(path.join(outDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`);
+  safeWriteFile(path.join(outDir, "inspection.json"), `${JSON.stringify(inspection, null, 2)}\n`);
+  safeWriteFile(path.join(outDir, "runtime-control-manifest.json"), `${JSON.stringify(manifest ?? {}, null, 2)}\n`);
+  safeWriteFile(path.join(outDir, "tmux-pane-tail.txt"), `${tmuxTail ?? "(tmux pane unavailable)"}\n`);
+  safeWriteFile(path.join(outDir, "tmux-pane-log-tail.txt"), `${paneLogTail ?? "(pane log unavailable)"}\n`);
+  safeWriteFile(path.join(outDir, "app-log-tail.txt"), `${appLogTail ?? "(app log unavailable)"}\n`);
+
+  out({
+    ok: true,
+    bundleDir: outDir,
+    files: [
+      "health.json",
+      "instances.json",
+      "state.json",
+      "inspection.json",
+      "runtime-control-manifest.json",
+      "tmux-pane-tail.txt",
+      "tmux-pane-log-tail.txt",
+      "app-log-tail.txt",
+    ],
+  });
 }
 
 // ── Clean (orphan process + stale file cleanup) ─────────
@@ -1356,6 +1516,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "start",       desc: "Start instance (idempotent if already running)",  fn: (a) => cmdStart(a) },
   { name: "restart",     desc: "Stop and restart instance",                       fn: (a) => cmdRestart(a) },
   { name: "instances",   aliases: ["list", "ls"], desc: "List running instances (PID-checked)",   fn: () => cmdInstances() },
+  { name: "crash-bundle", args: "[--out <dir>]", desc: "Collect health/state/log/tmux crash evidence bundle", fn: (a) => cmdCrashBundle(a) },
   { name: "clean",       args: "[--kill] [--force]", desc: "Find orphan processes + stale files (dry run unless --kill)", fn: (a) => cmdClean(a) },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
   { name: "open",        args: "<path|url> [--app A] [--line N]", desc: "Open file/dir/URL in WibWob-DOS (fallback: system)", fn: (a) => cmdOpen(a) },
@@ -1400,8 +1561,9 @@ function usage() {
   lines.push("");
   lines.push("Instance resolution (in order):");
   lines.push("  1. -i / --instance flag or $WIBWOB_INSTANCE env var → named socket");
-  lines.push("  2. Socket scan: find sole alive instance via PID check");
-  lines.push("  3. Error (no silent port fallback)");
+  lines.push("  2. Runtime control manifest → canonical last-running socket");
+  lines.push("  3. Socket scan: find sole alive instance via PID check");
+  lines.push("  4. Error (no silent port fallback)");
   lines.push("");
   lines.push("Environment:");
   lines.push("  WIBWOB_INSTANCE  Target instance label (same as --instance)");

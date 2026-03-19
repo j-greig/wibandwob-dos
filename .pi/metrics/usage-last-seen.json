@@ -1,11 +1,40 @@
 {
-  "generatedAt": "2026-03-19T14:19:34.746Z",
+  "generatedAt": "2026-03-19T21:03:17.141Z",
   "surfaces": {
-    "skills": {},
+    "skills": {
+      "joan-stark-ascii-art": {
+        "lastSeen": "2026-03-19T18:39:38.389Z",
+        "count": 2,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "ww-ops": {
+        "lastSeen": "2026-03-19T19:24:34.949Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "commit": {
+        "lastSeen": "2026-03-19T20:59:19.960Z",
+        "count": 2,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "simplify-docs": {
+        "lastSeen": "2026-03-19T20:42:58.560Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      }
+    },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-19T14:19:34.746Z",
-        "count": 17,
+        "lastSeen": "2026-03-19T21:03:17.141Z",
+        "count": 34,
         "sources": [
           "tool:edit"
         ]
@@ -17,8 +46,30 @@
           "tool:signal_microloop_success",
           "command:/microloop"
         ]
+      },
+      "ptc": {
+        "lastSeen": "2026-03-19T20:08:50.676Z",
+        "count": 4,
+        "sources": [
+          "tool:execute_code"
+        ]
       }
     },
-    "agents": {}
+    "agents": {
+      "microapp-product-owner": {
+        "lastSeen": "2026-03-19T19:14:41.879Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "microapp-developer": {
+        "lastSeen": "2026-03-19T20:48:15.951Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      }
+    }
   }
 }

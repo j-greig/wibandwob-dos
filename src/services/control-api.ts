@@ -209,6 +209,7 @@ export class ControlApiService {
   private discoveryPath?: string;
   private legacySocketPath?: string;
   private legacyPidPath?: string;
+  private runtimeManifestPath?: string;
   private readonly startedAt = Date.now();
   private enabled = false;
   private getScreenSize?: () => { width: number; height: number };
@@ -228,6 +229,42 @@ export class ControlApiService {
   /** Whether a socket is currently registered for discovery. */
   hasSocket(): boolean {
     return this.socketPath != null;
+  }
+
+  private writeRuntimeControlManifest(socketPath: string): void {
+    if (!this.identity.dataRoot) return;
+    const manifestPath = path.join(this.identity.dataRoot, "runtime", "control-manifest.json");
+    this.runtimeManifestPath = manifestPath;
+    safeWriteFile(
+      manifestPath,
+      `${JSON.stringify({
+        instanceId: this.identity.instanceId,
+        instanceDisplayId: this.identity.instanceDisplayId,
+        instanceLabel: this.identity.instanceLabel ?? null,
+        pid: process.pid,
+        host: this.identity.host,
+        apiPort: this.actualPort ?? this.port,
+        socketPath,
+        instanceRoot: this.identity.instanceRoot,
+        dataRoot: this.identity.dataRoot,
+        updatedAt: new Date().toISOString(),
+      }, null, 2)}\n`,
+    );
+  }
+
+  private cleanupRuntimeControlManifest(): void {
+    const manifestPath = this.runtimeManifestPath;
+    if (!manifestPath) return;
+    try {
+      const current = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { instanceId?: string; pid?: number };
+      const sameProcess = current?.pid === process.pid;
+      const sameInstance = current?.instanceId === this.identity.instanceId;
+      if (sameProcess || sameInstance) {
+        try { fs.unlinkSync(manifestPath); } catch {}
+      }
+    } catch {
+      // Ignore parse/read errors on cleanup.
+    }
   }
 
   /** Start HTTP server + unix socket (normal startup). */
@@ -301,6 +338,7 @@ export class ControlApiService {
         if (!fp) continue;
         try { fs.unlinkSync(fp); } catch {}
       }
+      this.cleanupRuntimeControlManifest();
     };
     process.on("SIGTERM", cleanup);
     process.on("SIGINT", cleanup);
@@ -371,6 +409,7 @@ export class ControlApiService {
         try { fs.writeFileSync(legacyPidPath, String(process.pid)); } catch {}
       }
 
+      this.writeRuntimeControlManifest(canonicalSockPath);
       log.app(`control API socket at ${canonicalSockPath} (pid ${process.pid})`);
     } catch (err) {
       log.err(`control API socket failed: ${err}`);
@@ -399,6 +438,7 @@ export class ControlApiService {
     this.discoveryPath = undefined;
     this.legacySocketPath = undefined;
     this.legacyPidPath = undefined;
+    this.cleanupRuntimeControlManifest();
     log.app("control API socket deregistered");
   }
 

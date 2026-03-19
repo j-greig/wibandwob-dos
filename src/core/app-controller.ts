@@ -222,6 +222,7 @@ export class TsTuiMvpApp {
   private readonly instanceId: string;
   private readonly instanceDisplayId: string;
   private readonly runtimeNode: RuntimeNodeDescriptor;
+  private readonly bootedAtMs = Date.now();
   private microappReloadEpoch = 0;
   private microappDeps?: MicroappHostDeps;
 
@@ -548,11 +549,73 @@ export class TsTuiMvpApp {
     this.menus.push(...this.commands.buildMenus());
   }
 
+  private collectReloadInvalidationFiles(limit = 6): string[] {
+    const hostSensitiveDirs = [
+      path.join(REPO_ROOT, "src", "core"),
+      path.join(REPO_ROOT, "src", "services"),
+      path.join(REPO_ROOT, "src", "windows"),
+      path.join(REPO_ROOT, "src", "sdk"),
+      path.join(REPO_ROOT, "src", "ui"),
+    ];
+    const hostSensitiveFiles = [
+      path.join(REPO_ROOT, "package.json"),
+      path.join(REPO_ROOT, "bun.lock"),
+      path.join(REPO_ROOT, "bun.lockb"),
+      path.join(REPO_ROOT, "tsconfig.json"),
+    ];
+
+    const changed: string[] = [];
+    const visit = (targetPath: string) => {
+      if (changed.length >= limit) return;
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(targetPath);
+      } catch {
+        return;
+      }
+
+      if (stat.isDirectory()) {
+        let entries: string[];
+        try {
+          entries = fs.readdirSync(targetPath);
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          visit(path.join(targetPath, entry));
+          if (changed.length >= limit) return;
+        }
+        return;
+      }
+
+      if (!stat.isFile()) return;
+      if (stat.mtimeMs <= this.bootedAtMs) return;
+      changed.push(path.relative(REPO_ROOT, targetPath));
+    };
+
+    for (const file of hostSensitiveFiles) visit(file);
+    for (const dir of hostSensitiveDirs) visit(dir);
+    return changed;
+  }
+
   private async reloadMicroappsFromDisk(): Promise<{
     reloaded: number;
     clearedCommands: number;
     clearedSnapshots: number;
+    requiresRestart?: boolean;
+    blockedFiles?: string[];
   }> {
+    const blockedFiles = this.collectReloadInvalidationFiles();
+    if (blockedFiles.length > 0) {
+      return {
+        reloaded: 0,
+        clearedCommands: 0,
+        clearedSnapshots: 0,
+        requiresRestart: true,
+        blockedFiles,
+      };
+    }
+
     this.microappDeps ??= this.buildMicroappDeps();
     try {
       const result = await reloadMicroapps(this.microappDeps);
@@ -1680,6 +1743,15 @@ export class TsTuiMvpApp {
           });
       },
       reloadMicroapps: () => {
+        const blockedFiles = this.collectReloadInvalidationFiles();
+        if (blockedFiles.length > 0) {
+          const files = blockedFiles.join(", ");
+          this.overlays.flash(
+            `Reload blocked: host files changed since boot. Restart required${files ? ` (${files})` : ""}`,
+          );
+          return { ok: false, error: "restart required", requiresRestart: true, blockedFiles };
+        }
+
         void this.reloadMicroappsFromDisk()
           .then((result) => {
             this.overlays.flash(

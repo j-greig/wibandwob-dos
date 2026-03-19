@@ -38,6 +38,29 @@ export default function setup(host: MicroappHost) {
     direct: true,
   });
 
+  // ── "favourites" command — pure data, no window ──
+  host.registerCommand({
+    id: "favourites",
+    label: "Figlet Favourite Fonts",
+    description:
+      "List favourite FIGlet fonts with metadata.",
+    action: () => {
+      const catalogue = getFigletCatalogue();
+      const favourites = catalogue.favourites;
+      return {
+        defaultFont: getDefaultFigletFont(),
+        count: favourites.length,
+        favourites: favourites.map((font) => ({
+          name: font,
+          meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
+        })),
+      };
+    },
+    palette: false,
+    menu: false,
+    direct: true,
+  });
+
   // ── "open" command — main entry point ──
   host.registerCommand({
     id: "open",
