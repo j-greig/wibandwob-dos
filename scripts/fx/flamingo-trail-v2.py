@@ -164,6 +164,36 @@ def lerp(a, b, t):
     return int(a + (b - a) * t)
 
 
+def parse_hex_rgb(value: str):
+    v = value.strip()
+    if v.startswith("#"):
+        v = v[1:]
+    if len(v) != 6:
+        raise ValueError(f"Invalid hex colour: {value}")
+    return (int(v[0:2], 16), int(v[2:4], 16), int(v[4:6], 16))
+
+
+def resolve_colours(theme_name: str, bg_hex: str | None, fg_start_hex: str | None, fg_end_hex: str | None):
+    """Resolve runtime colours. Supports preset: dark-pastel."""
+    if theme_name == "dark-pastel":
+        bg = parse_hex_rgb("#1e1e2e")       # body bg
+        fg_start = parse_hex_rgb("#cdd6f4") # body fg
+        fg_end = parse_hex_rgb("#f38ba8")   # highlight fg
+    else:
+        bg = (204, 146, 154)
+        fg_start = (255, 255, 255)
+        fg_end = (0, 0, 0)
+
+    if bg_hex:
+        bg = parse_hex_rgb(bg_hex)
+    if fg_start_hex:
+        fg_start = parse_hex_rgb(fg_start_hex)
+    if fg_end_hex:
+        fg_end = parse_hex_rgb(fg_end_hex)
+
+    return bg, fg_start, fg_end
+
+
 def render_ansi(canvas, colour_idx, palette, bg_rgb):
     """Render with solid pink background + per-cell foreground colours."""
     br, bg, bb = bg_rgb
@@ -211,6 +241,10 @@ def main():
     p.add_argument("--bounce-count", type=int, default=5)
     p.add_argument("--freeze-after", type=int, default=None)
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--theme", default="", help="colour preset (e.g. dark-pastel)")
+    p.add_argument("--bg", default=None, help="override background hex (#RRGGBB)")
+    p.add_argument("--fg-start", default=None, help="override start foreground hex (#RRGGBB)")
+    p.add_argument("--fg-end", default=None, help="override end foreground hex (#RRGGBB)")
     args = p.parse_args()
 
     if args.seed is not None:
@@ -262,13 +296,12 @@ def main():
     print(f"  API   : {API_BASE}", file=sys.stderr)
     print(f"  source: {src.name}  {aw}x{ah}", file=sys.stderr)
     print(f"  window: {wid}  size={win_w}x{win_h}  (reuse={'no' if args.new_window else 'yes'})", file=sys.stderr)
+    # Colour setup (default pink/mono; or --theme dark-pastel)
+    bg_rgb, fg_start, fg_end = resolve_colours(args.theme, args.bg, args.fg_start, args.fg_end)
+
     print(f"  canvas: {cw}x{ch}  dx={args.dx} dy={args.dy}", file=sys.stderr)
     print(f"  mode  : {'BOUNCE' if args.bounce else 'WRAP'}  bounce_count={args.bounce_count}", file=sys.stderr)
-
-    # Pink background + bounce-step foreground palette (white -> black)
-    bg_rgb = (204, 146, 154)
-    fg_start = (255, 255, 255)
-    fg_end = (0, 0, 0)
+    print(f"  theme : {args.theme or 'custom/default'}  bg={bg_rgb} fg_start={fg_start} fg_end={fg_end}", file=sys.stderr)
 
     target_bounces = args.bounce_count if args.bounce_count > 0 else 10
     palette = []
@@ -307,8 +340,8 @@ def main():
                     if hit:
                         bounces += 1
                         idx_dbg = min(bounces, target_bounces)
-                        v = palette[idx_dbg][0]
-                        print(f"  bounce {bounces} -> new-stamp fg rgb=({v},{v},{v})", file=sys.stderr)
+                        pr, pg, pb = palette[idx_dbg]
+                        print(f"  bounce {bounces} -> new-stamp fg rgb=({pr},{pg},{pb})", file=sys.stderr)
                         if args.bounce_count > 0 and bounces >= args.bounce_count:
                             frozen = True
                             if not freeze_logged:
