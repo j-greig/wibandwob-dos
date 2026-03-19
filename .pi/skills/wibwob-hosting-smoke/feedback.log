@@ -1,0 +1,20 @@
+# wibwob-hosting-smoke feedback log
+# Append only. Keep generalizable user preferences for future sessions.
+
+2026-03-18
+- User prefers low-tax communication: minimal steps, clear directives, avoid unnecessary verbosity.
+- User prefers the agent to decide and execute concrete next actions, then report only what the user needs to do.
+- User preference: maintain this feedback log discipline (read at session start; append general corrections/preferences immediately; skip task-specific noise).
+
+2026-03-18 (retrospective big 3)
+- In deployment guidance, choose one concrete path and drive it end-to-end; avoid branching instructions that increase user decision load.
+- Keep docs/runbooks minimal and operational: one canonical instruction path, no duplicated explanations.
+- In multi-agent sessions, default to this skill’s process/output quality work; escalate runtime/code fixes only when they are true blockers.
+
+2026-03-18 (correction: feedback-log quality)
+- Feedback entries should capture stable user preferences and correction patterns (tone, brevity, decision style, workflow style), not meta commentary.
+- Preferred output style: concise, decisive, low-tax; agent chooses next step and asks only when strictly necessary.
+- Troubleshooting response pattern: root cause first, exact fix second, user action list last.
+
+2026-03-19 (gotcha logging preference)
+- When a repeated hosting issue appears, capture it as a gotcha only after we have the verified fix path; avoid logging unresolved noise.

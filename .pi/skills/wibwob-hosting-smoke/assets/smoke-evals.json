@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "deprecated": true,
+  "note": "Docker-only legacy eval set copied from wibwob-vps-smoke. Prefer assets/hosting-evals.json for this hosting-agnostic skill.",
+  "evals": [
+    {
+      "id": "E1",
+      "name": "docker_build_succeeds",
+      "question": "Did docker_build check pass?",
+      "pass": "docker_build status is PASS",
+      "fail": "docker_build is FAIL or missing"
+    },
+    {
+      "id": "E2",
+      "name": "ssh_ready",
+      "question": "Did ssh_ready check pass?",
+      "pass": "ssh tunnelable shell access works",
+      "fail": "SSH never becomes ready"
+    },
+    {
+      "id": "E3",
+      "name": "api_ready_via_tunnel",
+      "question": "Did api_ready check pass?",
+      "pass": "Control API responds through tunnel",
+      "fail": "No /health through tunnel"
+    }
+  ]
+}
