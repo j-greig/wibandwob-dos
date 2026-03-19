@@ -109,6 +109,11 @@ Spec: `.planning/epics/e051-programmatic-tool-calling/README.md`
 Write friction you notice, patterns that confused, things that worked.
 Devlogs: `.agents/reflections/2026-W{nn}.md`
 
+**Usage hygiene (skills/extensions/agents)** — keep stale surfaces visible.
+- Live telemetry extension: `.pi/extensions/usage-pulse.ts` writes compact last-seen state to `.pi/metrics/usage-last-seen.json` (no unbounded log stream).
+- Weekly audit skill: `bash .pi/skills/pi-usage-audit/scripts/export.sh --days 14 --out scratch/reports/pi-usage-audit.md --json-out scratch/reports/pi-usage-audit.json`
+- Action rule: if stale for 14+ days, either use it, improve it, or archive it.
+
 **Discovery:** `bash scripts/discover.sh`
 
 ## Planning

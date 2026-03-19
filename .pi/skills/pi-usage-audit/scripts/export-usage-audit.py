@@ -97,6 +97,53 @@ def parse_ts(value: str | None) -> dt.datetime | None:
         return None
 
 
+def merge_last_seen(target: dict[str, dt.datetime], name: str, ts: dt.datetime | None) -> None:
+    if ts is None:
+        return
+    prev = target.get(name)
+    if prev is None or ts > prev:
+        target[name] = ts
+
+
+def load_live_usage_state(
+    state_path: Path,
+    known_skills: set[str],
+    known_exts: set[str],
+    known_agents: set[str],
+) -> tuple[dict[str, dt.datetime], dict[str, dt.datetime], dict[str, dt.datetime]]:
+    skill_seen: dict[str, dt.datetime] = {}
+    ext_seen: dict[str, dt.datetime] = {}
+    agent_seen: dict[str, dt.datetime] = {}
+
+    if not state_path.exists():
+        return skill_seen, ext_seen, agent_seen
+
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return skill_seen, ext_seen, agent_seen
+
+    surfaces = payload.get("surfaces", {}) if isinstance(payload, dict) else {}
+
+    def ingest(surface_name: str, known: set[str], out: dict[str, dt.datetime]) -> None:
+        surface = surfaces.get(surface_name, {})
+        if not isinstance(surface, dict):
+            return
+        for name, entry in surface.items():
+            if name not in known:
+                continue
+            if isinstance(entry, dict):
+                ts = parse_ts(entry.get("lastSeen"))
+            else:
+                ts = None
+            merge_last_seen(out, name, ts)
+
+    ingest("skills", known_skills, skill_seen)
+    ingest("extensions", known_exts, ext_seen)
+    ingest("agents", known_agents, agent_seen)
+    return skill_seen, ext_seen, agent_seen
+
+
 def fmt_ts(ts: dt.datetime | None) -> str:
     if ts is None:
         return "never"
@@ -117,6 +164,7 @@ def build_report(
     all_ext_names: set[str],
     all_agent_names: set[str],
     scanned_files: int,
+    live_state_used: bool,
 ):
     cutoff = now - dt.timedelta(days=threshold_days)
 
@@ -125,8 +173,9 @@ def build_report(
     lines.append("")
     lines.append("## TL;DR")
     lines.append(f"- Scanned **{scanned_files}** session logs for this repo.")
+    lines.append(f"- Live usage state: **{'yes' if live_state_used else 'no'}** (`.pi/metrics/usage-last-seen.json`).")
     lines.append(f"- Stale threshold: **{threshold_days} days** (cutoff {cutoff.date()}).")
-    lines.append("- ‘never’ means no usage signal found in scanned logs.")
+    lines.append("- ‘never’ means no usage signal found in logs/state.")
     lines.append("")
 
     stale_candidates: list[tuple[str, str, dt.datetime | None]] = []
@@ -255,6 +304,21 @@ def main() -> int:
     ext_last_seen: dict[str, dt.datetime] = {}
     agent_last_seen: dict[str, dt.datetime] = {}
 
+    live_state_path = cwd / ".pi" / "metrics" / "usage-last-seen.json"
+    live_skill_seen, live_ext_seen, live_agent_seen = load_live_usage_state(
+        live_state_path,
+        known_skills,
+        known_exts,
+        known_agents,
+    )
+    for name, ts in live_skill_seen.items():
+        merge_last_seen(skill_last_seen, name, ts)
+    for name, ts in live_ext_seen.items():
+        merge_last_seen(ext_last_seen, name, ts)
+    for name, ts in live_agent_seen.items():
+        merge_last_seen(agent_last_seen, name, ts)
+    live_state_used = live_state_path.exists()
+
     files = list(bucket.glob("*.jsonl")) if bucket.exists() else []
 
     for _, obj in iter_jsonl_lines(files):
@@ -324,6 +388,7 @@ def main() -> int:
         all_ext_names=known_exts,
         all_agent_names=known_agents,
         scanned_files=len(files),
+        live_state_used=live_state_used,
     )
 
     out = Path(args.out)
