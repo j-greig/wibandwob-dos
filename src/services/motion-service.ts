@@ -47,6 +47,31 @@ export interface TweenOpts {
   onComplete?: () => void;
 }
 
+export interface TweenPingPongOpts {
+  from: number;
+  to: number;
+  duration: number; // per half cycle (ms)
+  cycles?: number; // default 1
+  easing?: EasingFn | string;
+  onUpdate: (value: number) => void;
+  onCycle?: (cycleIndex: number) => void;
+  onComplete?: () => void;
+}
+
+export interface TweenSequenceStep {
+  to: number;
+  duration: number;
+  easing?: EasingFn | string;
+}
+
+export interface TweenSequenceOpts {
+  from: number;
+  steps: TweenSequenceStep[];
+  onUpdate: (value: number) => void;
+  onStepComplete?: (stepIndex: number, value: number) => void;
+  onComplete?: () => void;
+}
+
 function resolveEasing(easing?: EasingFn | string): EasingFn {
   if (typeof easing === "function") {
     return easing;
@@ -103,6 +128,105 @@ export function tween(opts: TweenOpts): { cancel: () => void } {
   }, 16);
 
   return { cancel };
+}
+
+/**
+ * Animate from A→B then B→A for N cycles.
+ * Useful for pulse/breathe effects and focus attention hints.
+ */
+export function tweenPingPong(opts: TweenPingPongOpts): { cancel: () => void } {
+  const cycles = Math.max(1, Math.floor(opts.cycles ?? 1));
+  let cancelled = false;
+  let active: { cancel: () => void } | null = null;
+
+  const runHalf = (from: number, to: number, onDone: () => void) => {
+    active = tween({
+      from,
+      to,
+      duration: opts.duration,
+      easing: opts.easing,
+      onUpdate: opts.onUpdate,
+      onComplete: () => {
+        if (cancelled) return;
+        onDone();
+      },
+    });
+  };
+
+  let cycleIndex = 0;
+  const runCycle = () => {
+    if (cancelled) return;
+    runHalf(opts.from, opts.to, () => {
+      runHalf(opts.to, opts.from, () => {
+        if (cancelled) return;
+        opts.onCycle?.(cycleIndex);
+        cycleIndex += 1;
+        if (cycleIndex >= cycles) {
+          opts.onComplete?.();
+          return;
+        }
+        runCycle();
+      });
+    });
+  };
+
+  runCycle();
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      active?.cancel();
+    },
+  };
+}
+
+/**
+ * Run a chained tween sequence from a start value through key steps.
+ */
+export function tweenSequence(opts: TweenSequenceOpts): { cancel: () => void } {
+  if (opts.steps.length === 0) {
+    opts.onUpdate(opts.from);
+    opts.onComplete?.();
+    return { cancel: () => {} };
+  }
+
+  let cancelled = false;
+  let active: { cancel: () => void } | null = null;
+  let stepIndex = 0;
+  let current = opts.from;
+
+  const runStep = () => {
+    if (cancelled) return;
+    const step = opts.steps[stepIndex];
+    if (!step) {
+      opts.onComplete?.();
+      return;
+    }
+
+    active = tween({
+      from: current,
+      to: step.to,
+      duration: step.duration,
+      easing: step.easing,
+      onUpdate: opts.onUpdate,
+      onComplete: () => {
+        if (cancelled) return;
+        current = step.to;
+        opts.onStepComplete?.(stepIndex, current);
+        stepIndex += 1;
+        runStep();
+      },
+    });
+  };
+
+  runStep();
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      active?.cancel();
+    },
+  };
 }
 
 type WindowFrame = { left: number; top: number; width: number; height: number };

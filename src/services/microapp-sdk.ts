@@ -138,10 +138,11 @@ export {
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
 // See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
-// ── ui-parts — layout primitives, directly importable ────────────────────────
-// These are also available on host.ui.* but can be imported directly for
-// cleaner module-level imports. host.ui.createLayoutButtonBar(...) and
-// import { createLayoutButtonBar } from "microapp-sdk" are equivalent.
+// ── ui-parts — lower-level layout/chrome primitives ─────────────────────────
+// These are used by host wiring and advanced module internals.
+// For third-party microapp authoring, prefer composition helpers exported below
+// (`createHeaderBar`, `createStatusBar`, `createButtonBar`, etc).
+// `createLayout*` names remain for compatibility but are not the preferred API.
 /** @internal */
 export {
   clamp,
@@ -237,7 +238,7 @@ export type {
 
 // Timers + teardown helpers — use instead of raw setInterval and brittle destroy chains
 /** @internal */
-export { createTimer, clearTimers, safeDestroy, safeDestroyAll } from "../core/ui-primitives.js";
+export { createTimer, clearTimers, toEvenCellWidth, safeDestroy, safeDestroyAll } from "../core/ui-primitives.js";
 
 // Scroll helpers — use with scrollable blessed boxes
 /** @internal */
@@ -281,9 +282,9 @@ export type {
 
 // Motion / tween — animate values, window position and size smoothly
 /** @internal */
-export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
+export { tween, tweenPingPong, tweenSequence, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 /** @internal */
-export type { EasingFn, TweenOpts } from "./motion-service.js";
+export type { EasingFn, TweenOpts, TweenPingPongOpts, TweenSequenceStep, TweenSequenceOpts } from "./motion-service.js";
 
 // Render monitoring — track frame rate and render pressure
 /** @internal */

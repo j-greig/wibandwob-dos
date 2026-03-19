@@ -33,7 +33,7 @@ const TARGET_PLAYBOOK = [
   "microapps/demo-forms-playground",
   "microapps/sdk-showcase",
   "microapps/demo-e026-demo",
-  "microapps/demo-layout-stress-test-pi",
+  "microapps/demo-layout-stress-test",
   "microapps/demo-ansi-lab",
 ] as const;
 

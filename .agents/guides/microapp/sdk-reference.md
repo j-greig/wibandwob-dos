@@ -14,9 +14,13 @@ API surface for microapp authors. Import everything from
 | **Forms** | createInputLine, createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl |
 | **Data Display** | createKeyValuePanel, createLogView |
 | **Feedback** | createProgressBar, createSpinner |
-| **Animation** | createAnimationClock, tween, EASINGS |
+| **Animation** | createAnimationClock, tween, tweenPingPong, tweenSequence, EASINGS |
 | **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
 | **Diagnostics** | createLayoutReporter (canonical responsive layout report), fetchRuntimeInspection, fetchRuntimeCommands, fetchRuntimeHealth |
+
+Naming policy:
+- Prefer composition helper names (`createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`) for microapp authoring.
+- `createLayout*` names are lower-level/host-centric compatibility surfaces.
 
 All components follow the [component contract](component-contract.md).
 
@@ -92,6 +96,10 @@ host.ui.createFigletDisplay(...)
 host.ui.createAnimatedPanel(...)
 host.ui.createButtonBar(...)
 host.ui.applyRect(node, rect)
+
+// Legacy aliases still exist for compatibility:
+// host.ui.createLayoutStatusBar(...)  -> prefer createStatusBar(...)
+// host.ui.createLayoutButtonBar(...)  -> prefer createButtonBar(...)
 
 // Advanced layout helpers — direct import only (not on host.ui):
 // createGrid(parent, options)       — 2D grid layout
@@ -655,6 +663,17 @@ win.onCleanup(() => {
 });
 ```
 
+### Drawille/contrib width guard
+
+```typescript
+import { toEvenCellWidth } from "../../src/services/microapp-sdk.js";
+
+const chartWidth = toEvenCellWidth(Number(panel.width) - 2);
+// Use chartWidth before creating drawille-backed contrib canvases.
+```
+
+This avoids `Width must be multiple of 2!` crashes on odd layout widths.
+
 ### TreeWidget
 
 ```typescript
@@ -695,20 +714,52 @@ Keys 1-9 switch tabs. Pass `{ keys: false }` as third arg to disable.
 ### Tween / motion
 
 ```typescript
-import { tweenWindowPosition, tweenWindowSize, tween, EASINGS } from "../../src/services/microapp-sdk.js";
+import {
+  tweenWindowPosition,
+  tweenWindowSize,
+  tween,
+  tweenPingPong,
+  tweenSequence,
+  EASINGS,
+} from "../../src/services/microapp-sdk.js";
 
 tweenWindowPosition(host.windows, win.id, 20, 5, 400, "easeOutCubic");
 tweenWindowSize(host.windows, win.id, 120, 36, 300, "easeOutCubic");
 
-const { cancel } = tween({
+const single = tween({
   from: 0, to: 100, duration: 600,
   easing: EASINGS.elasticOut,
   onUpdate: (v) => { box.width = Math.round(v); host.screen.render(); },
+});
+
+const pulse = tweenPingPong({
+  from: 0,
+  to: 1,
+  duration: 220,
+  cycles: 3,
+  easing: "easeInOutCubic",
+  onUpdate: (v) => {
+    box.style = { ...box.style, bg: v > 0.5 ? "blue" : "black" };
+    host.screen.render();
+  },
+});
+
+const sequence = tweenSequence({
+  from: 10,
+  steps: [
+    { to: 30, duration: 120, easing: "easeOut" },
+    { to: 22, duration: 100, easing: "easeInOut" },
+    { to: 26, duration: 90, easing: "easeOut" },
+  ],
+  onUpdate: (v) => { box.left = Math.round(v); host.screen.render(); },
 });
 ```
 
 Easings: `linear` `easeIn` `easeOut` `easeInOut` `easeInCubic` `easeOutCubic`
 `easeInOutCubic` `elasticOut` `bounceOut`
+
+Tip: use `tweenPingPong` for pulse/breathe emphasis and `tweenSequence` for
+small choreography without hand-written timer chains.
 
 ### RenderMonitor
 

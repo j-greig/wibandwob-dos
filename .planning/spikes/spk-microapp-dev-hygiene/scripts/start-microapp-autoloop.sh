@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Safe v1 harness: baseline + optional iterative mutate/eval loop.
-# Default target: demo-layout-stress-test-pi
+# Default target: demo-layout-stress-test
 
 SLUG="${1:-layout-stress-test-pi-v2}"
-TARGET_DIR="${2:-microapps/demo-layout-stress-test-pi}"
-COMMAND_ID="${3:-microapp.wibwob.layout-stress-test-pi.open}"
+TARGET_DIR="${2:-microapps/demo-layout-stress-test}"
+COMMAND_ID="${3:-microapp.wibwob.layout-stress-test.open}"
 SIGNAL_REGEX="${4:-layout|stress|pi}"
 TITLE_REGEX="${5:-Layout Stress Test \\(Pi\\)}"
 MODE_FIELD="${6:-mode}"

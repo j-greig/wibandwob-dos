@@ -10,7 +10,7 @@ set -euo pipefail
 #   WIBWOB_CLI="bun run src/cli/wibwob.ts" bash .../check-responsive-sizes.sh ...
 
 STAGE="${1:-all}"
-CMD_ID="${2:-microapp.wibwob.layout-stress-test-pi.open}"
+CMD_ID="${2:-microapp.wibwob.layout-stress-test.open}"
 TITLE_REGEX="${3:-Layout Stress Test \(Pi\)}"
 SIGNAL_REGEX="${4:-layout|stress|pi}"
 MODE_FIELD="${5:-mode}"   # set empty to disable mode checks

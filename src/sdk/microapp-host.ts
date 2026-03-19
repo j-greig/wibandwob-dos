@@ -65,14 +65,14 @@ export interface MicroappHost {
     createStack: typeof createStack;
     createRow: typeof createRow;
     createHeaderBar: typeof createHeaderBar;
-    createLayoutStatusBar: typeof createLayoutStatusBar;
-    createStatusBar: typeof createLayoutStatusBar;  // backward-compat alias
+    createStatusBar: typeof createLayoutStatusBar;
+    createLayoutStatusBar: typeof createLayoutStatusBar; // legacy alias
     createTextBlock: typeof createTextBlock;
     createRule: typeof createRule;
     createFigletDisplay: typeof createFigletDisplay;
     createAnimatedPanel: typeof createAnimatedPanel;
-    createLayoutButtonBar: typeof createLayoutButtonBar;
-    createButtonBar: typeof createLayoutButtonBar;  // backward-compat alias
+    createButtonBar: typeof createLayoutButtonBar;
+    createLayoutButtonBar: typeof createLayoutButtonBar; // legacy alias
     applyRect: typeof applyRect;
   };
 

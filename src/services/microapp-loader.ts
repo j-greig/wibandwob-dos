@@ -267,14 +267,14 @@ function createMicroappHost(
       createStack,
       createRow,
       createHeaderBar,
-      createLayoutStatusBar,
-      createStatusBar: createLayoutStatusBar,  // backward-compat alias
+      createStatusBar: createLayoutStatusBar,
+      createLayoutStatusBar, // legacy alias
       createTextBlock,
       createRule,
       createFigletDisplay,
       createAnimatedPanel,
-      createLayoutButtonBar,
-      createButtonBar: createLayoutButtonBar,  // backward-compat alias
+      createButtonBar: createLayoutButtonBar,
+      createLayoutButtonBar, // legacy alias
       applyRect,
     },
 

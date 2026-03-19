@@ -45,7 +45,7 @@ a function call.
 | Widgets added to `win.frame` | Always add to `win.body` |
 | Grandchildren of scrollable box render blank | Set `fixed: true` on grandchildren — blessed's `_getCoords` double-subtracts scroll offset |
 | `setContent` on a scrollable node with width=0 | Infinite loop — blessed word-wrap divides by width. Guard: `if (Number(node.width) > 0)` |
-| blessed-contrib canvas crash (`this.ctx._canvas` undefined) | Initial render race before attach. Guard widget render until `ctx` exists, guard `setData()`/draw calls with `widget?.ctx?._canvas`, and best-effort destroy contrib widgets in cleanup if they expose `destroy()` |
+| blessed-contrib canvas crash (`this.ctx._canvas` undefined) | Initial render race before attach. Guard widget render until `ctx` exists, guard `setData()`/draw calls with `widget?.ctx?._canvas`, clamp chart widths with SDK `toEvenCellWidth(...)` before drawille-backed init, and best-effort destroy contrib widgets in cleanup if they expose `destroy()` |
 
 ## Theme
 

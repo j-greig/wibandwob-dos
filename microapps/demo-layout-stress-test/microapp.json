@@ -1,0 +1,18 @@
+{
+  "name": "layout-stress-test",
+  "version": "0.1.0",
+  "description": "Layout stress test — contrib interop, responsive figlet/art, deep nesting, live charts",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.layout-stress-test",
+    "title": "Layout Stress Test",
+    "description": "Five stress test panels proving flex+contrib+responsive+nesting+lifecycle",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [{ "category": "demos", "order": 96, "label": "Layout Stress Test" }],
+    "palette": { "order": 296, "label": "Layout Stress Test" },
+    "agent": true,
+    "api": true
+  }
+}

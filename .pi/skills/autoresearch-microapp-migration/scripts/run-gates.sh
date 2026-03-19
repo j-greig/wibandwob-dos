@@ -7,8 +7,8 @@ set -euo pipefail
 # Optional CLI override:
 #   WIBWOB_CLI="bun run src/cli/wibwob.ts" bash .../run-gates.sh ...
 
-TARGET_DIR="${1:-microapps/demo-layout-stress-test-pi}"
-COMMAND_ID="${2:-microapp.wibwob.layout-stress-test-pi.open}"
+TARGET_DIR="${1:-microapps/demo-layout-stress-test}"
+COMMAND_ID="${2:-microapp.wibwob.layout-stress-test.open}"
 SIGNAL_REGEX="${3:-layout|stress|pi}"
 TITLE_REGEX="${4:-Layout Stress Test \\(Pi\\)}"
 MODE_FIELD="${5:-mode}"

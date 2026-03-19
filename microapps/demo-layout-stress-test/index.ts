@@ -1,5 +1,5 @@
 /**
- * Layout Stress Test (Pi/Claude version)
+ * Layout Stress Test
  *
  * Five panels in one module, each proving a different hard layout problem:
  *   A: Contrib grid inside flex (interop)
@@ -28,6 +28,7 @@ import {
   xLabels,
   createScrollbar,
   scrollableStyle,
+  toEvenCellWidth,
   safeDestroyAll,
 } from "../../src/services/microapp-sdk.js";
 
@@ -120,10 +121,10 @@ const TAG_LABELS_D = ["ai", "ux", "sim", "map", "net", "gfx"];
 export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
-    label: "Layout Stress Test (Pi)",
+    label: "Layout Stress Test",
     description: "Five stress test panels: contrib interop, responsive figlet/art, nesting, live chart",
     action: () => {
-      const win = host.createWindow({ title: "Layout Stress Test (Pi)", width: 120, height: 35 });
+      const win = host.createWindow({ title: "Layout Stress Test", width: 120, height: 35 });
       const timers = new Set<ReturnType<typeof setInterval>>();
       let mode: Mode = "lg";
       let liveRunning = false;
@@ -171,21 +172,43 @@ export default function setup(host: MicroappHost) {
         { key: "flex-side", basis: 20, part: flexSide.part },
       ]);
 
-      const contribGrid = new contrib.grid({ rows: 12, cols: 12, screen: panelA.node as any });
-      const lineChart = contribGrid.set(0, 0, 8, 12, contrib.line, {
-        label: " CPU ", showLegend: true, legend: { width: 6 },
-        style: { line: "green", text: "white", baseline: "white" },
-      }) as any;
-      const barChart = contribGrid.set(8, 0, 4, 12, contrib.bar, {
-        label: " Queue ", barWidth: 3, barSpacing: 1, maxHeight: 100,
-        style: { fg: "cyan" },
-      }) as any;
+      let contribGrid: any | null = null;
+      let lineChart: any | null = null;
+      let barChart: any | null = null;
+      let contribInitError: string | null = null;
 
       let seriesA = randHistory(20, 20, 90);
       let seriesB = randHistory(20, 5, 70);
       const chartLabels = xLabels(20);
 
       const hasContribCanvas = (widget: any) => Boolean(widget?.ctx?._canvas);
+
+      function ensurePanelAContrib(): void {
+        if (lineChart && barChart) return;
+        const innerW = panelA.innerW();
+        const innerH = panelA.innerH();
+        if (innerW < 8 || innerH < 8) return;
+        const evenWidth = toEvenCellWidth(innerW);
+        if (evenWidth < 2) return;
+        panelA.node.width = evenWidth + 2;
+        try {
+          contribGrid = new contrib.grid({ rows: 12, cols: 12, screen: panelA.node as any });
+          lineChart = contribGrid.set(0, 0, 8, 12, contrib.line, {
+            label: " CPU ", showLegend: true, legend: { width: 6 },
+            style: { line: "green", text: "white", baseline: "white" },
+          }) as any;
+          barChart = contribGrid.set(8, 0, 4, 12, contrib.bar, {
+            label: " Queue ", barWidth: 3, barSpacing: 1, maxHeight: 100,
+            style: { fg: "cyan" },
+          }) as any;
+          contribInitError = null;
+        } catch (error) {
+          contribInitError = error instanceof Error ? error.message : String(error);
+          lineChart = null;
+          barChart = null;
+          contribGrid = null;
+        }
+      }
 
       // ── Panel B: Responsive figlet chips ───────────────────────
       const panelB = panel(content, "B: RESPONSIVE FIGLET", "yellow");
@@ -252,12 +275,27 @@ export default function setup(host: MicroappHost) {
 
       // ── Panel E: Live chart in responsive flex ─────────────────
       const panelE = panel(content, "E: LIVE CHART", "red");
-      const sparkline = contrib.sparkline({
-        parent: panelE.node as any,
-        label: " Spark ",
-        tags: true,
-        style: { fg: "yellow" },
-      }) as any;
+      let sparkline: any | null = null;
+      function ensurePanelEContrib(): void {
+        if (sparkline) return;
+        const innerW = panelE.innerW();
+        if (innerW < 2 || panelE.innerH() < 2) return;
+        const evenWidth = toEvenCellWidth(innerW);
+        if (evenWidth < 2) return;
+        panelE.node.width = evenWidth + 2;
+        try {
+          sparkline = contrib.sparkline({
+            parent: panelE.node as any,
+            label: " Spark ",
+            tags: true,
+            style: { fg: "yellow" },
+          }) as any;
+          contribInitError = null;
+        } catch (error) {
+          contribInitError = error instanceof Error ? error.message : String(error);
+          sparkline = null;
+        }
+      }
       const liveA = randHistory(18, 10, 60);
       const liveB = randHistory(18, 20, 80);
 
@@ -367,6 +405,8 @@ export default function setup(host: MicroappHost) {
         liveRunning = mode !== "sm";
 
         positionPanels(w, h);
+        ensurePanelAContrib();
+        ensurePanelEContrib();
 
         // Header / footer
         headerBox.setContent(` LAYOUT STRESS TEST  ${mode.toUpperCase()}  ${w}x${h}`);
@@ -376,6 +416,9 @@ export default function setup(host: MicroappHost) {
 
         // Panel A: flex side label
         flexSide.paint(`Flex\nSide\n${Number(flexSide.node.width)||0}x${Number(flexSide.node.height)||0}`);
+        if ((!lineChart || !barChart) && contribInitError) {
+          panelA.paint(`Contrib init failed:\n${contribInitError}`);
+        }
 
         // Panel B: responsive figlet
         figletFont = mode === "lg" ? "small" : mode === "md" ? "mini" : "text";
@@ -422,10 +465,14 @@ export default function setup(host: MicroappHost) {
         tagRowsD = layoutWrapRow(tagNodes.map(t => t.node), Math.max(1, Number(tagContainer.width) || 1), 6, 1, 1);
 
         // Panel E: sparkline positioning
-        sparkline.top = 1;
-        sparkline.left = 1;
-        sparkline.width = Math.max(1, panelE.innerW());
-        sparkline.height = Math.max(1, panelE.innerH());
+        if (sparkline) {
+          sparkline.top = 1;
+          sparkline.left = 1;
+          sparkline.width = toEvenCellWidth(Math.max(1, panelE.innerW()));
+          sparkline.height = Math.max(1, panelE.innerH());
+        } else if (contribInitError) {
+          panelE.paint(`Sparkline init failed:\n${contribInitError}`);
+        }
 
         updateCharts();
         host.screen.render();
@@ -451,6 +498,7 @@ export default function setup(host: MicroappHost) {
           footerBox,
           content,
           viewport,
+          contribGrid,
           lineChart,
           barChart,
           sparkline,
@@ -473,6 +521,7 @@ export default function setup(host: MicroappHost) {
         contribGridWidth: Number(panelA.node.width) || 0,
         flexSideWidth: Number(flexSide.node.width) || 0,
         sparklineVisible: liveRunning,
+        contribInitError,
         windowWidth: Number(win.body.width) || 0,
         windowHeight: Number(win.body.height) || 0,
       }));
@@ -483,7 +532,7 @@ export default function setup(host: MicroappHost) {
 
       win.focus();
     },
-    menu: [{ category: "demos", order: 96, label: "Layout Stress Test (Pi)" }],
-    palette: { order: 296, label: "Layout Stress Test (Pi)" },
+    menu: [{ category: "demos", order: 96, label: "Layout Stress Test" }],
+    palette: { order: 296, label: "Layout Stress Test" },
   });
 }
