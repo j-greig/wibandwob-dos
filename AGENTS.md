@@ -193,16 +193,16 @@ PY
 
 Opens a notepad, fetches the real desktop size from the API, centres the window,
 then runs the bouncing mech animation with colour evolution.
+The WID is captured and passed to the animation script so it controls the right window.
 
 ```bash
 cd ~/Repos/wibwob-zine-moodboard
 LABEL=8pr
 API_PORT=8100
 
-# 1. Open notepad + centre it dynamically (Python)
-WIBWOB_API=http://127.0.0.1:$API_PORT python3 - <<'PY'
+# 1. Open notepad + centre it dynamically; capture WID
+WID=$(WIBWOB_API=http://127.0.0.1:$API_PORT python3 - <<'PY'
 import urllib.request, json, time
-
 api = "http://127.0.0.1:8100"
 def post(p, b):
     d=json.dumps(b).encode()
@@ -210,27 +210,24 @@ def post(p, b):
     return json.loads(urllib.request.urlopen(r,timeout=5).read())
 def get(p):
     return json.loads(urllib.request.urlopen(f"{api}{p}",timeout=5).read())
-
-sw=int(get("/health")["screen"]["width"])
-sh=int(get("/health")["screen"]["height"])
-print(f"Desktop: {sw}x{sh}")
-
+sw=int(get("/health")["screen"]["width"]); sh=int(get("/health")["screen"]["height"])
 post("/commands/run",{"id":"microapp.wibwob.notepad.open","args":{}})
 time.sleep(0.35)
-
 state=get("/state")
 wid=[w for w in state["windows"] if(w.get("details")or{}).get("appType")=="wibwob.notepad"][-1]["id"]
-
-win_w,win_h=120,60
-cx=(sw-win_w)//2; cy=(sh-win_h)//2
-print(f"Centering {win_w}x{win_h} at ({cx},{cy}) on {sw}x{sh}")
+win_w,win_h=120,60; cx=(sw-win_w)//2; cy=(sh-win_h)//2
 post("/windows/batch",{"ops":[{"id":wid,"width":win_w,"height":win_h,"left":cx,"top":cy}]})
-print(f"WID={wid}")
+print(wid)   # capture WID for caller
 PY
+)
+echo "Window ID: $WID"
 
-# 2. Run animation into that window
+# 2. Confirm position with minimap
+bun run src/cli/wibwob.ts -i $LABEL minimap
+
+# 3. Run animation into the centred window (script won't reposition it)
 WIBWOB_API=http://127.0.0.1:$API_PORT python3 scripts/fx/flamingo-trail-v2.py \
-  --window-id 23 \
+  --window-id $WID \
   --source microapps-private/wibwob-primers/primers/mech.txt \
   --theme dark-pastel \
   --window-w 120 --window-h 60 \

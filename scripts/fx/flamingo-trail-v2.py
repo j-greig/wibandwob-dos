@@ -286,8 +286,7 @@ def main():
         if wid is None:
             print("Could not open/reuse notepad window", file=sys.stderr)
             sys.exit(1)
-    else:
-        api_post("/windows/batch", {"ops": [{"id": wid, "left": 0, "top": 0, "width": win_w, "height": win_h}]})
+    # When window-id is provided, do NOT touch its position/size — trust the caller
 
     # Clear contents once before starting so colour transitions are visible in one doc
     write_notepad(wid, "")
