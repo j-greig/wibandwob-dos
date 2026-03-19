@@ -1,6 +1,61 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
+import { existsSync } from "fs";
+import path from "path";
+
+const ANSI_LAB_ASSET_IMAGE = path.join(import.meta.dir, "assets", "cat.jpg");
+const CHAFA_CACHE = new Map<string, string>();
+
+function stripCursorToggles(raw: string): string {
+  return raw.replace(/\x1b\[\?25[lh]/g, "");
+}
+
+function convertAnsiRgbToBlessedTags(raw: string): string {
+  return stripCursorToggles(raw)
+    .replace(/\x1b\[38;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
+      const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
+      return `{#${hex}-fg}`;
+    })
+    .replace(/\x1b\[48;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
+      const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
+      return `{#${hex}-bg}`;
+    })
+    .replace(/\x1b\[0m/g, "{/}")
+    .replace(/\x1b\[7m/g, "")
+    .replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function renderChafa(args: string[]): string {
+  const cacheKey = JSON.stringify(args);
+  const cached = CHAFA_CACHE.get(cacheKey);
+  if (cached) return cached;
+  if (!existsSync(ANSI_LAB_ASSET_IMAGE)) {
+    const missingAssetMessage = [
+      "  ERROR: missing image asset for chafa tests.",
+      `  Expected: ${ANSI_LAB_ASSET_IMAGE}`,
+      "  Add an image at microapps/demo-ansi-lab/assets/cat.jpg",
+    ].join("\n");
+    CHAFA_CACHE.set(cacheKey, missingAssetMessage);
+    return missingAssetMessage;
+  }
+
+  try {
+    const out = execFileSync("chafa", [...args, ANSI_LAB_ASSET_IMAGE], {
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    CHAFA_CACHE.set(cacheKey, out);
+    return out;
+  } catch {
+    const missingChafaMessage = [
+      "  ERROR: chafa is unavailable for ANSI Lab preview tests.",
+      "  Install chafa or skip tests 5/6/8/9/10.",
+    ].join("\n");
+    CHAFA_CACHE.set(cacheKey, missingChafaMessage);
+    return missingChafaMessage;
+  }
+}
 
 export default function init(ctx: MicroappHost) {
   ctx.registerCommand({
@@ -11,6 +66,7 @@ export default function init(ctx: MicroappHost) {
     palette: { order: 300, label: "ANSI Lab" },
     action: () => {
       const win = ctx.createWindow({ title: "ANSI Lab", width: 80, height: 35 });
+      let isClosing = false;
 
       const content = blessed.box({
         parent: win.body,
@@ -38,6 +94,7 @@ export default function init(ctx: MicroappHost) {
       });
 
       let currentTest = 0;
+      let currentRender = "";
       const tests = [
         { name: "1: blessed {#hex-fg} tags", fn: testBlessedHexTags },
         { name: "2: blessed {color-fg} named", fn: testBlessedNamedTags },
@@ -51,16 +108,41 @@ export default function init(ctx: MicroappHost) {
         { name: "10: chafa 16-color raw", fn: testChafa16 },
       ];
 
+      const normalizeTestIndex = (test: number) => ((test % tests.length) + tests.length) % tests.length;
+
       function show(test: number) {
-        currentTest = test % tests.length;
+        if (isClosing) return;
+        currentTest = normalizeTestIndex(test);
         const t = tests[currentTest]!;
-        content.setContent(t.fn());
+        currentRender = t.fn();
+        content.setContent(currentRender);
         status.setContent(` ${t.name}  |  n/p = next/prev  |  ${currentTest + 1}/${tests.length}`);
         ctx.screen.render();
       }
 
+      const requestClose = () => {
+        if (isClosing) return;
+        win.close();
+      };
+
       content.key(["n", "right"], () => show(currentTest + 1));
-      content.key(["p", "left"], () => show(currentTest - 1 + tests.length));
+      content.key(["p", "left"], () => show(currentTest - 1));
+      content.key(["q", "escape"], requestClose);
+
+      win.describeState(() => ({
+        summary: `ANSI Lab test ${currentTest + 1}/${tests.length}`,
+        testIndex: currentTest,
+        testName: tests[currentTest]?.name ?? "unknown",
+      }));
+      win.captureText(() => {
+        const header = `ANSI Lab ${currentTest + 1}/${tests.length} — ${tests[currentTest]?.name ?? "unknown"}`;
+        return `${header}\n\n${currentRender}`;
+      });
+      win.onCleanup(() => {
+        isClosing = true;
+        currentRender = "";
+      });
+
       content.focus();
       show(0);
     },
@@ -163,29 +245,8 @@ function testChafaBlessedTags(): string {
     "  =======================================",
     "",
   ];
-  try {
-    const raw = execSync(
-      "chafa -f symbols -s 60x20 --symbols block --color-space rgb /Users/james/Repos/wibandwob-dos/scratch/test-site/cat.jpg",
-      { encoding: "utf8", timeout: 5000 }
-    );
-    // Convert ANSI → blessed tags
-    const converted = raw
-      .replace(/\x1b\[38;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
-        const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
-        return `{#${hex}-fg}`;
-      })
-      .replace(/\x1b\[48;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
-        const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
-        return `{#${hex}-bg}`;
-      })
-      .replace(/\x1b\[0m/g, "{/}")
-      .replace(/\x1b\[7m/g, "")
-      .replace(/\x1b\[[0-9;]*m/g, "")
-      .replace(/\x1b\[\?25[lh]/g, "");
-    lines.push(converted);
-  } catch (e) {
-    lines.push("  ERROR: " + String(e));
-  }
+  const raw = renderChafa(["-f", "symbols", "-s", "60x20", "--symbols", "block", "--color-space", "rgb"]);
+  lines.push(convertAnsiRgbToBlessedTags(raw));
   return lines.join("\n");
 }
 
@@ -195,15 +256,8 @@ function testChafaRawAnsi(): string {
     "  =====================================",
     "",
   ];
-  try {
-    const raw = execSync(
-      "chafa -f symbols -s 60x20 --symbols block --color-space rgb /Users/james/Repos/wibandwob-dos/scratch/test-site/cat.jpg",
-      { encoding: "utf8", timeout: 5000 }
-    );
-    lines.push(raw.replace(/\x1b\[\?25[lh]/g, ""));
-  } catch (e) {
-    lines.push("  ERROR: " + String(e));
-  }
+  const raw = renderChafa(["-f", "symbols", "-s", "60x20", "--symbols", "block", "--color-space", "rgb"]);
+  lines.push(stripCursorToggles(raw));
   return lines.join("\n");
 }
 
@@ -237,15 +291,8 @@ function testChafa256(): string {
     "  ==============================",
     "",
   ];
-  try {
-    const raw = execSync(
-      "chafa -f symbols -c 256 -s 60x20 --symbols block /Users/james/Repos/wibandwob-dos/scratch/test-site/cat.jpg",
-      { encoding: "utf8", timeout: 5000 }
-    );
-    lines.push(raw.replace(/\x1b\[\?25[lh]/g, ""));
-  } catch (e) {
-    lines.push("  ERROR: " + String(e));
-  }
+  const raw = renderChafa(["-f", "symbols", "-c", "256", "-s", "60x20", "--symbols", "block"]);
+  lines.push(stripCursorToggles(raw));
   return lines.join("\n");
 }
 
@@ -255,15 +302,8 @@ function testChafa16(): string {
     "  ============================",
     "",
   ];
-  try {
-    const raw = execSync(
-      "chafa -f symbols -c 16 -s 60x20 --symbols block /Users/james/Repos/wibandwob-dos/scratch/test-site/cat.jpg",
-      { encoding: "utf8", timeout: 5000 }
-    );
-    lines.push(raw.replace(/\x1b\[\?25[lh]/g, ""));
-  } catch (e) {
-    lines.push("  ERROR: " + String(e));
-  }
+  const raw = renderChafa(["-f", "symbols", "-c", "16", "-s", "60x20", "--symbols", "block"]);
+  lines.push(stripCursorToggles(raw));
   return lines.join("\n");
 }
 
@@ -275,28 +315,8 @@ function testMixedContent(): string {
     "  Here is some normal text above an image.",
     "",
   ];
-  try {
-    const raw = execSync(
-      "chafa -f symbols -s 40x12 --symbols block --color-space rgb /Users/james/Repos/wibandwob-dos/scratch/test-site/cat.jpg",
-      { encoding: "utf8", timeout: 5000 }
-    );
-    const converted = raw
-      .replace(/\x1b\[38;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
-        const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
-        return `{#${hex}-fg}`;
-      })
-      .replace(/\x1b\[48;2;(\d+);(\d+);(\d+)m/g, (_m: string, r: string, g: string, b: string) => {
-        const hex = ((+r << 16) | (+g << 8) | +b).toString(16).padStart(6, "0");
-        return `{#${hex}-bg}`;
-      })
-      .replace(/\x1b\[0m/g, "{/}")
-      .replace(/\x1b\[7m/g, "")
-      .replace(/\x1b\[[0-9;]*m/g, "")
-      .replace(/\x1b\[\?25[lh]/g, "");
-    lines.push(converted);
-  } catch (e) {
-    lines.push("  ERROR: " + String(e));
-  }
+  const raw = renderChafa(["-f", "symbols", "-s", "40x12", "--symbols", "block", "--color-space", "rgb"]);
+  lines.push(convertAnsiRgbToBlessedTags(raw));
   lines.push("");
   lines.push("  And here is text below the image. All good?");
   return lines.join("\n");

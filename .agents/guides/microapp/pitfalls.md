@@ -22,7 +22,21 @@ a function call.
 |---------|-----|
 | Raw `setInterval` / `setTimeout` | Use `createTimer(fn, ms, timers)` from the SDK |
 | Forgetting the timer set | `const timers = new Set<ReturnType<typeof setInterval>>()` at module scope |
+| Untracked one-shot `setTimeout` in motion helpers | Store timeout handles in the same `timers` set so `clearTimers(timers)` cancels them on close |
 | Cleanup without `clearTimers` | `win.onCleanup(() => clearTimers(timers))` |
+| Timer tick or resize callback races window teardown | Add an `isClosing` flag checked in render/update/focus callbacks, set it at start of `onCleanup` |
+| Restyle/select callbacks still fire while teardown begins | Guard `onRestyle` and selection handlers with close-phase checks (`if (isClosing) return`) |
+| Multiple close triggers (keys/buttons) cause duplicate close attempts | Route all close paths through one `requestClose()` guard that no-ops when already closing |
+| Demo windows lack local exit keys, forcing external close flow | Bind `q`/`escape` to `requestClose()` for reliable in-window exit and parity with status hints |
+| Button callback throws crash the interaction flow | Use resilient button primitives (SDK `createButton`) and keep callback side-effects isolated |
+| Per-app ad-hoc button styling drift | Use SDK `createButton` variants (`primary`/`secondary`/`ghost`/`destructive`) for consistent design-system semantics |
+| Reimplementing single-choice mode pickers with custom key handling | Prefer SDK `createSegmentedControl` for compact mode/density/theme selectors |
+| Reimplementing boolean mode flags as ad-hoc text widgets | Prefer SDK `createToggleSwitch` for explicit on/off semantics and keyboard parity |
+| Checkbox `onChange` callback throws destabilise interactions | Prefer SDK `createCheckbox` callback isolation and keep side-effects guarded |
+| Radio/select `onChange` callback throws destabilise interactions | Prefer SDK `createRadioGroup` / `createSelect` callback isolation and keep side-effects guarded |
+| Filterable-list callbacks (`onSelect`/`onHighlight`/`onCancel`) throw destabilise interactions | Prefer SDK `createFilterableList` callback isolation and keep side-effects guarded |
+| Destroy order races in complex widget trees | Unsubscribe/clear timers first, then use SDK `safeDestroyAll(...)` / `safeDestroy(...)` for best-effort teardown so one destroy failure does not abort the rest |
+| Switching live demo panes can fail when previous pane teardown throws | Wrap per-pane teardown callbacks (`activeDestroy`) in best-effort guards before mounting next pane |
 
 ## Widget parenting
 
@@ -31,6 +45,7 @@ a function call.
 | Widgets added to `win.frame` | Always add to `win.body` |
 | Grandchildren of scrollable box render blank | Set `fixed: true` on grandchildren — blessed's `_getCoords` double-subtracts scroll offset |
 | `setContent` on a scrollable node with width=0 | Infinite loop — blessed word-wrap divides by width. Guard: `if (Number(node.width) > 0)` |
+| blessed-contrib canvas crash (`this.ctx._canvas` undefined) | Initial render race before attach. Guard widget render until `ctx` exists, guard `setData()`/draw calls with `widget?.ctx?._canvas`, and best-effort destroy contrib widgets in cleanup if they expose `destroy()` |
 
 ## Theme
 
@@ -57,6 +72,12 @@ a function call.
 | Importing from `src/core/theme/types.js` | Use `ThemeVariant` from the SDK |
 | Importing from `src/services/figlet-service.js` | Use `renderFigletLines` etc from the SDK (already re-exported) |
 | `spawnSync("figlet", ...)` | Use `renderFiglet` from the SDK — cached, safe fallback |
+| Hardcoded `/scratch/...` asset paths in microapps | Ship assets inside the microapp (`microapps/<app>/assets/*`) and resolve via `import.meta.dir` |
+| Re-running expensive external CLIs every keypress/switch | Memoize deterministic command output (e.g. chafa previews) to reduce UI stalls/timeouts |
+| Copy-pasted ANSI conversion regex chains across tests/views | Centralise conversion helpers (e.g. `convertAnsiRgbToBlessedTags`) to keep behaviour consistent and simplify debugging |
+| Assuming list selection indices are always valid after restyle/update | Clamp/normalise selected indices before dereferencing and avoid unnecessary teardown/rebuild when selection did not change |
+| Status/help line advertises keys that are not actually bound | Keep UI hints and key bindings in lockstep (e.g. if status says `q/esc close`, bind both) |
+| Assuming optional binaries always exist (e.g. `chafa`) | Catch process failures and render stable fallback text instead of noisy stack traces in UI |
 | Hand-built tab bar + key bindings | Use `createTabs` from the SDK |
 | Copy-pasting pattern generators | Import from `PATTERNS` or individual named exports |
 

@@ -59,6 +59,8 @@ function openMyApp(host: MicroappHost) {
 
 ## 4. Verify
 
+Command id reminder: use `microapp.<microapp.json:microapp.id>.open` (not the directory name) when writing gate commands.
+
 ```bash
 bun run typecheck
 wibwob cmd microapps.reload

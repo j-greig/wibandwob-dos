@@ -28,6 +28,7 @@ import {
   xLabels,
   createScrollbar,
   scrollableStyle,
+  safeDestroyAll,
 } from "../../src/services/microapp-sdk.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -127,6 +128,7 @@ export default function setup(host: MicroappHost) {
       let mode: Mode = "lg";
       let liveRunning = false;
       let liveTick = 0;
+      let isClosing = false;
 
       // ── Header / Footer (direct children of win.body) ──────────
       const headerBox = blessed.box({
@@ -182,6 +184,8 @@ export default function setup(host: MicroappHost) {
       let seriesA = randHistory(20, 20, 90);
       let seriesB = randHistory(20, 5, 70);
       const chartLabels = xLabels(20);
+
+      const hasContribCanvas = (widget: any) => Boolean(widget?.ctx?._canvas);
 
       // ── Panel B: Responsive figlet chips ───────────────────────
       const panelB = panel(content, "B: RESPONSIVE FIGLET", "yellow");
@@ -325,18 +329,23 @@ export default function setup(host: MicroappHost) {
       }
 
       function updateCharts() {
+        if (isClosing) return;
         seriesA.push(Math.max(1, Math.min(100, seriesA[seriesA.length - 1]! + (Math.random() - 0.5) * 15)));
         seriesA.shift();
         seriesB.push(Math.max(1, Math.min(100, seriesB[seriesB.length - 1]! + (Math.random() - 0.5) * 12)));
         seriesB.shift();
-        lineChart.setData([
-          { title: "A", x: chartLabels, y: seriesA.map(Math.round), style: { line: "green" } },
-          { title: "B", x: chartLabels, y: seriesB.map(Math.round), style: { line: "magenta" } },
-        ]);
-        barChart.setData({
-          titles: ["q1", "q2", "q3", "q4"],
-          data: [20, 40, 65, 30].map(v => v + Math.round(Math.random() * 20)),
-        });
+        if (hasContribCanvas(lineChart)) {
+          lineChart.setData([
+            { title: "A", x: chartLabels, y: seriesA.map(Math.round), style: { line: "green" } },
+            { title: "B", x: chartLabels, y: seriesB.map(Math.round), style: { line: "magenta" } },
+          ]);
+        }
+        if (hasContribCanvas(barChart)) {
+          barChart.setData({
+            titles: ["q1", "q2", "q3", "q4"],
+            data: [20, 40, 65, 30].map(v => v + Math.round(Math.random() * 20)),
+          });
+        }
 
         if (liveRunning) {
           liveTick++;
@@ -344,11 +353,14 @@ export default function setup(host: MicroappHost) {
           liveA.shift();
           liveB.push(Math.max(0, Math.min(100, liveB[liveB.length - 1]! + (Math.random() - 0.5) * 10)));
           liveB.shift();
-          sparkline.setData(["a", "b"], [liveA.map(Math.round), liveB.map(Math.round)]);
+          if (hasContribCanvas(sparkline)) {
+            sparkline.setData(["a", "b"], [liveA.map(Math.round), liveB.map(Math.round)]);
+          }
         }
       }
 
       function render() {
+        if (isClosing) return;
         const w = Math.max(1, Number(win.body.width) || 120);
         const h = Math.max(1, Number(win.body.height) || 35);
         mode = pickMode(w);
@@ -424,20 +436,25 @@ export default function setup(host: MicroappHost) {
 
       win.onResize(render);
       win.onCleanup(() => {
+        isClosing = true;
         clearTimers(timers);
-        for (const chip of figletChips) chip.node.destroy();
-        for (const tag of tagNodes) tag.destroy();
-        level1.destroy();
-        panelARow.destroy();
-        panelB.part.destroy();
-        panelC.part.destroy();
-        panelD.part.destroy();
-        panelE.part.destroy();
-        headerBox.destroy();
-        footerBox.destroy();
-        content.destroy();
-        viewport.destroy();
-        sparkline.destroy?.();
+        safeDestroyAll(
+          ...figletChips.map((chip) => chip.node),
+          ...tagNodes,
+          level1,
+          panelARow,
+          panelB.part,
+          panelC.part,
+          panelD.part,
+          panelE.part,
+          headerBox,
+          footerBox,
+          content,
+          viewport,
+          lineChart,
+          barChart,
+          sparkline,
+        );
       });
       win.onRestyle(() => {
         content.style = host.theme().body;

@@ -73,6 +73,7 @@ microapps/
 Key fields:
 
 - `id` — globally unique microapp identifier, used as `appType` in state
+  - Open command id convention: `microapp.<microapp.id>.open` (derived from manifest id, not folder name)
 - `multiInstance` — true if multiple windows of this type can coexist
 - `persist` — true if window state should survive workspace save/restore
 - `menu` — where the app appears in the menu bar
@@ -312,7 +313,7 @@ Every microapp window MUST implement these four hooks:
 Use `createTimer` from the SDK for interval-based updates:
 
 ```typescript
-import { createTimer, clearTimers, createTextBlock } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, safeDestroyAll, safeDestroy, createTextBlock } from "../../src/services/microapp-sdk.js";
 
 function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "Animated", width: 40, height: 10 });
@@ -330,7 +331,11 @@ function openMyApp(host: MicroappHost) {
   win.describeState(() => ({ summary: `Animated — tick ${tick}` }));
   win.captureText(() => `Tick: ${tick}`);
   win.onRestyle(() => { display.restyle(); host.screen.render(); });
-  win.onCleanup(() => clearTimers(timers));
+  win.onCleanup(() => {
+    clearTimers(timers);
+    safeDestroyAll(content, statusBar, sidebar);
+    safeDestroy(optionalThirdPartyWidget);
+  });
 }
 ```
 

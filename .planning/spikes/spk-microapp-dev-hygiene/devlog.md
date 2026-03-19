@@ -1,0 +1,771 @@
+# Devlog — spk-microapp-dev-hygiene
+
+Use this log for session learning loops (not commit summaries).
+IMPORTANT: use shell system time/date to get accurate HH:MM timestamps
+
+## Entry template
+
+```md
+### HH:MM — <short title>
+- Intent:
+- Observed behaviour:
+- Gap type: [parity|granularity|composability|verification|ux]
+- Root cause:
+- Patch layer: [description|skill|script|hook|docs]
+- Evidence:
+- Canon update:
+```
+
+## Session counters
+
+- Trigger misses: 0
+- Silent success failures: 1
+- Verification escapes: 0
+
+---
+
+## Entries
+
+### 11:32 — Responsive gate reliability hardening
+- Intent: Improve microapp reliability checks in one smallest safe slice and keep docs in sync.
+- Observed behaviour: Responsive gate used global screenshot signal and a wrong maximize arg (`--windowId`), allowing false positives and ambiguous fullscreen behaviour.
+- Gap type: verification
+- Root cause: Gate script had command-arg drift and non-targeted screenshot check.
+- Patch layer: script + docs
+- Evidence:
+  - `bun run typecheck` pass
+  - `bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-layout-stress-test-pi microapp.wibwob.layout-stress-test-pi.open "layout|stress|pi" "Layout Stress Test \(Pi\)" mode` → PASS all gates
+  - `/tmp/microloop-shot.txt` contains expected signal: `Layout Stress Test — lg live:on art:lg figlet:small`
+  - `demo-dashboards-v2` gate still fails by app/runtime issue (`no target window`), now surfaced clearly instead of masked checks
+- Canon update:
+  - responsive gate must validate screenshot signal by window id
+  - use `--id` (not `--windowId`) for `window.toggle_maximize`
+  - keep retry-based window discovery for flake resistance
+
+### 11:40 — Crash visibility and gate observability hardening
+- Intent: ensure agentic loop can *see* terminal/tmux runtime crashes (not just API failures), and prevent silent gate brittleness.
+- Observed behaviour: dashboard gate failures were opaque (`no target window`), while tmux showed critical stack traces (`this.ctx._canvas`). Agent path was missing terminal diagnostics.
+- Gap type: verification
+- Root cause: gate harness lacked crash telemetry and relied on brittle title/details assumptions.
+- Patch layer: script + code + docs
+- Evidence:
+  - `run-gates.sh` now emits debug bundle on failure: health JSON + tmux pane tail + scratch log tail.
+  - runtime preflight now enforces non-headless screen (`screen.width/height > 1`).
+  - responsive checker now matches by appType fallback, stabilises detail reads, and uses id-scoped screenshot checks.
+  - `microapp.wibwob.demo-dashboards-v2.open` no longer crashes dev:world; gate proceeds to real mode assertion failure (`expected md ... got lg`) instead of process death.
+  - visual artefacts captured: `/tmp/microloop-map-iter3.txt`, `/tmp/microloop-shot-iter3.txt`, `/tmp/microloop-state-iter3.json`.
+- Canon update:
+  - gate failures must always surface terminal/tmux evidence automatically.
+  - responsive checks must not depend on title-only discovery or immediate unstable details.
+  - a failing assertion with alive runtime is better than a silent crash and is now the enforced baseline.
+
+### 11:59 — ANSI Lab observability + command-id canon fix
+- Intent: run one safe reliability slice on `demo-ansi-lab` with no doc drift.
+- Observed behaviour: initial gate failed at command discovery due command-id mismatch assumption (`microapp.wibwob.demo-ansi-lab.open` vs actual manifest-derived id).
+- Gap type: verification
+- Root cause: tooling habit drifted to directory-name command ids; microapp uses `microapp.id = wibwob.ansi-lab`.
+- Patch layer: code + docs
+- Evidence:
+  - code: `microapps/demo-ansi-lab/index.ts`
+    - normalised test index via positive modulo helper (`normalizeTestIndex`) to avoid future negative-index edge cases.
+    - added `win.describeState` and `win.captureText` so state/screenshot/debug surfaces carry active test context.
+  - docs synced:
+    - `docs/building-custom-microapps.md` now states open command format is `microapp.<microapp.id>.open`.
+    - `.agents/guides/microapp/quick-start.md` now repeats the same command-id rule in verify section.
+  - verification:
+    - `bun run typecheck` pass.
+    - `wibwob cmd microapps.reload` pass.
+    - `bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-ansi-lab microapp.wibwob.ansi-lab.open "ansi|lab|colour|color" "ANSI Lab" ""` → PASS all gates (with runtime crash sentinel active).
+  - visual proof captured:
+    - `/tmp/microloop-state-ansi-lab-iter1.json`
+    - `/tmp/microloop-map-ansi-lab-iter1.txt`
+    - `/tmp/microloop-shot-ansi-lab-iter1.txt`
+- Canon update:
+  - always derive gate command ids from `microapp.json` `microapp.id`, never from directory slug.
+  - microapps should expose meaningful `describeState` + `captureText` to strengthen crash/debug observability.
+
+### 12:06 — ANSI Lab chafa asset path hardening
+- Intent: remove fragile external dependency causing chafa test errors and keep docs aligned.
+- Observed behaviour: chafa tests errored because image path referenced a non-existent scratch file.
+- Gap type: reliability
+- Root cause: hardcoded absolute path (`/scratch/test-site/cat.jpg`) outside microapp ownership.
+- Patch layer: code + docs + asset
+- Evidence:
+  - code: `microapps/demo-ansi-lab/index.ts`
+    - replaced shell-string `execSync` calls with `execFileSync` helper (`renderChafa`) for safer args.
+    - chafa input now resolves from `import.meta.dir/assets/cat.jpg`.
+    - missing asset now returns explicit instructional text instead of opaque process error.
+  - asset added: `microapps/demo-ansi-lab/assets/cat.jpg`.
+  - docs synced: `.agents/guides/microapp/pitfalls.md` now forbids hardcoded `/scratch` asset paths; canonical pattern is microapp-local assets + `import.meta.dir`.
+  - verification:
+    - `bun run typecheck` pass.
+    - `wibwob cmd microapps.reload` pass.
+    - `bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-ansi-lab microapp.wibwob.ansi-lab.open "ansi|lab|colour|color|chafa" "ANSI Lab" ""` → PASS all gates.
+  - visual proof captured:
+    - `/tmp/microloop-state-ansi-lab-iter1b.json`
+    - `/tmp/microloop-map-ansi-lab-iter1b.txt`
+    - `/tmp/microloop-shot-ansi-lab-iter1b.txt`
+- Canon update:
+  - demo/test fixtures that drive rendering checks must live inside the microapp package (e.g. `assets/`), never in ad-hoc scratch paths.
+
+### 12:10 — ANSI Lab optional-binary fallback stabilisation
+- Intent: stop chafa process errors from polluting the UI while keeping ANSI Lab usable.
+- Observed behaviour: when chafa/path/runtime conditions were wrong, UI showed noisy process errors; restart also briefly produced a 1x1 headless screen preflight fail.
+- Gap type: reliability
+- Root cause: chafa execution path assumed binary availability and propagated raw process failures; runtime not always attached to a full tmux screen.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-ansi-lab/index.ts`
+    - `renderChafa()` now catches process failures and returns stable guidance text instead of stack-like error output.
+    - fallback outputs (missing asset / missing chafa) are cached, reducing repeated expensive/erroring subprocess calls.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added rule for optional external binaries: catch failures + show stable fallback text.
+  - verification:
+    - `bun run typecheck` pass.
+    - `wibwob cmd microapps.reload` pass.
+    - `bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-ansi-lab microapp.wibwob.ansi-lab.open "ansi|lab|colour|color|chafa" "ANSI Lab" ""` → PASS all gates (runtime crash sentinel active).
+  - visual proof:
+    - `/tmp/microloop-state-ansi-lab-iter2b.json`
+    - `/tmp/microloop-map-ansi-lab-iter2b.txt`
+    - `/tmp/microloop-shot-ansi-lab-iter2b.txt`
+- Canon update:
+  - optional CLI dependencies inside microapps must degrade gracefully with deterministic fallback text.
+  - if gate preflight shows 1x1 screen, relaunch in tmux before trusting results.
+
+### 12:21 — SDK Showcase key-hint parity + selection guard simplification
+- Intent: tighten one deterministic reliability slice on `sdk-showcase` and keep docs synced.
+- Observed behaviour: status line advertised close key but window had no explicit close binding; demo rebuilds could run unnecessarily on same selection.
+- Gap type: reliability
+- Root cause: hint/binding drift and missing guard around unchanged selection path.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/sdk-showcase/index.ts`
+    - added explicit close bindings for `q` and `escape` on focusable panes.
+    - status text now reflects real bindings (`q/esc close`).
+    - added index normalisation + unchanged-selection guard in `showDemo` to avoid needless teardown/rebuild churn.
+    - cleanup now nulls `activeDestroy` after execution.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added canon for status/help key-hint parity and index normalisation on list-driven UIs.
+  - verification (instance-isolated to avoid touching parallel session):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `PATH=/tmp/wibwob444bin:$PATH bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof captured:
+    - `/tmp/microloop-state-sdk-showcase-iter4.json`
+    - `/tmp/microloop-map-sdk-showcase-iter4.txt`
+    - `/tmp/microloop-shot-sdk-showcase-iter4.txt`
+- Canon update:
+  - any key hint shown to users must have a matching bound handler in the same slice.
+  - when multiple instances run, pin CLI calls to the intended instance (e.g. `bun run src/cli/wibwob.ts -i 444 ...`) and isolate gate execution wrappers accordingly.
+
+### 12:25 — Layout Stress Test contrib setData race-guard
+- Intent: apply one minimal reliability hardening slice to a deterministic canary microapp.
+- Observed behaviour: blessed-contrib widgets can race before canvas attach (`this.ctx._canvas`) during early render/update phases.
+- Gap type: reliability
+- Root cause: chart `setData()` calls assumed canvas context was always ready.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-layout-stress-test-pi/index.ts`
+    - added `hasContribCanvas(widget)` helper.
+    - guarded `lineChart.setData`, `barChart.setData`, and `sparkline.setData` behind canvas-availability checks.
+  - docs synced: `.agents/guides/microapp/pitfalls.md`
+    - updated blessed-contrib crash guidance to explicitly guard `setData()` calls with `widget?.ctx?._canvas`.
+  - verification (instance-pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-layout-stress-test-pi microapp.wibwob.layout-stress-test-pi.open "layout|stress|pi" "Layout Stress Test \(Pi\)" mode` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-layout-stress-iter5.json`
+    - `/tmp/microloop-map-layout-stress-iter5.txt`
+    - `/tmp/microloop-shot-layout-stress-iter5.txt`
+- Fresh-eyes pass:
+  - clarity gaps: (1) contrib race assumption implicit, now explicit helper; (2) pitfalls row lacked setData mention, now added; (3) multi-instance verification provenance could drift, now logged with pinned command.
+  - reliability risks: (1) early setData on not-yet-attached widgets, mitigated; (2) resize/render races on small screens, mitigated by guard; (3) mixed-instance false confidence, mitigated via pinning.
+  - simplifications: (1) one reusable guard helper vs repeated inline assumptions; (2) shared guard pattern for three widgets; (3) fewer crash-path branches under attach races.
+- Canon update:
+  - for contrib-backed microapps, treat canvas availability as a runtime precondition for draw/setData calls.
+
+### 12:36 — Layout Stress Test cleanup-race guard for timer renders
+- Intent: harden one single-concern reliability edge case in canary app teardown path.
+- Observed behaviour: render/update timers can tick during cleanup windows; widget teardown and in-flight callbacks can overlap.
+- Gap type: reliability
+- Root cause: callbacks had no explicit close-phase guard.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-layout-stress-test-pi/index.ts`
+    - added `isClosing` flag.
+    - render/update callbacks early-return when closing.
+    - set `isClosing = true` at start of `win.onCleanup` before timer/resource teardown.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added timer teardown race guidance (`isClosing` guard pattern).
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-layout-stress-test-pi microapp.wibwob.layout-stress-test-pi.open "layout|stress|pi" "Layout Stress Test \(Pi\)" mode` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-layout-stress-iter6.json`
+    - `/tmp/microloop-map-layout-stress-iter6.txt`
+    - `/tmp/microloop-shot-layout-stress-iter6.txt`
+- Fresh-eyes pass:
+  - clarity gaps: (1) teardown phase was implicit, now explicit via `isClosing`; (2) timer race pattern undocumented, now codified in pitfalls; (3) cleanup ordering intent now visible in code.
+  - reliability risks: (1) in-flight timer after close, mitigated; (2) render on destroyed nodes, mitigated; (3) intermittent non-repro close crashes, mitigated by deterministic close gate.
+  - simplifications: (1) single boolean guard instead of scattered defensive checks; (2) no extra lifecycle hooks added; (3) minimal line-diff with high leverage.
+- Canon update:
+  - for timer-driven microapps, set a close-phase guard flag before cleanup and check it at callback entry.
+
+### 12:48 — Layout Stress Test resilient teardown via safeDestroy
+- Intent: harden cleanup reliability in one minimal slice without changing runtime behaviour.
+- Observed behaviour: complex teardown chains can fail partially if one `destroy()` throws, leaving residual nodes/timers in inconsistent states.
+- Gap type: reliability
+- Root cause: strict destroy sequencing assumed every widget/node destroy is infallible.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-layout-stress-test-pi/index.ts`
+    - added `safeDestroy()` helper (best-effort, exception-safe).
+    - cleanup now uses `safeDestroy()` for chip nodes, tags, layout parts, panels, viewport/content, and sparkline.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added teardown-race guidance for complex widget trees: use `safeDestroy()` style wrappers.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-layout-stress-test-pi microapp.wibwob.layout-stress-test-pi.open "layout|stress|pi" "Layout Stress Test \(Pi\)" mode` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-layout-stress-iter7.json`
+    - `/tmp/microloop-map-layout-stress-iter7.txt`
+    - `/tmp/microloop-shot-layout-stress-iter7.txt`
+- Canon update:
+  - in teardown-heavy microapps, cleanup should be best-effort and exception-tolerant so one bad destroy does not mask or prevent remaining cleanup.
+
+### 12:51 — E026 motion timeout lifecycle guard
+- Intent: carry the teardown-race pattern to another deterministic timer/motion microapp.
+- Observed behaviour: `sizeBounce()` used untracked `setTimeout`, which could fire after close; timer/render callbacks also lacked close-phase guard.
+- Gap type: reliability
+- Root cause: one-shot timeout handle not managed in shared timer lifecycle; callbacks assumed window remained alive.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-e026-demo/index.ts`
+    - added `isClosing` guard flag.
+    - guarded motion helpers (`tweenToRandom`, `resetCentre`, `sizeBounce`) and timer/monitor callbacks.
+    - tracked `sizeBounce` timeout handle inside shared `timers` set; removes itself on fire.
+    - set `isClosing = true` at start of cleanup.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added timer pitfall for untracked one-shot `setTimeout` handles in motion helpers.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-e026-demo microapp.wibwob.example.e026.open "e026|tree|fps|timer" "E026 Demo" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-e026-iter-next.json`
+    - `/tmp/microloop-map-e026-iter-next.txt`
+    - `/tmp/microloop-shot-e026-iter-next.txt`
+- Fresh-eyes pass:
+  - clarity gaps: timeout lifecycle ownership was implicit, now explicit; close-phase state now named; motion helper contract now clear.
+  - reliability risks: post-close timeout fire, render after teardown, monitor callback on closed window — all reduced.
+  - simplifications: one shared `isClosing` rule; one shared timers set for interval+timeout; no new framework/helper required.
+- Canon update:
+  - one-shot timeouts are part of lifecycle state and must be tracked/cancelled with the same rigor as intervals.
+
+### 13:06 — E026 teardown chain made exception-tolerant
+- Intent: smallest reliability hardening for cleanup path after recent timer/motion lifecycle fixes.
+- Observed behaviour: cleanup still used strict destroy chain (`monitor.destroy`, `tree.destroy`, `root.destroy`), so one throw could abort remaining teardown.
+- Gap type: reliability
+- Root cause: destroy calls assumed infallible widgets/services.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-e026-demo/index.ts`
+    - added local `safeDestroy()` helper.
+    - cleanup now does `safeDestroy(monitor/tree/root)` after `clearTimers` + unsubscribe.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - refined cleanup canon: unsubscribe/clear timers first, then safe-destroy chain.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-e026-demo microapp.wibwob.example.e026.open "e026|tree|fps|timer" "E026 Demo" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-e026-iter2.json`
+    - `/tmp/microloop-map-e026-iter2.txt`
+    - `/tmp/microloop-shot-e026-iter2.txt`
+- Canon update:
+  - teardown for composite microapps must be exception-tolerant and ordered: stop async sources first, then best-effort destroy the widget/service graph.
+
+### 13:10 — SDK Showcase teardown hardening for SDK handles
+- Intent: validate repeated-loop behaviour with another deterministic microapp cleanup slice.
+- Observed behaviour: cleanup used strict destroy sequence; one throw in demo teardown could abort remaining handle cleanup.
+- Gap type: reliability
+- Root cause: raw `destroy()` calls assumed infallible SDK handles/widgets.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/sdk-showcase/index.ts`
+    - added local `safeDestroy()` helper.
+    - wrapped `activeDestroy()` in try/catch (best effort).
+    - switched cleanup for `list/split/infoBar/demoArea/status` to safe-destroy path.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - updated teardown canon to explicitly include SDK handles in safe-destroy guidance.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-sdk-showcase-iter-next2.json`
+    - `/tmp/microloop-map-sdk-showcase-iter-next2.txt`
+    - `/tmp/microloop-shot-sdk-showcase-iter-next2.txt`
+- Fresh-eyes pass:
+  - clarity gaps: cleanup path now clearly best-effort; active demo destroy risk documented; SDK-handle cleanup rule explicit in pitfalls.
+  - reliability risks: single destroy failure no longer blocks full teardown; demo callback teardown less brittle; post-close residual widgets less likely.
+  - simplifications: one helper for all destroys; no additional lifecycle hooks; minimal diff and predictable behaviour.
+- Canon update:
+  - apply the same ordered, exception-tolerant cleanup pattern across deterministic demo microapps to reduce close-path flake.
+
+### 13:13 — SDK Showcase pane-switch teardown guard
+- Intent: continue loop with a smallest reliability slice that validates repeated self-looping behaviour.
+- Observed behaviour: on demo switching, previous pane cleanup (`activeDestroy`) could throw and block next pane mount/update path.
+- Gap type: reliability
+- Root cause: `showDemo()` teardown path called `activeDestroy()` without guard while cleanup path already used best-effort semantics.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/sdk-showcase/index.ts`
+    - wrapped `activeDestroy()` in `showDemo()` with best-effort guard + null reset.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added explicit pitfall for live demo-pane switch teardown failures.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-sdk-showcase-iter-next3.json`
+    - `/tmp/microloop-map-sdk-showcase-iter-next3.txt`
+    - `/tmp/microloop-shot-sdk-showcase-iter-next3.txt`
+- Fresh-eyes pass:
+  - clarity gaps: switch-path teardown semantics now consistent with close-path cleanup semantics.
+  - reliability risks: one bad pane teardown no longer blocks subsequent pane render.
+  - simplifications: no new abstractions; one targeted guard in the only unguarded teardown site.
+- Canon update:
+  - guard teardown at both close-time and switch-time for demo-driven microapps with dynamic mounts.
+
+### 13:16 — E026 resize/focus callbacks guarded during close phase
+- Intent: continue loop with smallest reliability slice on deterministic demo, validating repeated iterations.
+- Observed behaviour: close-phase races can still hit `render()`/`setFocus()` via resize or late key events after teardown has started.
+- Gap type: reliability
+- Root cause: callback entrypoints were not all close-aware even though `isClosing` existed.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-e026-demo/index.ts`
+    - added `if (isClosing) return;` guards at entry of `render()` and `setFocus()`.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - broadened canon from timer-only race to timer/resize/focus callback race during teardown.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-e026-demo microapp.wibwob.example.e026.open "e026|tree|fps|timer" "E026 Demo" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-e026-iter3.json`
+    - `/tmp/microloop-map-e026-iter3.txt`
+    - `/tmp/microloop-shot-e026-iter3.txt`
+- Fresh-eyes pass:
+  - clarity gaps: callback lifecycle boundary now explicit in function bodies.
+  - reliability risks: post-close resize/layout and focus reroute calls now short-circuit.
+  - simplifications: reuse existing `isClosing` flag rather than adding extra teardown state.
+- Canon update:
+  - any user/input/layout callback reachable after close-start must check close-phase guard at entry.
+
+### 13:20 — SDK Showcase close-phase guard for restyle/select callbacks
+- Intent: next deterministic slice to validate ongoing loop behaviour and tighten callback lifecycle reliability.
+- Observed behaviour: `isClosing` existed only in cleanup path semantics; restyle/select handlers could still run while teardown began.
+- Gap type: reliability
+- Root cause: close-phase guard coverage was incomplete across callback entrypoints.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/sdk-showcase/index.ts`
+    - introduced `isClosing` flag for the window lifecycle.
+    - added close-phase guards at `showDemo()`, `list.onSelect`, and `win.onRestyle`.
+    - sets `isClosing = true` at start of cleanup.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added pitfall for restyle/select callbacks firing during teardown.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i 444 cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=444 bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-sdk-showcase-iter-next4.json`
+    - `/tmp/microloop-map-sdk-showcase-iter-next4.txt`
+    - `/tmp/microloop-shot-sdk-showcase-iter-next4.txt`
+- Fresh-eyes pass:
+  - clarity gaps: callback lifecycle boundary now explicit for selection + restyle flows.
+  - reliability risks: restyle/select re-entry during teardown now short-circuits.
+  - simplifications: single shared `isClosing` guard model across callbacks.
+- Canon update:
+  - once close starts, all externally-triggered callbacks (input/select/restyle/resize) should treat the window as closing and no-op.
+
+### 13:24 — SDK-level safeDestroyAll extraction + showcase adoption
+- Intent: extract repeated teardown helper into SDK canon and prove usage in one deterministic microapp.
+- Observed behaviour: multiple microapps duplicated local `safeDestroy` logic; cleanup patterns were converging but not centralised.
+- Gap type: composability
+- Root cause: teardown helper existed only as per-microapp ad hoc utility.
+- Patch layer: SDK + microapp + docs
+- Evidence:
+  - SDK changes:
+    - `src/core/ui-primitives.ts`: added `safeDestroy(node)` and `safeDestroyAll(...nodes)` primitives.
+    - `src/services/microapp-sdk.ts`: re-exported `safeDestroy` + `safeDestroyAll` on canonical import surface.
+  - microapp adoption:
+    - `microapps/sdk-showcase/index.ts`
+      - removed local `safeDestroy` helper.
+      - imported `safeDestroyAll` from SDK and used it in cleanup for handle set.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md` includes `safeDestroyAll` in primitives snippet.
+    - `docs/building-custom-microapps.md` cleanup example now uses `safeDestroyAll` after timer clear.
+    - `.agents/guides/microapp/pitfalls.md` already aligned with exception-tolerant destroy canon.
+  - verification (after one runtime-precondition repair for 1x1 direct launch):
+    - repaired runtime by relaunching in tmux (`205x55`) per self-correction rule.
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-sdk-safeDestroyAll-iter7.json`
+    - `/tmp/microloop-map-sdk-safeDestroyAll-iter7.txt`
+    - `/tmp/microloop-shot-sdk-safeDestroyAll-iter7.txt`
+- Fresh-eyes pass:
+  - clarity gaps: one teardown primitive now canonical instead of repeated local helpers.
+  - reliability risks: fewer divergent cleanup implementations across microapps.
+  - simplifications: one SDK helper call replaces repeated try/catch chains.
+- Canon update:
+  - teardown helpers that repeat across 2+ microapps should be extracted into SDK surface and used directly.
+
+### 13:28 — E026 migrated from local safeDestroy to SDK safeDestroyAll
+- Intent: prove the new SDK teardown primitive works across multiple microapps (not just showcase).
+- Observed behaviour: E026 still carried a local `safeDestroy` implementation, duplicating recently extracted SDK functionality.
+- Gap type: composability
+- Root cause: post-extraction adoption lag in existing microapps.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-e026-demo/index.ts`
+    - removed local `safeDestroy` helper.
+    - imported `safeDestroyAll` from SDK and used it in cleanup (`safeDestroyAll(monitor, tree, root)`).
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - tightened guidance to prefer SDK `safeDestroyAll/safeDestroy` over local wrappers.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-e026-demo microapp.wibwob.example.e026.open "e026|tree|fps|timer" "E026 Demo" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-e026-safeDestroyAll-iter8.json`
+    - `/tmp/microloop-map-e026-safeDestroyAll-iter8.txt`
+    - `/tmp/microloop-shot-e026-safeDestroyAll-iter8.txt`
+- Fresh-eyes pass:
+  - clarity gaps: one canonical teardown helper path now used in E026.
+  - reliability risks: fewer divergent local helper behaviours.
+  - simplifications: removed duplicated helper code; single import + call site.
+- Canon update:
+  - after SDK helper extraction, first follow-up slices should migrate at least one additional production microapp to lock in adoption.
+
+### 13:32 — Layout Stress Test migrated to SDK safeDestroyAll
+- Intent: third adoption slice to validate extracted teardown primitive across another complex microapp.
+- Observed behaviour: layout stress test still had local `safeDestroy` helper and manual cleanup loops.
+- Gap type: composability
+- Root cause: incremental migration lag after SDK helper extraction.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-layout-stress-test-pi/index.ts`
+    - removed local `safeDestroy` helper.
+    - imported SDK `safeDestroyAll`.
+    - replaced cleanup loops/chains with one `safeDestroyAll(...)` call including chips, tags, layout parts, and contrib widgets.
+  - docs synced:
+    - `docs/building-custom-microapps.md` cleanup example now demonstrates `safeDestroyAll` + optional per-widget `safeDestroy`.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-layout-stress-test-pi microapp.wibwob.layout-stress-test-pi.open "layout|stress|pi" "Layout Stress Test \(Pi\)" mode` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-layout-safeDestroyAll-iter9.json`
+    - `/tmp/microloop-map-layout-safeDestroyAll-iter9.txt`
+    - `/tmp/microloop-shot-layout-safeDestroyAll-iter9.txt`
+- Fresh-eyes pass:
+  - clarity gaps: teardown now reads as one canonical primitive call.
+  - reliability risks: fewer bespoke teardown branches and less drift from SDK canon.
+  - simplifications: removed local helper + repetitive destroy blocks.
+- Canon update:
+  - once an SDK cleanup primitive exists, migrate high-complexity microapps first to maximise convergence and reduce per-app teardown variance.
+
+### 13:36 — SDK Showcase deduplicated close-path guard
+- Intent: next smallest reliability slice to keep loop momentum and reduce close-event races.
+- Observed behaviour: multiple key handlers could call `win.close()` directly, risking duplicate close attempts during teardown start.
+- Gap type: reliability
+- Root cause: close actions were bound in multiple places without a shared guard function.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/sdk-showcase/index.ts`
+    - introduced `requestClose()` wrapper that no-ops when `isClosing`.
+    - close keys now route through `requestClose` instead of direct `win.close`.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added pitfall for duplicate close key paths and canonical `requestClose` guard pattern.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/sdk-showcase microapp.wibwob.sdk-showcase.open "sdk|showcase|component" "SDK Showcase" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-sdk-showcase-iter10.json`
+    - `/tmp/microloop-map-sdk-showcase-iter10.txt`
+    - `/tmp/microloop-shot-sdk-showcase-iter10.txt`
+- Fresh-eyes pass:
+  - clarity gaps: close intent now centralised in one function.
+  - reliability risks: duplicate close request paths now collapse to one guarded path.
+  - simplifications: one helper removes repeated inline close lambdas.
+- Canon update:
+  - when multiple UI actions close a window, route through a single close-request guard tied to close-phase state.
+
+### 13:40 — E026 unified close-request guard across key/button paths
+- Intent: smallest reliability slice to validate close-path canon on another interactive demo microapp.
+- Observed behaviour: E026 had multiple direct `win.close()` call sites (button bar + key handlers), risking duplicate close requests during teardown start.
+- Gap type: reliability
+- Root cause: close actions were not routed through a shared guard despite existing `isClosing` lifecycle state.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-e026-demo/index.ts`
+    - added `requestClose()` helper (no-op when `isClosing`).
+    - switched button-bar close action and `q/escape` key handlers to `requestClose`.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - updated close-path pitfall to include keys + buttons under one guard pattern.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-e026-demo microapp.wibwob.example.e026.open "e026|tree|fps|timer" "E026 Demo" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-e026-iter11.json`
+    - `/tmp/microloop-map-e026-iter11.txt`
+    - `/tmp/microloop-shot-e026-iter11.txt`
+- Fresh-eyes pass:
+  - clarity gaps: close intent now has one named path.
+  - reliability risks: duplicate close attempts from mixed input surfaces now collapsed.
+  - simplifications: removed repeated inline close lambdas.
+- Canon update:
+  - for interactive microapps, all close affordances (buttons + keys + palette actions) should funnel through one close-request guard.
+
+### 13:45 — ANSI Lab close-path guard + local exit parity
+- Intent: apply close-request guard canon to a simpler demo microapp and verify repeated-loop consistency.
+- Observed behaviour: ANSI Lab lacked local close keys and had no close-phase guard in its render path.
+- Gap type: reliability
+- Root cause: close-flow and callback lifecycle protections were focused on larger demos, not smaller test windows.
+- Patch layer: microapp code + docs
+- Evidence:
+  - code: `microapps/demo-ansi-lab/index.ts`
+    - added `isClosing` state and guarded `show()` callback entry.
+    - added `requestClose()` helper and bound `q/escape` keys through it.
+    - set `isClosing = true` in cleanup.
+  - docs: `.agents/guides/microapp/pitfalls.md`
+    - added pitfall/canon for demo windows lacking local exit keys and routing to `requestClose`.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-ansi-lab microapp.wibwob.ansi-lab.open "ansi|lab|colour|color|chafa" "ANSI Lab" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-ansi-lab-iter12.json`
+    - `/tmp/microloop-map-ansi-lab-iter12.txt`
+    - `/tmp/microloop-shot-ansi-lab-iter12.txt`
+- Fresh-eyes pass:
+  - clarity gaps: close behaviour now explicit and discoverable in-window.
+  - reliability risks: repeated close attempts and post-close show updates now guarded.
+  - simplifications: tiny guard helper reused pattern already proven in other apps.
+- Canon update:
+  - even lightweight demo microapps should include in-window close affordances (`q/escape`) and close-phase callback guards.
+
+### 13:50 — Core SDK button press isolation hardening (Forms Playground validation)
+- Intent: shift focus to core design-system primitives with a smallest reliability slice that benefits all microapps.
+- Observed behaviour: `createButton` delegated directly to consumer callbacks; a thrown callback could break interaction flow.
+- Gap type: reliability
+- Root cause: shared button primitive had no callback isolation guard.
+- Patch layer: SDK core + docs + validation microapp
+- Evidence:
+  - code:
+    - `src/ui/forms.ts`: `createButton` now routes key/click activation through `triggerPress()` with try/catch isolation.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md`: createButton notes callback error isolation behaviour.
+    - `.agents/guides/microapp/pitfalls.md`: added pitfall for button callback crash flows.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter13.json`
+    - `/tmp/microloop-map-forms-iter13.txt`
+    - `/tmp/microloop-shot-forms-iter13.txt`
+- Fresh-eyes pass:
+  - clarity gaps: button activation path now explicit (`triggerPress`) rather than duplicated inline calls.
+  - reliability risks: one faulty callback no longer takes down shared interaction path.
+  - simplifications: keypress/click handlers share one path; less duplicated logic.
+- Canon update:
+  - core form primitives should isolate consumer callback failures so one module bug does not destabilise the wider TUI session.
+
+### 13:58 — Core SDK checkbox callback isolation (Forms validation)
+- Intent: continue core design-system hardening by applying button-style callback isolation to checkbox primitive.
+- Observed behaviour: `createCheckbox` invoked consumer `onChange` directly; thrown handlers could bubble and destabilise interaction flow.
+- Gap type: reliability
+- Root cause: shared form primitive lacked callback fault isolation unlike recently hardened button path.
+- Patch layer: SDK core + docs + validation microapp
+- Evidence:
+  - code: `src/ui/forms.ts`
+    - `createCheckbox.toggle()` now wraps `onChange` in try/catch isolation.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md` createCheckbox section now notes callback-error isolation.
+    - `.agents/guides/microapp/pitfalls.md` added checkbox callback crash pitfall.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter14.json`
+    - `/tmp/microloop-map-forms-iter14.txt` (fallback via `scripts/minimap.sh` due current `wibwob map` bug)
+    - `/tmp/microloop-shot-forms-iter14.txt`
+- Fresh-eyes pass:
+  - clarity gaps: checkbox callback path now mirrors button callback path.
+  - reliability risks: one faulty checkbox handler no longer cascades through UI interactions.
+  - simplifications: same guard model reused; no API surface change.
+- Blocker note (diagnosed, no target pivot):
+  - `bun run src/cli/wibwob.ts -i main map` intermittently fails with `undefined is not an object (evaluating 'grid[y1][x] = ch')`.
+  - treated as separate product-level CLI map bug; iteration used `scripts/minimap.sh` as visual fallback while keeping target scope fixed.
+- Canon update:
+  - core form controls should uniformly isolate consumer callback errors.
+
+### 14:02 — Core SDK radio/select callback isolation (Forms validation)
+- Intent: complete callback-isolation consistency across core form controls after button+checkbox hardening.
+- Observed behaviour: `createRadioGroup` and `createSelect` still called consumer `onChange` directly, unlike hardened button/checkbox paths.
+- Gap type: reliability
+- Root cause: callback isolation was applied incrementally and not yet propagated to all selection controls.
+- Patch layer: SDK core + docs + validation microapp
+- Evidence:
+  - code: `src/ui/forms.ts`
+    - wrapped `onChange` dispatch in `createRadioGroup.selectCurrent()` with try/catch.
+    - wrapped `onChange` dispatch in `createSelect.navigate()` with try/catch.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md` now notes callback isolation for `createRadioGroup` and `createSelect`.
+    - `.agents/guides/microapp/pitfalls.md` now includes radio/select callback throw pitfall.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter16.json`
+    - `/tmp/microloop-map-forms-iter16.txt` (fallback via `scripts/minimap.sh`)
+    - `/tmp/microloop-shot-forms-iter16.txt`
+- Fresh-eyes pass:
+  - clarity gaps: form callback fault model now consistent across button/checkbox/radio/select.
+  - reliability risks: consumer handler exceptions no longer bubble through selection interactions.
+  - simplifications: identical isolation pattern reused across controls; no API changes.
+- Canon update:
+  - all core form controls must isolate consumer callback exceptions by default.
+
+### 14:07 — Core SDK filterable-list callback isolation (Forms validation)
+- Intent: complete callback-isolation consistency in core forms/navigation primitives.
+- Observed behaviour: `createFilterableList` still called `onSelect`/`onHighlight`/`onCancel` directly.
+- Gap type: reliability
+- Root cause: callback hardening was applied to button/checkbox/radio/select first; filterable-list remained unguarded.
+- Patch layer: SDK core + docs + validation microapp
+- Evidence:
+  - code: `src/ui/forms.ts`
+    - wrapped `onHighlight` dispatch in `emitHighlight()` with try/catch.
+    - wrapped `onSelect` dispatch on Enter with try/catch.
+    - wrapped `onCancel` dispatch on Escape with try/catch.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md`: createFilterableList now notes callback isolation.
+    - `.agents/guides/microapp/pitfalls.md`: added filterable-list callback throw pitfall.
+  - verification (instance pinned):
+    - `bun run typecheck` pass.
+    - `bun run src/cli/wibwob.ts -i main cmd microapps.reload` pass.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select|filter" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter17.json`
+    - `/tmp/microloop-map-forms-iter17.txt` (fallback via `scripts/minimap.sh`)
+    - `/tmp/microloop-shot-forms-iter17.txt`
+- Fresh-eyes pass:
+  - clarity gaps: callback fault model is now consistent across core form/navigation controls.
+  - reliability risks: callback throws in list interactions no longer bubble.
+  - simplifications: reused same isolation pattern already established in other controls.
+- Canon update:
+  - when a component exposes user callbacks, default behaviour should be fault-isolating unless explicitly documented as fail-fast.
+
+### 14:18 — FilterableList callback fault-isolation + harness precondition recovery
+- Intent: continue core SDK component hardening by finishing callback isolation on filterable-list interaction hooks.
+- Observed behaviour: `createFilterableList` still invoked `onHighlight`, `onSelect`, and `onCancel` directly.
+- Gap type: reliability
+- Root cause: callback isolation rollout had not yet reached filterable-list handlers.
+- Patch layer: SDK core + docs
+- Evidence:
+  - code: `src/ui/forms.ts`
+    - wrapped `onHighlight`, `onSelect`, and `onCancel` dispatches in try/catch isolation.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md` createFilterableList section now states callback isolation behaviour.
+    - `.agents/guides/microapp/pitfalls.md` now includes filterable-list callback throw pitfall.
+  - verification (instance pinned):
+    - initial run failed at responsive-medium due runtime clutter precondition (`medium width too small:50`) from many stale Forms windows.
+    - repaired once per self-correction rule by closing stale `wibwob.forms-playground` windows, then reran same gate.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select|filter|button" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter19.json`
+    - `/tmp/microloop-map-forms-iter19.txt`
+    - `/tmp/microloop-shot-forms-iter19.txt`
+- Fresh-eyes pass:
+  - clarity gaps: filterable-list now follows same callback fault model as other form controls.
+  - reliability risks: consumer callback throws no longer bubble from list interactions.
+  - simplifications: no new API; reused established isolation pattern.
+- Canon update:
+  - callback fault-isolation is now expected across the full interactive form/navigation control family.
+
+### 14:12 — New core primitive: createSegmentedControl (design-system slice)
+- Intent: begin additive core component expansion (beyond reliability hardening) with one composable primitive useful across microapps.
+- Observed behaviour: mode/density selectors were being approximated via select/radio patterns; missing compact segmented primitive common in modern design systems.
+- Gap type: composability
+- Root cause: SDK lacked a single-row segmented control primitive for quick mutually-exclusive mode selection.
+- Patch layer: SDK core + consumer microapp + docs
+- Evidence:
+  - code:
+    - `src/ui/forms.ts`: added `createSegmentedControl` + types (`SegmentedControlOptions`, `SegmentedControlHandle`) with keyboard/click navigation and callback isolation.
+    - `src/services/microapp-sdk.ts`: re-exported segmented control + types.
+    - `microapps/demo-forms-playground/index.ts`: integrated segmented control (`Density`) and surfaced selected value in state panel.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md`: component family table updated; new `createSegmentedControl` section + usage snippet.
+    - `.agents/guides/microapp/pitfalls.md`: guidance to avoid ad-hoc mode pickers when segmented control fits.
+  - verification (instance pinned):
+    - initial verification hit runtime precondition drift (command catalogue stale due 1x1 direct instance / stale state).
+    - repaired once by restarting into tmux-backed runtime (`205x55`) and rerunning same gate.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select|filter|segment" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-forms-iter20.json`
+    - `/tmp/microloop-map-forms-iter20.json.txt`
+    - `/tmp/microloop-shot-forms-iter20.txt`
+- Fresh-eyes pass:
+  - clarity gaps: segmented selection now has first-class API instead of improvised patterns.
+  - reliability risks: callback dispatch follows existing isolation standard.
+  - simplifications: one reusable primitive replaces repeated custom selector implementations.
+- Canon update:
+  - when a selection pattern appears in multiple microapps and has a clear interaction model, extract it as a first-class SDK primitive with docs + one live demo adoption in the same slice.
+
+### 14:20 — New core primitive: createToggleSwitch (boolean mode flags)
+- Intent: add one compact, composable SDK primitive for boolean mode flags without forcing per-app key/click plumbing.
+- Target choice: `microapps/demo-forms-playground` (deterministic canary, existing gate coverage, low-noise signal).
+- Hypothesis:
+  - expected gain: reduce ad-hoc boolean control implementations and keep interaction parity (Enter/Space/click) with callback isolation.
+  - failure mode: runtime command discoverability drift (microapp command missing) after reload/restart churn.
+  - rollback trigger: if forms-playground command remained undiscoverable after one runtime repair and same-gate rerun.
+- Patch layer: SDK core + demo adoption + docs + planning verification contract tightening.
+- Evidence:
+  - code:
+    - `src/ui/forms.ts`: added `createToggleSwitch` + options/handle types (`onLabel`, `offLabel`, `checked`, `disabled`, isolated callback dispatch).
+    - `src/services/microapp-sdk.ts`: re-exported toggle control + types.
+    - `microapps/demo-forms-playground/index.ts`: integrated `Live validation` toggle and surfaced state in key-value panel.
+  - docs synced:
+    - `.agents/guides/microapp/sdk-reference.md`: forms family table + new `createToggleSwitch` section.
+    - `.agents/guides/microapp/pitfalls.md`: add pitfall row steering authors away from ad-hoc boolean widgets.
+    - `.planning/spikes/spk-microapp-dev-hygiene/README.md`: verification contract now explicitly uses instance-pinned `wibwob` commands.
+    - `.planning/spikes/spk-microapp-dev-hygiene/today-plan.md`: current SDK primitive queue updated.
+  - verification (instance pinned):
+    - first two gate attempts failed at command discoverability due runtime/session precondition drift (`forms-playground` commands missing during unstable runtime state).
+    - repaired once by full tmux-backed runtime recycle, then reran same gate.
+    - `WIBWOB_INSTANCE=main bash .pi/skills/autoresearch-microapp-migration/scripts/run-gates.sh microapps/demo-forms-playground microapp.wibwob.forms-playground.open "forms|checkbox|radio|select|filter|segment|toggle" "Forms Playground" ""` → PASS all gates.
+  - visual proof:
+    - `/tmp/microloop-state-iter2.json`
+    - `/tmp/microloop-map-iter2.txt`
+    - `/tmp/microloop-screenshot-iter2.out`
+- Fresh-eyes pass:
+  - clarity gaps: toggle now has explicit naming and on/off label options; docs show canonical usage.
+  - reliability risks: callbacks isolated; focused/disabled states reuse established visual contract.
+  - simplifications: one reusable control removed need for repeated per-microapp key/click switch logic.
+- Canon update:
+  - add new SDK primitives only with same-iteration demo adoption + docs + pinned gate/visual evidence; otherwise defer.

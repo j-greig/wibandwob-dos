@@ -235,9 +235,9 @@ export type {
 // CORE MODULE AUTHORING — start here when building a new microapp
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Timers — use instead of raw setInterval for proper cleanup
+// Timers + teardown helpers — use instead of raw setInterval and brittle destroy chains
 /** @internal */
-export { createTimer, clearTimers } from "../core/ui-primitives.js";
+export { createTimer, clearTimers, safeDestroy, safeDestroyAll } from "../core/ui-primitives.js";
 
 // Scroll helpers — use with scrollable blessed boxes
 /** @internal */
@@ -245,12 +245,14 @@ export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
 // Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
 /** @internal */
-export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
+export { createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
 /** @internal */
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  ToggleSwitchOptions, ToggleSwitchHandle,
   RadioOption, RadioGroupOptions, RadioGroupHandle,
   SelectOption, SelectOptions, SelectHandle,
+  SegmentedControlOptions, SegmentedControlHandle,
   ChangeEvent, SelectEvent,
   FilterableItem, FilterableListOptions, FilterableListHandle,
   FormFieldOptions, FormFieldHandle,

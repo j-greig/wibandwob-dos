@@ -11,7 +11,7 @@ API surface for microapp authors. Import everything from
 | **Chrome** | createHeaderBar, createStatusBar, createButtonBar, createBorderedPanel, createSidebarPanel, createRule |
 | **Content** | createTextBlock, createFigletDisplay, createMessageHistory, createContentStack, createCollapsibleBlock |
 | **Navigation** | createTabs, createSelectableList, createInlineSearch |
-| **Forms** | createInputLine, createButton, createCheckbox, createRadioGroup, createSelect |
+| **Forms** | createInputLine, createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl |
 | **Data Display** | createKeyValuePanel, createLogView |
 | **Feedback** | createProgressBar, createSpinner |
 | **Animation** | createAnimationClock, tween, EASINGS |
@@ -362,13 +362,14 @@ Import from `../../src/services/microapp-sdk.js`.
 ```typescript
 const btn = createButton({
   label: "Submit",
+  variant: "primary",    // optional: primary|secondary|ghost|destructive
   onPress: () => save(),
   disabled: false,        // optional
 });
-// btn.update({ label: "Saving...", disabled: true });
+// btn.update({ label: "Saving...", disabled: true, variant: "ghost" });
 ```
 
-Focusable. Enter/Space activates. Focus ring shows inverted colours.
+Focusable. Enter/Space activates. Focus ring shows inverted colours. Handler errors are isolated so one bad callback does not crash the form surface. Prefer `variant: "primary"` for main submit actions.
 
 ### createCheckbox
 
@@ -385,7 +386,25 @@ const cb = createCheckbox({
 // cb.update({ checked: false })
 ```
 
-Space toggles. Renders `[x]` or `[ ]`.
+Space toggles. Renders `[x]` or `[ ]`. Callback errors are isolated so one handler fault does not crash the form flow.
+
+### createToggleSwitch
+
+```typescript
+const live = createToggleSwitch({
+  label: "Live validation",
+  checked: true,
+  onLabel: "LIVE",       // optional, default "ON"
+  offLabel: "PAUSE",     // optional, default "OFF"
+  onChange: (e) => {
+    console.log(e.value);
+  },
+});
+// live.checked()  → boolean
+```
+
+Compact on/off switch for mode flags. Enter/Space toggles. Click toggles and focuses.
+Callback errors are isolated so one handler fault does not crash the form flow.
 
 ### createRadioGroup
 
@@ -406,7 +425,7 @@ const radio = createRadioGroup({
 ```
 
 Arrow Up/Down navigates. Enter/Space selects. Shows `(o)` selected, `( )` unselected,
-`>` focus indicator.
+`>` focus indicator. Callback errors are isolated so one handler fault does not crash the form flow.
 
 ### createSelect
 
@@ -426,6 +445,28 @@ const sel = createSelect({
 
 Inline single-row picker (not a dropdown — blessed constraint).
 Arrow Left/Right or Up/Down cycles through options. Renders `< label >`.
+Callback errors are isolated so one handler fault does not crash the form flow.
+
+### createSegmentedControl
+
+```typescript
+const density = createSegmentedControl({
+  options: [
+    { label: "Compact", value: "compact" },
+    { label: "Comfort", value: "comfort" },
+    { label: "Spacious", value: "spacious" },
+  ],
+  selected: "comfort",   // optional
+  onChange: (e) => {
+    console.log(e.value);
+  },
+});
+// density.selected()  → string | undefined
+```
+
+Inline segmented selector with all options visible.
+Arrow Left/Right or Up/Down cycles options; click advances selection.
+Callback errors are isolated so one handler fault does not crash the form flow.
 
 ---
 
@@ -500,6 +541,7 @@ const list = createFilterableList({
 
 Type to filter, Arrow Up/Down to navigate, Enter to select, Escape to clear,
 Backspace to edit query. Height = 1 (search row) + visible items.
+Callback errors (`onSelect`/`onHighlight`/`onCancel`) are isolated so handler faults do not crash the form flow.
 
 ### createFormField
 
@@ -603,11 +645,14 @@ Flex columns share remaining space proportionally. Truncates with `~` on narrow.
 ### Timers
 
 ```typescript
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, safeDestroyAll } from "../../src/services/microapp-sdk.js";
 
 const timers = new Set<ReturnType<typeof setInterval>>();
 createTimer(() => { /* runs every 500ms */ }, 500, timers);
-win.onCleanup(() => clearTimers(timers));
+win.onCleanup(() => {
+  clearTimers(timers);
+  safeDestroyAll(tree, tabs, monitor);
+});
 ```
 
 ### TreeWidget

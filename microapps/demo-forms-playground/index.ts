@@ -15,8 +15,10 @@ import {
   clearTimers,
   createButton,
   createCheckbox,
+  createToggleSwitch,
   createRadioGroup,
   createSelect,
+  createSegmentedControl,
   createProgressBar,
   createSpinner,
   createToast,
@@ -81,12 +83,14 @@ function openPlayground(host: MicroappHost) {
   // ── Left column: interactive controls ───────────────────────────────
   const btn1 = createButton({
     label: "Click Me",
+    variant: "primary",
     onPress: () => { clickCount++; log(`Button #${clickCount}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
   const severities = ["info", "success", "warning", "error"] as const;
   const btn2 = createButton({
     label: "Show Toast",
+    variant: "ghost",
     onPress: () => {
       const sev = severities[clickCount % severities.length]!;
       createToast({ message: `Toast #${clickCount} (${sev})`, severity: sev, parent: win.body });
@@ -101,6 +105,14 @@ function openPlayground(host: MicroappHost) {
   const cb2 = createCheckbox({
     label: "Dark mode",
     onChange: (e) => { log(`Dark: ${e.value ? "ON" : "OFF"}`); kvPanel.update({ entries: kvEntries() }); },
+  });
+
+  const liveValidation = createToggleSwitch({
+    label: "Live validation",
+    checked: true,
+    onLabel: "LIVE",
+    offLabel: "PAUSE",
+    onChange: (e) => { log(`Validation: ${e.value ? "LIVE" : "PAUSED"}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
   const radio = createRadioGroup({
@@ -119,6 +131,16 @@ function openPlayground(host: MicroappHost) {
     ],
     placeholder: "Pick colour",
     onChange: (e) => { log(`Colour: ${e.value}`); kvPanel.update({ entries: kvEntries() }); },
+  });
+
+  const density = createSegmentedControl({
+    options: [
+      { label: "Compact", value: "compact" },
+      { label: "Comfort", value: "comfort" },
+      { label: "Spacious", value: "spacious" },
+    ],
+    selected: "comfort",
+    onChange: (e) => { log(`Density: ${e.value}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
   const filterList = createFilterableList({
@@ -143,12 +165,15 @@ function openPlayground(host: MicroappHost) {
     { key: "lCb",     basis: 1, part: createNodePart(sl("CHECKBOXES")) },
     { key: "cb1",     basis: 1, part: cb1 },
     { key: "cb2",     basis: 1, part: cb2 },
+    { key: "toggle",  basis: 1, part: liveValidation },
     { key: "lRadio",  basis: 1, part: createNodePart(sl("RADIO")) },
     { key: "radio",   basis: 4, part: radio },
     { key: "lSel",    basis: 1, part: createNodePart(sl("SELECT")) },
     { key: "sel",     basis: 1, part: sel },
     { key: "lFilter", basis: 1, part: createNodePart(sl("FILTER LIST")) },
     { key: "filter",  basis: 4, part: filterList },
+    { key: "lSegment",basis: 1, part: createNodePart(sl("SEGMENTED")) },
+    { key: "segment", basis: 1, part: density },
     { key: "lForm",   basis: 1, part: createNodePart(sl("FORM FIELD")) },
     { key: "form",    basis: 6, part: formField },
   ]);
@@ -185,8 +210,10 @@ function openPlayground(host: MicroappHost) {
     return [
       { key: "Clicks", value: String(clickCount) },
       { key: "Sound", value: cb1.checked() ? "ON" : "OFF" },
+      { key: "Validate", value: liveValidation.checked() ? "LIVE" : "PAUSE" },
       { key: "Size", value: radio.selected() ?? "-" },
       { key: "Colour", value: sel.selected() ?? "-" },
+      { key: "Density", value: density.selected() ?? "-" },
     ];
   }
   const kvPanel = createKeyValuePanel({ entries: kvEntries(), border: true, label: "State" });
@@ -290,6 +317,7 @@ function openContactForm(host: MicroappHost) {
   // ── Submit button ───────────────────────────────────────────────────
   const submitBtn = createButton({
     label: "Submit",
+    variant: "primary",
     onPress: () => {
       const first = firstNameInput.value().trim();
       const last = lastNameInput.value().trim();

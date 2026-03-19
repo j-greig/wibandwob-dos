@@ -288,6 +288,9 @@ export default function setup(host: MicroappHost) {
         style: { line: "yellow", text: "white", baseline: "white" },
       }) as any;
 
+      // Guard initial render race for contrib widgets.
+      [cpuMemLine, netBar, diskDonut, uptimeGauge, loadSpark, sysLog, latLine].forEach(guardContribRender);
+
       // ── SM: stacked simple boxes ───────────────────────────
       const smBox = blessed.box({
         parent: overviewBox, top: 0, left: 0, width: "100%", height: "100%",
@@ -331,6 +334,17 @@ export default function setup(host: MicroappHost) {
         try {
           if (widget && typeof (widget as any)[method] === "function") (widget as any)[method](...args);
         } catch { /* not on screen yet */ }
+      }
+
+      function guardContribRender(widget: any) {
+        if (!widget || typeof widget.render !== "function") return;
+        const original = widget.render.bind(widget);
+        widget.render = function (...args: any[]) {
+          // Some blessed-contrib widgets can render before attach sets ctx.
+          // Guard to avoid crashing the whole shell on first paint race.
+          if (!(this as any).ctx) return "";
+          return original(...args);
+        };
       }
 
       function positionLgMd(vw: number, vh: number) {

@@ -1,0 +1,18 @@
+{
+  "slug": "layout-stress-test-pi-v2",
+  "status": "idle",
+  "current_experiment": 0,
+  "best_score": 11,
+  "max_score": 11,
+  "experiments": [
+    {
+      "experiment": 0,
+      "score": 11,
+      "max_score": 11,
+      "pass_rate": "100.0%",
+      "status": "baseline",
+      "description": "baseline gates"
+    }
+  ],
+  "stopReason": "no-mutate-cmd"
+}

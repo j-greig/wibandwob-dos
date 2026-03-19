@@ -10,6 +10,7 @@ import {
   createTabs,
   createRule,
   createInputLine,
+  safeDestroyAll,
 } from "../../src/services/microapp-sdk.js";
 
 /**
@@ -178,6 +179,7 @@ function openShowcase(host: MicroappHost) {
     width: 90,
     height: 32,
   });
+  let isClosing = false;
 
   const molecules = DEMOS.filter(d => d.layer === "molecule");
   const organisms = DEMOS.filter(d => d.layer === "organism");
@@ -206,16 +208,36 @@ function openShowcase(host: MicroappHost) {
 
   const status = createStatusBar(win.body, {
     left: ` ${DEMOS.length} components │ ${molecules.length} molecules │ ${organisms.length} organisms`,
-    right: "↑/↓ browse  Enter preview  q close ",
+    right: "↑/↓ browse  Enter preview  q/esc close ",
   });
 
   let activeDestroy: (() => void) | null = null;
   let activeIndex = 0;
 
-  function showDemo(index: number) {
-    if (activeDestroy) { activeDestroy(); activeDestroy = null; }
-    activeIndex = index;
-    const demo = DEMOS[index];
+  function normalizeDemoIndex(index: number): number {
+    if (DEMOS.length === 0) return 0;
+    if (index < 0) return 0;
+    if (index >= DEMOS.length) return DEMOS.length - 1;
+    return index;
+  }
+
+  function showDemo(index: number, opts?: { force?: boolean }) {
+    if (isClosing) return;
+    const nextIndex = normalizeDemoIndex(index);
+    if (!opts?.force && nextIndex === activeIndex && activeDestroy) {
+      return;
+    }
+
+    if (activeDestroy) {
+      try {
+        activeDestroy();
+      } catch {
+        // best-effort when previous demo teardown throws
+      }
+      activeDestroy = null;
+    }
+    activeIndex = nextIndex;
+    const demo = DEMOS[activeIndex];
     if (!demo) return;
 
     infoBar.update({ left: ` ${demo.name}`, right: `${demo.layer} ` });
@@ -224,8 +246,19 @@ function openShowcase(host: MicroappHost) {
     host.screen.render();
   }
 
-  list.onSelect((index) => showDemo(index));
-  showDemo(0);
+  list.onSelect((index) => {
+    if (isClosing) return;
+    showDemo(index);
+  });
+  showDemo(0, { force: true });
+
+  const closeKeys = ["q", "escape"];
+  const requestClose = () => {
+    if (isClosing) return;
+    win.close();
+  };
+  list.element.key(closeKeys, requestClose);
+  demoArea.element.key(closeKeys, requestClose);
 
   win.setFocusTarget(list.element);
 
@@ -249,18 +282,23 @@ function openShowcase(host: MicroappHost) {
   ].join("\n"));
 
   win.onRestyle(() => {
+    if (isClosing) return;
     list.update({ items: componentNames });
     status.update({});
     infoBar.update({});
-    showDemo(activeIndex);
+    showDemo(activeIndex, { force: true });
   });
 
   win.onCleanup(() => {
-    if (activeDestroy) activeDestroy();
-    list.destroy();
-    split.destroy();
-    infoBar.destroy();
-    demoArea.destroy();
-    status.destroy();
+    isClosing = true;
+    if (activeDestroy) {
+      try {
+        activeDestroy();
+      } catch {
+        // best-effort cleanup for demo teardown
+      }
+    }
+    activeDestroy = null;
+    safeDestroyAll(list, split, infoBar, demoArea, status);
   });
 }
