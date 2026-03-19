@@ -47,6 +47,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.patchbay":           "beta",
   "wibwob.slap-editor":        "beta",
   "wibwob.asciicker":          "beta",
+  "wibwob.ansi-lab":           "core",
   "wibwob.symbient-twitter":   "beta",
   "wibwob.llm-orch-studio":    "beta",
   "wibwob.touchlab":           "beta",

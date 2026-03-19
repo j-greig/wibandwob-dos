@@ -14,7 +14,8 @@ Loop rule:
 | demo-hello-world | wibwob.example.hello | promoted tier to core + added explicit menu/palette command wiring + verified menu/state | 1 | done | e1f04468 |
 | demo-wibwob-poetry-clock | wibwob.poetry-clock | promoted tier to core + verified menu/state | 1 | done | 9b0e2d37 |
 | demo-wibwob-tidepool | wibwob.tidepool | promoted tier to core + verified menu/state + auto-pause after inactivity hardened | 2 | done | ac34bc4a, dbcc92db |
-| terrarium-life | wibwob.terrarium-life | migrated from .disabled + promoted tier to core + verified menu/state | 1 | done | pending |
+| terrarium-life | wibwob.terrarium-life | migrated from .disabled + promoted tier to core + verified menu/state | 1 | done | b0ee3569 |
+| demo-ansi-lab | wibwob.ansi-lab | migrated from .disabled + promoted to core/demos + verified menu/state/window-text | 1 | done | pending |
 
 ## Parking Lot (attempts > 15 or blocked)
 
@@ -22,7 +23,6 @@ Loop rule:
 |---|---|---:|
 | dashboard | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | dashboard-xxl | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
-| demo-ansi-lab | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-flex-bands-demo-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-flex-bands-demo-pi | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |
 | demo-flex-workbench-demo-codex | no active counterpart under microapps/; full port/migration required from .disabled | queued (if >15 then park) |

@@ -1,0 +1,20 @@
+{
+  "name": "ansi-lab",
+  "version": "0.1.0",
+  "description": "ANSI colour rendering test suite for blessed",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.ansi-lab",
+    "title": "ANSI Lab",
+    "description": "Test ANSI colour rendering methods in blessed",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 10, "label": "ANSI Lab" }
+    ],
+    "palette": { "order": 300, "label": "ANSI Lab" },
+    "agent": true,
+    "api": true
+  }
+}
