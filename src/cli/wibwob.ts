@@ -501,29 +501,33 @@ async function cmdHealth() {
   process.stderr.write(`uptime: ${health.uptime ?? "?"}\n`);
 
   // Multi-instance warning: scan for other alive instances
+  // De-duplicate by actual PID from health probe (discovery.json instanceId is stale after restarts)
   const alive = findAliveInstances();
-  if (alive.length > 1) {
-    process.stderr.write(`\n⚠ ${alive.length} instances running:\n`);
-    for (const inst of alive) {
-      // Try to probe each for screen size (200ms timeout)
-      let extra = "";
-      try {
-        const res = await fetch(`http://localhost/health`, {
-          ...(unixFetchOpts(inst.socketPath)),
-          signal: AbortSignal.timeout(200),
-        } as any);
-        if (res.ok) {
-          const h = (await res.json()) as { screen?: { width: number; height: number } | null; pid?: number };
-          const sw = h.screen ? `screen=${h.screen.width}×${h.screen.height}` : "";
-          const pidStr = h.pid ? `pid=${h.pid}` : "";
-          const warn = h.screen && (h.screen.width < MIN_W || h.screen.height < MIN_H) ? "  ← HEADLESS" : "";
-          const here = inst.label === label ? "  ← you are here" : "";
-          extra = `  ${pidStr}  ${sw}${warn}${here}`;
-        }
-      } catch {
-        extra = "  (unresponsive)";
-      }
-      process.stderr.write(`  ${inst.label}${extra}\n`);
+  const seen = new Set<number>();
+  const shown: Array<{ socketPath: string; label: string; pid?: number; screen?: { width: number; height: number } | null }> = [];
+  for (const inst of alive) {
+    try {
+      const res = await fetch(`http://localhost/health`, {
+        ...(unixFetchOpts(inst.socketPath)),
+        signal: AbortSignal.timeout(200),
+      } as any);
+      if (!res.ok) continue;
+      const h = (await res.json()) as { screen?: { width: number; height: number } | null; pid?: number };
+      if (h.pid != null && seen.has(h.pid)) continue;
+      if (h.pid != null) seen.add(h.pid);
+      shown.push({ socketPath: inst.socketPath, label: inst.label, pid: h.pid, screen: h.screen });
+    } catch {
+      // unresponsive — skip
+    }
+  }
+  if (shown.length > 1) {
+    process.stderr.write(`\n⚠ ${shown.length} instances running:\n`);
+    for (const s of shown) {
+      const sw = s.screen ? `screen=${s.screen.width}×${s.screen.height}` : "";
+      const pidStr = s.pid ? `pid=${s.pid}` : "";
+      const warn = s.screen && (s.screen.width < MIN_W || s.screen.height < MIN_H) ? "  ← HEADLESS" : "";
+      const here = s.label === label ? "  ← you are here" : "";
+      process.stderr.write(`  ${s.label}  ${pidStr}  ${sw}${warn}${here}\n`);
     }
   }
 
