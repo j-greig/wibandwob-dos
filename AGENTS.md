@@ -31,6 +31,194 @@ Window manager, command registry, state service, control API, theme engine.
 - `.agents/guides/shell/control-api.md` — API reference
 - `.agents/specs/` — subsystem specs (read before touching listed files)
 
+## Instance Targeting & Practical CLI Workflows
+
+> The **first thing** to do in every session: find your instance label.
+> Then use `-i <label>` on every command.
+
+### Finding your instance label
+
+```bash
+bun run src/cli/wibwob.ts instances
+# or scan ports manually:
+for p in 8098 8099 8100 8101; do
+  echo -n "$p "; curl -sf "http://127.0.0.1:$p/health" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("instanceId","?"))' 2>/dev/null || echo -
+done
+```
+
+The label (e.g. `8pr`) is the instance identifier. Use `-i <label>` on **every** `wibwob` call:
+
+```bash
+bun run src/cli/wibwob.ts -i 8pr health   # verify it's alive
+bun run src/cli/wibwob.ts -i 8pr minimap  # visual desktop map
+bun run src/cli/wibwob.ts -i 8pr windows  # JSON window list
+```
+
+### CLI essentials
+
+```bash
+# Open a window
+bun run src/cli/wibwob.ts -i 8pr cmd microapp.wibwob.notepad.open
+
+# Resize and move a window
+bun run src/cli/wibwob.ts -i 8pr window 21 resize --width 120 --height 60
+bun run src/cli/wibwob.ts -i 8pr window 21 move --left 122 --top 17
+
+# Inspect state
+bun run src/cli/wibwob.ts -i 8pr minimap      # visual map (ASCII art of desktop)
+bun run src/cli/wibwob.ts -i 8pr windows      # full JSON window list
+bun run src/cli/wibwob.ts -i 8pr state       # full desktop state JSON
+bun run src/cli/wibwob.ts -i 8pr commands -q # all command IDs
+
+# Read / write window content
+bun run src/cli/wibwob.ts -i 8pr read 21      # text content of window 21
+echo "hello" | bun run src/cli/wibwob.ts -i 8pr write 21  # write text to window 21
+```
+
+Window command pattern: `wibwob window <id> <verb> [--flags]`
+
+### Python FX scripts (scripts/fx/)
+
+These use `WIBWOB_API=http://...` directly, not the Bun CLI:
+
+```bash
+WIBWOB_API=http://127.0.0.1:8100 python3 scripts/fx/flamingo-trail-v2.py [args]
+```
+
+Key flags:
+- `--source <path>` — ASCII art file
+- `--theme dark-pastel` — use catppuccin colours
+- `--window-w N --window-h N` — window size in chars
+- `--canvas-w N --canvas-h N` — canvas/text area size
+- `--bounce-count N` — freeze after N bounces
+- `--steps N` — frame count (0 = infinite)
+- `--new-window` — force a fresh notepad
+
+### Three starter tasks
+
+#### Task 1 — Simplest: Inspect and screenshot the desktop
+
+1. Find your instance label (`bun run src/cli/wibwob.ts instances`)
+2. Run `bun run src/cli/wibwob.ts -i <label> minimap`
+3. Screenshot the whole instance and save to `/tmp/`:
+
+```bash
+cd ~/Repos/wibwob-zine-moodboard
+LABEL=8pr
+OUT=/tmp/$(date +%Y%m%d-%H%M%S)-${LABEL}-desktop.txt
+bun run src/cli/wibwob.ts -i $LABEL read > "$OUT"
+echo "Saved to $OUT"
+open -R "$OUT"
+```
+
+**Variations:**
+- Screenshot a specific window: `bun run src/cli/wibwob.ts -i $LABEL read 21 > /tmp/win21.txt`
+- List all windows with IDs: `bun run src/cli/wibwob.ts -i $LABEL windows`
+- Check health: `bun run src/cli/wibwob.ts -i $LABEL health`
+
+#### Task 2 — Medium: Open a notepad, size it, write plain + figlet text
+
+1. Open a new notepad
+2. Resize + position it using `wibwob window <id>` commands
+3. Confirm size with `wibwob minimap`
+4. Render plain text + two figlet sizes via the `figlet` CLI
+5. Write all three into the notepad in one pass
+
+```bash
+cd ~/Repos/wibwob-zine-moodboard
+LABEL=8pr
+API_PORT=8100   # match the instance's port (use instances or health to confirm)
+
+# 1. Open notepad
+bun run src/cli/wibwob.ts -i $LABEL cmd microapp.wibwob.notepad.open
+sleep 0.3
+
+# 2. Find its window ID
+WID=$(bun run src/cli/wibwob.ts -i $LABEL windows -q | tail -1)
+echo "Window ID: $WID"
+
+# 3. Resize + centre on desktop (364x95; adjust for your screen)
+bun run src/cli/wibwob.ts -i $LABEL window $WID resize --width 120 --height 60
+bun run src/cli/wibwob.ts -i $LABEL window $WID move --left 122 --top 17
+
+# 4. Confirm
+bun run src/cli/wibwob.ts -i $LABEL minimap
+
+# 5. Write plain + 4 figlet sizes (digital → standard → larry3d → isometric1)
+WIBWOB_API=http://127.0.0.1:$API_PORT python3 - <<'PY'
+import urllib.request, json, subprocess
+
+api = "http://127.0.0.1:8100"
+wid = int("$WID")
+msg = "HELLO WORLD"
+
+def fig(font):
+    return subprocess.run(
+        ["figlet", "-f", font, msg], capture_output=True, text=True
+    ).stdout
+
+# Order: plain + 2 blanks → digital → standard → larry3d → isometric1
+plain = f"{msg}\n\n"
+sections = [
+    ("digital",    "digital"),
+    ("standard",   "standard"),
+    ("larry3d",    "larry3d"),
+    ("isometric1", "isometric1"),
+]
+text = plain
+for label, font in sections:
+    text += f"--- {label} ---\n{fig(font)}\n"
+
+body = json.dumps({
+    "id": "microapp.wibwob.notepad.write",
+    "args": {"windowId": wid, "text": text}
+}).encode()
+req = urllib.request.Request(
+    f"{api}/commands/run", data=body,
+    headers={"Content-Type": "application/json"}, method="POST"
+)
+with urllib.request.urlopen(req, timeout=8) as r:
+    print(json.loads(r.read()))
+PY
+```
+
+**Variations:**
+- Try more iso fonts: `isometric2`, `isometric3`, `isometric4`
+- Other good fonts: `block`, `bubble`, `shadow`, `slant` (medium), `smslant` (small)
+- Add colour: prefix sections with ANSI `\x1b[38;2;R;G;Bm` codes
+- Open a primer instead: `bun run src/cli/wibwob.ts -i $LABEL cmd primer.open --filePath <path> --x 0 --y 0`
+- Add ANSI colour: wrap figlet output with bg/fg escape sequences (see `scripts/fx/flamingo-trail-v2.py` `render_ansi()`)
+
+#### Task 3 — Full animation: Bouncing ASCII art with colour evolution
+
+The flamingo-trail-v2.py script opens a notepad, fills it with bouncing ASCII art,
+and steps the foreground colour through a palette on each bounce.
+
+1. Open + size + centre a notepad (same as Task 2 steps 1–4)
+2. Run the animation into it:
+
+```bash
+cd ~/Repos/wibwob-zine-moodboard
+LABEL=8pr
+API_PORT=8100
+WID=21   # from Task 2
+
+WIBWOB_API=http://127.0.0.1:$API_PORT python3 scripts/fx/flamingo-trail-v2.py \
+  --window-id $WID \
+  --source microapps-private/wibwob-primers/primers/mech.txt \
+  --theme dark-pastel \
+  --window-w 120 --window-h 60 \
+  --canvas-w 120 --canvas-h 60 \
+  --dx 3 --dy 2 \
+  --fps 10 --bounce-count 5 --steps 120
+```
+
+**Variations:**
+- Flamingo instead of mech: `--source flamingo-0000-2.txt` (JGS default)
+- Spectral colours: `--bg '#0a0a1a' --fg-start '#00ffff' --fg-end '#ff00ff'`
+- Portrait mode: `--window-w 80 --window-h 90 --canvas-w 80 --canvas-h 90 --dx 1 --dy 2 --bounce-count 8`
+- Infinite: `--steps 0`, Ctrl+C to freeze and leave window open
+
 ## Principles
 
 **COAT — Command Once, Adapt Thin.** The runtime is a shared semantic core
