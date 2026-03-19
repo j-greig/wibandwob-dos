@@ -58,6 +58,14 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
+function applyContribRect(
+  widget: any,
+  rect: { top: number; left: number; width: number; height: number },
+) {
+  applyRect(widget, rect);
+  if (widget && typeof widget.emit === "function") widget.emit("resize");
+}
+
 function nodeSize(node: blessed.Widgets.Node) {
   return {
     w: Math.max(1, Number(node.width) || 0),
@@ -329,20 +337,20 @@ export default function setup(host: MicroappHost) {
         const topH = Math.max(8, Math.floor(vh * 0.55));
         const netW = Math.max(20, Math.floor(vw / 3));
         const cpuW = Math.max(20, vw - netW - 1);
-        applyRect(cpuMemLine as any, { top: 0, left: 0, width: cpuW, height: topH });
-        applyRect(netBar as any,     { top: 0, left: cpuW + 1, width: netW, height: topH });
+        applyContribRect(cpuMemLine as any, { top: 0, left: 0, width: cpuW, height: topH });
+        applyContribRect(netBar as any,     { top: 0, left: cpuW + 1, width: netW, height: topH });
 
         // Middle row: 4 equal widgets (Disk | Uptime | Load | Log)
         const botH = vh - topH - 1;
         const midH = Math.max(6, Math.floor(botH * 0.35));
         const w4 = Math.max(10, Math.floor((vw - 3) / 4));
-        applyRect(diskDonut as any,  { top: topH + 1, left: 0, width: w4, height: midH });
-        applyRect(uptimeGauge as any, { top: topH + 1, left: w4 + 1, width: w4, height: midH });
-        applyRect(loadSpark as any,   { top: topH + 1, left: (w4 + 1) * 2, width: w4, height: midH });
-        applyRect(sysLog as any,      { top: topH + 1, left: (w4 + 1) * 3, width: Math.max(10, vw - (w4 + 1) * 3), height: midH });
+        applyContribRect(diskDonut as any,   { top: topH + 1, left: 0, width: w4, height: midH });
+        applyContribRect(uptimeGauge as any, { top: topH + 1, left: w4 + 1, width: w4, height: midH });
+        applyContribRect(loadSpark as any,   { top: topH + 1, left: (w4 + 1) * 2, width: w4, height: midH });
+        applyContribRect(sysLog as any,      { top: topH + 1, left: (w4 + 1) * 3, width: Math.max(10, vw - (w4 + 1) * 3), height: midH });
 
         // Bottom: Latency line
-        applyRect(latLine as any, { top: topH + midH + 1, left: 0, width: vw, height: Math.max(5, vh - topH - midH - 1) });
+        applyContribRect(latLine as any, { top: topH + midH + 1, left: 0, width: vw, height: Math.max(5, vh - topH - midH - 1) });
       }
 
       function positionSm(vw: number, vh: number) {

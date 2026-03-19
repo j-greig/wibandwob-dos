@@ -36,6 +36,27 @@ import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
+
+function trimTrailingBlankLines(text: string): string {
+  return text.replace(/[ \t]+$/gm, "").replace(/\n{3,}$/g, "\n\n");
+}
+
+function isTinyScreenshot(text: string): boolean {
+  const t = text.trim();
+  return t.length <= 2;
+}
+
+function formatPrettyScreenshot(text: string, kind: "text" | "ansi"): string {
+  const stamp = new Date().toISOString();
+  const title = kind === "ansi" ? "WibWob Screenshot (ANSI)" : "WibWob Screenshot (text)";
+  const body = trimTrailingBlankLines(text);
+  const safeBody = body.length > 0 ? body : "(empty screenshot)";
+  return [
+    `╭─ ${title} ─ ${stamp} ─╮`,
+    safeBody,
+    "╰─ tip: use /state and /windows/text?id=N for semantic inspection ─╯",
+  ].join("\n");
+}
 import { setActualControlApiPort } from "../runtime/runtime-node.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
@@ -88,6 +109,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
+  { method: "GET",  path: "/screenshot",                    description: "Friendly screenshot alias. Defaults to clean text output." },
   { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
   { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
@@ -592,6 +614,13 @@ export class ControlApiService {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
+    // ── /screenshot — friendly alias to /screenshot/text ──────────────────
+    if (request.method === "GET" && url.pathname === "/screenshot") {
+      const next = new URL(request.url);
+      next.pathname = "/screenshot/text";
+      return this.handleRequest(new Request(next.toString(), request));
+    }
+
     // ── /screenshot/text — clean readable text (default) ──────────────────
     if (request.method === "GET" && url.pathname === "/screenshot/text") {
       const rawId = url.searchParams.get("id");
@@ -603,7 +632,8 @@ export class ControlApiService {
         const semantic = this.deps.windows.captureText(id);
         if (semantic !== undefined) {
           // captureText may include ANSI styling (e.g. syntax-highlighted editor content)
-          return new Response(stripAnsi(semantic), { headers: TEXT_HEADERS });
+          const cleaned = trimTrailingBlankLines(stripAnsi(semantic));
+          return new Response(cleaned, { headers: TEXT_HEADERS });
         }
         // Fallback: crop from blessed screen dump + strip
         const raw = this.deps.inspection.screenshotText();
@@ -617,13 +647,15 @@ export class ControlApiService {
           const cropped = lines.slice(y, y + h).map((line: string) => {
             return stripBlessedChrome(line).slice(x, x + w);
           });
-          return new Response(cropped.join("\n"), { headers: TEXT_HEADERS });
+          return new Response(trimTrailingBlankLines(cropped.join("\n")), { headers: TEXT_HEADERS });
         }
         return new Response("window not found", { status: 404, headers: TEXT_HEADERS });
       }
-      // Full screen: strip everything
-      const text = stripBlessedChrome(this.deps.inspection.screenshotText());
-      return new Response(text, { headers: TEXT_HEADERS });
+      // Full screen: strip everything + add friendly framing on tiny/empty outputs
+      const raw = stripBlessedChrome(this.deps.inspection.screenshotText());
+      const text = trimTrailingBlankLines(raw);
+      const pretty = isTinyScreenshot(text) ? formatPrettyScreenshot(text, "text") : text;
+      return new Response(pretty, { headers: TEXT_HEADERS });
     }
 
     // ── /screenshot/ansi — raw blessed dump (preserves escapes) ─────────
@@ -651,7 +683,10 @@ export class ControlApiService {
           text = cropped.join("\n");
         }
       }
-      return new Response(text, { headers: TEXT_HEADERS });
+      const out = rawId === null && isTinyScreenshot(stripAnsi(text))
+        ? formatPrettyScreenshot(text, "ansi")
+        : text;
+      return new Response(out, { headers: TEXT_HEADERS });
     }
 
     if (request.method === "GET" && url.pathname === "/windows/text") {
