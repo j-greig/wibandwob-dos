@@ -64,7 +64,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.example.hello":                  "internal",
   "wibwob.example.e026":                   "internal",
   "wibwob.demo.layout-stress.codex":       "internal",
-  "wibwob.layout-stress-test-pi":          "internal",
+  "wibwob.layout-stress-test-pi":          "core",
 };
 
 /** Default tier for microapps not listed in the registry. */

@@ -98,7 +98,8 @@ interface MicroappManifestConfig {
 
 function createMicroappHost(
   manifest: MicroappManifestConfig,
-  deps: MicroappHostDeps
+  deps: MicroappHostDeps,
+  sourceDirName?: string,
 ): MicroappHost {
   const { screen, windowManager, commands, geometry, focusOrCreate, worldChat } = deps;
   const microappId = manifest.id;
@@ -187,15 +188,35 @@ function createMicroappHost(
       const showApi     = isTierVisibleOn(tier, "api");
       const showAgent   = isTierVisibleOn(tier, "agent");
 
+      const isDemoMicroapp = Boolean(
+        (sourceDirName && sourceDirName.startsWith("demo-"))
+        || microappId.includes(".demo.")
+        || microappId.includes("-demo")
+      );
+
+      const resolveMenuCategory = (requested: string): MenuPlacement["category"] => {
+        if (tier !== "core") return requested as MenuPlacement["category"];
+        // Host decides promotion buckets. For core-tier microapps:
+        // - demo-* go to Demos menu
+        // - non-demo app entries go to Core Apps
+        // - explicit non-app categories preserved
+        if (requested === "demos" || (requested === "applications" && isDemoMicroapp)) {
+          return "demos";
+        }
+        if (requested === "applications") {
+          return "core";
+        }
+        return requested as MenuPlacement["category"];
+      };
+
       const dynDef: DynamicCommandDefinition = {
         id: fullId,
         label: def.label,
         description: def.description,
         action: def.direct ? def.action : (args) => focusOrCreate(microappId, () => def.action(args), multiInstance),
         multiInstance,
-        // Core-tier microapps go into "core" menu category (host decides, not author)
         menuPlacements: (showMenu && Array.isArray(def.menu)) ? def.menu.map(m => ({
-          category: (tier === "core" ? "core" : m.category) as MenuPlacement["category"],
+          category: resolveMenuCategory(m.category),
           order: m.order,
           label: m.label,
         })) : undefined,
@@ -413,7 +434,7 @@ async function loadMicroappModule(mod: DiscoveredMicroapp, deps: MicroappHostDep
       return;
     }
 
-    const host = createMicroappHost(config, deps);
+    const host = createMicroappHost(config, deps, path.basename(mod.dir));
     setup(host);
     log.app(`[microapp-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
   } catch (err) {
