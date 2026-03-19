@@ -43,7 +43,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.terrarium":          "beta",
   "wibwob.terrarium-life":     "beta",
   "wibwob.tidepool":           "beta",
-  "wibwob.glitchbox":          "beta",
+  "wibwob.glitchbox":          "core",
   "wibwob.patchbay":           "beta",
   "wibwob.slap-editor":        "beta",
   "wibwob.asciicker":          "beta",
