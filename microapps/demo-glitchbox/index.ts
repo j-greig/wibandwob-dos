@@ -395,9 +395,9 @@ export default function setup(host: MicroappHost) {
 
     skeletonLayer.element.setFront();
 
-    // Wire layout
-    poseBar.layout({ top: Number(win.body.height) - 3, left: 0, width: Number(win.body.width), height: 1 });
-    moodBar.layout({ top: Number(win.body.height) - 2, left: 0, width: Number(win.body.width), height: 1 });
+    // Wire layout (ButtonBarHandle is bottom-pinned; offset bars above status row)
+    poseBar.element.bottom = 2;
+    moodBar.element.bottom = 1;
 
     // ── Render ───────────────────────────────────────────────────────────────
 
@@ -562,10 +562,8 @@ export default function setup(host: MicroappHost) {
     win.onInput(handleKey);
 
     win.onResize(() => {
-      const bw = Number(win.body.width);
-      const bh = Number(win.body.height);
-      poseBar.layout({ top: bh-3, left: 0, width: bw, height: 1 });
-      moodBar.layout({ top: bh-2, left: 0, width: bw, height: 1 });
+      poseBar.element.bottom = 2;
+      moodBar.element.bottom = 1;
       renderAll();
     });
 
@@ -574,7 +572,8 @@ export default function setup(host: MicroappHost) {
       fieldLayer.element.style = host.theme().body;
       skeletonLayer.element.style = { ...host.theme().body, bg: "default", transparent: true };
       statusBar.style = host.theme().header;
-      poseBar.restyle(); moodBar.restyle();
+      poseBar.update({});
+      moodBar.update({});
       renderAll();
     });
 
