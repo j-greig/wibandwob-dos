@@ -17,41 +17,54 @@ tmux new-session -d -s wibwob -x 288 -y 80 "bun run /app/src/app.ts"
 
 echo "tmux session started, waiting for control API..."
 
-# Wait for the control API to be ready (up to 30s)
-for i in $(seq 1 30); do
-  if curl -sf http://127.0.0.1:8099/health > /dev/null 2>&1; then
+API=http://127.0.0.1:8099
+API_READY=0
+
+# Wait for the control API to be ready (up to 90s)
+for i in $(seq 1 90); do
+  if curl -sf "$API/health" > /dev/null 2>&1; then
     echo "control API ready on :8099"
+    API_READY=1
     break
   fi
   sleep 1
 done
 
-# Health check result
-curl -s http://127.0.0.1:8099/health | jq . 2>/dev/null || echo "warning: health check failed"
+# Health check result (non-fatal)
+if [ "$API_READY" -eq 1 ]; then
+  curl -s "$API/health" | jq . 2>/dev/null || echo "warning: health check json parse failed"
+else
+  echo "warning: control API not ready after timeout; skipping workspace/bootstrap calls"
+fi
 
 # Load pre-seeded workspace (agent-welcome layout with figlets + cheatsheet)
-if [ -f /app/scratch/workspaces/agent-welcome.json ]; then
+if [ "$API_READY" -eq 1 ] && [ -f /app/scratch/workspaces/agent-welcome.json ]; then
   echo "loading agent-welcome workspace..."
-  curl -sf -X POST http://127.0.0.1:8099/workspace/load \
+  curl -sf -X POST "$API/workspace/load" \
     -H 'Content-Type: application/json' \
     -d '{"name":"agent-welcome"}' || echo "warning: workspace load failed"
 
   # Wait for windows to open, then arrange by title → geometry mapping
   sleep 3
   echo "arranging windows..."
-  API=http://127.0.0.1:8099
+
   # Build batch ops from live window IDs matched to expected titles
-  OPS=$(curl -s $API/state | jq -c '[
-    (.windows[] | select(.title | test("WIBWOB")) | {id, left:0, top:0, width:62, height:10}),
-    (.windows[] | select(.title | test("DOS"))    | {id, left:64, top:0, width:48, height:10}),
-    (.windows[] | select(.title | test("AGENTS")) | {id, left:0, top:11, width:54, height:10}),
-    (.windows[] | select(.title | test("FLY"))    | {id, left:56, top:11, width:56, height:7}),
-    (.windows[] | select(.title | test("README")) | {id, left:0, top:22, width:70, height:38}),
-    (.windows[] | select(.title | test("conscious")) | {id, left:72, top:19, width:40, height:41})
-  ]')
-  curl -sf -X POST $API/windows/batch \
-    -H 'Content-Type: application/json' \
-    -d "{\"ops\":$OPS}" || echo "warning: batch arrange failed"
+  STATE_JSON="$(curl -sf "$API/state" || true)"
+  if [ -n "$STATE_JSON" ]; then
+    OPS="$(printf '%s' "$STATE_JSON" | jq -c '[
+      (.windows[] | select(.title | test("WIBWOB")) | {id, left:0, top:0, width:62, height:10}),
+      (.windows[] | select(.title | test("DOS"))    | {id, left:64, top:0, width:48, height:10}),
+      (.windows[] | select(.title | test("AGENTS")) | {id, left:0, top:11, width:54, height:10}),
+      (.windows[] | select(.title | test("FLY"))    | {id, left:56, top:11, width:56, height:7}),
+      (.windows[] | select(.title | test("README")) | {id, left:0, top:22, width:70, height:38}),
+      (.windows[] | select(.title | test("conscious")) | {id, left:72, top:19, width:40, height:41})
+    ]' || echo '[]')"
+    curl -sf -X POST "$API/windows/batch" \
+      -H 'Content-Type: application/json' \
+      -d "{\"ops\":$OPS}" || echo "warning: batch arrange failed"
+  else
+    echo "warning: state unavailable; skipping batch arrange"
+  fi
 fi
 
 # ttyd — web terminal at :7681 (read-only view of the TUI)
