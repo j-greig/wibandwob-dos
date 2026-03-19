@@ -1,0 +1,4 @@
+Screenshot Pipeline Smoke Test
+==============================
+
+✗ No WibWob-DOS instance found — cannot test
