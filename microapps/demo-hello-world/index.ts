@@ -7,8 +7,10 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
-    label: "Open Hello World",
+    label: "Hello World",
     description: "Open a minimal greeting window.",
+    menu: [{ category: "demos", order: 40, label: "Hello World" }],
+    palette: { order: 210, label: "Hello World" },
     action: () => {
       const win = host.createWindow({
         title: "Hello World",
