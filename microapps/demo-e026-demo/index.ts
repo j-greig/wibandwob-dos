@@ -25,6 +25,7 @@ import type blessed from "blessed";
 import {
   createRenderMonitor,
   createBorderedPanel,
+  createCanvas,
   type BorderedPanelHandle,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";

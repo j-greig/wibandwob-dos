@@ -62,7 +62,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.sdk-showcase":                     "beta",
   "wibwob.data-dashboard":                  "internal",
   "wibwob.example.hello":                  "internal",
-  "wibwob.example.e026":                   "internal",
+  "wibwob.example.e026":                   "core",
   "wibwob.demo.layout-stress.codex":       "internal",
   "wibwob.layout-stress-test-pi":          "core",
 };
