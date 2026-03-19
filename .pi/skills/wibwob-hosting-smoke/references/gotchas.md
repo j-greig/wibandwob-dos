@@ -116,3 +116,19 @@ As of latest ledger update, these are **done in runtime**:
 Remaining blockers relevant to this skill loop:
 - Fly target wiring for real-run scoring (`FLY_APP_NAME` + auth)
 - coordination guardrail when multiple agents edit the same folder
+
+## 11) Render setup drift (Node auto-selection + bad path fields)
+
+Symptoms:
+- build errors like `Root directory "render.yaml" does not exist`
+- `invalid local: ... /opt/render/project/src/epic: no such file or directory`
+- service runs but `/screenshot/text` is just `T` (`screen` is `1x1`)
+
+Mitigation:
+- prefer Blueprint path (repo-root `render.yaml`) or manual Docker with exact fields
+- keep `Root Directory` blank (or `.`), `Dockerfile path=deploy/render/Dockerfile`, branch set correctly
+- do not use Node runtime for screenshot/visual smoke assertions
+
+Status (2026-03-19): **mitigated**
+- `https://wibandwob-dos.onrender.com/health` reports `screen: 288x80`
+- `/screenshot/text` returns full desktop dump (~23KB)

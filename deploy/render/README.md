@@ -6,50 +6,55 @@ Goal: replicate Fly disposable testbed behavior on Render with minimal changes.
 
 - `deploy/render/Dockerfile`
 - `deploy/render/entrypoint.sh`
-- `deploy/render/render.yaml` (blueprint)
+- `render.yaml` (repo-root Blueprint; preferred)
+- `deploy/render/render.yaml` (legacy copy)
 
-## Quick setup (Render dashboard)
+## Canonical path (use this)
 
-### Preferred path (Docker)
+### A) Blueprint (recommended)
 
-1. Create new **Web Service** from this repo (or use blueprint from `render.yaml`).
-2. Environment: **Docker**.
-3. Dockerfile path: `deploy/render/Dockerfile`.
-4. Ensure service has a disk mounted at `/var/data` (optional but recommended).
-5. Deploy.
+1. Push branch with repo-root `render.yaml`.
+2. Render → **New → Blueprint**.
+3. Select repo + branch.
+4. Deploy.
 
-### Alternate path (Node runtime) — experimental / often fails
+### B) Manual Docker service (if needed)
 
-Node runtime can fail with `No open ports detected` because this app expects a PTY-backed TUI process.
-
-If you hit that symptom, switch to Docker path immediately.
-
-- Build command: `bun install --ignore-scripts`
-- Start command: `WIBWOB_INSTANCE_LABEL=render-disposable WIBWOB_CONTROL_HOST=0.0.0.0 CONTROL_API_PORT=$PORT bun run src/app.ts`
+- Environment: **Docker**
+- Branch: `epic/e053-external-config-packaging` (or branch containing `deploy/render/*`)
+- Root directory: blank
+- Dockerfile path: `deploy/render/Dockerfile`
 - Health check path: `/health`
 
-Render provides `$PORT`; app must bind `0.0.0.0:$PORT`.
+## Do not use Node runtime for visual smoke
+
+Node mode can boot API but produce a 1×1 headless screen (`/screenshot/text` returns `T`).
+For visual/screenshot gates, use Docker + `deploy/render/entrypoint.sh` (tmux 288×80).
+
+## Failure signatures → exact fix
+
+- `Root directory "render.yaml" does not exist` or command prefixes like `deploy/render/render.yaml/ $ ...`
+  - Fix: Root directory must be blank (or `.`), never a file path.
+
+- `error: invalid local: resolve : lstat /opt/render/project/src/epic: no such file or directory`
+  - Fix: branch name accidentally placed in Docker path/context; keep branch only in Branch field.
+
+- `.../deploy/render: no such file or directory` while building
+  - Fix: service is on `main` (or wrong branch); switch to branch containing `deploy/render/`.
 
 ## Proof endpoints
 
 - `/health`
 - `/help`
-- `/state`
+- `/runtime/inspection`
+- `/screenshot/text`
 
-## Live deployment log (2026-03-18)
+## Verified state (2026-03-19)
 
-- Render service id: `srv-d6tj7gdm5p6s73be44f0`
-- URL: `https://wibandwob-dos.onrender.com`
-- Build signal observed:
-  - `794 packages installed`
-  - `Build successful`
-  - Deploy phase started (`WEB_CONCURRENCY=1` auto-set)
+Service: `https://wibandwob-dos.onrender.com`
 
-Pending verification checklist after deploy settles:
-
-1. `GET /health` returns JSON
-2. `GET /help` returns JSON
-3. `GET /runtime/inspection` returns rate-limit snapshot
+- `/health` → `ok: true`, `host: 0.0.0.0`, `port: 10000`, `screen: 288×80`
+- `/screenshot/text` → full desktop dump (~23KB), not single-char output
 
 ## Notes
 

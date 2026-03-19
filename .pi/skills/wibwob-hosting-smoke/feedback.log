@@ -18,3 +18,6 @@
 
 2026-03-19 (gotcha logging preference)
 - When a repeated hosting issue appears, capture it as a gotcha only after we have the verified fix path; avoid logging unresolved noise.
+
+2026-03-19 (guidance correction)
+- When a platform UI flow is flaky, prefer the config-driven path immediately (e.g., Render Blueprint with root render.yaml) instead of prolonged form debugging.
