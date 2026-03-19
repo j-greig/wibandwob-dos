@@ -25,6 +25,17 @@ bash .pi/skills/pi-usage-audit/scripts/export.sh \
   --json-out scratch/reports/pi-usage-audit.json
 ```
 
+## Weekly hygiene wrapper
+
+```bash
+bash .pi/skills/pi-usage-audit/scripts/weekly-hygiene.sh 14
+```
+
+This will:
+- run the audit,
+- print the Top stale 10 block to terminal,
+- and open the Markdown report on macOS.
+
 ## Output
 
 - Markdown report includes:

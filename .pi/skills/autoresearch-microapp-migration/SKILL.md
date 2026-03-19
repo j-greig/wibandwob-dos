@@ -109,6 +109,8 @@ Use `scripts/stop-check.py` to compute the stop decision from `results.tsv` + `l
 
 Every experiment must include these checks (instance-targeted where possible):
 
+Note: `scripts/run-gates.sh` now includes runtime preflight (`screen.width/height > 1`), an active runtime crash sentinel (tmux + `scratch/wibwob.log` regex fail), and automatic crash diagnostics (health + tmux pane + log tail) on failure. Responsive checks also support appType-based window matching to avoid brittle title-only targeting. Both scripts now accept `WIBWOB_INSTANCE=<id-or-label>` for explicit multi-instance targeting.
+
 1. **Typecheck pass**
    - `bun run typecheck`
 
@@ -133,6 +135,7 @@ Every experiment must include these checks (instance-targeted where possible):
 
 8. **Responsive check: default size quality**
    - `bash .pi/skills/autoresearch-microapp-migration/scripts/check-responsive-sizes.sh default <command-id>`
+   - script now retries window discovery and validates screenshot signal against the target window id
 
 9. **Responsive check: medium size adaptation**
    - `bash .pi/skills/autoresearch-microapp-migration/scripts/check-responsive-sizes.sh medium <command-id>`

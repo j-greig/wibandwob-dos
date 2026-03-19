@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-03-19T14:19:34.746Z",
+  "surfaces": {
+    "skills": {},
+    "extensions": {
+      "multi-edit": {
+        "lastSeen": "2026-03-19T14:19:34.746Z",
+        "count": 17,
+        "sources": [
+          "tool:edit"
+        ]
+      },
+      "microloop": {
+        "lastSeen": "2026-03-19T12:59:31.874Z",
+        "count": 4,
+        "sources": [
+          "tool:signal_microloop_success",
+          "command:/microloop"
+        ]
+      }
+    },
+    "agents": {}
+  }
+}

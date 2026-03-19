@@ -2,115 +2,99 @@
 name: simplify-docs
 description: >-
   Three-pass review of PRDs, specifications, architecture docs, and technical
-  handover documents. Checks DRY definitions (repeated specs that should be
-  single-sourced, stale code sketches), agent readability (can an agent build
-  from this spec without ambiguity?), and human readability (can a prompt
-  engineer understand and direct agents from this doc?). Fixes issues directly.
-  Use when the user says "simplify docs", "tighten the specs", "review the
-  docs", or before a planning milestone.
+  handovers. Use when you need DRY definitions, agent-readable build instructions,
+  and high-scanability docs. Triggers on: "simplify docs", "tighten specs",
+  "agent-friendly docs", "progressive disclosure", "dedupe docs".
 ---
-# Simplify Docs: Specification & Architecture Review
 
-Review technical documents for DRYness, agent legibility, and human
-readability. Fix issues directly.
+# Simplify Docs
 
-Never simplify for brevity alone. Simplify because it makes documents more
-useful to the two audiences: agents writing code from these specs, and humans
-prompting those agents.
+Review technical documents for DRYness, agent legibility, and human scanability.
+Fix issues directly.
+
+Design target: **minimal words, maximal semantic precision**.
+
+## Quick run
+
+1. Build target set (user paths or recently changed `.md` files).
+2. Run pass 1 (DRY ownership).
+3. Run pass 2 (agent decidability).
+4. Run pass 3 (human scanability).
+5. Apply fixes.
+6. Run a **fresh-eyes pass** before finalising.
 
 ## Scope
 
-The user may name specific files or a docs directory. If no target is given,
-review recently changed `.md` files under the project's docs directories.
-Read each target document fully before reviewing.
+If user gives files/dirs, use those.
+If no target, review recently changed docs first.
+Read each target doc fully before editing.
 
-## Pass 1: DRY — Single-Source Definitions
+## Pass 1 — DRY / single-source ownership
 
-1. **Cross-doc duplication.** Flag any concept, type, interface, or
-   architectural rule defined in more than one document. The canonical
-   definition should live in one place; other docs should cross-reference,
-   not restate.
+1. Cross-doc duplication
+   - One concept/type/rule = one canonical owner file.
+   - Secondary docs should link, not restate.
 
-2. **Doc vs source drift.** Flag inline code sketches or interface
-   definitions that duplicate what already exists in the actual codebase.
-   If a real TypeScript file implements the spec, the doc should reference
-   the source file rather than carry a stale copy.
+2. Doc-vs-code drift
+   - If source code already defines a contract, link the source path.
+   - Remove stale duplicated sketches unless needed for explanation.
 
-3. **Restated constraints.** Flag story or feature docs that restate
-   epic-level guardrails verbatim. Replace with a one-line cross-reference.
+3. Restated guardrails
+   - Replace repeated epic-level constraints with cross-references.
 
-4. **Missing reference-implementation citations.** If a well-known
-   dependency or adjacent codebase already solves a problem the doc is
-   speccing from scratch, note it. Examples: TypeBox for runtime schema
-   validation, chalk for terminal colour abstraction, blessed's existing
-   API for widget patterns.
+4. Missing source-of-truth references
+   - Add concrete file references where behaviour is implemented.
 
-## Pass 2: Agent Readability
+## Pass 2 — Agent readability / build decidability
 
-Review from the perspective of a coding agent receiving this doc as context.
+1. Decidability
+   - Remove soft ambiguity (`should/could`) where direction is known.
+   - If unresolved, mark explicitly: `DECISION NEEDED:`
 
-1. **Module-header contract.** Does each specced module have a clear
-   one-paragraph purpose statement extractable as a file-header doc
-   comment? If the description is buried in prose, extract it into a
-   standalone block.
+2. Naming/path consistency
+   - File paths, command IDs, type names must match repo reality.
 
-2. **Decidability.** Can an agent determine what to build without further
-   clarification? Flag specs that say "should" or "could" without
-   resolving which option is intended.
+3. Dependency direction clarity
+   - Make import/ownership direction explicit when architecture is described.
 
-3. **Naming consistency.** Are file paths, function names, and type names
-   consistent between the doc and the actual source tree? Flag drift.
+4. Procedure over declarations
+   - Prefer stepwise build/verify instructions over abstract statements.
 
-4. **Import graph clarity.** Does the doc make dependency direction clear?
-   An agent needs to know what a module imports and what imports it.
+5. Defaults over menus
+   - Pick one default approach; list alternatives only as fallbacks.
 
-5. **Code sketch freshness.** If the doc contains code sketches, do they
-   match current codebase signatures? Stale sketches actively mislead
-   agents. Update them or replace with a file reference.
+## Pass 3 — Human scanability / operator usability
 
-## Pass 3: Human Readability
+1. Status clarity
+   - Active/in-progress/done/stale must be obvious.
 
-Review from the perspective of a human whose job is to prompt agents to
-build or modify the system.
+2. Structure
+   - Convert wall prose into headers, lists, tables, checklists.
 
-1. **Narrative flow.** Can someone read top-to-bottom and build a mental
-   model? Flag docs requiring non-linear reading.
+3. Signal-to-noise
+   - Move historical/exploratory context under `Background`.
 
-2. **Status clarity.** Is it immediately obvious whether this doc is
-   active, landed, stale, or reference-only?
+4. Comment-block seeding
+   - Preserve concise module purpose text usable as top-of-file comments.
 
-3. **Signal-to-noise.** Flag historical or exploratory sections mixed
-   with actionable spec. Move these under a "Background" heading or
-   into a separate reference doc.
+## Fresh-eyes pass (mandatory)
 
-4. **Scanability.** Flag wall-of-prose sections that need tables, lists,
-   or headers for skimming.
+Run this prompt against the updated docs:
 
-5. **Comment-block seeding.** For specced modules, does the doc contain a
-   concise purpose statement suitable as a top-of-file doc comment? If
-   the spec has a good description but the source file lacks the
-   corresponding comment block, note it as a follow-up.
+`Review this with fresh eyes. Assume current output is serviceable but suboptimal. Find the top 3 clarity gaps, top 3 reliability risks, and top 3 simplifications. Then propose smallest safe edits.`
 
-## Fix Issues
+Apply worthwhile changes.
 
-Fix each issue directly in the document files.
+## Fix policy
 
-- **Duplicate definitions:** Replace secondary copies with a
-  cross-reference.
-- **Stale code sketches:** Update to match source, or replace with a
-  file-path reference.
-- **Buried module descriptions:** Extract into a formatted block usable
-  as a file header comment.
-- **Ambiguous specs:** Resolve if the codebase already chose a direction.
-  If genuinely unresolved, mark with `DECISION NEEDED:` rather than
-  leaving soft language.
-- **Mixed historical/active content:** Move historical material under a
-  "Background" heading.
-- **Missing source references:** Add file-path references to actual
-  implementations.
+- Keep information; do not orphan it.
+- Prefer move/restructure/link over delete.
+- Preserve canon terms and command IDs exactly.
 
-Never delete information that has no other home. Move, restructure, or
-cross-reference it.
+## Output summary format
 
-When done, briefly summarise what was fixed per document, or confirm docs
-were already clean.
+For each edited doc, report:
+- what was deduplicated
+- what became canonical owner
+- what ambiguity was resolved
+- what remains `DECISION NEEDED`

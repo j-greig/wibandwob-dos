@@ -165,6 +165,11 @@ def build_report(
     all_agent_names: set[str],
     scanned_files: int,
     live_state_used: bool,
+    sessions_bucket_path: Path,
+    live_state_path: Path,
+    skills_dir: Path,
+    extensions_dir: Path,
+    agents_dir: Path,
 ):
     cutoff = now - dt.timedelta(days=threshold_days)
 
@@ -173,9 +178,16 @@ def build_report(
     lines.append("")
     lines.append("## TL;DR")
     lines.append(f"- Scanned **{scanned_files}** session logs for this repo.")
-    lines.append(f"- Live usage state: **{'yes' if live_state_used else 'no'}** (`.pi/metrics/usage-last-seen.json`).")
     lines.append(f"- Stale threshold: **{threshold_days} days** (cutoff {cutoff.date()}).")
     lines.append("- ‘never’ means no usage signal found in logs/state.")
+    lines.append("")
+
+    lines.append("## Scan scope")
+    lines.append(f"- Session logs: `{sessions_bucket_path}`")
+    lines.append(f"- Live usage state: `{live_state_path}` (present: {'yes' if live_state_used else 'no'})")
+    lines.append(f"- Skills folder: `{skills_dir}`")
+    lines.append(f"- Extensions folder: `{extensions_dir}`")
+    lines.append(f"- Agents folder: `{agents_dir}`")
     lines.append("")
 
     stale_candidates: list[tuple[str, str, dt.datetime | None]] = []
@@ -389,6 +401,11 @@ def main() -> int:
         all_agent_names=known_agents,
         scanned_files=len(files),
         live_state_used=live_state_used,
+        sessions_bucket_path=bucket,
+        live_state_path=live_state_path,
+        skills_dir=skills_dir,
+        extensions_dir=extensions_dir,
+        agents_dir=agents_dir,
     )
 
     out = Path(args.out)

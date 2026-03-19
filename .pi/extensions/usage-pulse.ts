@@ -74,6 +74,17 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
+async function findRepoRoot(startCwd: string): Promise<string> {
+  let current = path.resolve(startCwd);
+  while (true) {
+    const marker = path.join(current, ".pi");
+    if (await fileExists(marker)) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return path.resolve(startCwd);
+    current = parent;
+  }
+}
+
 async function readJson<T>(p: string, fallback: T): Promise<T> {
   try {
     const raw = await fs.readFile(p, "utf8");
@@ -108,16 +119,17 @@ function updateEntry(surface: Record<string, UsageEntry>, name: string, source: 
 export default function usagePulseExtension(pi: ExtensionAPI): void {
   const lastWriteByKey = new Map<string, number>();
 
-  let cachedCwd = "";
+  let cachedRoot = "";
   let commandToExtension = new Map<string, string>();
   let toolToExtension = new Map<string, string>();
 
   async function refreshExtensionIndex(cwd: string): Promise<void> {
-    if (cachedCwd === cwd && commandToExtension.size > 0) return;
+    const repoRoot = await findRepoRoot(cwd);
+    if (cachedRoot === repoRoot && commandToExtension.size > 0) return;
 
-    const extensionsDir = path.join(cwd, ".pi", "extensions");
+    const extensionsDir = path.join(repoRoot, ".pi", "extensions");
     if (!(await fileExists(extensionsDir))) {
-      cachedCwd = cwd;
+      cachedRoot = repoRoot;
       commandToExtension = new Map();
       toolToExtension = new Map();
       return;
@@ -142,7 +154,7 @@ export default function usagePulseExtension(pi: ExtensionAPI): void {
       while ((m = toolRe.exec(src)) !== null) toolMap.set(m[1], extName);
     }
 
-    cachedCwd = cwd;
+    cachedRoot = repoRoot;
     commandToExtension = cmdMap;
     toolToExtension = toolMap;
   }
@@ -154,7 +166,8 @@ export default function usagePulseExtension(pi: ExtensionAPI): void {
     if (nowMs - prev < WRITE_COOLDOWN_MS) return;
     lastWriteByKey.set(key, nowMs);
 
-    const statePath = path.join(ctx.cwd, ".pi", "metrics", "usage-last-seen.json");
+    const baseRoot = cachedRoot || (await findRepoRoot(ctx.cwd));
+    const statePath = path.join(baseRoot, ".pi", "metrics", "usage-last-seen.json");
     const state = await readJson<UsageState>(statePath, defaultState());
     updateEntry(state.surfaces[surface], name, source);
     state.generatedAt = new Date().toISOString();
@@ -217,7 +230,8 @@ export default function usagePulseExtension(pi: ExtensionAPI): void {
 
     for (const m of text.matchAll(MENTION_RE)) {
       const agent = m[1];
-      const agentPath = path.join(ctx.cwd, ".pi", "agents", `${agent}.md`);
+      const baseRoot = cachedRoot || (await findRepoRoot(ctx.cwd));
+      const agentPath = path.join(baseRoot, ".pi", "agents", `${agent}.md`);
       if (await fileExists(agentPath)) {
         await recordUsage(ctx, "agents", agent, "mention:@agent");
       }
