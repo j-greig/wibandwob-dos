@@ -20,7 +20,8 @@ API surface for microapp authors. Import everything from
 
 Naming policy:
 - Prefer composition helper names (`createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`) for microapp authoring.
-- `createLayout*` names are lower-level/host-centric compatibility surfaces.
+- `createLayout*` names are lower-level/host-centric compatibility surfaces, marked `@deprecated` in code.
+- All public SDK exports carry `@public`, `@beta`, or `@internal` JSDoc tags indicating stability.
 
 ### Preferred names vs legacy aliases
 
@@ -28,6 +29,7 @@ Naming policy:
 |---|---|
 | `createStatusBar` | `createLayoutStatusBar` |
 | `createButtonBar` | `createLayoutButtonBar` |
+| `createHeaderBar` | `createLayoutHeaderBar` |
 | `createTabs` | `createLayoutTabs` |
 | `createInputLine` | `createLayoutInputLine` |
 | `createRule` | `createLayoutRule` |
