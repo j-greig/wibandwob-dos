@@ -189,22 +189,48 @@ PY
 - Open a primer instead: `bun run src/cli/wibwob.ts -i $LABEL cmd primer.open --filePath <path> --x 0 --y 0`
 - Add ANSI colour: wrap figlet output with bg/fg escape sequences (see `scripts/fx/flamingo-trail-v2.py` `render_ansi()`)
 
-#### Task 3 — Full animation: Bouncing ASCII art with colour evolution
+#### Task 3 — Full animation: Dynamic-centre notepad + bouncing ANSI art
 
-The flamingo-trail-v2.py script opens a notepad, fills it with bouncing ASCII art,
-and steps the foreground colour through a palette on each bounce.
-
-1. Open + size + centre a notepad (same as Task 2 steps 1–4)
-2. Run the animation into it:
+Opens a notepad, fetches the real desktop size from the API, centres the window,
+then runs the bouncing mech animation with colour evolution.
 
 ```bash
 cd ~/Repos/wibwob-zine-moodboard
 LABEL=8pr
 API_PORT=8100
-WID=21   # from Task 2
 
+# 1. Open notepad + centre it dynamically (Python)
+WIBWOB_API=http://127.0.0.1:$API_PORT python3 - <<'PY'
+import urllib.request, json, time
+
+api = "http://127.0.0.1:8100"
+def post(p, b):
+    d=json.dumps(b).encode()
+    r=urllib.request.Request(f"{api}{p}",data=d,headers={"Content-Type":"application/json"},method="POST")
+    return json.loads(urllib.request.urlopen(r,timeout=5).read())
+def get(p):
+    return json.loads(urllib.request.urlopen(f"{api}{p}",timeout=5).read())
+
+sw=int(get("/health")["screen"]["width"])
+sh=int(get("/health")["screen"]["height"])
+print(f"Desktop: {sw}x{sh}")
+
+post("/commands/run",{"id":"microapp.wibwob.notepad.open","args":{}})
+time.sleep(0.35)
+
+state=get("/state")
+wid=[w for w in state["windows"] if(w.get("details")or{}).get("appType")=="wibwob.notepad"][-1]["id"]
+
+win_w,win_h=120,60
+cx=(sw-win_w)//2; cy=(sh-win_h)//2
+print(f"Centering {win_w}x{win_h} at ({cx},{cy}) on {sw}x{sh}")
+post("/windows/batch",{"ops":[{"id":wid,"width":win_w,"height":win_h,"left":cx,"top":cy}]})
+print(f"WID={wid}")
+PY
+
+# 2. Run animation into that window
 WIBWOB_API=http://127.0.0.1:$API_PORT python3 scripts/fx/flamingo-trail-v2.py \
-  --window-id $WID \
+  --window-id 23 \
   --source microapps-private/wibwob-primers/primers/mech.txt \
   --theme dark-pastel \
   --window-w 120 --window-h 60 \
@@ -214,7 +240,7 @@ WIBWOB_API=http://127.0.0.1:$API_PORT python3 scripts/fx/flamingo-trail-v2.py \
 ```
 
 **Variations:**
-- Flamingo instead of mech: `--source flamingo-0000-2.txt` (JGS default)
+- Flamingo: `--source flamingo-0000-2.txt`
 - Spectral colours: `--bg '#0a0a1a' --fg-start '#00ffff' --fg-end '#ff00ff'`
 - Portrait mode: `--window-w 80 --window-h 90 --canvas-w 80 --canvas-h 90 --dx 1 --dy 2 --bounce-count 8`
 - Infinite: `--steps 0`, Ctrl+C to freeze and leave window open
