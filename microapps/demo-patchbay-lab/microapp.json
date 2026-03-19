@@ -1,0 +1,20 @@
+{
+  "name": "patchbay-lab",
+  "version": "0.1.0",
+  "description": "Patchbay Lab microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.patchbay",
+    "title": "Patchbay Lab",
+    "description": "Patchbay Lab SDK coverage harness.",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [
+      { "category": "demos", "order": 125, "label": "Patchbay Lab" }
+    ],
+    "palette": { "order": 125, "label": "Open Patchbay Lab" },
+    "agent": true,
+    "api": true
+  }
+}
