@@ -34,7 +34,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.plasma":             "beta",
   "wibwob.generative":         "beta",
   "wibwob.workspace-beacon":   "beta",
-  "wibwob.poetry-clock":       "beta",
+  "wibwob.poetry-clock":       "core",
   "wibwob.spore-clock":        "beta",
   "wibwob.sy2chronicles":      "beta",
   "wibwob.tr808":              "beta",
