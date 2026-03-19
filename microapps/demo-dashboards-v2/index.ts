@@ -33,6 +33,7 @@ import {
   xLabels,
   ansiGradientLine,
   applyRect,
+  toEvenCellWidth,
 } from "../../src/services/microapp-sdk.js";
 
 // ── types ─────────────────────────────────────────────────────
@@ -62,7 +63,13 @@ function applyContribRect(
   widget: any,
   rect: { top: number; left: number; width: number; height: number },
 ) {
-  applyRect(widget, rect);
+  // drawille-based contrib widgets crash on odd widths — clamp to even.
+  const evenRect = {
+    ...rect,
+    width: toEvenCellWidth(rect.width),
+    height: Math.max(2, rect.height),
+  };
+  applyRect(widget, evenRect);
   if (widget && typeof widget.emit === "function") widget.emit("resize");
 }
 
