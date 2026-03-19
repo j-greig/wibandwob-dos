@@ -19,7 +19,7 @@ with no animation or background updates.
 
 An ASCII heartbeat monitor with two timers (fast waveform + slow BPM counter).
 
-**Shows:** createTimer/clearTimers, multiple blessed boxes, structured
+**Shows:** createTimer/clearTimers, multiple SDK layout parts, structured
 describeState with semantic fields (bpm, uptime, frame, beat), proper
 onCleanup that clears all timers.
 

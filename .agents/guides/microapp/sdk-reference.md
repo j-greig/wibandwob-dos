@@ -235,8 +235,9 @@ const body = createRow(win.body, [
 // Both accept optional { gap: N } — character-cell spacing between children
 // Gap is subtracted before flex distribution, so 1fr children still split evenly.
 
-// Wrap a raw blessed box as a LayoutPart
-const panel = createNodePart(blessed.box({ parent: win.body, style: host.theme().body }));
+// Prefer SDK parts directly; only use createNodePart when integrating legacy/raw widgets
+const legacyNode = someLegacyWidget;
+const panel = createNodePart(legacyNode);
 ```
 
 ### Grid: createGrid

@@ -135,15 +135,16 @@ normal way to build complex screens.
 
 ### createNodePart — the bridge
 
-Wrap any raw blessed box or contrib widget as a LayoutPart:
+Wrap any legacy node or contrib widget as a LayoutPart:
 
 ```ts
 import { createNodePart } from "../../src/services/microapp-sdk.js";
 
-const panel = createNodePart(blessed.box({ parent: win.body, style: host.theme().body }));
+const legacyNode = someLegacyWidget;
+const panel = createNodePart(legacyNode);
 ```
 
-This is essential for placing plain blessed nodes inside flex or grid layouts.
+Use this for interop only. Prefer SDK-native components for new UI.
 
 ### Nesting patterns
 

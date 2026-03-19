@@ -99,8 +99,8 @@ Example:
 ## The entry point: index.ts
 
 ```typescript
-import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { createTextBlock } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -116,14 +116,10 @@ export default function setup(host: MicroappHost) {
 function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "My App", width: 60, height: 20 });
 
-  const content = blessed.box({
-    parent: win.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    content: "Hello from My App!",
-    style: host.theme().body,
+  const content = createTextBlock(win.body, {
+    text: "Hello from My App!",
+    paddingLeft: 1,
+    paddingTop: 1,
   });
 
   // Required lifecycle hooks:
@@ -132,10 +128,10 @@ function openMyApp(host: MicroappHost) {
     summary: "My App — running.",
   }));
 
-  win.captureText(() => content.getContent());
+  win.captureText(() => "Hello from My App!");
 
   win.onRestyle(() => {
-    content.style = host.theme().body;
+    content.restyle();
     host.screen.render();
   });
 
@@ -316,28 +312,24 @@ Every microapp window MUST implement these four hooks:
 Use `createTimer` from the SDK for interval-based updates:
 
 ```typescript
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, createTextBlock } from "../../src/services/microapp-sdk.js";
 
 function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "Animated", width: 40, height: 10 });
   const timers = new Set<ReturnType<typeof setInterval>>();
 
-  const display = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 0,
-    style: host.theme().body,
-  });
+  const display = createTextBlock(win.body, { text: "Tick: 0" });
 
   let tick = 0;
   createTimer(() => {
     tick++;
-    display.setContent(`Tick: ${tick}`);
+    display.update({ text: `Tick: ${tick}` });
     host.screen.render();
   }, 100, timers);
 
   win.describeState(() => ({ summary: `Animated — tick ${tick}` }));
   win.captureText(() => `Tick: ${tick}`);
-  win.onRestyle(() => { display.style = host.theme().body; host.screen.render(); });
+  win.onRestyle(() => { display.restyle(); host.screen.render(); });
   win.onCleanup(() => clearTimers(timers));
 }
 ```

@@ -30,6 +30,23 @@ export const PI_THEME_PATH = path.join(PI_DIR, "themes", "wibwob-tv.json");
  * 
  * Selection is based on intent (env/mode), not filesystem presence.
  * The directory will be created if it doesn't exist. */
+function isDirectoryPath(target: string): boolean {
+  try {
+    return fs.statSync(target).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function pathExists(target: string): boolean {
+  try {
+    fs.statSync(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveDataRoot(): string {
   // 1. Explicit override (strongest signal)
   if (process.env.WIBWOB_DATA_DIR) {
@@ -45,14 +62,20 @@ export function resolveDataRoot(): string {
     return projectDataDir;
   }
 
-  // Weak signal: treat existing .wibwob as project indicator
-  if (fs.existsSync(projectDataDir)) {
+  // Weak signal: only an existing DIRECTORY implies project-local mode.
+  if (isDirectoryPath(projectDataDir)) {
     return projectDataDir;
   }
 
   // 3. Global user directory (default stable location for npm/Docker/VPS)
   const globalDataDir = path.join(os.homedir(), ".wibwob");
-  return globalDataDir;
+  if (!pathExists(globalDataDir) || isDirectoryPath(globalDataDir)) {
+    return globalDataDir;
+  }
+
+  // Fallback guard: ~/.wibwob can be an accidental FILE.
+  // Use adjacent directory name to keep startup resilient.
+  return path.join(os.homedir(), ".wibwob-data");
 }
 
 /** Ensure a directory exists.

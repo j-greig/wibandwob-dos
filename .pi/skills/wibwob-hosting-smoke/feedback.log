@@ -21,3 +21,6 @@
 
 2026-03-19 (guidance correction)
 - When a platform UI flow is flaky, prefer the config-driven path immediately (e.g., Render Blueprint with root render.yaml) instead of prolonged form debugging.
+
+2026-03-19 (autoresearch loop preference)
+- For autonomous loops, require explicit stop controls (max loop count + deterministic stop reasons) instead of open-ended iteration.

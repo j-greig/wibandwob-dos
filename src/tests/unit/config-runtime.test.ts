@@ -40,10 +40,52 @@ describe("config runtime", () => {
     expect(resolveDataRoot()).toBe(path.join(process.cwd(), ".wibwob"));
   });
 
-  test("resolveDataRoot: fallback is ~/.wibwob", () => {
+  test("resolveDataRoot: fallback is ~/.wibwob (or ~/.wibwob-data if ~/.wibwob is a file)", () => {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-global-fallback-"));
     process.chdir(temp);
-    expect(resolveDataRoot()).toBe(path.join(os.homedir(), ".wibwob"));
+
+    const globalDir = path.join(os.homedir(), ".wibwob");
+    const expected = (() => {
+      try {
+        return fs.statSync(globalDir).isDirectory()
+          ? globalDir
+          : path.join(os.homedir(), ".wibwob-data");
+      } catch {
+        return globalDir;
+      }
+    })();
+
+    expect(resolveDataRoot()).toBe(expected);
+  });
+
+  test("resolveDataRoot: existing .wibwob file in cwd does not imply project-local mode", () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-e053-project-dotfile-"));
+    process.chdir(temp);
+    const dotPath = path.join(process.cwd(), ".wibwob");
+    fs.writeFileSync(dotPath, "not a dir");
+
+    const resolved = resolveDataRoot();
+    expect(resolved).not.toBe(dotPath);
+  });
+
+  test("resolveDataRoot: dev/local guard falls back when ~/.wibwob is a file", () => {
+    process.env.NODE_ENV = "development";
+    const globalDir = path.join(os.homedir(), ".wibwob");
+    const fallbackDir = path.join(os.homedir(), ".wibwob-data");
+
+    const originalStatSync = fs.statSync;
+    (fs as unknown as { statSync: typeof fs.statSync }).statSync = ((target: fs.PathLike) => {
+      if (String(target) === globalDir) {
+        return { isDirectory: () => false } as fs.Stats;
+      }
+      return originalStatSync(target);
+    }) as typeof fs.statSync;
+
+    try {
+      expect(resolveDataRoot()).toBe(fallbackDir);
+    } finally {
+      (fs as unknown as { statSync: typeof fs.statSync }).statSync = originalStatSync;
+    }
   });
 
   test("resolveInstancePaths: returns canonical instance-scoped layout", () => {
