@@ -325,9 +325,9 @@ export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG, DEFAULT_FIGLE
 /** @beta */
 export type { RenderMarkdownOptions, FigletHeadingConfig } from "./markdown-service.js";
 /** @beta */
-export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize } from "./figlet-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize, setFigletFavourites, toggleFigletFavourite } from "./figlet-service.js";
 /** @beta */
-export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier } from "./figlet-service.js";
+export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier, SetFigletFavouritesResult, ToggleFigletFavouriteResult } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)
