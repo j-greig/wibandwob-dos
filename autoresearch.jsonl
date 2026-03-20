@@ -1,1 +1,2 @@
 {"type":"config","name":"Skill Index Doc — docs/skills.md quality score","metricName":"score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"7c4b12b","metric":0,"metrics":{"coverage":0,"triggers":0,"doesnot":0,"roles":0},"status":"keep","description":"Baseline — docs/skills.md does not exist yet","timestamp":1774018670773,"segment":0,"confidence":null}
