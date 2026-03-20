@@ -186,5 +186,20 @@ check "pd_focus" '
   done
 '
 
+# 15. Content freshness — regenerating all outputs produces no diff (generated files match their scripts)
+check "content_fresh" '
+  # stash any working changes, regenerate, check for diff, restore
+  for s in scripts/gen-*.ts scripts/gen-*.py; do
+    [ -f "$s" ] || continue
+    run_cmd=$(grep -E "^(//|#) @run" "$s" | sed "s|.*@run ||" | sed "s|^[[:space:]]*||;s|[[:space:]]*$||")
+    output=$(grep -E "^(//|#) @output" "$s" | sed "s|.*@output ||" | tr -d " ")
+    [ -z "$run_cmd" ] || [ -z "$output" ] || [ ! -f "$output" ] && continue
+    before=$(md5 -q "$output" 2>/dev/null || md5sum "$output" 2>/dev/null | cut -d" " -f1)
+    eval "$run_cmd" > /dev/null 2>&1 || continue
+    after=$(md5 -q "$output" 2>/dev/null || md5sum "$output" 2>/dev/null | cut -d" " -f1)
+    [ "$before" = "$after" ] || exit 1
+  done
+'
+
 echo "METRIC doc_health=$SCORE"
 exit 0
