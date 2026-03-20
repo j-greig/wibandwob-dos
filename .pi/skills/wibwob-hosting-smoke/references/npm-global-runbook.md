@@ -15,7 +15,7 @@ bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh npm-global
 ```
 
 Runner:
-- `scripts/devops/npm-global-smoke.sh`
+- `.pi/skills/wibwob-hosting-smoke/scripts/npm-global-smoke.sh`
 
 ## What this path verifies
 

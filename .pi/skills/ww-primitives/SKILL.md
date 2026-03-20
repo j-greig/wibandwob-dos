@@ -52,4 +52,4 @@ bun run typecheck
 
 ## Generator
 
-The generator lives at `scripts/gen-primitives.ts`. It scans `src/` for exports tagged with `@primitive` and emits grouped re-exports into `src/core/primitives.ts`.
+The generator lives at `.pi/skills/ww-primitives/scripts/gen-primitives.ts`. It scans `src/` for exports tagged with `@primitive` and emits grouped re-exports into `src/core/primitives.ts`.

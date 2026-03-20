@@ -18,7 +18,7 @@ import {
   type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
 
-import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
+import { PI_APPEND_SYSTEM_PATH, PI_DIR, REPO_ROOT } from "../core/config.js";
 import type { ChatMessageEntry, DesktopState, ToolRun, ToolCallEntry } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { agentToolToDefinition, createTuiToolDefinitions, createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
@@ -247,7 +247,7 @@ function loadBasePrompt(): string {
   } catch {
     // Fallback to the legacy single-file path
     try {
-      return safeReadFile(SPIKE_PI_APPEND_SYSTEM_PATH)?.trim() ?? "";
+      return safeReadFile(PI_APPEND_SYSTEM_PATH)?.trim() ?? "";
     } catch {
       return [
         "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
@@ -526,7 +526,7 @@ export class WibWobAgentSession {
     try {
       const authStorage = AuthStorage.create();
       const modelRegistry = new ModelRegistry(authStorage);
-      const settingsManager = SettingsManager.create(this.cwd, SPIKE_PI_DIR);
+      const settingsManager = SettingsManager.create(this.cwd, PI_DIR);
       const initial = resolveModel({ modelRegistry, settingsManager });
 
       if (!initial.model) {
@@ -535,7 +535,7 @@ export class WibWobAgentSession {
 
       const resourceLoader = new DefaultResourceLoader({
         cwd: this.cwd,
-        agentDir: SPIKE_PI_DIR,
+        agentDir: PI_DIR,
         settingsManager,
       });
       await resourceLoader.reload();

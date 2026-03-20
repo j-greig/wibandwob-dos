@@ -25,10 +25,10 @@ import {
   DATA_ROOT,
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
+  APP_NOTES_PATH,
+  APP_ROOT,
   REPO_ROOT,
   SCRATCH_BASE,
-  SPIKE_NOTES_PATH,
-  SPIKE_ROOT,
 } from "./config.js";
 import { appFlags } from "./cli.js";
 import { loadMicroapps, reloadMicroapps } from "../services/microapp-loader.js";
@@ -362,8 +362,8 @@ export class TsTuiMvpApp {
       screen: this.screen,
       isMenuOpen: () => this.menuUi.isAnyMenuOpen(),
       invalidation: this.invalidation,
-      defaultDir: SPIKE_ROOT,
-      editorStartDir: path.dirname(SPIKE_NOTES_PATH),
+      defaultDir: APP_ROOT,
+      editorStartDir: path.dirname(APP_NOTES_PATH),
     });
     this.rateLimiter = new RateLimitService(resolveRateLimitConfig());
     this.runtimeCommands = createRuntimeCommandService({

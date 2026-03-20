@@ -86,7 +86,7 @@ bash .pi/skills/wibwob-hosting-smoke/scripts/run-smoke.sh flyio
 ```
 
 Current runner:
-- `scripts/devops/fly-smoke.sh`
+- `.pi/skills/wibwob-hosting-smoke/scripts/fly-smoke.sh`
 
 Artifacts:
 - `scratch/captures/fly-smoke-<timestamp>/report.md`
