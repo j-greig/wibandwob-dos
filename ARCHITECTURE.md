@@ -27,11 +27,11 @@ Four seams connect every adapter to the core:
 | **Window** | `window-facade.ts` + `window-manager.ts` | 11-method interface; all consumers identical |
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
-<prog-disclosure>
+<progressive-disclosure>
 Every HTTP endpoint and CLI command currently registered, grouped by domain —
 the exhaustive proof that every surface hits the same registry. If something
 is missing from this list, it is not COAT-compliant.
-</prog-disclosure>
+</progressive-disclosure>
 
 ---
 
@@ -160,11 +160,11 @@ Importing from `src/core/` or `src/services/` directly is a COAT violation.
 | Use full id in `runCommand` | Omit prefix — `"open"` not `"wibwob.app.open"` |
 | Inline blessed style literals | Use `host.theme()` tokens |
 
-<prog-disclosure>
+<progressive-disclosure>
 Every export from microapp-sdk.ts with stability tier (@public / @beta / @internal),
 its call signature, and a one-line description — the full component directory for
 picking the right primitive without opening source.
-</prog-disclosure>
+</progressive-disclosure>
 
 Seven reference examples ordered by complexity: `demo-hello-world` →
 `demo-wibwob-tidepool` → `demo-wibwob-poetry-clock` → `demo-e026-demo` →

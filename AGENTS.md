@@ -34,7 +34,7 @@ wibwob -i <label> read <id>                # semantic text from window
 echo "text" | wibwob -i <label> write <id>
 ```
 
-**Visual verification is mandatory.** API responses are not sufficient proof.
+For TUI-related work eg on the frontend, **visual verification is mandatory.** API responses are not sufficient proof.
 
 ---
 
@@ -86,10 +86,10 @@ chaining 3+ non-bash tool calls.
 **Devlog** — `scripts/devlog.sh "note"` → `.pi/reflections/2026-W{nn}.md`.
 Write friction, patterns that confused, things that worked.
 
-<prog-disclosure>
+<progressive-disclosure>
 Live index of every script, skill, and doc in the repo — organised by
 agent lens (shell-architect, microapp-builder, ops, quality, creative).
-</prog-disclosure>
+</progressive-disclosure>
 
 ---
 
