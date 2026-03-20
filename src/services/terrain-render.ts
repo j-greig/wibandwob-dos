@@ -13,11 +13,13 @@ export interface TerrainRenderOptions {
     width: number;
     height: number;
   };
-  /** Camera for first-person mode. Auto-placed opposite the highest peak if omitted. */
+  /** Camera for first-person / flight mode. Auto-placed opposite the highest peak if omitted. */
   firstPersonCamera?: {
     x: number;
     y: number;
-    yaw?: number; // radians; auto-computed toward highest peak if omitted
+    yaw?: number;      // radians; auto-computed toward highest peak if omitted
+    altitude?: number; // units above terrain-cell elevation (0 = ground, 0.25 = low flight)
+    pitch?: number;    // radians; positive = nose up (more sky), negative = nose down
   };
   player?: {
     x: number;
@@ -170,27 +172,36 @@ function renderFirstPerson(
   tags: boolean,
 ): string[] {
   const peak = findTerrainPeak(map);
+  const alt   = camOpt?.altitude ?? 0;
+  const pitch = camOpt?.pitch    ?? 0;
   const cam = camOpt ?? fpAutoCamera(map, peak);
   const camCell = map.cells[Math.round(cam.y)]?.[Math.round(cam.x)];
-  const camElev = camCell?.elevation ?? map.seaLevel;
+  const camElev = (camCell?.elevation ?? map.seaLevel) + alt;
   const yaw = cam.yaw ?? Math.atan2(peak.y - cam.y, peak.x - cam.x);
 
-  const SW = width;
-  const SH = height;
+  const SW  = width;
+  const SH  = height;
+  const SW1 = SW - 1;
   const sea = map.seaLevel;
-  const FOV = Math.PI / 2.4; // slightly narrower for more depth
-  const HORIZON = Math.floor(SH * 0.38); // lower horizon = more sky = more dramatic
+  const FOV = Math.PI / 2.4;
+  // HORIZON: pitch shifts it — nose up (pitch>0) → HORIZON row increases → more sky visible
+  const HORIZON = Math.max(2, Math.min(SH - 4,
+    Math.floor(SH * 0.38) + Math.round(pitch * SH * 0.5)));
   const isElevated = camElev > sea + 0.05;
-  // Much stronger elevation scaling for dramatic hills
-  const ELEV_SC = SH * (isElevated ? 0.75 : 0.45);
+  const ELEV_SC = SH * (alt > 0.15 ? 1.2 : isElevated ? 0.75 : 0.45);
   const FAR = Math.max(
     Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * 1.6,
-    Math.max(map.width, map.height) * 0.9,
+    Math.max(map.width, map.height) * (alt > 0.1 ? 1.4 : 0.9),
   );
   const STEPS = 1000;
-  // Sun position (fixed right-of-centre for lighting)
-  const sunCol = Math.floor(SW * 0.7);
-  const sunRow = Math.floor(HORIZON * 0.15);
+  // Sun: fixed in world space at SUN_WORLD_YAW — moves across screen as you turn
+  const SUN_WORLD_YAW = 1.0; // radians from world east
+  const sunFrac = (SUN_WORLD_YAW - yaw) / FOV + 0.5;
+  const sunCol  = Math.round(sunFrac * SW1); // may be off-screen — that's correct
+  const sunRow  = Math.floor(HORIZON * 0.15);
+  // Sky parallax: wx = skyXOff + col gives world-space x so clouds/stars
+  // stay fixed in world space as camera rotates (not screen-space)
+  const skyXOff = yaw * SW1 / FOV - SW1 / 2;
 
   const tag = (color: string, ch: string) =>
     tags ? `{${color}-fg}${ch}{/${color}-fg}` : ch;
@@ -252,7 +263,6 @@ function renderFirstPerson(
   // ── Precompute per-column ray directions (cos/sin only needed once per column) ──
   const rayDX = new Float64Array(SW);
   const rayDY = new Float64Array(SW);
-  const SW1 = SW - 1;
   for (let col = 0; col < SW; col++) {
     const ang = yaw + FOV * (col / SW1 - 0.5);
     rayDX[col] = Math.cos(ang);
@@ -430,22 +440,27 @@ function renderFirstPerson(
     Math.sin(x * sx * 0.3 + y * sy * 1.2) * 0.5;
 
   for (let r = 0; r < SH; r++) {
+    const frac = HORIZON > 0 ? r / HORIZON : 0; // 0=top, 1=horizon — row-invariant
+    const dSunR = Math.abs(r - sunRow);           // row-invariant
+    const dSunR2x4 = dSunR * dSunR * 4;          // pre-multiply for elliptical distance
     for (let col = 0; col < SW; col++) {
       if (canvas[r]![col] !== null) continue;
-      const frac = HORIZON > 0 ? r / HORIZON : 0; // 0=top, 1=horizon
 
-      // Sun and sun glow — large, warm, radiating
-      const dSunC = Math.abs(col - sunCol);
-      const dSunR = Math.abs(r - sunRow);
-      const dSun = Math.sqrt(dSunC * dSunC + dSunR * dSunR * 4);
-      if (dSun < 2) { canvas[r]![col] = tag("light-yellow", "☀"); continue; }
-      if (dSun < 6) { canvas[r]![col] = tag("light-yellow", "◌"); continue; }
-      if (dSun < 12) { canvas[r]![col] = tag("yellow", "·"); continue; }
+      // Sun and sun glow — squared elliptical distance (avoids sqrt, same visual result)
+      const dSunC = col - sunCol; // signed, used below
+      const dSunCabs = Math.abs(dSunC);
+      const dSun2 = dSunCabs * dSunCabs + dSunR2x4; // thresholds: 4, 36, 144
+      if (dSun2 < 4)   { canvas[r]![col] = tag("light-yellow", "☀"); continue; }
+      if (dSun2 < 36)  { canvas[r]![col] = tag("light-yellow", "◌"); continue; }
+      if (dSun2 < 144) { canvas[r]![col] = tag("yellow", "·"); continue; }
+      // World-space x for this column — shifts with yaw so sky stays fixed in world
+      const wx  = skyXOff + col;
+      const wxI = Math.floor(wx);
 
       // ── Layer 1: Zenith (frac 0–0.12) — deep space, stars ──
       if (frac < 0.12) {
-        const starHash = Math.sin(col * 7.3 + r * 13.1) * 0.5 + 0.5;
-        const starHash2 = Math.sin(col * 11.7 + r * 5.3) * 0.5 + 0.5;
+        const starHash  = Math.sin(wx * 7.3  + r * 13.1) * 0.5 + 0.5;
+        const starHash2 = Math.sin(wx * 11.7 + r *  5.3) * 0.5 + 0.5;
         if (starHash > 0.96) {
           canvas[r]![col] = tag("light-white", "✦");
         } else if (starHash > 0.93) {
@@ -456,25 +471,23 @@ function renderFirstPerson(
           // Deep blue gradient — darker at very top
           canvas[r]![col] = frac < 0.04
             ? tag("blue", " ")
-            : tag("blue", ((col + r) & 7) === 0 ? "·" : " ");
+            : tag("blue", ((wxI + r) & 7) === 0 ? "·" : " ");
         }
         continue;
       }
 
       // ── Layer 2: Upper sky (frac 0.12–0.35) — high cirrus clouds ──
       if (frac < 0.35) {
-        // Wispy high-altitude clouds
-        const cirrus = noise2d(col, r, 0.06, 0.15);
-        const cirrus2 = Math.sin(col * 0.04 + r * 0.08) * 0.4;
+        const cirrus  = noise2d(wx, r, 0.06, 0.15);
+        const cirrus2 = Math.sin(wx * 0.04 + r * 0.08) * 0.4;
         const combined = cirrus + cirrus2;
         if (combined > 1.0) {
           canvas[r]![col] = tag("light-white", "░");
         } else if (combined > 0.75) {
           canvas[r]![col] = tag("light-cyan", "·");
         } else {
-          // Blue sky with subtle gradient
           const skyDensity = frac < 0.2 ? 5 : 3;
-          canvas[r]![col] = ((col + r * 2) % skyDensity === 0)
+          canvas[r]![col] = (((wxI + r * 2) % skyDensity + skyDensity) % skyDensity === 0)
             ? tag("blue", "·")
             : tag("blue", " ");
         }
@@ -483,11 +496,11 @@ function renderFirstPerson(
 
       // ── Layer 3: Mid sky (frac 0.35–0.6) — cumulus cloud band ──
       if (frac < 0.6) {
-        const cx = col * 0.09;
-        const cy = r * 0.2;
-        const cloud1 = noise2d(col, r, 0.09, 0.2);
+        const cx = wx * 0.09;
+        const cy = r  * 0.2;
+        const cloud1 = noise2d(wx, r, 0.09, 0.2);
         const cloud2 = Math.sin(cx * 1.7 + cy * 0.5) * Math.cos(cx * 0.8 + cy * 1.3) * 0.6;
-        const cloud3 = Math.sin(col * 0.02 + r * 0.05) * 0.3; // large-scale patches
+        const cloud3 = Math.sin(wx * 0.02 + r * 0.05) * 0.3;
         const cloud = cloud1 + cloud2 + cloud3;
 
         // Cloud shadow effect — slightly darker below dense clouds
@@ -502,8 +515,7 @@ function renderFirstPerson(
         } else if (cloud > 0.4) {
           canvas[r]![col] = tag("light-cyan", "░");
         } else {
-          // Sky between clouds — cyan gradient
-          canvas[r]![col] = ((col + r) & 3) === 0
+          canvas[r]![col] = ((wxI + r) & 3) === 0
             ? tag("cyan", "·")
             : tag("cyan", " ");
         }
@@ -513,12 +525,12 @@ function renderFirstPerson(
       // ── Layer 4: Low sky (frac 0.6–0.8) — atmospheric haze ──
       if (frac < 0.8) {
         // Low scattered clouds + haze building toward horizon
-        const haze = noise2d(col, r, 0.07, 0.12);
-        const hazeFrac = (frac - 0.6) / 0.2; // 0=top of band, 1=bottom
+        const haze     = noise2d(wx, r, 0.07, 0.12);
+        const hazeFrac = (frac - 0.6) / 0.2;
 
-        // Sun pillar effect near sun column
-        const sunDist = Math.abs(col - sunCol);
-        if (sunDist < 15 && dSun < 40) {
+        // Sun pillar — visible when near sun column AND near sun row
+        const sunDist = dSunCabs; // screen-space col distance from sun
+        if (sunDist < 15 && (sunDist * sunDist + dSunR2x4) < 1600) {
           const pillarStrength = (1 - sunDist / 15) * (1 - hazeFrac * 0.5);
           if (pillarStrength > 0.5) {
             canvas[r]![col] = tag("yellow", "░");
@@ -562,7 +574,7 @@ function renderFirstPerson(
           }
         } else {
           // Upper horizon glow
-          const haze = noise2d(col, r, 0.05, 0.1);
+          const haze = noise2d(wx, r, 0.05, 0.1);
           if (haze > 0.5) {
             canvas[r]![col] = tag("light-white", "░");
           } else {

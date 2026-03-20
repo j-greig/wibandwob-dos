@@ -33,19 +33,24 @@ import type {
 } from "../../src/services/microapp-sdk.js";
 import { renderIso } from "./render-iso.js";
 
-type WorldRenderMode = TerrainRenderMode | "iso";
+type WorldRenderMode = TerrainRenderMode | "iso" | "flight";
 
-const RENDER_MODES: WorldRenderMode[] = ["terrain", "contours", "iso", "hybrid", "firstperson"];
+const RENDER_MODES: WorldRenderMode[] = ["terrain", "contours", "iso", "hybrid", "firstperson", "flight"];
 const MODE_BUTTONS = [
-  { mode: "terrain", label: "TERRAIN" },
-  { mode: "contours", label: "CNTRS" },
-  { mode: "iso", label: "ISO" },
-  { mode: "hybrid", label: "HYBRID" },
-  { mode: "firstperson", label: "3D" },
+  { mode: "terrain",      label: "TERRAIN" },
+  { mode: "contours",     label: "CNTRS" },
+  { mode: "iso",          label: "ISO" },
+  { mode: "hybrid",       label: "HYBRID" },
+  { mode: "firstperson",  label: "3D" },
+  { mode: "flight",       label: "FLIGHT" },
 ] as const;
 const DEFAULT_TERRAIN = Math.max(0, terrainNames.indexOf("archipelago"));
-const FP_STEP = 4; // map cells per WASD keypress
-const FP_TURN = Math.PI / 8; // radians per arrow-key press (22.5°)
+const FP_STEP       = 4;            // map cells per WASD/arrow keypress
+const FP_TURN       = Math.PI / 8; // radians per arrow-key press (22.5°)
+const FP_PITCH_STEP = 0.06;        // radians per pitch key (~3.4°)
+const FP_ALT_STEP   = 0.05;        // altitude units per keypress
+const FP_DEFAULT_ALT   =  0.25;    // default flight altitude above terrain
+const FP_DEFAULT_PITCH = -0.10;    // slight nose-down so terrain visible ahead
 
 /** 8-direction compass arrow from yaw (radians, east=0, south=π/2). */
 function yawArrow(yaw: number): string {
@@ -141,7 +146,7 @@ export default function setup(host: MicroappHost) {
         /** Absolute camera placement — switches to firstperson if needed. */
         setCameraPosition: (x: number, y: number, yaw?: number) => void;
         /** Relative camera step — direction mirrors keyboard bindings. */
-        moveCameraStep: (direction: "forward" | "back" | "strafe-left" | "strafe-right" | "turn-left" | "turn-right", steps?: number) => void;
+        moveCameraStep: (direction: "forward" | "back" | "strafe-left" | "strafe-right" | "turn-left" | "turn-right" | "pitch-up" | "pitch-down" | "ascend" | "descend", steps?: number) => void;
       }
     | undefined;
 
@@ -174,16 +179,20 @@ export default function setup(host: MicroappHost) {
     // createTerrainMap on every camera-only render. Zero visual difference.
     let terrainCacheKey = "";
     let terrainCache: TerrainMap | undefined;
-    // First-person camera — seed initial position from args if provided
-    // First-person camera state (independent of focus/terrain generation)
+    // First-person / flight camera state (independent of terrain generation)
     let fpYaw: number | undefined =
       typeof args?.cameraYaw === "number" ? args.cameraYaw : undefined;
     let fpCamX: number | undefined =
       typeof args?.cameraX === "number" ? Math.round(args.cameraX) : undefined;
     let fpCamY: number | undefined =
       typeof args?.cameraY === "number" ? Math.round(args.cameraY) : undefined;
+    let fpAlt   = typeof args?.cameraAlt   === "number" ? args.cameraAlt   : FP_DEFAULT_ALT;
+    let fpPitch = typeof args?.cameraPitch === "number" ? args.cameraPitch : FP_DEFAULT_PITCH;
 
-    function resetFpCamera() { fpYaw = undefined; fpCamX = undefined; fpCamY = undefined; }
+    function resetFpCamera() {
+      fpYaw = undefined; fpCamX = undefined; fpCamY = undefined;
+      fpAlt = FP_DEFAULT_ALT; fpPitch = FP_DEFAULT_PITCH;
+    }
 
     function initFpYaw() {
       if (fpYaw !== undefined) return;
@@ -245,7 +254,7 @@ export default function setup(host: MicroappHost) {
       MODE_BUTTONS.map(b => ({ id: b.mode, label: b.label })),
       (mode) => {
         renderMode = mode;
-        if (mode === "firstperson") {
+        if (mode === "firstperson" || mode === "flight") {
           initFpYaw();
           render();
           renderFp();
@@ -260,7 +269,7 @@ export default function setup(host: MicroappHost) {
       layout(rect) {
         applyRect(bodyNode, rect);
 
-        if (renderMode === "firstperson") {
+        if (renderMode === "firstperson" || renderMode === "flight") {
           applyRect(mapBox, { top: 0, left: rect.width, width: 0, height: 0 });
           applyRect(isoBox, { top: 0, left: rect.width, width: 0, height: 0 });
           fpPart.layout({ top: 0, left: 0, width: rect.width, height: rect.height });
@@ -331,7 +340,8 @@ export default function setup(host: MicroappHost) {
     ]);
 
     function renderFp() {
-      if (renderMode !== "firstperson" || !latestTerrain || !latestFocus) return;
+      const isFp = renderMode === "firstperson" || renderMode === "flight";
+      if (!isFp || !latestTerrain || !latestFocus) return;
       const fpW = Math.max(8, Math.floor(Number(fpBox.width) || 0));
       const fpH = Math.max(4, Math.floor(Number(fpBox.height) || 0));
       if (fpW < 8 || fpH < 4) return;
@@ -340,7 +350,11 @@ export default function setup(host: MicroappHost) {
       const rows = renderTerrainMap(latestTerrain, {
         mode: "firstperson", levels, tags: true,
         camera: { centerX: camX, centerY: camY, width: fpW, height: fpH },
-        firstPersonCamera: { x: camX, y: camY, yaw: fpYaw },
+        firstPersonCamera: {
+          x: camX, y: camY, yaw: fpYaw,
+          altitude: renderMode === "flight" ? fpAlt   : undefined,
+          pitch:    renderMode === "flight" ? fpPitch : undefined,
+        },
       });
       fpBox.setContent(rows.join("\n"));
       lastText = rows.map((row) => row.replace(/\{\/?[^}]+\}/g, "")).join("\n");
@@ -365,7 +379,7 @@ export default function setup(host: MicroappHost) {
         const hybridIsoViewportH = Math.max(1, Math.floor(isoBodyH * 0.95));
 
         const targetViewport =
-          renderMode === "firstperson" ? viewportOf(fpBox) :
+          (renderMode === "firstperson" || renderMode === "flight") ? viewportOf(fpBox) :
           renderMode === "iso" ? { width: isoBodyW, height: isoBodyH } :
           viewportOf(mapBox);
         const mapViewport = {
@@ -408,8 +422,9 @@ export default function setup(host: MicroappHost) {
         const camX = fpCamX ?? focus.x;
         const camY = fpCamY ?? focus.y;
         const sprite = PLAYER_SPRITE;
+        const isFpMode = renderMode === "firstperson" || renderMode === "flight";
         const mapMode: TerrainRenderMode =
-          renderMode === "firstperson"
+          isFpMode
             ? "firstperson"
             : renderMode === "terrain" || renderMode === "contours"
               ? renderMode
@@ -424,8 +439,12 @@ export default function setup(host: MicroappHost) {
             width: Math.max(1, mapViewport.width - 1),
             height: Math.max(1, mapViewport.height - 1),
           },
-          firstPersonCamera: { x: camX, y: camY, yaw: fpYaw },
-          player: renderMode === "firstperson"
+          firstPersonCamera: {
+            x: camX, y: camY, yaw: fpYaw,
+            altitude: renderMode === "flight" ? fpAlt   : undefined,
+            pitch:    renderMode === "flight" ? fpPitch : undefined,
+          },
+          player: isFpMode
             ? undefined
             : {
                 x: camX,
@@ -434,7 +453,7 @@ export default function setup(host: MicroappHost) {
                 color: "magenta",
                 sprite,
               },
-          markers: renderMode === "firstperson"
+          markers: isFpMode
             ? undefined
             : [
                 ...(fpYaw !== undefined ? [compassMarker(camX, camY, fpYaw)] : []),
@@ -466,7 +485,7 @@ export default function setup(host: MicroappHost) {
           mapBox.setContent("");
           fpBox.setContent("");
           lastText = isoRows.map((row) => row.replace(/\{\/?[^}]+\}/g, "")).join("\n");
-        } else if (renderMode === "firstperson") {
+        } else if (renderMode === "firstperson" || renderMode === "flight") {
           fpBox.setContent(mapRows.join("\n"));
           mapBox.setContent("");
           isoBox.setContent("");
@@ -577,14 +596,16 @@ export default function setup(host: MicroappHost) {
           : "";
 
         modeBarPart.update({
-          leftText: renderMode === "firstperson"
+          leftText: renderMode === "flight"
+            ? `←→:turn  ↑↓/ws:fly  ,.pitch  []:alt  m:mode  r:reseed  ${yawArrow(fpYaw ?? 0)}`
+            : renderMode === "firstperson"
             ? `←→:turn  ↑↓/ws:move  ad:strafe  m:mode  r:reseed  ${yawArrow(fpYaw ?? 0)}`
             : `↑↓←→ move  ${tileInfo}${lastCaptureName ? `  saved:${lastCaptureName}` : ""}`,
           activeId: renderMode,
         });
 
         win.describeState(() => ({
-          summary: `WibWobWorld terrain surface — ${terrain.terrainName}, ${renderMode}${renderMode === "firstperson" ? ` ${yawArrow(fpYaw ?? 0)}` : ""}, ${summarizeWater(terrain.waterCoverage)}`,
+          summary: `WibWobWorld terrain surface — ${terrain.terrainName}, ${renderMode}${(renderMode === "firstperson" || renderMode === "flight") ? ` ${yawArrow(fpYaw ?? 0)}` : ""}${renderMode === "flight" ? ` alt:${fpAlt.toFixed(2)}` : ""}, ${summarizeWater(terrain.waterCoverage)}`,
           contentPreview: lastText.split("\n").slice(0, 10).join("\n"),
           renderMode,
           terrain: terrain.terrainName,
@@ -649,7 +670,7 @@ export default function setup(host: MicroappHost) {
     const cycleMode = () => {
       const next = RENDER_MODES[(RENDER_MODES.indexOf(renderMode) + 1) % RENDER_MODES.length] ?? "hybrid";
       renderMode = next;
-      if (next === "firstperson") { initFpYaw(); render(); renderFp(); }
+      if (next === "firstperson" || next === "flight") { initFpYaw(); render(); renderFp(); }
       else render();
     };
     const cycleTerrain = () => {
@@ -753,6 +774,10 @@ export default function setup(host: MicroappHost) {
         for (let i = 0; i < n; i++) {
           if (direction === "turn-left")  { initFpYaw(); fpYaw = (fpYaw ?? 0) - FP_TURN; }
           else if (direction === "turn-right") { initFpYaw(); fpYaw = (fpYaw ?? 0) + FP_TURN; }
+          else if (direction === "pitch-up")  { fpPitch = clamp(fpPitch + FP_PITCH_STEP, -0.6, 0.6); }
+          else if (direction === "pitch-down") { fpPitch = clamp(fpPitch - FP_PITCH_STEP, -0.6, 0.6); }
+          else if (direction === "ascend")     { fpAlt   = clamp(fpAlt   + FP_ALT_STEP,   0,   1.2); }
+          else if (direction === "descend")    { fpAlt   = clamp(fpAlt   - FP_ALT_STEP,   0,   1.2); }
           else {
             const offset = direction === "forward" ? 0
               : direction === "back"         ? Math.PI
@@ -770,8 +795,7 @@ export default function setup(host: MicroappHost) {
       node.key(["m"], cycleMode);
       node.key(["t", "tab"], cycleTerrain);
       node.key(["r"], reseed);
-      node.key(["[", "{"], () => setSea(seaLevel - 0.03));
-      node.key(["]", "}"], () => setSea(seaLevel + 0.03));
+      // [/] handled below with flight alt override
       node.key(["+", "="], () => setContourLevels(levels + 1));
       node.key(["-"], () => setContourLevels(levels - 1));
       node.key(["v"], toggleVegetation);
@@ -782,25 +806,31 @@ export default function setup(host: MicroappHost) {
       node.key(["q", "escape"], () => win.close());
       // Arrow keys: move cursor in map modes, rotate/move in firstperson
       node.key(["left"],  () => {
-        if (renderMode === "firstperson") { initFpYaw(); fpYaw = (fpYaw ?? 0) - FP_TURN; render(); scheduleRenderFp(); }
+        if (renderMode === "firstperson" || renderMode === "flight") { initFpYaw(); fpYaw = (fpYaw ?? 0) - FP_TURN; render(); scheduleRenderFp(); }
         else { fpCamX = clamp((fpCamX ?? latestFocus?.x ?? 0) - 1, 0, (latestTerrain?.width ?? 1) - 1); render(); }
       });
       node.key(["right"], () => {
-        if (renderMode === "firstperson") { initFpYaw(); fpYaw = (fpYaw ?? 0) + FP_TURN; render(); scheduleRenderFp(); }
+        if (renderMode === "firstperson" || renderMode === "flight") { initFpYaw(); fpYaw = (fpYaw ?? 0) + FP_TURN; render(); scheduleRenderFp(); }
         else { fpCamX = clamp((fpCamX ?? latestFocus?.x ?? 0) + 1, 0, (latestTerrain?.width ?? 1) - 1); render(); }
       });
       node.key(["up"], () => {
-        if (renderMode === "firstperson") moveFpCamera(0);
+        if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(0);
         else { fpCamY = clamp((fpCamY ?? latestFocus?.y ?? 0) - 1, 0, (latestTerrain?.height ?? 1) - 1); render(); }
       });
       node.key(["down"], () => {
-        if (renderMode === "firstperson") moveFpCamera(Math.PI);
+        if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(Math.PI);
         else { fpCamY = clamp((fpCamY ?? latestFocus?.y ?? 0) + 1, 0, (latestTerrain?.height ?? 1) - 1); render(); }
       });
-      // WASD: move camera in firstperson only
-      node.key(["w"], () => { if (renderMode === "firstperson") moveFpCamera(0);            });
-      node.key(["a"], () => { if (renderMode === "firstperson") moveFpCamera(-Math.PI / 2); });
-      node.key(["d"], () => { if (renderMode === "firstperson") moveFpCamera(Math.PI / 2);  });
+      // WASD: move in firstperson/flight; pitch and altitude in flight via , . [ ]
+      node.key(["w"], () => { if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(0);            });
+      node.key(["a"], () => { if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(-Math.PI / 2); });
+      node.key(["d"], () => { if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(Math.PI / 2);  });
+      // Flight pitch: , = nose down (see terrain), . = nose up (see sky)
+      node.key([",", "<"], () => { if (renderMode === "flight") { fpPitch = clamp(fpPitch - FP_PITCH_STEP, -0.6, 0.6); render(); } });
+      node.key([".", ">"], () => { if (renderMode === "flight") { fpPitch = clamp(fpPitch + FP_PITCH_STEP, -0.6, 0.6); render(); } });
+      // [ / ] in flight = altitude down/up; in other modes = sea level (existing behaviour)
+      node.key(["[", "{"], () => { if (renderMode === "flight") { fpAlt = clamp(fpAlt - FP_ALT_STEP, 0, 1.2); render(); } else setSea(seaLevel - 0.03); });
+      node.key(["]", "}"], () => { if (renderMode === "flight") { fpAlt = clamp(fpAlt + FP_ALT_STEP, 0, 1.2); render(); } else setSea(seaLevel + 0.03); });
     };
 
     bindKeys(win.body);
