@@ -1,5 +1,7 @@
 # LEXICON
 
+> Human-facing only. Not agent orientation — a glossary to sharpen software engineering vocabulary for humans working on this codebase.
+
 ## PROJECT VOCABULARY
 **content-aware apps**
 - primers, text, figlet, animations, and later other content-aware apps should open from measured/recommended size instead of generic defaults

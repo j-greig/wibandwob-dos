@@ -27,7 +27,7 @@ FAMILIES = {
     "chiptune":        ["chiptune", "chiptune-cover", "chiptune-studio"],
     "autoresearch":    ["autoresearch", "autoresearch-microapp-migration"],
     "simplify":        ["simplify", "simplify-docs", "simplify-planning"],
-    "wibwob-ops":      ["wibwobdos", "wibwobdos-cinema", "ww-ops"],
+    "wibwob-ops":      ["wibwobdos", "wibwobdos-cinema"],
     "pi-introspection":["pi-extension-catalogue", "pi-session-log-explorer", "pi-usage-audit"],
 }
 
@@ -37,7 +37,7 @@ FAMILY_NOTES = {
     "chiptune":         "chiptune (see also: chiptune-cover, chiptune-studio)",
     "autoresearch":     "autoresearch (see also: autoresearch-microapp-migration)",
     "simplify":         "simplify (see also: simplify-docs, simplify-planning)",
-    "wibwob-ops":       "wibwob-ops (see also: wibwobdos, wibwobdos-cinema, ww-ops)",
+    "wibwob-ops":       "wibwob-ops (see also: wibwobdos, wibwobdos-cinema)",
     "pi-introspection": "pi-introspection (see also: pi-extension-catalogue, pi-session-log-explorer, pi-usage-audit)",
 }
 
@@ -80,7 +80,6 @@ ROLE_MAP = {
     "wibwob-hosting-smoke":            "Deployment Validator",
     "wibwobdos":                       "Desktop Operator",
     "wibwobdos-cinema":                "Reel Director",
-    "ww-ops":                          "Ops Engineer",
     "ww-primitives":                   "Primitives Maintainer",
     "ww-room-chat":                    "Room Chat Launcher",
     "youtube-transcript":              "Transcript Fetcher",
@@ -128,7 +127,7 @@ def extract_doesnot(desc: str, skill_name: str) -> str:
         "chiptune":         "Does not produce MIDI — use signls. Does not record TUI — use wibwobdos-cinema.",
         "autoresearch":     "Does not make runtime or code changes — optimisation loop only.",
         "simplify":         "Does not simplify other domains in this family — pick the right variant.",
-        "wibwob-ops":       "Does not overlap with the other two wibwob-ops members — see family note.",
+        "wibwob-ops":       "Does not overlap with the other wibwob-ops member — see family note.",
         "pi-introspection": "Does not modify the data it reads — audit and report only.",
     }
     if fam and fam in inferences:

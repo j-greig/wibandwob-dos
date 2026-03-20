@@ -25,9 +25,8 @@ Four seams connect every adapter to the core:
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
 <progressive-disclosure>
-Live endpoints:  curl localhost:8099/ · curl localhost:8099/help
-Live commands:   wibwob -i <label> commands · curl localhost:8099/commands/list
-Static snapshot: `bun scripts/gen-COAT.ts`
+  <output>`COAT.md` — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)</output>
+  <generator>`bun scripts/gen-COAT.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
 </progressive-disclosure>
 
 ---
@@ -109,9 +108,7 @@ win.onRestyle(() => { /* re-apply host.theme() */ })
 **Import rule:** only `import from "../../src/services/microapp-sdk.js"`.
 Importing from `src/core/` or `src/services/` directly is a COAT violation.
 
-<progressive-disclosure>
-Full SDK export directory with stability tiers: run `bun scripts/gen-sdk-surface.ts`
-</progressive-disclosure>
+
 
 ---
 
