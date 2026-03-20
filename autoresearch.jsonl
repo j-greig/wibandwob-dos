@@ -1,0 +1,1 @@
+{"run":1,"commit":"30acd86","metric":15,"metrics":{},"status":"keep","description":"rewrite doc-health.sh: 5 categories, clearer axis names, helper function, fix counts_match/refs_valid bugs, .js→.ts fallback, baseline captured","timestamp":1774042251903,"segment":0}
