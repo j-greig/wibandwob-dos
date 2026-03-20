@@ -15,18 +15,20 @@ with no animation or background updates.
 
 **Copy from it:** the responsive figlet pattern, the onResize → rerender flow.
 
-## Tier 2: Animated — `microapps/demo-heartbeat/`
+## Tier 2: Animated — `microapps/demo-wibwob-tidepool/`
 
-An ASCII heartbeat monitor with two timers (fast waveform + slow BPM counter).
+A cellular automaton tide pool with species simulation, timers, and live
+render loop (separate engine.ts + renderer.ts pattern).
 
-**Shows:** createTimer/clearTimers, multiple SDK layout parts, structured
-describeState with semantic fields (bpm, uptime, frame, beat), proper
-onCleanup that clears all timers.
+**Shows:** createTimer/clearTimers, engine/renderer separation, structured
+describeState with semantic state fields, proper onCleanup, keyboard input
+wired to simulation state.
 
 **Start here if:** your microapp has animation, polling, or any background
 update loop.
 
-**Copy from it:** the timer set pattern, the structured describeState shape.
+**Copy from it:** the timer set pattern, the engine/renderer split, the
+structured describeState shape.
 
 ## Tier 3: Persistent + AI — `microapps/demo-wibwob-poetry-clock/`
 
@@ -92,6 +94,6 @@ tabbed operator UI.
 | Microapp | What it shows |
 |--------|--------------|
 | `microapps/demo-glitchbox/` | Complex animation, multiple commands, `direct: true` for query commands |
-| `microapps/dashboard/` | Tabbed container (`createTabs`), multi-panel layout |
+| `microapps/demo-dashboards-v2/` | Tabbed container (`createTabs`), multi-panel layout (Overview/XXL/Creative tabs, blessed-contrib charts) |
 | `microapps/wibwob-tr808/` | Audio + persistence, structured state |
 | `microapps/zine/` | Panel layout, scrollable canvas, content composition |

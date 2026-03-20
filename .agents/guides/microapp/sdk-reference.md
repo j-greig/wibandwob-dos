@@ -783,6 +783,11 @@ Easings: `linear` `easeIn` `easeOut` `easeInOut` `easeInCubic` `easeOutCubic`
 Tip: use `tweenPingPong` for pulse/breathe emphasis and `tweenSequence` for
 small choreography without hand-written timer chains.
 
+**Reliability:** All motion callbacks (`onUpdate`, `onComplete`, `onCycle`, `onStepComplete`)
+are isolated internally — a throw in your callback logs `[motion] <fn> threw: <err>` and
+lets the loop continue. `tweenSequence` with an empty `steps` array emits a `console.warn`
+and no-ops. There are no API surface changes; this is engine-level resilience.
+
 ### RenderMonitor
 
 ```typescript

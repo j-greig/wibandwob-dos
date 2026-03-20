@@ -38,6 +38,14 @@ a function call.
 | Destroy order races in complex widget trees | Unsubscribe/clear timers first, then use SDK `safeDestroyAll(...)` / `safeDestroy(...)` for best-effort teardown so one destroy failure does not abort the rest |
 | Switching live demo panes can fail when previous pane teardown throws | Wrap per-pane teardown callbacks (`activeDestroy`) in best-effort guards before mounting next pane |
 
+## Motion / Tween
+
+| Mistake | What happens | Fix |
+|---------|-------------|-----|
+| Motion callback (`onUpdate`, `onComplete`, `onCycle`, `onStepComplete`) throws | Previously killed the tween loop silently | Callbacks are now isolated via internal `safeCall` — a throw logs `[motion] <fn> threw: <err>` to the console and the loop continues. If a tween appears to stop mid-way, check the console for these messages. |
+| Passing `steps: []` to `tweenSequence` | `tweenSequence` emits a `console.warn` and no-ops | Always supply at least one step. Don't pass empty steps expecting silence — the warn is intentional. |
+| Calling `safeCall` directly in microapp code | Not exported — internal to the motion engine | Handle errors inside your callbacks. The engine guarantees your callback won't crash the loop; you own your own state cleanup. |
+
 ## Widget parenting
 
 | Mistake | Fix |
@@ -46,6 +54,7 @@ a function call.
 | Grandchildren of scrollable box render blank | Set `fixed: true` on grandchildren — blessed's `_getCoords` double-subtracts scroll offset |
 | `setContent` on a scrollable node with width=0 | Infinite loop — blessed word-wrap divides by width. Guard: `if (Number(node.width) > 0)` |
 | blessed-contrib canvas crash (`this.ctx._canvas` undefined) | Initial render race before attach. Guard widget render until `ctx` exists, guard `setData()`/draw calls with `widget?.ctx?._canvas`, clamp chart widths with SDK `toEvenCellWidth(...)` before drawille-backed init, and best-effort destroy contrib widgets in cleanup if they expose `destroy()` |
+| Drawille-backed contrib widget crashes with `Width must be multiple of 2!` | Import `toEvenCellWidth` from the SDK and apply it to the computed width before creating any drawille-backed canvas or chart: `const w = toEvenCellWidth(Number(panel.width) - 2)`. Drawille requires even pixel widths; odd layout widths (common after resize) trigger this crash. |
 
 ## Theme
 
