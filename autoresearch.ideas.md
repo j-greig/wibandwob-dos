@@ -1,18 +1,18 @@
 # Doc Health — Ideas Backlog
 
 ## Active ideas
-- Subagent delta judge as periodic review (tested: scored AGENTS.md 8/10, found 6 redundancies)
-- Subagent GOTCHAS promotion review: read GOTCHAS, suggest entries to promote to parent CAPS
-- Test that doc-agent skill actually works end-to-end when subagent infra is available
-- Add axis: every gen script @output path also appears in its @parent CAPS file's <output> tag (tighter circularity)
+- Pre-commit hook doesn't catch content drift in generated files (only source staleness). Would need --dry-run per gen script to compare output — expensive but correct.
 - Agent task success test: give fresh context only CAPS files + "build a microapp" task, measure pass/fail
+- Subagent GOTCHAS promotion review: periodically spawn doc-agent to suggest promotions
 
-## Diminishing returns zone
-- More structural axes that all pass — 14/14 is regression-catching territory now
-- Python Path() parsing for @watches derivation — too complex for grep, low ROI
-- doc-health --json mode — useful for tooling but not for the autoresearch loop itself
+## Plateau reached
+- 14/14 all green, delta judge scores 8-9/10 across all CAPS files
+- Missing-output-skip bug fixed — suite now has real sensitivity
+- Stress tests pass: 4 sabotage scenarios all caught correctly
+- Adding more structural axes is diminishing returns unless source code changes introduce drift
 
 ## Deferred (later sessions)
 - MicroappHost gen: repurpose gen-sdk-surface.ts for real JSDoc + type signatures
 - Analytics JSONL: upgrade usage-pulse.ts
-- Pre-commit hook auto-install (package.json postinstall or similar)
+- Pre-commit hook auto-install
+- doc-health --dry-run mode: run all gen scripts, compare output to committed files (expensive but catches content drift)
