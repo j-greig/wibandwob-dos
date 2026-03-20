@@ -8,7 +8,7 @@
 > Every endpoint and command flows through the same registry. This file is that claim made concrete.
 
 Generated: 2026-03-20
-Endpoints: 24 · Commands: 84
+Endpoints: 25 · Commands: 85
 
 ---
 
@@ -83,6 +83,10 @@ Default: `http://127.0.0.1:8099`. **Prefer `wibwob` CLI over `curl`.**
 
 - `GET /scramble/state` — Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath
 - `GET /scramble/history` — Full Scramble conversation history as JSON array
+
+### /browser
+
+- `GET /browser/state` — Chrome browser state: currentUrl, currentTitle, historyLength, loading.
 
 ### /overlay
 
@@ -159,6 +163,7 @@ Execute via `bun run wibwob cmd <id>` or `POST /commands/run {"id":"<id>"}`.
 ### web-reader
 
 - `web-reader.open` — Open a Chrome browser window for web content extraction. Args: url (string, optional). Without args opens to default page.
+- `web-reader.navigate` — Navigate the focused Chrome browser window to a URL. Args: url (string, required).
 
 ### agent
 

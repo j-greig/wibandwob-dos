@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T22:12:11.914Z",
+  "generatedAt": "2026-03-20T22:54:44.306Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -59,14 +59,21 @@
         ]
       },
       "microapp-creator": {
-        "lastSeen": "2026-03-20T19:29:39.514Z",
-        "count": 1,
+        "lastSeen": "2026-03-20T22:25:56.008Z",
+        "count": 2,
         "sources": [
           "read:SKILL.md"
         ]
       },
       "doc-agent": {
         "lastSeen": "2026-03-20T20:33:33.615Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "agentic-dev-reflection": {
+        "lastSeen": "2026-03-20T22:53:24.961Z",
         "count": 1,
         "sources": [
           "read:SKILL.md"
@@ -127,8 +134,8 @@
         ]
       },
       "quizme": {
-        "lastSeen": "2026-03-20T22:12:11.914Z",
-        "count": 3,
+        "lastSeen": "2026-03-20T22:54:44.306Z",
+        "count": 6,
         "sources": [
           "tool:quizme"
         ]

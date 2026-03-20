@@ -21,7 +21,8 @@ export type AppCommandGroup =
   | "surface"
   | "edit"
   | "inspect"
-  | "system";
+  | "system"
+  | "web-reader";
 
 export interface MenuPlacement {
   category: AppCommandCategory;

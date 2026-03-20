@@ -20,7 +20,7 @@ Triggers on: "Reflect on implementation friction after sessions", "agentic dev r
 
 Does not: Does not make changes — reads and reports only.
 
-Last used: never · See: `.pi/skills/agentic-dev-reflection/SKILL.md`
+Last used: today (2026-03-20) · See: `.pi/skills/agentic-dev-reflection/SKILL.md`
 
 ---
 
@@ -106,6 +106,17 @@ Triggers on: "the human explicitly requests Codex", "Delegate tasks to OpenAI Co
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
 Last used: today (2026-03-20) · See: `.pi/skills/codex/SKILL.md`
+
+---
+
+## command-scaffold
+**Your Specialist** — Add a new command to WibWob-DOS — walks the 4-file wiring path so you don't miss a step. Use when: "add a command", "new command", "wire a command", "scaffold c…
+
+Triggers on: "add a command", "new command", "wire a command", "scaffold command".
+
+Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+
+Last used: never · See: `.pi/skills/command-scaffold/SKILL.md`
 
 ---
 
@@ -443,6 +454,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | chiptune-cover | Chiptune Arranger | Convert well-known melodies, themes, and scores into chiptune arrangements using |
 | chiptune-studio | Studio Engineer | Composable audio synthesis toolkit for building chiptune music from numpy primit |
 | codex | Codex Delegate | Delegate tasks to OpenAI Codex CLI as a subagent |
+| command-scaffold | Specialist | Add a new command to WibWob-DOS — walks the 4-file wiring path so you don't miss |
 | commit | Commit Gatekeeper | Read this skill before making git commits |
 | devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |

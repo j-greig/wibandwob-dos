@@ -16,13 +16,13 @@ The autopoietic documentation system is built and working:
 ### 0. Real-world smoke test — prove the system works on actual code changes
 **The honest gap:** We built and tested doc-health in isolation. We haven't made a real code change and watched the autopoietic loop catch it, regenerate, and stay honest.
 
-Test scenarios (do these first, before anything else):
-- [ ] Add a new API endpoint to `control-api.ts` → does `doc-sync.sh` detect it? → does `gen-integration-surface.ts` regenerate COAT.md? → does COAT.md include it? → does `doc-health.sh` stay green?
-- [ ] Add a new microapp skill → does `gen-skills.py` pick it up? → does `skills.md` update? → does doc-health stay green?
-- [ ] Delete a skill → does skills.md drop it? → does doc-health catch a stale output if you forget to regen?
-- [ ] Add a new `@public` export to `microapp-sdk.ts` → does `gen-sdk-surface.ts` pick it up?
+Test scenarios:
+- [x] Add a new API endpoint to `control-api.ts` → doc-sync detected it → gen-integration-surface.ts regenerated COAT.md → new endpoints appeared → doc-health 15/15. **PASSED** (Chrome browser enhancement, 2026-03-20)
+- [x] Delete a skill → doc-sync detected `.pi/skills/` change → skills.md flagged stale. **PASSED** (after fixing glob expansion bug in doc-sync.sh — `for watch in $watches` was shell-expanding globs before regex conversion)
+- [x] Add a new microapp skill → doc-sync flagged skills.md stale → gen-skills.py regenerated → command-scaffold appeared. **PASSED** (command-scaffold skill, 2026-03-20)
+- [x] Add `@public` export to `microapp-sdk.ts` → doc-sync flagged src/sdk/README.md stale. **PASSED** (simulated change, 2026-03-20)
 
-If any of these fail, the system we built is decorative, not functional. Fix before moving on.
+All four smoke tests passed. The autopoietic loop works on real code changes.
 
 ### 1. doc-review.sh — semantic + functional tiers
 **Spec:** `.planning/autoresearch-doc-health/doc-review-spec.md`
@@ -47,6 +47,12 @@ Write up autopoietic homoiconicity as a transferable pattern:
 - Minimum viable seed for a new repo
 
 Could live as a blog post, a standalone pi skill, or a section in the repo README.
+
+### 5. add-command.sh scaffold script
+Adding a command touches 4+ files (documented in GOTCHAS.md). A scaffold script would
+reduce this to one invocation. **Placement decision deferred** — run the microapp triad
+(product-owner → developer → doc-refiner) to decide whether it belongs under
+microapp-creator, a new wibwob-scaffold skill, or repo root scripts/.
 
 ## Not now
 

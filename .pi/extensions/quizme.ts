@@ -91,10 +91,12 @@ export default function quizme(pi: ExtensionAPI) {
 			"CONSTRUCTING THE QUIZ: read the specificity of the request. " +
 			"If the request is explicit and detailed — transcribe it precisely, no additions. " +
 			"If the request is exploratory or open-ended ('what next?', 'quiz me on X') — use your knowledge of the codebase philosophy, project momentum, and the user's working style (smallest slice that proves the direction, delta over noise, prove it works before extending it) to surface options the user didn't think to name. " +
-			"The quiz is a decision surface, not a transcription.",
+			"The quiz is a decision surface, not a transcription. " +
+			"IMPORTANT: This tool opens an interactive UI. It MUST be the only tool call in your response — " +
+			"do not batch it with read, bash, or any other tool. Do not send any follow-up message until the human has interacted with the quiz.",
 		parameters: ChecklistParams,
 
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
 			if (!ctx.hasUI) {
 				return {
 					content: [{ type: "text", text: "Error: UI not available" }],
@@ -139,7 +141,19 @@ export default function quizme(pi: ExtensionAPI) {
 				for (let ii = 0; ii < sections[si].items.length; ii++)
 					navList.push({ si, ii });
 
+			// Abort early if signal already fired (batched with another tool call)
+			if (signal?.aborted) {
+				return {
+					content: [{ type: "text", text: "Error: quizme must be the ONLY tool call in your response. Do not batch it with other tools." }],
+					details: { cancelled: true, executed: [] } as ChecklistResult,
+				};
+			}
+
 			const result = await ctx.ui.custom<ChecklistResult>((tui, theme, _kb, done) => {
+				// Wire abort signal — cancel gracefully if agent sends another message
+				signal?.addEventListener("abort", () => {
+					done({ cancelled: true, executed: [] });
+				}, { once: true });
 				let cursor = 0;
 				let buttonFocused = false;
 

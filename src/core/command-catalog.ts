@@ -64,6 +64,7 @@ export interface AppMenuActions {
   openGallery: () => void;
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
+  navigateChromeBrowser: (args?: Record<string, unknown>) => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openCompanionWindow: () => void;
   openScrambleSmol: () => void;
@@ -588,6 +589,17 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 40 }],
     palettePlacement: { order: 110 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "web-reader.navigate",
+    label: "Browse URL",
+    description: "Navigate the focused Chrome browser window to a URL. Args: url (string, required).",
+    group: "web-reader",
+    actionKey: "navigateChromeBrowser",
+    requires: ["bin.chrome"],
+    palettePlacement: { order: 111 },
     api: true,
     agent: true
   },

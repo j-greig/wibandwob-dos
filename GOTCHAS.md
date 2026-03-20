@@ -34,10 +34,38 @@ Changing it silently breaks all commands, workspace saves, and API paths for tha
 
 ---
 
+## Adding a command
+
+**Adding one command touches 4+ files.** This is the COAT architecture tax:
+1. `src/core/command-catalog.ts` — command definition + `AppMenuActions` interface
+2. `src/domain/command-definition.ts` — add to `AppCommandGroup` union if new group
+3. `src/core/app-controller.ts` — action implementation in the actions object
+4. `src/services/control-api.ts` — HTTP route handler (if API-exposed)
+
+A scaffold script is planned — see `.planning/autopoietic-next/README.md §5`.
+
+---
+
+## Bash scripting
+
+**`grep -c` returns multiline output.** Always pipe through `| tail -1 | tr -d " \n"` or
+use `|| echo 0`. Raw `grep -c` breaks bash arithmetic (`[[ $count -gt 0 ]]`) silently.
+This has bitten us three times.
+
+---
+
 ## Ops
 
 **Never `kill -9` the wibwob process as first resort.** blessed needs clean shutdown to
 release mouse tracking escape codes. Use `SIGTERM` (`kill $PID`). If terminal mangles: `reset`.
+
+---
+
+## Gen scripts
+
+**Gen scripts don't auto-run on save.** They run at commit time via the pre-commit hook.
+A `doc-sync.sh --watch` mode (fswatch/fs.watch on `@watches` paths) would make docs
+always-current. Standard pattern (webpack, tsc --watch, tailwind). Not built yet.
 
 ---
 

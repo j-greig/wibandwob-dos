@@ -147,6 +147,9 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/view/inspector/open",           body: {}, description: "Open state inspector. Alias: inspector.open" },
   { method: "GET",  path: "/view/zine/canvases",            description: "List selectable Zine canvases. Alias: microapp.wibwob.zine.list-canvases" },
   { method: "POST", path: "/view/zine/open",                body: { filePath: "string (optional)", index: "number (optional, from /view/zine/canvases)" }, description: "Open Zine canvas without interactive picker." },
+  // ── Browser endpoints ──
+  { method: "POST", path: "/browser/navigate",              body: { url: "string (required)" }, description: "Navigate a Chrome browser window to a URL. Uses the focused browser or first found." },
+  { method: "GET",  path: "/browser/state",                 description: "Chrome browser state: currentUrl, currentTitle, historyLength, loading." },
   // ── Window operations ──
   { method: "POST", path: "/windows/focus",                 body: { id: "number" }, description: "Focus a window by id" },
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" }, description: "Move a window to absolute coordinates" },
@@ -590,6 +593,25 @@ export class ControlApiService {
     if (request.method === "GET" && url.pathname === "/scramble/history") {
       return Response.json({ history: this.deps.inspection.getSnapshot().history });
     }
+    // ── Browser endpoints ──
+    if (request.method === "GET" && url.pathname === "/browser/state") {
+      const state = this.deps.inspection.getSnapshot().state;
+      const browserWin = state.windows.find(w => w.appType === "web-reader");
+      if (!browserWin) return Response.json({ ok: false, error: "No browser window open" }, { status: 404 });
+      return Response.json({ ok: true, ...browserWin });
+    }
+
+    if (request.method === "POST" && url.pathname === "/browser/navigate") {
+      const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+      const targetUrl = body.url as string | undefined;
+      if (!targetUrl) return Response.json({ ok: false, error: "url is required" }, { status: 400 });
+      const state = this.deps.inspection.getSnapshot().state;
+      const browserWin = state.windows.find(w => w.appType === "web-reader");
+      if (!browserWin) return Response.json({ ok: false, error: "No browser window open" }, { status: 404 });
+      const sent = this.deps.windows.sendInput(browserWin.id, targetUrl);
+      return Response.json({ ok: sent, windowId: browserWin.id, url: targetUrl });
+    }
+
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
       const tierFilter = url.searchParams.get("tier");
