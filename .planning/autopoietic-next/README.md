@@ -13,6 +13,17 @@ The autopoietic documentation system is built and working:
 
 ## Workstreams (priority order)
 
+### 0. Real-world smoke test — prove the system works on actual code changes
+**The honest gap:** We built and tested doc-health in isolation. We haven't made a real code change and watched the autopoietic loop catch it, regenerate, and stay honest.
+
+Test scenarios (do these first, before anything else):
+- [ ] Add a new API endpoint to `control-api.ts` → does `doc-sync.sh` detect it? → does `gen-integration-surface.ts` regenerate COAT.md? → does COAT.md include it? → does `doc-health.sh` stay green?
+- [ ] Add a new microapp skill → does `gen-skills.py` pick it up? → does `skills.md` update? → does doc-health stay green?
+- [ ] Delete a skill → does skills.md drop it? → does doc-health catch a stale output if you forget to regen?
+- [ ] Add a new `@public` export to `microapp-sdk.ts` → does `gen-sdk-surface.ts` pick it up?
+
+If any of these fail, the system we built is decorative, not functional. Fix before moving on.
+
 ### 1. doc-review.sh — semantic + functional tiers
 **Spec:** `.planning/autoresearch-doc-health/doc-review-spec.md`
 
