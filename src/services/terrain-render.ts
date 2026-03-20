@@ -275,6 +275,11 @@ function renderFirstPerson(
     if (activeCols <= 0) break; // all columns filled — no more work to do
     const dist = (FAR * step) / STEPS;
     const d = dist / FAR; // 0=near, 1=far
+    // Hoist per-step constants out of the column loop
+    const invDepth = 1 / (1 + d * 0.5); // replaces per-col division in projection
+    const dNear = d < 0.2;              // surface glyph band thresholds
+    const dMid  = !dNear && d < 0.5;
+    const dFarCliff = d >= 0.6;         // cliff colour band
     for (let col = 0; col < SW; col++) {
       if (yBuf[col]! <= 0) continue;
       const wx = cam.x + rayDX[col]! * dist;
@@ -285,22 +290,22 @@ function renderFirstPerson(
       const cell = map.cells[iy]![ix]; // bounds already checked above
       if (!cell) continue;
 
-      // Perspective projection with distance attenuation
+      // Perspective projection — multiply by invDepth (hoisted per-step, avoids per-col division)
       const proj = Math.max(0, Math.min(SH - 1,
-        HORIZON - Math.round((cell.elevation - camElev) * ELEV_SC / (1 + d * 0.5)),
+        HORIZON - Math.round((cell.elevation - camElev) * ELEV_SC * invDepth),
       ));
 
       if (proj < yBuf[col]!) {
         const hash = ((ix * 31 + iy * 7) & 0x7fffffff);
 
-        // Surface glyph + colour by distance
+        // Surface glyph + colour — use pre-computed distance band flags
         let sg: string;
         let sc: string;
-        if (d < 0.2) {
+        if (dNear) {
           const arr = SURF_NEAR[cell.biome];
           sg = arr[hash % arr.length];
           sc = COL_NEAR[cell.biome];
-        } else if (d < 0.5) {
+        } else if (dMid) {
           const arr = SURF_MID[cell.biome];
           sg = arr[hash % arr.length];
           sc = COL_MID[cell.biome];
@@ -321,13 +326,13 @@ function renderFirstPerson(
             // Water columns: wave animation feel
             const waveChar = ((col + r) & 1) ? "~" : "≈";
             canvas[r]![col] = tag(d < 0.4 ? "cyan" : "blue", waveChar);
-          } else if (d < 0.35) {
+          } else if (!dNear && d < 0.35 || dNear) {
             // Near: rich cliff textures
             const cliffArr = CLIFF_NEAR[cell.biome];
             const ci = Math.min(cliffArr.length - 1, Math.floor(fillFrac * cliffArr.length));
             const cliffColor = fillFrac < 0.5 ? sc : "light-black";
             canvas[r]![col] = tag(cliffColor, cliffArr[ci]);
-          } else if (d < 0.6) {
+          } else if (!dFarCliff) {
             // Mid: simpler cliff
             const ci = Math.min(CLIFF_FAR.length - 1, Math.floor(fillFrac * CLIFF_FAR.length));
             canvas[r]![col] = tag("light-black", CLIFF_FAR[ci]);
@@ -341,8 +346,8 @@ function renderFirstPerson(
 
         // ── Object rendering ──
         if (cell.object && proj > 0) {
-          const spriteSet = d < 0.18 ? FP_OBJ_SPRITE_NEAR
-            : d < 0.45 ? FP_OBJ_SPRITE_MID
+          const spriteSet = dNear ? FP_OBJ_SPRITE_NEAR
+            : dMid  ? FP_OBJ_SPRITE_MID
             : FP_OBJ_SPRITE_FAR;
           const sprite = spriteSet[cell.object];
           if (sprite && sprite.length > 0) {
