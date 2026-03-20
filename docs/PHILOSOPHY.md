@@ -1,7 +1,7 @@
 # WibWob-DOS Philosophy & Platform Vision
 > Distilled from the Refactor Masterplan v1.3. Living document — updated as the platform evolves.
-> Implementation details: `AGENTS.md`. File inventory: `.agents/guides/shell/architecture.md`.
-> Component system: `docs/design-system.md`. Invariants: `.agents/guides/shell/invariants.md`.
+> Implementation details: `AGENTS.md`. Shell guide: `.agents/guides/shell.md`.
+> Component system: `docs/design-system.md`. Microapp guide: `.agents/guides/microapp.md`.
 
 ---
 

@@ -96,7 +96,7 @@ gather_skills() {
 
 gather_docs() {
   # .agents/ docs
-  for f in "$ROOT"/.agents/*.md "$ROOT"/.agents/guides/microapp/*.md "$ROOT"/.agents/guides/shell/*.md "$ROOT"/.agents/specs/*.md "$ROOT"/.agents/reflections/*.md "$ROOT"/.agents/reference/*.md; do
+  for f in "$ROOT"/.agents/*.md "$ROOT"/.agents/guides/*.md "$ROOT"/.agents/specs/*.md "$ROOT"/.agents/reflections/*.md; do
     [ -f "$f" ] || continue
     rel="${f#$ROOT/}"
     base="$(basename "$f" .md)"
@@ -105,13 +105,12 @@ gather_docs() {
     
     # Classify by path
     case "$rel" in
-      .agents/guides/microapp/*) lens="microapp" ;;
-      .agents/guides/shell/*) lens="shell" ;;
-      .agents/specs/*) lens="shell" ;;
-      .agents/reflections/*) lens="meta" ;;
-      .agents/reference/*) lens="meta" ;;
-      .agents/agent-master-plan*) lens="shared" ;;
-      *) lens="other" ;;
+      .agents/guides/microapp*) lens="microapp" ;;
+      .agents/guides/shell*)    lens="shell" ;;
+      .agents/specs/*)          lens="shell" ;;
+      .agents/reflections/*)    lens="meta" ;;
+      .agents/integration-surface*) lens="shell" ;;
+      *)                        lens="other" ;;
     esac
     printf "%s|%s|doc|%s\n" "$lens" "$rel" "$desc"
   done

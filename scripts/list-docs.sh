@@ -15,10 +15,9 @@ echo ""
 for section in \
   "Root:." \
   ".agents:.agents" \
-  ".agents/shell-dev:.agents/shell-dev" \
-  ".agents/shell-dev/specs:.agents/shell-dev/specs" \
-  ".agents/shell-dev/devlogs:.agents/shell-dev/devlogs" \
-  ".agents/microapp-dev:.agents/microapp-dev" \
+  ".agents/guides:.agents/guides" \
+  ".agents/specs:.agents/specs" \
+  ".agents/reflections:.agents/reflections" \
   "docs:docs" \
   ".planning:.planning" \
   ".planning/epics:.planning/epics" \

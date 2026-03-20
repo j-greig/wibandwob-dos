@@ -7,7 +7,7 @@ files:
   - src/core/window-chrome.ts
   - src/core/types.ts (WindowRecord, WindowKind, AppType)
   - src/core/app-controller.ts (focusOrCreate, clearDesktop)
-  - .agents/guides/microapp/sdk-reference.md
+  - .agents/guides/microapp.md
 triggers:
   pre-change: window lifecycle, createFrame, registerWindow, describeState, WindowRecord fields
   post-change: verify bun run typecheck, GET /state, window appears/closes correctly
@@ -28,7 +28,7 @@ Microapps register their own window types at runtime via microapp-loader.ts.
 - src/core/window-chrome.ts — chrome sizing math (borders, padding offsets); never inline in window code
 - src/core/types.ts:231 — WindowRecord definition; :9 — WindowKind union; :111 — AppType union
 - src/core/app-controller.ts:364 — focusOrCreate (singleton guard pattern); :734 — findWindowByAppType
-- .agents/guides/microapp/sdk-reference.md — full microapp registration contract
+- .agents/guides/microapp.md — full microapp registration contract
 
 ## Core Types
 
@@ -129,7 +129,7 @@ Microapps (microapps/*/index.ts) register window types via MicroappHost:
 
 WindowKind for all microapps is "microapp" (types.ts:9). AppType is the registered id string.
 The isMicroappWindow(w) guard (types.ts) narrows to MicroappWindowRecord with guaranteed microappId.
-Full SDK: .agents/guides/microapp/sdk-reference.md
+Full SDK: .agents/guides/microapp.md
 
 ## Blessed Scroll + Nested Child Gotchas (from agentic-devlog 2026-03-09)
 

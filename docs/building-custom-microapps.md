@@ -17,7 +17,7 @@ Terminology:
 
 ## Quick start
 
-For the absolute shortest bootstrap path, use `.agents/guides/microapp/quick-start.md`.
+For the absolute shortest bootstrap path, use `.agents/guides/microapp.md`.
 This document is the deeper build guide (structure, lifecycle, persistence, patterns).
 
 Use the scaffold script to create a new microapp package:
@@ -309,7 +309,7 @@ Absolute path to the WibWob-DOS repo root. Use instead of hardcoding paths.
 
 ## Required lifecycle hooks
 
-> **Canonical reference:** `.agents/guides/microapp/quick-start.md` §Required hooks. The definitions here are supplementary context.
+> **Canonical reference:** `.agents/guides/microapp.md` §Required hooks. The definitions here are supplementary context.
 
 Every microapp window MUST implement these four hooks:
 
@@ -450,5 +450,5 @@ After creating your module:
 ## Further reading
 
 - `src/services/microapp-sdk.ts` — full list of SDK exports
-- `.agents/guides/microapp/sdk-reference.md` — SDK API reference and advanced primitives
+- `.agents/guides/microapp.md` — SDK API reference and advanced primitives
 - `scripts/scaffold-microapp.sh` — automated module scaffolding

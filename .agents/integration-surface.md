@@ -1,7 +1,7 @@
 # WibWob-DOS Integration Surface
 
-> **Auto-generated** by `scripts/checks/gen-integration-surface.ts`.
-> Do not edit by hand. Regenerate: `bun run scripts/checks/gen-integration-surface.ts`
+> **Auto-generated** by `.pi/skills/ww-primitives/scripts/gen-integration-surface.ts`.
+> Do not edit by hand. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`
 
 Generated: 2026-03-17
 Endpoints: 23 · Commands: 85

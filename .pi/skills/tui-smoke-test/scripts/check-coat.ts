@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "fs";
 import { join, relative } from "path";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "../../../..");
 const MICROAPPS_DIR = join(ROOT, "microapps");
 const CATALOG_PATH = join(ROOT, "src/core/command-catalog.ts");
 const CONTROLLER_PATH = join(ROOT, "src/core/app-controller.ts");

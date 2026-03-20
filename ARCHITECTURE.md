@@ -1,8 +1,8 @@
 # WibWob-DOS — Architecture
 
 > Philosophy and north star: `PHILOSOPHY.md`
-> Full file inventory: `.agents/guides/shell/architecture.md`
-> Full invariants: `.agents/guides/shell/invariants.md`
+> Shell invariants + control API: `.agents/guides/shell.md`
+> Microapp guide: `.agents/guides/microapp.md`
 
 ---
 
@@ -108,7 +108,7 @@ See `PHILOSOPHY.md §SDK stability contract` for the boundary diagram.
 Capabilities the shell and microapps share.
 
 - `state-service.ts` — canonical live desktop state; all windows report through `describeState()`
-- `control-api.ts` — local HTTP surface (default port 8099); see `.agents/guides/shell/control-api.md`
+- `control-api.ts` — local HTTP surface (default port 8099); see `.agents/guides/shell.md`
 - `agent-tools.ts` — `tui_list_commands` / `tui_run_command`; all tools wrap WindowFacade
 - `wibwob-agent-session.ts` — native Wib&Wob agent; model selection, tool wiring, desktop state injection
 
@@ -157,7 +157,7 @@ Lifecycle: `setup → createWindow → describeState / captureText / onRestyle /
 Seven reference microapps ordered by complexity: `hello-world → notepad →
 runtime-inspector → figlet-banner → layout-stress-test → data-dashboard → file-manager`
 
-Full guide: `.agents/guides/microapp/quick-start.md`
+Full guide: `.agents/guides/microapp.md`
 
 ---
 
@@ -179,13 +179,13 @@ Full guide: `.agents/guides/microapp/quick-start.md`
 | `src/cli/wibwob.ts` | The CLI — preferred over curl for all API calls |
 | `microapps/` | All microapp implementations |
 | `src/windows/` | Host-managed windows (not yet migrated to microapp pattern) |
-| `.agents/reference/integration-surface.md` | Auto-generated: 23 endpoints, 85 commands |
+| `.agents/integration-surface.md` | Auto-generated: 23 endpoints, 85 commands |
 
 ---
 
 ## Five design rules (distilled from invariants)
 
-Full list of 14: `.agents/guides/shell/invariants.md`
+Full list of 14: `.agents/guides/shell.md`
 
 **1. One concept, one owner.**
 If a concept has a home, extend that home. Do not create parallel helpers for
@@ -226,11 +226,10 @@ explicitly asked. Extract, consolidate, normalise first.
 
 | Starting point | Read next |
 |---------------|-----------|
-| New to the codebase | This file → `PHILOSOPHY.md` → `.agents/guides/shell/invariants.md` |
-| Building a microapp | `.agents/guides/microapp/quick-start.md` → `sdk-reference.md` |
-| Shell / host work | `.agents/guides/shell/invariants.md` → `control-api.md` |
+| New to the codebase | This file → `PHILOSOPHY.md` → `.agents/guides/shell.md` |
+| Building a microapp | `.agents/guides/microapp.md` |
+| Shell / host work | `.agents/guides/shell.md` |
 | Running / restarting | `.pi/skills/ww-ops/SKILL.md` |
-| Live API surface | `.agents/reference/integration-surface.md` (auto-generated) |
-| Full file inventory | `.agents/guides/shell/architecture.md` |
-| World chat / IRC | `.agents/guides/shell/architecture.md §World Chat` |
-| Dual-instance setup | `.agents/guides/shell/architecture.md §Dual-instance` |
+| Live API surface | `.agents/integration-surface.md` (auto-generated) |
+| World chat / IRC | `.agents/guides/shell.md §World Chat` |
+| Dual-instance setup | `.agents/guides/shell.md §Dual-instance` |

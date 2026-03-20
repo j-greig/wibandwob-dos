@@ -31,8 +31,8 @@ while ((m = cmdRegex.exec(catSrc))) {
 const lines: string[] = [
   "# WibWob-DOS Integration Surface",
   "",
-  "> **Auto-generated** by `scripts/checks/gen-integration-surface.ts`.",
-  "> Do not edit by hand. Regenerate: `bun run scripts/checks/gen-integration-surface.ts`",
+  "> **Auto-generated** by `.pi/skills/ww-primitives/scripts/gen-integration-surface.ts`.",
+  "> Do not edit by hand. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`",
   "",
   `Generated: ${new Date().toISOString().split("T")[0]}`,
   `Endpoints: ${endpoints.length} · Commands: ${commands.length}`,
