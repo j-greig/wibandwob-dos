@@ -155,7 +155,40 @@ Not urgent. High leverage when working near production.
 
 ---
 
-## 11. Your additions
+## 11. Code-reviewer findings (from parallel agent review)
+
+_Source: code-reviewer agent run against README.md + invariants.md, 2026-03-20_
+
+- [ ] **Session 3: `node` → `bun`** — the `sdk-export-index.sh` stub uses `node - <<'JS'`
+  which violates the Bun-first rule in AGENTS.md. Must be `bun run scripts/sdk-export-index.ts`.
+
+- [ ] **Session 4: Invariant 1 risk** — `platform-commands.ts`, `audio-process.ts`, `append-log.ts`
+  as three new sibling files alongside `safe-fs.ts` may violate "if a concept already has a home,
+  extend that home." Needs a written argument for why these can't just be additional exports
+  inside `safe-fs.ts`, or collapse them in.
+
+- [ ] **Circular deps have no resolution path** — `skeleton↔webcam` and `capability↔chrome-browser`
+  are known but the spike just adds them to the gate as permanent tolerated failures. Needs
+  either a fix sprint stub or an explicit documented "tolerated, here's why" note. Otherwise
+  `health-full.sh` exits 1 forever.
+
+- [ ] **`file-manager-window.ts` needs a stub spike** — 1859 lines, larger than music-player
+  (1227), yet only mentioned as a footnote in Session 5. Should have a `spk-file-manager-migration`
+  placeholder so it doesn't keep getting deferred.
+
+- [ ] **`codebase-gardener` agent has no file** — charter is prose-only in post-spike-masterplan.md.
+  No `.pi/agents/codebase-gardener.md` exists. Risks router confusion with `arch-reviewer` until
+  it has a real file with a clear "does NOT" boundary.
+
+- [ ] **`health-full.sh` needs a complexity cap** — no AC prevents it becoming a god-script.
+  Rule: max N checks, each check is a named function, any new check requires removing or merging
+  an existing one.
+
+> 💭 _your thoughts:_
+
+---
+
+## 12. Your additions
 
 > 💭
 
