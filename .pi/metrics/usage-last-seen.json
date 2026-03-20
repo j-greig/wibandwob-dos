@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T13:12:58.878Z",
+  "generatedAt": "2026-03-20T14:21:14.410Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -17,8 +17,8 @@
         ]
       },
       "commit": {
-        "lastSeen": "2026-03-19T20:59:19.960Z",
-        "count": 2,
+        "lastSeen": "2026-03-20T13:25:23.994Z",
+        "count": 3,
         "sources": [
           "read:SKILL.md"
         ]
@@ -43,12 +43,26 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "skill-creator": {
+        "lastSeen": "2026-03-20T14:05:42.909Z",
+        "count": 2,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "changelog": {
+        "lastSeen": "2026-03-20T14:03:15.628Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-20T12:37:40.375Z",
-        "count": 43,
+        "lastSeen": "2026-03-20T14:13:41.759Z",
+        "count": 46,
         "sources": [
           "tool:edit",
           "tool:multi_edit"
@@ -63,8 +77,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T13:12:58.878Z",
-        "count": 22,
+        "lastSeen": "2026-03-20T14:21:14.410Z",
+        "count": 25,
         "sources": [
           "tool:execute_code"
         ]
@@ -81,6 +95,13 @@
         "count": 1,
         "sources": [
           "command:/todos"
+        ]
+      },
+      "session-breakdown": {
+        "lastSeen": "2026-03-20T14:10:47.164Z",
+        "count": 1,
+        "sources": [
+          "command:/session-breakdown"
         ]
       }
     },

@@ -54,6 +54,11 @@ The body is loaded when the skill activates. Keep it **under 500 lines / 5000 to
 - Exhaustive optional edge cases without strong evidence
 - Long reference material better placed under `references/`
 
+**The LLM-known test:** before writing any instruction, ask — would an LLM already
+know this from training data? General TypeScript conventions, standard git workflow,
+common CLI patterns — these waste tokens without adding orientation. Only write what
+is genuinely non-obvious about *this* repo or *this* tool.
+
 ### 4. Write the description (the trigger gate)
 
 The description carries the entire burden of triggering.

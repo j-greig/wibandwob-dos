@@ -68,12 +68,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/org/repo/releases/tag/v1.1.0
 ```
 
+## How [Unreleased] works
+
+`[Unreleased]` is a **temporary holding pen** at the top of the file.
+Every notable change lands here first. On release day, the whole section
+gets stamped with a version and date — and a fresh empty `[Unreleased]`
+opens above it, ready for the next batch.
+
+```
+ship a feature → add one line to [Unreleased]
+                         ↓  (repeat until release)
+release day → rename [Unreleased] to [X.Y.Z] - YYYY-MM-DD
+                         ↓
+             add fresh empty [Unreleased] above it
+                         ↓
+    those lines are now permanently in the versioned changelog
+```
+
+The payoff: release day is thirty seconds (rename, version, date) instead of
+reconstructing everything from git log. Nothing in `[Unreleased]` is ever
+thrown away — it all folds into the next versioned entry.
+
 ## Workflow
 
 ### Adding unreleased changes
 1. Open `CHANGELOG.md`
 2. Add a line under `## [Unreleased]` in the correct type section
-3. Create `## [Unreleased]` at top if it doesn't exist yet
+3. Do this **at commit time**, not on release day — that's what keeps it easy
+4. Create `## [Unreleased]` at top if it doesn't exist yet
 
 ### Cutting a release
 1. Rename `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD`

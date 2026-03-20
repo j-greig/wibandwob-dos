@@ -1540,8 +1540,16 @@ for (const cmd of CLI_COMMANDS) {
 }
 
 function usage() {
+  // Agent-facing context: live instances + targeting reminder
+  const alive = findAliveInstances();
+  const instanceLine = alive.length === 0
+    ? "Instances: none running — start with: bun run dev:world"
+    : `Instances: ${alive.map(i => i.label).join(" · ")}  →  use -i <label> on every command`;
+
   const lines = [
     "wibwob — Unix CLI for WibWob-DOS",
+    "",
+    instanceLine,
     "",
     "Usage:",
   ];
