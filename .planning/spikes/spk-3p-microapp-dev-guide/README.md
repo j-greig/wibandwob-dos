@@ -38,9 +38,9 @@ to build a microapp from scratch without any other context.
 
 - `reference/pi-extensions.md` — the gold-standard doc we're modelling after
 - `SDK.md` (repo root) — current SDK contract
-- `src/microapps/` — real microapp implementations
+- `microapps/` — real microapp implementations (start with `demo-hello-world`, 33 lines)
 - `.pi/skills/microapp-creator/` — the agent skill that scaffolds microapps
-- `GOTCHAS.md` — known footguns
+- `GOTCHAS.md` — two relevant entries (sdk import surface, id field), but **no blessed/lifecycle gotchas exist yet** — the gotchas section of the guide must be written by building a microapp and capturing what burns
 
 ## Deliverable
 
