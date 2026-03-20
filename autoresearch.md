@@ -12,7 +12,7 @@ must close a loop, tighten a link, or remove drift — not add noise.
 
 ## Metrics
 
-- **Primary**: `doc_health` (integer 0–12, higher is better) — binary pass/fail on 12 axes
+- **Primary**: `doc_health` (integer 0–14, higher is better) — binary pass/fail on 14 axes
 - **Secondary**: none yet
 
 ## How to Run
@@ -62,7 +62,13 @@ must close a loop, tighten a link, or remove drift — not add noise.
 - **Axes 11+12 (10→12):** CAPS word-count cap (800w) + cross-ref validation. Both passed immediately
 - **Key insight:** Adding axes that all pass is diminishing returns. Real value is regression catching — the score should occasionally DROP when source changes break a loop
 
+- **Axes 13+14 (12→14):** Gen discoverability (AGENTS.md mentions `gen-*` pattern + all @outputs exist) + PD focus (max 3 tags per CAPS file). GOTCHAS.md split rule added.
+- **Missing-output-skip bug fix:** Axes 3/4/6/7/9 silently skipped when @output file was missing instead of failing. Now deleting a generated file drops score 14→9 (5 axes catch it).
+- **Stress tested:** Deliberately broke 4 things — deleted output, removed header, added headerless gen script, bloated CAPS file. All caught correctly.
+- **Key insight at 14/14:** Adding new axes that pass is diminishing returns. Tightening existing axes to catch subtler failures is more valuable.
+
 ## Dead Ends
 
 - @watches derivation from Python Path() calls — too complex to parse reliably via grep, vacuous pass
-- Scoring exit codes in bash — fragile with set -e; switched to subshell eval pattern
+- Scoring exit codes in bash — fragile with set -e; switched to subshell eval + set +e
+- Adding axes that all pass immediately — score inflation, not system improvement

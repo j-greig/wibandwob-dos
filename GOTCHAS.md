@@ -39,8 +39,6 @@ Changing it silently breaks all commands, workspace saves, and API paths for tha
 **Never `kill -9` the wibwob process as first resort.** blessed needs clean shutdown to
 release mouse tracking escape codes. Use `SIGTERM` (`kill $PID`). If terminal mangles: `reset`.
 
-**Never commit to `main`.** Branch first. The pre-commit hook enforces this.
-
 ---
 
 ## CAPS files
