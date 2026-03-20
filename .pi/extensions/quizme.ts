@@ -87,7 +87,11 @@ export default function quizme(pi: ExtensionAPI) {
 			"If 3+ sections, auto-appends a 'What else?' free-text section for things the agent missed. " +
 			"Human presses DO IT to execute all chosen items. " +
 			"AGENT RULE: after DO IT, execute ONLY what the human explicitly selected — nothing more. " +
-			"Do not infer, extend, or act on unchecked items.",
+			"Do not infer, extend, or act on unchecked items. " +
+			"CONSTRUCTING THE QUIZ: read the specificity of the request. " +
+			"If the request is explicit and detailed — transcribe it precisely, no additions. " +
+			"If the request is exploratory or open-ended ('what next?', 'quiz me on X') — use your knowledge of the codebase philosophy, project momentum, and the user's working style (smallest slice that proves the direction, delta over noise, prove it works before extending it) to surface options the user didn't think to name. " +
+			"The quiz is a decision surface, not a transcription.",
 		parameters: ChecklistParams,
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
