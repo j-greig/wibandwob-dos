@@ -5,10 +5,14 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 SCORE=0
+VERBOSE="${VERBOSE:-}"
 
 check() {
   if ( eval "$2" ) > /dev/null 2>&1; then
     SCORE=$((SCORE + 1))
+    [ -n "$VERBOSE" ] && echo "  ✓ $1" >&2
+  else
+    [ -n "$VERBOSE" ] && echo "  ✗ $1" >&2
   fi
 }
 
@@ -155,6 +159,15 @@ check "caps_refs" '
       echo "$ref" | grep -qE "^src/|^scripts/|^\.pi/|^[A-Z]+\.md$" || continue
       [ -f "$ref" ] || [ -d "$ref" ] || exit 1
     done < <(grep -oE "`[^`]+`" "$caps" | tr -d "`" || true)
+  done
+'
+
+# 13. Gen script discoverability — every gen-* script is mentioned in AGENTS.md
+check "gen_discoverable" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do
+    [ -f "$s" ] || continue
+    basename_s=$(basename "$s")
+    grep -q "$basename_s" AGENTS.md || exit 1
   done
 '
 

@@ -12,7 +12,7 @@ must close a loop, tighten a link, or remove drift — not add noise.
 
 ## Metrics
 
-- **Primary**: `doc_health` (integer 0–8, higher is better) — binary pass/fail on 8 axes
+- **Primary**: `doc_health` (integer 0–12, higher is better) — binary pass/fail on 12 axes
 - **Secondary**: none yet
 
 ## How to Run
@@ -57,4 +57,12 @@ must close a loop, tighten a link, or remove drift — not add noise.
 
 ## What's Been Tried
 
-_Nothing yet — this is the first run._
+- **Baseline (8/8):** Original 8 axes all green — staleness, headers, back-links, forward-links, PD integrity, watches precision, circularity, orphans
+- **Axes 9+10 (8→9→10):** Added parent section validation + @watches import match. SDK.md had stale §Microapp lifecycle ref → fixed to §Lifecycle. TS import matching works; Python Path() syntax skipped (vacuous pass)
+- **Axes 11+12 (10→12):** CAPS word-count cap (800w) + cross-ref validation. Both passed immediately
+- **Key insight:** Adding axes that all pass is diminishing returns. Real value is regression catching — the score should occasionally DROP when source changes break a loop
+
+## Dead Ends
+
+- @watches derivation from Python Path() calls — too complex to parse reliably via grep, vacuous pass
+- Scoring exit codes in bash — fragile with set -e; switched to subshell eval pattern
