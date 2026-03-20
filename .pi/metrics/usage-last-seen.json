@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T11:01:19.293Z",
+  "generatedAt": "2026-03-20T13:12:58.878Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -36,14 +36,22 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "codex": {
+        "lastSeen": "2026-03-20T12:22:34.068Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-20T10:50:33.207Z",
-        "count": 42,
+        "lastSeen": "2026-03-20T12:37:40.375Z",
+        "count": 43,
         "sources": [
-          "tool:edit"
+          "tool:edit",
+          "tool:multi_edit"
         ]
       },
       "microloop": {
@@ -55,8 +63,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T11:01:19.293Z",
-        "count": 20,
+        "lastSeen": "2026-03-20T13:12:58.878Z",
+        "count": 22,
         "sources": [
           "tool:execute_code"
         ]
@@ -85,7 +93,42 @@
         ]
       },
       "microapp-developer": {
-        "lastSeen": "2026-03-19T20:48:15.951Z",
+        "lastSeen": "2026-03-20T12:37:50.997Z",
+        "count": 2,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "MODELS": {
+        "lastSeen": "2026-03-20T12:22:34.055Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "haiku": {
+        "lastSeen": "2026-03-20T12:37:14.916Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "microapp-doc-refiner": {
+        "lastSeen": "2026-03-20T12:38:02.305Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "ops": {
+        "lastSeen": "2026-03-20T12:38:02.315Z",
+        "count": 1,
+        "sources": [
+          "read:agent.md"
+        ]
+      },
+      "opus": {
+        "lastSeen": "2026-03-20T12:38:02.323Z",
         "count": 1,
         "sources": [
           "read:agent.md"

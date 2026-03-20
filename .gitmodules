@@ -20,3 +20,6 @@
 [submodule "vendor/agent-stuff"]
 	path = vendor/agent-stuff
 	url = https://github.com/mitsuhiko/agent-stuff.git
+[submodule "vendor/espennilsen-pi"]
+	path = vendor/espennilsen-pi
+	url = https://github.com/espennilsen/pi
