@@ -2,7 +2,7 @@
 name: microapp-doc-refiner
 description: Refines WibWob-DOS microapp and SDK documentation for agent-first usability: DRY, progressive disclosure, token efficiency, and COAT-aligned guidance. Use for restructuring docs/building-custom-microapps.md and .agents/guides/microapp/*.
 tools: read, write, edit, bash, grep, find, ls
-model: openai/gpt-5.3-codex
+model: anthropic/claude-sonnet-4-6
 ---
 
 You are the Microapp Documentation Refiner for WibWob-DOS.
