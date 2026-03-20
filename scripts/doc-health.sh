@@ -7,7 +7,7 @@ cd "$(git rev-parse --show-toplevel)"
 SCORE=0
 
 check() {
-  if eval "$2" > /dev/null 2>&1; then
+  if ( eval "$2" ) > /dev/null 2>&1; then
     SCORE=$((SCORE + 1))
   fi
 }
@@ -93,6 +93,40 @@ check "functional" '
     doc=$(grep -c "^## " .pi/skills/skills.md 2>/dev/null || echo 0)
     [ "$doc" -ge "$((src - 2))" ] || exit 1
   fi
+'
+
+# 9. Parent section exists — Parent header's §section actually exists in the CAPS file
+check "parent_section" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do
+    [ -f "$s" ] || continue
+    o=$(grep -E "^(//|#) @output" "$s" | sed "s|.*@output ||" | tr -d " ")
+    [ -z "$o" ] || [ ! -f "$o" ] && continue
+    parent_line=$(head -5 "$o" | grep "Parent:" | head -1)
+    [ -z "$parent_line" ] && continue
+    caps=$(echo "$parent_line" | grep -oE "[A-Z]+\.md" | head -1)
+    section=$(echo "$parent_line" | grep -oE "§[^-]+" | sed "s/§//" | sed "s/[[:space:]]*$//" | head -1)
+    [ -z "$caps" ] || [ -z "$section" ] || [ ! -f "$caps" ] && continue
+    grep -qi "$section" "$caps" || exit 1
+  done
+'
+
+# 10. @watches import match — declared watches contain files the script actually reads
+check "watches_match" '
+  for s in scripts/gen-*.ts; do
+    [ -f "$s" ] || continue
+    watches=$(grep -E "^// @watches" "$s" | sed "s|.*@watches ||")
+    [ -z "$watches" ] && continue
+    while IFS= read -r imp; do
+      imp=$(echo "$imp" | tr -d "\"" | tr -d "'\'' ")
+      [ -z "$imp" ] && continue
+      # Check that at least one @watches entry is a prefix of this import
+      matched=false
+      for w in $watches; do
+        echo "$imp" | grep -q "$w" && matched=true && break
+      done
+      [ "$matched" = true ] || exit 1
+    done < <(grep -oE "readFileSync\([^)]+\)" "$s" | grep -oE "\"[^\"]+\"" | grep -v "utf" || true)
+  done
 '
 
 echo "METRIC doc_health=$SCORE"
