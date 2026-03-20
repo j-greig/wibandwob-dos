@@ -440,22 +440,21 @@ function renderFirstPerson(
     Math.sin(x * sx * 0.3 + y * sy * 1.2) * 0.5;
 
   for (let r = 0; r < SH; r++) {
-    const frac = HORIZON > 0 ? r / HORIZON : 0; // 0=top, 1=horizon — row-invariant
-    const dSunR = Math.abs(r - sunRow);           // row-invariant
-    const dSunR2x4 = dSunR * dSunR * 4;          // pre-multiply for elliptical distance
-    for (let col = 0; col < SW; col++) {
+    const frac = HORIZON > 0 ? r / HORIZON : 0;
+    const dSunR    = Math.abs(r - sunRow);
+    const dSunR2x4 = dSunR * dSunR * 4;
+    // wx/wxI increment by 1 each col — eliminates float-add + Math.floor per pixel
+    let wx  = skyXOff;             // world-space x at col=0
+    let wxI = Math.floor(skyXOff); // integer part, incremented alongside wx
+    for (let col = 0; col < SW; col++, wx++, wxI++) {
       if (canvas[r]![col] !== null) continue;
 
-      // Sun and sun glow — squared elliptical distance (avoids sqrt, same visual result)
-      const dSunC = col - sunCol; // signed, used below
-      const dSunCabs = Math.abs(dSunC);
-      const dSun2 = dSunCabs * dSunCabs + dSunR2x4; // thresholds: 4, 36, 144
+      // Sun glow — squared elliptical distance (no sqrt needed)
+      const dSunCabs = Math.abs(col - sunCol);
+      const dSun2 = dSunCabs * dSunCabs + dSunR2x4;
       if (dSun2 < 4)   { canvas[r]![col] = tag("light-yellow", "☀"); continue; }
       if (dSun2 < 36)  { canvas[r]![col] = tag("light-yellow", "◌"); continue; }
       if (dSun2 < 144) { canvas[r]![col] = tag("yellow", "·"); continue; }
-      // World-space x for this column — shifts with yaw so sky stays fixed in world
-      const wx  = skyXOff + col;
-      const wxI = Math.floor(wx);
 
       // ── Layer 1: Zenith (frac 0–0.12) — deep space, stars ──
       if (frac < 0.12) {
