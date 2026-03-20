@@ -32,26 +32,32 @@ export default function register(pi: any) {
       ),
     }),
     execute: async (args: { path: string; app?: string; line?: number }) => {
-      const { route, discoverInstance, dispatch } = await import(
-        "../../../lib/wibwob-router.js"
-      );
+      let route: any, discoverInstance: any, dispatch: any;
+      try {
+        const mod = await import("../../../lib/wibwob-router.js");
+        route = mod.route; discoverInstance = mod.discoverInstance; dispatch = mod.dispatch;
+      } catch {
+        // Router not available — fall through to system open below
+      }
 
-      const result = route({
+      const result = route ? route({
         path: args.path,
         app: args.app as "editor" | "finder" | "markdown" | "primer" | undefined,
         line: args.line,
-      });
+      }) : null;
 
-      if (!result) {
+      if (!result && route) {
         return `Cannot route: ${args.path}`;
       }
 
       // Discover WibWob-DOS instance (sockets first, then port scan)
-      const path = await import("node:path");
-      const projectRoot = path.resolve(import.meta.dir, "../../..");
+      const pathMod = await import("node:path");
+      const url = await import("node:url");
+      const __dirname = pathMod.dirname(url.fileURLToPath(import.meta.url));
+      const projectRoot = pathMod.resolve(__dirname, "../../..");
       const instance = await discoverInstance(projectRoot);
 
-      if (instance) {
+      if (instance && result && dispatch) {
         const ok = await dispatch(instance, result);
         if (ok) {
           const cmds = result.commands.map((c: { id: string }) => c.id).join(" → ");

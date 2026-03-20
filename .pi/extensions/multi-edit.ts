@@ -611,7 +611,7 @@ async function applyPatchOperations(
 
 export default function (pi: ExtensionAPI) {
 	pi.registerTool({
-		name: "edit",
+		name: "multi_edit",
 		label: "edit",
 		description:
 			"Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits. Supports a `multi` parameter for batch edits across one or more files, and a `patch` parameter for Codex-style patches.",
