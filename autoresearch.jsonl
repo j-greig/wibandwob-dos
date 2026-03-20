@@ -1,2 +1,3 @@
 {"type":"config","name":"Skill Index Doc — docs/skills.md quality score","metricName":"score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"7c4b12b","metric":0,"metrics":{"coverage":0,"triggers":0,"doesnot":0,"roles":0},"status":"keep","description":"Baseline — docs/skills.md does not exist yet","timestamp":1774018670773,"segment":0,"confidence":null}
+{"run":2,"commit":"f763473","metric":96,"metrics":{"coverage":30,"triggers":33,"doesnot":20,"roles":13},"status":"keep","description":"Generator script — 96/100: coverage 30/30, doesnot 20/20, triggers 33/35 (2 skills short), roles 13/15 (5 skills missing label)","timestamp":1774019133593,"segment":0,"confidence":null}

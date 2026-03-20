@@ -49,7 +49,7 @@ ROLE_MAP = {
     "backroom-log-explorer":           "Archive Curator",
     "changelog":                       "Release Scribe",
     "chiptune":                        "Chiptune Composer",
-    "chiptune-cover":                  "8-bit Arranger",
+    "chiptune-cover":                  "Chiptune Arranger",
     "chiptune-studio":                 "Studio Engineer",
     "codex":                           "Codex Delegate",
     "commit":                          "Commit Gatekeeper",
@@ -69,7 +69,7 @@ ROLE_MAP = {
     "qmd":                             "Knowledge Searcher",
     "repo-hygiene":                    "Repo Janitor",
     "session-archaeology":             "Confusion Miner",
-    "signls":                          "MIDI Sequencer Pilot",
+    "signls":                          "Sequencer Pilot",
     "simplify":                        "Code Simplifier",
     "simplify-docs":                   "Docs Simplifier",
     "simplify-planning":               "Planning Simplifier",
@@ -225,6 +225,16 @@ def render_section(skill: dict, usage: dict) -> str:
         for chunk in first.split(","):
             t = chunk.strip().strip('"').strip()
             if 4 <= len(t) <= 60 and t not in triggers:
+                triggers.append(t)
+
+    # hard-coded extras for skills with sparse frontmatter
+    EXTRA_TRIGGERS = {
+        "img-to-ascii":       ["convert image to ASCII", "image to primer", "img-to-ascii", "turn this image into text art"],
+        "joan-stark-ascii-art": ["find ASCII art", "Joan Stark art", "period-authentic ASCII", "jgs art", "ASCII animal"],
+    }
+    if slug in EXTRA_TRIGGERS:
+        for t in EXTRA_TRIGGERS[slug]:
+            if t not in triggers:
                 triggers.append(t)
 
     trigger_str = ", ".join(f'"{t}"' for t in triggers[:7]) if triggers else '"(see SKILL.md)"'

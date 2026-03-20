@@ -81,7 +81,7 @@ Last used: never · See: `.pi/skills/chiptune/SKILL.md`
 ---
 
 ## chiptune-cover
-**Your 8-bit Arranger** — Convert well-known melodies, themes, and scores into chiptune arrangements using chiptune-studio. Takes a song reference (title, artist, or melody description),…
+**Your Chiptune Arranger** — Convert well-known melodies, themes, and scores into chiptune arrangements using chiptune-studio. Takes a song reference (title, artist, or melody description),…
 
 Triggers on: "user asks to "make a chiptune version of [song]", "cover [track] in 8-bit", "arrange [theme] for chiptune", "do a chiptune [song name]", "make a chiptune version of [song]", "soundtrack this with [song]", "score this video with a chiptune [reference]".
 
@@ -186,7 +186,7 @@ Last used: never · See: `.pi/skills/git-branch-oneliners/SKILL.md`
 ## img-to-ascii
 **Your ASCII Converter** — Convert images to plain-text ASCII art primers for the TUI. Covers sourcing images, tuning conversion parameters, and opening the result as a primer window in t…
 
-Triggers on: "Convert images to plain-text ASCII art primers for the TUI".
+Triggers on: "Convert images to plain-text ASCII art primers for the TUI", "convert image to ASCII", "image to primer", "img-to-ascii", "turn this image into text art".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -197,7 +197,7 @@ Last used: never · See: `.pi/skills/img-to-ascii/SKILL.md`
 ## joan-stark-ascii-art
 **Your Art Librarian** — "Library of 500+ ASCII art pieces by Joan G. Stark (jgs), legendary ASCII artist 1996-2001. Use to find period-authentic ASCII art for primers, decoration, and…
 
-Triggers on: "Library of 500+ ASCII art pieces by Joan G".
+Triggers on: "Library of 500+ ASCII art pieces by Joan G", "find ASCII art", "Joan Stark art", "period-authentic ASCII", "jgs art", "ASCII animal".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -311,7 +311,7 @@ Last used: never · See: `.pi/skills/session-archaeology/SKILL.md`
 ---
 
 ## signls
-**Your MIDI Sequencer Pilot** — Manage the signls generative MIDI sequencer. Install, launch in tmux, stop, check status, and inspect bank files. Use when composing generative MIDI sequences,…
+**Your Sequencer Pilot** — Manage the signls generative MIDI sequencer. Install, launch in tmux, stop, check status, and inspect bank files. Use when composing generative MIDI sequences,…
 
 Triggers on: "composing generative MIDI sequences", "launching the sequencer", "managing bank files", "or any task involving signls".
 
@@ -497,7 +497,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | backroom-log-explorer | Archive Curator | Search and extract ASCII art, themes, primers, dialogue, and metadata from the W |
 | changelog | Release Scribe | Maintain a CHANGELOG |
 | chiptune | Chiptune Composer | Composable audio synthesis toolkit for chiptune music, covers, and scoring |
-| chiptune-cover | 8-bit Arranger | Convert well-known melodies, themes, and scores into chiptune arrangements using |
+| chiptune-cover | Chiptune Arranger | Convert well-known melodies, themes, and scores into chiptune arrangements using |
 | chiptune-studio | Studio Engineer | Composable audio synthesis toolkit for building chiptune music from numpy primit |
 | codex | Codex Delegate | Delegate tasks to OpenAI Codex CLI as a subagent |
 | commit | Commit Gatekeeper | "Read this skill before making git commits |
@@ -517,7 +517,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | qmd | Knowledge Searcher | Search markdown knowledge bases, notes, and documentation using QMD |
 | repo-hygiene | Repo Janitor | - Monthly repo health check — branch census, worktree audit, stale docs, plannin |
 | session-archaeology | Confusion Miner | Mine pi agent session logs (~/ |
-| signls | MIDI Sequencer Pilot | Manage the signls generative MIDI sequencer |
+| signls | Sequencer Pilot | Manage the signls generative MIDI sequencer |
 | simplify | Code Simplifier | - Three-pass code review and cleanup after a batch of changes |
 | simplify-docs | Docs Simplifier | - Three-pass review of PRDs, specifications, architecture docs, and technical ha |
 | simplify-planning | Planning Simplifier | - Three-pass review of planning epics, features, stories, spikes, and refactor t |
