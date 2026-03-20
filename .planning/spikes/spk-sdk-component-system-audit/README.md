@@ -1,8 +1,8 @@
 ---
-status: not-started
+status: complete
 owner: agent
 branch: spike/spk-sdk-component-system-audit
-updated: 2026-03-19
+updated: 2026-03-20
 ---
 
 # spk-sdk-component-system-audit
@@ -168,8 +168,13 @@ bun run src/cli/wibwob.ts -i <label> minimap
 
 ## Closeout checklist
 
-- [ ] all deliverables updated
-- [ ] docs and SDK exports aligned
-- [ ] deprecations/deletions documented
-- [ ] visual evidence captured
-- [ ] next execution stories proposed
+- [x] all deliverables updated
+- [x] docs and SDK exports aligned
+- [x] deprecations/deletions documented (`@deprecated` on all createLayout* aliases)
+- [x] visual evidence captured (crash-bundle artefacts, wibwob minimap)
+- [x] next execution stories proposed (`post-spike-masterplan.md`)
+
+## Post-spike
+
+See `post-spike-masterplan.md` for the ordered next-session plan, agent fleet
+consolidation, and scripts/hooks to keep src + docs on track going forward.

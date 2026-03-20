@@ -1,4 +1,4 @@
-# Product Owner Cuts — Naming & Surface Coherence
+# Product Owner Cuts - Naming & Surface Coherence
 
 ## Intent
 
@@ -14,11 +14,11 @@ Naming is design. Third-party developers should see one clear happy path, not pa
 | SDK showcase composition | split monolith into shell + demos catalogue | implemented (`index.ts` + `demos.ts`) |
 | Motion helper discoverability | elevate `tweenPingPong` + `tweenSequence` in docs/showcase | implemented |
 
-## Remaining cuts
+## Remaining cuts — all done ✅
 
-1. Mark `createLayout*` exports in SDK reference as legacy in one dedicated section.
-2. Reduce advanced/internal export cognitive load in SDK docs (clear “not for most authors” fence).
-3. Ensure all examples in docs use preferred names only.
+1. ✅ Mark `createLayout*` exports as legacy — `@deprecated` JSDoc added to all 6 aliases in `ui-parts.ts`; preferred/legacy table in `sdk-reference.md` complete.
+2. ✅ Advanced/internal SDK fence — `@public` / `@beta` / `@internal` tags on all exports; naming policy note in sdk-reference.
+3. ✅ Examples use preferred names only — verified in docs audit (S7).
 
 ## Anti-patterns blocked
 
