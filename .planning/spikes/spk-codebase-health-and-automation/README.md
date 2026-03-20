@@ -23,11 +23,15 @@ Five sessions. One output per session. All compound.
 
 | Session | Output | Unlocks |
 |---------|--------|---------|
+| 0 | gstack deep-dive research → concrete adaptation plan | Informed decisions on gen-docs + hooks |
 | 1 | `scripts/health-full.sh` + knip + madge in devDeps | Every session starts clean |
 | 2 | Hero 7 validated (data-dashboard + file-manager) | `examples-by-tier.md` accurate |
 | 3 | `scripts/sdk-export-index.sh` + `docs/sdk-export-index.md` | Docs drift caught automatically |
 | 4 | platform/audio/log wrappers + 24 raw fs calls removed | Safe-fs coverage complete |
 | 5 | music-player-window.ts → `microapps/music-player/` | Last host-side god-window gone |
+
+**Research:** `research/gstack-deep-dive.md` — full gstack ecosystem audit with
+direct WibWob-DOS adaptations. Read this before Sessions 1 and 3.
 
 **Gate target:** `bun run health-full` exits 0. No manual audit needed. Ever again.
 
