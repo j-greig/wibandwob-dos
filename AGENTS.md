@@ -41,7 +41,7 @@ For TUI-related work eg on the frontend, **visual verification is mandatory.** A
 ## Building a microapp
 
 ```bash
-bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
+bash .pi/skills/microapp-creator/scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
 ```
 
 **Non-obvious:** the microapp won't appear until you add it to

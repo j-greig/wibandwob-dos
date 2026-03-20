@@ -133,7 +133,7 @@ diagnostics. Microapp owns logic.
 
 **Scaffold:**
 ```bash
-bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
+bash .pi/skills/microapp-creator/scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
 ```
 
 **Register** in `src/core/microapp-registry.ts` → `REGISTRY`. The microapp
