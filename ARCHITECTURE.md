@@ -28,7 +28,7 @@ Four seams connect every adapter to the core:
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
 <progressive-disclosure>
-scripts/gen-coat.ts
+All registered endpoints and commands: run `bun scripts/gen-coat.ts` or read `COAT.md`
 </progressive-disclosure>
 
 ---
@@ -159,7 +159,7 @@ Importing from `src/core/` or `src/services/` directly is a COAT violation.
 | Inline blessed style literals | Use `host.theme()` tokens |
 
 <progressive-disclosure>
-scripts/gen-sdk-surface.ts
+Full SDK export directory with stability tiers: run `bun scripts/gen-sdk-surface.ts`
 </progressive-disclosure>
 
 Seven reference examples ordered by complexity: `demo-hello-world` →

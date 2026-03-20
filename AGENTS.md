@@ -6,6 +6,25 @@ WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + loca
 
 ---
 
+## How these docs work
+
+Five CAPS MD files at repo root are the entire doc surface:
+`AGENTS.md` · `PHILOSOPHY.md` · `ARCHITECTURE.md` · `LEXICON.md` · `COAT.md`
+
+Human maintains the first four. `COAT.md` is auto-generated.
+
+`<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
+deeper generated detail. Run the script to get it:
+
+```
+scripts/gen-coat.ts          → COAT.md (all endpoints + commands)
+scripts/gen-skills.py        → .pi/skills/skills.md (skill index + usage)
+scripts/gen-sdk-surface.ts   → (TBD) SDK export directory with tiers
+scripts/gen-primitives.ts    → src/core/primitives.ts barrel
+```
+
+---
+
 ## Instance targeting (do this first, every session)
 
 Every `wibwob` command needs `-i <label>`. Find your label:
@@ -87,7 +106,7 @@ chaining 3+ non-bash tool calls.
 Write friction, patterns that confused, things that worked.
 
 <progressive-disclosure>
-scripts/gen-skills.py
+Full skill index with usage data: run `python3 scripts/gen-skills.py`
 </progressive-disclosure>
 
 ---
@@ -101,21 +120,6 @@ scripts/gen-skills.py
 Branches: `epic/e0NN-slug` · `spike/spk-slug` · `fix/slug` · `feat/slug`
 Never commit to `main`.
 Worktrees: `git worktree add ~/Repos/wibwob-<slug> <branch>`
-
----
-
-## Progressive disclosure
-
-`<progressive-disclosure>` tags in CAPS MD files contain a path to a `scripts/gen-*`
-script. Run it to get the full generated detail. The CAPS file gives you the context;
-the script gives you the data. Human maintains the CAPS files, agent maintains the scripts.
-
-```
-scripts/gen-coat.ts          → COAT.md (endpoints + commands)
-scripts/gen-skills.py        → .pi/skills/skills.md (skill index)
-scripts/gen-sdk-surface.ts   → (TBD) SDK export directory
-scripts/gen-primitives.ts    → src/core/primitives.ts index
-```
 
 ---
 
