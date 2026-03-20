@@ -5,3 +5,4 @@
 {"run":4,"commit":"f0fb871","metric":10,"metrics":{},"status":"keep","description":"add axes 9+10, fix parent section ref, fix functional count parsing, fix subshell eval — 10/10","timestamp":1774040006184,"segment":0}
 {"run":5,"commit":"f23d1eb","metric":12,"metrics":{},"status":"keep","description":"add axes 11 (CAPS word-count cap) + 12 (cross-ref validation) — 12/12 all green","timestamp":1774040129102,"segment":0}
 {"run":6,"commit":"abf94a1","metric":12,"metrics":{},"status":"keep","description":"add axis 13 (gen script discoverability) + verbose mode + prune ideas — 12/13, exposes gen-primitives.ts and gen-sdk-surface.ts missing from AGENTS.md","timestamp":1774040275293,"segment":0}
+{"run":7,"commit":"4c117a7","metric":13,"metrics":{},"status":"keep","description":"axis 13 (gen discoverability via pattern not names), fix set -e crash in measurement script, verbose mode — 13/13","timestamp":1774040450734,"segment":0}

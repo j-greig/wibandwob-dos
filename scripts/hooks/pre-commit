@@ -11,20 +11,14 @@ if ! bash scripts/doc-sync.sh --check > /dev/null 2>&1; then
 fi
 
 echo "doc-health: checking loop integrity..."
-RESULT=$(bash scripts/doc-health.sh --json 2>/dev/null)
-SCORE=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['score'])" 2>/dev/null || echo "0")
-MAX=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['max'])" 2>/dev/null || echo "80")
+SCORE=$(bash scripts/doc-health.sh 2>/dev/null | grep -oE 'doc_health=[0-9]+' | grep -oE '[0-9]+')
+TOTAL=$(grep -c '^check ' scripts/doc-health.sh 2>/dev/null || echo 13)
 
-if [[ "$SCORE" -lt "$MAX" ]]; then
-  echo "✗ doc-health: $SCORE/$MAX — fix open loops before committing"
-  echo "$RESULT" | python3 -c "
-import json,sys
-d = json.load(sys.stdin)
-for i in d.get('issues', []):
-    print(f'  · {i}')
-" 2>/dev/null
+if [[ -z "$SCORE" || "$SCORE" -lt "$TOTAL" ]]; then
+  echo "✗ doc-health: ${SCORE:-0}/$TOTAL — fix open loops before committing"
+  VERBOSE=1 bash scripts/doc-health.sh 2>&1 | grep "✗" || true
   exit 1
 fi
 
-echo "✓ doc-health: $SCORE/$MAX — loop closed"
+echo "✓ doc-health: $SCORE/$TOTAL — loop closed"
 exit 0
