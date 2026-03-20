@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T18:02:13.818Z",
+  "generatedAt": "2026-03-20T18:03:02.615Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -91,10 +91,11 @@
         ]
       },
       "todos": {
-        "lastSeen": "2026-03-20T10:20:21.076Z",
-        "count": 1,
+        "lastSeen": "2026-03-20T18:03:02.615Z",
+        "count": 2,
         "sources": [
-          "command:/todos"
+          "command:/todos",
+          "tool:todo"
         ]
       },
       "session-breakdown": {
