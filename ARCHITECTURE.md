@@ -22,7 +22,7 @@ Four seams connect every adapter to the core:
 
 <progressive-disclosure>
   <output>`COAT.md` — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)</output>
-  <generator>`bun scripts/gen-COAT.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
+  <generator>`bun scripts/gen-integration-surface.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
 </progressive-disclosure>
 
 
