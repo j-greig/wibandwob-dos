@@ -237,7 +237,7 @@ bash scripts/scaffold-microapp.sh microapps/my-app wibwob.my-app "My App" 50
 #   kill $(cat scratch/wibwob.pid) && bun run start
 ```
 
-See `docs/building-custom-microapps.md` for the full guide. Example modules by complexity:
+See `.agents/guides/microapp.md` for the full guide. Example modules by complexity:
 
 | Tier | Module | What it shows |
 |------|--------|---------------|

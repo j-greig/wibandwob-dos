@@ -39,21 +39,31 @@ Scope: orientation docs (root + `.agents/` + `docs/` agent-facing). Reflections,
 
 ---
 
-## docs/ — public / cross-audience
+## Root hero docs (elevated from docs/)
 
-| File | Lines | Author | Freshness | Notes |
-|------|-------|--------|-----------|-------|
-| `docs/building-custom-microapps.md` | 454 | Human | ✅ 2026-03-20 | Public microapp guide. **Overlaps with `.agents/guides/microapp.md`**. Opportunity: make this the "human-first" narrative (with screenshots, context) and microapp.md the "agent-first" reference (tables, contracts). Currently they're both mixed. |
-| `docs/sdk-primitives.md` | 300 | Human | ✅ 2026-03-20 | Pre-refactor era helpers. Header says "for context". **Opportunity: deprecate or merge into microapp.md**. Agents read it unnecessarily. |
-| `docs/design-system.md` | 130 | Human | 2026-03-15 | Component system overview. Fine. |
-| `docs/PHILOSOPHY.md` | 401 | Human | ✅ 2026-03-20 | Old full version, noted as "pre-refactor". **Opportunity: archive.** The root `PHILOSOPHY.md` supersedes it. Agents who find this get the old picture. |
-| `docs/README.md` | 24 | Human | ✅ 2026-03-20 | Index. Fine. |
-| `docs/microapp-examples.md` | 79 | Human | 2026-03-19 | Examples. Overlaps with `guides/microapp.md §examples`. **Opportunity: link to guides/microapp.md instead of duplicating.** |
-| `docs/runtime-stats-surface.md` | 94 | Human | 2026-03-11 | Niche. Fine as reference. |
-| `docs/LEXICON.md` | 260 | Human | 2026-03-17 | Terminology. Good for onboarding. |
-| `docs/RECORDING.md` | 206 | Human | 2026-03-17 | VJ/recording ops. Fine. |
-| `docs/ascii-composition-vocabulary.md` | 211 | Agent | 2026-03-14 | Creative vocabulary. Niche. Fine. |
-| `docs/vendor-reference/*.md` | ~4353 | Agent | 2026-03-09 | pi/rich/textual internals. Very large. **Opportunity: verify still used. If not, archive.** |
+| File | Lines | Author | Notes |
+|------|-------|--------|-------|
+| `LEXICON.md` | 260 | Human | Project vocabulary. Elevated from `docs/`. |
+
+## docs/ — retired 2026-03-20
+
+`docs/` directory deleted. Contents either elevated to root, moved to skill references, or deleted as redundant/stale.
+
+| Was | Disposition |
+|-----|-------------|
+| `docs/LEXICON.md` | → `LEXICON.md` (root) |
+| `docs/RECORDING.md` | → `.pi/skills/wibwobdos-cinema/references/RECORDING.md` |
+| `docs/ascii-composition-vocabulary.md` | → `.pi/skills/wibwobdos/references/ascii-composition-vocabulary.md` |
+| `docs/building-custom-microapps.md` | Deleted — superseded by `.agents/guides/microapp.md` |
+| `docs/PHILOSOPHY.md` | Deleted — superseded by root `PHILOSOPHY.md` |
+| `docs/sdk-primitives.md` | Deleted — pre-refactor era, superseded |
+| `docs/microapp-examples.md` | Deleted — in `guides/microapp.md §examples` |
+| `docs/design-system.md` | Deleted — `src/ui/` directory structure; ARCHITECTURE.md covers the essence |
+| `docs/runtime-stats-surface.md` | Deleted — niche ops detail |
+| `docs/WELCOME.md` | Deleted — fluff |
+| `docs/README.md` | Deleted — just said "start at AGENTS.md" |
+| `docs/MOODBOARD.md` | Deleted — generated ASCII art, not docs |
+| `docs/vendor-reference/` | Deleted — stale external library refs (~4300L) |
 
 ---
 
@@ -74,16 +84,12 @@ Scope: orientation docs (root + `.agents/` + `docs/` agent-facing). Reflections,
 
 ---
 
-## Improvement opportunities (prioritised)
+## Open improvement opportunities
 
-1. **`docs/PHILOSOPHY.md`** — archive to `docs/.archive/`. Root `PHILOSOPHY.md` fully supersedes it. Agents occasionally read the old version and get confused.
+1. **`integration-surface.md` freshness** — add `gen-integration-surface.ts` to `health-full.sh` as a drift check (fail if output differs from committed). Same pattern as gstack's `--dry-run` flag.
 
-2. **`integration-surface.md` freshness** — add `gen-integration-surface.ts` to `health-full.sh` as a drift check (fail if output differs from committed file). Same pattern as gstack's `--dry-run` flag. See `autoresearch.ideas.md`.
+2. **`discover.sh` tier labels** — surface the Tier 1/2/3 model so agents get pointed to the right doc faster rather than just "shell" or "microapp" lens labels.
 
-3. **`docs/sdk-primitives.md`** — add a prominent deprecation notice; link to `guides/microapp.md §SDK reference`. Or merge the still-accurate rows into microapp.md and delete.
+3. **`PHILOSOPHY.md` SDK duplication** — "SDK stability contract" section overlaps with `ARCHITECTURE.md §SDK`. Replace with a one-line pointer to keep PHILOSOPHY.md philosophy-only.
 
-4. **`docs/vendor-reference/`** — 3 files, ~4300 lines combined. Verify usage in recent sessions. If last used >30 days ago, archive.
-
-5. **`discover.sh` tier labels** — could output the `.agents/` tier model (Tier 1/2/3) to help agents pick the right doc faster. Currently just "shell" or "microapp" labels.
-
-6. **`PHILOSOPHY.md` SDK duplication** — the "SDK stability contract" section in `PHILOSOPHY.md` overlaps with `ARCHITECTURE.md §SDK`. Suggest: keep in ARCHITECTURE.md, replace PHILOSOPHY.md section with a one-line pointer.
+4. **15 pre-existing COAT violations** — revealed when `check-coat.ts` ROOT path was fixed. Out of scope here; tracked separately.

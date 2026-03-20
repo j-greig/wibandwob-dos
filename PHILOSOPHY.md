@@ -1,7 +1,5 @@
 # WibWob-DOS — Philosophy
 
-> Full but soon depreciated original with status reports and design-system detail: `docs/PHILOSOPHY.md`
-
 ---
 
 ## What this is
@@ -119,4 +117,4 @@ Stability tiers: `@public` (stable), `@beta` (contract may change), `@internal`
 | Know the invariants and anti-patterns | `.agents/guides/shell.md` |
 | Build a microapp | `.agents/guides/microapp.md` |
 | Understand COAT (Command Once, Adapt Thin) | `ARCHITECTURE.md` §The core idea |
-| See original with design system + status | `docs/PHILOSOPHY.md` |
+

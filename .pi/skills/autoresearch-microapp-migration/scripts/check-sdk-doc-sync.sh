@@ -13,7 +13,7 @@ if [[ "$sdk_changed" -eq 0 ]]; then
 fi
 
 doc1='.agents/guides/microapp/sdk-reference.md'
-doc2='docs/building-custom-microapps.md'
+doc2='.agents/guides/microapp.md'
 
 doc1_changed=0
 doc2_changed=0

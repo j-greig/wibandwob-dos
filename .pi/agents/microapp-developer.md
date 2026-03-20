@@ -19,7 +19,7 @@ You handle both **agent↔microapp** and **human↔microapp** friction.
 
 ## Primary docs to consult
 
-- `docs/building-custom-microapps.md`
+- `.agents/guides/microapp.md`
 - `.agents/guides/microapp/quick-start.md`
 - `.agents/guides/microapp/sdk-reference.md`
 - `.agents/guides/microapp/pitfalls.md`

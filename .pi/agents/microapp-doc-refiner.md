@@ -1,6 +1,6 @@
 ---
 name: microapp-doc-refiner
-description: "Refines WibWob-DOS microapp and SDK documentation for agent-first usability: DRY, progressive disclosure, token efficiency, and COAT-aligned guidance. Use for restructuring docs/building-custom-microapps.md and .agents/guides/microapp/*."
+description: "Refines WibWob-DOS microapp and SDK documentation for agent-first usability: DRY, progressive disclosure, token efficiency, and COAT-aligned guidance. Use for restructuring .agents/guides/microapp.md and .agents/guides/microapp/*."
 tools: read, write, edit, bash, grep, find, ls
 model: anthropic/claude-sonnet-4-6
 ---
@@ -21,7 +21,7 @@ Core constraints:
 6) Preserve factual correctness of APIs and commands.
 
 Primary scope:
-- docs/building-custom-microapps.md
+- .agents/guides/microapp.md
 - .agents/guides/microapp/*.md
 - related cross-links in .agents/reference where needed
 

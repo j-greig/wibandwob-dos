@@ -94,7 +94,6 @@ Runtime composition root. Owns the four seams.
 ### Design system (`src/ui/`)
 Terminal component library. Layouts, molecules, organisms, data, feedback, forms, patterns.
 **Not for microapp authors directly** — accessed through the SDK Handle API.
-Full reference: `docs/design-system.md`
 
 ### SDK (`src/sdk/`, surface at `src/services/microapp-sdk.ts`)
 The **only** import path for microapp authors. Stable surface, mutable implementation.
@@ -226,7 +225,7 @@ explicitly asked. Extract, consolidate, normalise first.
 
 | Starting point | Read next |
 |---------------|-----------|
-| New to the codebase | This file → `PHILOSOPHY.md` → `.agents/guides/shell.md` |
+| New to the codebase | This file → `PHILOSOPHY.md` → `LEXICON.md` → `.agents/guides/shell.md` |
 | Building a microapp | `.agents/guides/microapp.md` |
 | Shell / host work | `.agents/guides/shell.md` |
 | Running / restarting | `.pi/skills/ww-ops/SKILL.md` |

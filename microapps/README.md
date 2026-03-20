@@ -17,7 +17,7 @@ visible to everyone.
 Canonical docs:
 
 - Quick start: `.agents/microapp-dev/quick-start.md`
-- Full guide: `docs/building-custom-microapps.md`
+- Full guide: `.agents/guides/microapp.md`
 - SDK reference: `.agents/microapp-dev/sdk-reference.md`
 - Examples by tier: `.agents/microapp-dev/examples-by-tier.md`
 - Persistence: `.agents/microapp-dev/persistence.md`
