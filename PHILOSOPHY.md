@@ -86,12 +86,6 @@ microapp authors. Stable surface, mutable implementation:
 
 Stability tiers: `@public` (stable) · `@beta` (may change) · `@internal` (host only).
 
-<progressive-disclosure>
-Every export from microapp-sdk.ts with its stability tier, type signature, and
-one-line description — the full surface an agent needs to pick the right component
-without reading source.
-</progressive-disclosure>
-
 ---
 
 ## North star

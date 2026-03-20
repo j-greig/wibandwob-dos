@@ -28,9 +28,7 @@ Four seams connect every adapter to the core:
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
 <progressive-disclosure>
-Every HTTP endpoint and CLI command currently registered, grouped by domain —
-the exhaustive proof that every surface hits the same registry. If something
-is missing from this list, it is not COAT-compliant.
+scripts/gen-coat.ts
 </progressive-disclosure>
 
 ---
@@ -161,9 +159,7 @@ Importing from `src/core/` or `src/services/` directly is a COAT violation.
 | Inline blessed style literals | Use `host.theme()` tokens |
 
 <progressive-disclosure>
-Every export from microapp-sdk.ts with stability tier (@public / @beta / @internal),
-its call signature, and a one-line description — the full component directory for
-picking the right primitive without opening source.
+scripts/gen-sdk-surface.ts
 </progressive-disclosure>
 
 Seven reference examples ordered by complexity: `demo-hello-world` →
