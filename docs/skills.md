@@ -11,16 +11,16 @@ One scannable index of every `.pi/skills/` entry — who they are, when to invok
 ## agentic-dev-reflection
 **Your Friction Journalist** — Reflect on implementation friction after sessions. Write for yourself and future agents. Focus on pain → why → fix. Skip git-log style entries.
 
-Triggers on: "Reflect on implementation friction after sessions", "unknown command", "## Entry format", "Example (real entry):", "wibwob cmd microapp.wibwob.theattyr.open".
+Triggers on: "Reflect on implementation friction after sessions", "agentic dev reflection", "agentic reflection".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: never · See: `.pi/skills/agentic-dev-reflection/SKILL.md`
 
 ---
 
 ## autoresearch
-**Your Skill Optimiser** — "Autonomously optimize any Claude Code skill by running it repeatedly, scoring outputs against binary evals, mutating the prompt, and keeping improvements. Base…
+**Your Skill Optimiser** — Autonomously optimize any Claude Code skill by running it repeatedly, scoring outputs against binary evals, mutating the prompt, and keeping improvements. Based…
 
 Triggers on: "optimize this skill", "improve this skill", "run autoresearch on", "make this skill better", "self-improve skill", "benchmark skill", "eval my skill".
 
@@ -33,7 +33,7 @@ Last used: never · See: `.pi/skills/autoresearch/SKILL.md`
 ---
 
 ## autoresearch-microapp-migration
-**Your Migration Pilot** — "Autonomous migration loop for pre-refactor microapps from microapps/.disabled into live microapps/ with binary runtime checks (wibwob CLI + API + screenshot/te…
+**Your Migration Pilot** — Autonomous migration loop for pre-refactor microapps from microapps/.disabled into live microapps/ with binary runtime checks (wibwob CLI + API + screenshot/tex…
 
 Triggers on: "migrate disabled microapps", "restore archived microapp", "run migration loop", "revive pre-refactor microapp".
 
@@ -50,7 +50,7 @@ Last used: never · See: `.pi/skills/autoresearch-microapp-migration/SKILL.md`
 
 Triggers on: "looking for specific art", "finding sessions by primer/theme/model", "extracting ASCII blocks", "or exploring the creative corpus".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: never · See: `.pi/skills/backroom-log-explorer/SKILL.md`
 
@@ -61,7 +61,7 @@ Last used: never · See: `.pi/skills/backroom-log-explorer/SKILL.md`
 
 Triggers on: "adding a changelog entry", "releasing a version", "creating a CHANGELOG", "update the changelog", "add to changelog", "what changed", "log this release".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not create from scratch — requires an existing input to convert or process.
 
 Last used: today (2026-03-20) · See: `.pi/skills/changelog/SKILL.md`
 
@@ -109,7 +109,7 @@ Last used: never · See: `.pi/skills/chiptune-studio/SKILL.md`
 ## codex
 **Your Codex Delegate** — Delegate tasks to OpenAI Codex CLI as a subagent. Two agents — codex-standard (gpt-5.3-codex, general-purpose) and codex-heavy (gpt-5.4, complex tasks). USAGE R…
 
-Triggers on: "the human explicitly requests Codex", "Delegate tasks to OpenAI Codex CLI as a subagent", "codex-heavy:", "diagnose the race condition in app/engine.cpp", "refactor error handling in app/api_ipc.cpp".
+Triggers on: "the human explicitly requests Codex", "Delegate tasks to OpenAI Codex CLI as a subagent", "codex".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -118,11 +118,11 @@ Last used: today (2026-03-20) · See: `.pi/skills/codex/SKILL.md`
 ---
 
 ## commit
-**Your Commit Gatekeeper** — "Read this skill before making git commits. Enforces WibWob-DOS conventional commit format."
+**Your Commit Gatekeeper** — Read this skill before making git commits. Enforces WibWob-DOS conventional commit format.
 
-Triggers on: "Read this skill before making git commits", "<subject>", "<body>", "<type>(<scope>): <imperative summary>", "feat".
+Triggers on: "Read this skill before making git commits", "commit".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make broad changes — stays within its narrow defined scope.
 
 Last used: today (2026-03-20) · See: `.pi/skills/commit/SKILL.md`
 
@@ -144,20 +144,18 @@ Last used: never · See: `.pi/skills/composable-engines/SKILL.md`
 
 Triggers on: "devlog", "briefing", "what's been happening", "catch me up", "standing notes", "open ideas".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write code — launches and manages existing systems.
 
 Last used: never · See: `.pi/skills/devlog-briefing/SKILL.md`
 
 ---
 
 ## discord-tui-share
-**Your TUI Broadcaster** — "Share WibWob-DOS TUI to a Discord channel. Two modes: (1) PNG screenshot of the full TUI or a single window, rendered as a styled terminal image; (2) ASCII min…
+**Your TUI Broadcaster** — Share WibWob-DOS TUI to a Discord channel. Two modes: (1) PNG screenshot of the full TUI or a single window, rendered as a styled terminal image; (2) ASCII mini…
 
-Triggers on: "Share WibWob-DOS TUI to a Discord channel", "WibWob-DOS", "Uses", "bash
-pip install Pillow
-# or: pip3 install Pillow", "DISCORD_WEBHOOK_URL".
+Triggers on: "Share WibWob-DOS TUI to a Discord channel", "discord tui share", "discord share".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write or modify code — operates and manages existing systems.
 
 Last used: never · See: `.pi/skills/discord-tui-share/SKILL.md`
 
@@ -179,7 +177,7 @@ Last used: never · See: `.pi/skills/figlet-videographer/SKILL.md`
 
 Triggers on: "the user asks for "git oneliners", "last 24h commits by branch", "repo summary", "branch commit summary", "or wants output like "# branch" then "- sha — MM-DD HH:MM — message", "git oneliners", "# branch".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: never · See: `.pi/skills/git-branch-oneliners/SKILL.md`
 
@@ -188,29 +186,29 @@ Last used: never · See: `.pi/skills/git-branch-oneliners/SKILL.md`
 ## img-to-ascii
 **Your ASCII Converter** — Convert images to plain-text ASCII art primers for the TUI. Covers sourcing images, tuning conversion parameters, and opening the result as a primer window in t…
 
-Triggers on: "Convert images to plain-text ASCII art primers for the TUI", ".txt", "-f symbols", "--symbols ascii", "-c none".
+Triggers on: "sourcing images", "tuning conversion parameters", "and opening the result as a primer window in the running app".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not create from scratch — requires an existing input to convert or process.
 
 Last used: never · See: `.pi/skills/img-to-ascii/SKILL.md`
 
 ---
 
 ## joan-stark-ascii-art
-**Your Art Librarian** — "Library of 500+ ASCII art pieces by Joan G. Stark (jgs), legendary ASCII artist 1996-2001. Use to find period-authentic ASCII art for primers, decoration, and…
+**Your Art Librarian** — Library of 500+ ASCII art pieces by Joan G. Stark (jgs), legendary ASCII artist 1996-2001. Use to find period-authentic ASCII art for primers, decoration, and c…
 
-Triggers on: "Library of 500+ ASCII art pieces by Joan G", "Content-Type: application/json", "primer.open", "args", "filePath".
+Triggers on: "period-authentic ASCII art for primers", "decoration", "and composition".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: today (2026-03-19) · See: `.pi/skills/joan-stark-ascii-art/SKILL.md`
 
 ---
 
 ## librarian
-**Your Repo Cacher** — "Cache and refresh remote git repositories under ~/.cache/checkouts/<host>/<org>/<repo> so future references can reuse a local copy. Use this skill when the use…
+**Your Repo Cacher** — Cache and refresh remote git repositories under ~/.cache/checkouts/<host>/<org>/<repo> so future references can reuse a local copy. Use this skill when the user…
 
-Triggers on: "Cache and refresh remote git repositories under ~/", "git@...", "owner/repo", "--filter=blob:none", "~/.cache/checkouts/<host>/<org>/<repo>".
+Triggers on: "Cache and refresh remote git repositories under ~/", "librarian".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -223,7 +221,7 @@ Last used: today (2026-03-20) · See: `.pi/skills/librarian/SKILL.md`
 
 Triggers on: "practical", "“visible craft” effects - playful logic", "loops", "repetition", "and rule-based worlds - music mapped to choreography", "objects".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write or modify code — operates and manages existing systems.
 
 Last used: never · See: `.pi/skills/michel-gondry-music-video-director/SKILL.md`
 
@@ -273,7 +271,7 @@ Last used: never · See: `.pi/skills/pi-usage-audit/SKILL.md`
 
 Triggers on: "task done", "story complete", "epic closed", "closing out work", "updating planning docs".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make broad changes — stays within its narrow defined scope.
 
 Last used: never · See: `.pi/skills/planning-update/SKILL.md`
 
@@ -284,7 +282,7 @@ Last used: never · See: `.pi/skills/planning-update/SKILL.md`
 
 Triggers on: "users ask to search notes", "find documents", "or look up information".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: never · See: `.pi/skills/qmd/SKILL.md`
 
@@ -306,7 +304,7 @@ Last used: never · See: `.pi/skills/repo-hygiene/SKILL.md`
 
 Triggers on: "auditing agent experience", "planning which subsystems need specs first", "building trigger tables", "investigating why agents keep getting something wrong", "or feeding a codified context infrastructure (E001 pattern)".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make changes — reads and reports only.
 
 Last used: never · See: `.pi/skills/session-archaeology/SKILL.md`
 
@@ -317,7 +315,7 @@ Last used: never · See: `.pi/skills/session-archaeology/SKILL.md`
 
 Triggers on: "composing generative MIDI sequences", "launching the sequencer", "managing bank files", "or any task involving signls".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write or modify code — operates and manages existing systems.
 
 Last used: never · See: `.pi/skills/signls/SKILL.md`
 
@@ -367,7 +365,7 @@ Last used: never · See: `.pi/skills/simplify-planning/SKILL.md`
 
 Triggers on: "building a new skill", "restructuring an existing one", "writing a SKILL", "make a skill", "create a skill", "scaffold a skill", "write a SKILL.md".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make broad changes — stays within its narrow defined scope.
 
 Last used: today (2026-03-20) · See: `.pi/skills/skill-creator/SKILL.md`
 
@@ -378,7 +376,7 @@ Last used: today (2026-03-20) · See: `.pi/skills/skill-creator/SKILL.md`
 
 Triggers on: "testing a new timeline", "verifying the pipeline after code changes", "or debugging cue behaviour", "smoke test timeline", "test the timeline", "capture each step", "screenshot each cue".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not run or produce the underlying content — records and exports only.
 
 Last used: never · See: `.pi/skills/timeline-smoke/SKILL.md`
 
@@ -387,7 +385,7 @@ Last used: never · See: `.pi/skills/timeline-smoke/SKILL.md`
 ## tui-smoke-test
 **Your TUI Test Writer** — Write and run headless integration tests for WibWob-DOS TUI. Covers agent window, slash commands, API errors, session logs, tool registration, and desktop state…
 
-Triggers on: "adding tests", "debugging test failures", "or extending the smoke suite".
+Triggers on: "adding tests", "debugging test failures", "or extending the smoke suite", "agent window", "slash commands", "API errors", "session logs".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -400,7 +398,7 @@ Last used: never · See: `.pi/skills/tui-smoke-test/SKILL.md`
 
 Triggers on: "creating a music video", "VJ show", "timed visual performance", "or any task that needs coordinated window choreography synced to audio", "music video", "visual performance", "timeline".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write or modify code — operates and manages existing systems.
 
 Last used: never · See: `.pi/skills/vj-timeline/SKILL.md`
 
@@ -409,7 +407,7 @@ Last used: never · See: `.pi/skills/vj-timeline/SKILL.md`
 ## wibwob-hosting-smoke
 **Your Deployment Validator** — Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VPS/Fly.io/npm-global style deployments using adapter runners + shared binary gate…
 
-Triggers on: ".pi/skills/wibwob-hosting-smoke/feedback.log", "feedback.log", "wibwob -i <instanceId> ...", "WIBWOB_DATA_DIR", "docker-vps".
+Triggers on: "wibwob hosting smoke", "wibwob smoke".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -418,7 +416,7 @@ Last used: never · See: `.pi/skills/wibwob-hosting-smoke/SKILL.md`
 ---
 
 ## wibwobdos
-**Your Desktop Operator** — "Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open wind…
+**Your Desktop Operator** — Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windo…
 
 Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
 
@@ -459,11 +457,9 @@ Last used: today (2026-03-19) · See: `.pi/skills/ww-ops/SKILL.md`
 ## ww-primitives
 **Your Primitives Maintainer** — Maintain the generated WibWob-DOS primitives index for shared reusable exports. Use when adding or updating shared building blocks that should be imported from…
 
-Triggers on: "../../src/core/primitives.js", "src/core/primitives.ts", "## Rules
+Triggers on: "primitives".
 
-- Never hand-edit", "@primitive", "/** @primitive */".
-
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not make broad changes — stays within its narrow defined scope.
 
 Last used: never · See: `.pi/skills/ww-primitives/SKILL.md`
 
@@ -474,7 +470,7 @@ Last used: never · See: `.pi/skills/ww-primitives/SKILL.md`
 
 Triggers on: "you want to test room chat", "check presence strip", "verify bidirectional relay", "inject test messages", "or do a full E008 smoke test", "room chat", "ww-room-chat".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write or modify code — operates and manages existing systems.
 
 Last used: never · See: `.pi/skills/ww-room-chat/SKILL.md`
 
@@ -485,7 +481,7 @@ Last used: never · See: `.pi/skills/ww-room-chat/SKILL.md`
 
 Triggers on: "user shares a YouTube URL and wants it summarised", "analysed", "quoted from", "or processed in any way", "transcribe this", "get the transcript", "summarise this video".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not create from scratch — requires an existing input to convert or process.
 
 Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 
@@ -496,23 +492,23 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | Skill | Specialist | What they do |
 |-------|-----------|--------------|
 | agentic-dev-reflection | Friction Journalist | Reflect on implementation friction after sessions |
-| autoresearch | Skill Optimiser | "Autonomously optimize any Claude Code skill by running it repeatedly, scoring o |
-| autoresearch-microapp-migration | Migration Pilot | "Autonomous migration loop for pre-refactor microapps from microapps/ |
+| autoresearch | Skill Optimiser | Autonomously optimize any Claude Code skill by running it repeatedly, scoring ou |
+| autoresearch-microapp-migration | Migration Pilot | Autonomous migration loop for pre-refactor microapps from microapps/ |
 | backroom-log-explorer | Archive Curator | Search and extract ASCII art, themes, primers, dialogue, and metadata from the W |
 | changelog | Release Scribe | Maintain a CHANGELOG |
 | chiptune | Chiptune Composer | Composable audio synthesis toolkit for chiptune music, covers, and scoring |
 | chiptune-cover | Chiptune Arranger | Convert well-known melodies, themes, and scores into chiptune arrangements using |
 | chiptune-studio | Studio Engineer | Composable audio synthesis toolkit for building chiptune music from numpy primit |
 | codex | Codex Delegate | Delegate tasks to OpenAI Codex CLI as a subagent |
-| commit | Commit Gatekeeper | "Read this skill before making git commits |
+| commit | Commit Gatekeeper | Read this skill before making git commits |
 | composable-engines | Engine Extractor | Extract a rendering/animation engine from a window, make it a reusable FramePlay |
 | devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
-| discord-tui-share | TUI Broadcaster | "Share WibWob-DOS TUI to a Discord channel |
+| discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | figlet-videographer | Typography VJ | Create typographic video sequences using figlet text animations in WibWob-DOS |
 | git-branch-oneliners | Git Reporter | - Export recent git commits grouped by branch into a plain text report |
 | img-to-ascii | ASCII Converter | Convert images to plain-text ASCII art primers for the TUI |
-| joan-stark-ascii-art | Art Librarian | "Library of 500+ ASCII art pieces by Joan G |
-| librarian | Repo Cacher | "Cache and refresh remote git repositories under ~/ |
+| joan-stark-ascii-art | Art Librarian | Library of 500+ ASCII art pieces by Joan G |
+| librarian | Repo Cacher | Cache and refresh remote git repositories under ~/ |
 | michel-gondry-music-video-director | Director Lens | A director-lens inspired by Michel Gondry’s public body of work and process: - h |
 | pi-extension-catalogue | Extension Mapper | Build an agent-friendly catalogue of all local Pi extensions in ` |
 | pi-session-log-explorer | Session Archaeologist | Search and extract content from pi agent session logs (~/ |
@@ -530,7 +526,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | tui-smoke-test | TUI Test Writer | Write and run headless integration tests for WibWob-DOS TUI |
 | vj-timeline | Show Director | Compose and execute timed music video shows inside WibWob-DOS TUI |
 | wibwob-hosting-smoke | Deployment Validator | Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VP |
-| wibwobdos | Desktop Operator | "Operate WibWob-DOS — a shared terminal desktop with overlapping windows, genera |
+| wibwobdos | Desktop Operator | Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generat |
 | wibwobdos-cinema | Reel Director | Record choreographed WibWob-DOS TUI sessions as retina GIF/MP4 with synced chipt |
 | ww-ops | Ops Engineer | Build, test, launch, and operate WibWob-DOS |
 | ww-primitives | Primitives Maintainer | Maintain the generated WibWob-DOS primitives index for shared reusable exports |

@@ -92,10 +92,10 @@ def extract_triggers(desc: str) -> list[str]:
     """Pull trigger phrases from a skill description string."""
     triggers = []
 
-    # Explicit "Use when:" / "Triggers on:" / "Invoke on:" lists
+    # Explicit invocation cues — broad set of action introducers
     for pattern in [
         r"(?:Use when|Triggers on|Trigger on|Invoke on|triggers on)[:\s]+(.+?)(?:\.|$)",
-        r"(?:Use for)[:\s]+(.+?)(?:\.|$)",
+        r"(?:Use for|Use to find|Use to|Covers)[:\s]+(.+?)(?:\.|$)",
     ]:
         m = re.search(pattern, desc, re.I | re.DOTALL)
         if m:
@@ -133,6 +133,40 @@ def extract_doesnot(desc: str, skill_name: str) -> str:
     }
     if fam and fam in inferences:
         return inferences[fam]
+
+    # Role-based inference — covers the common archetypes
+    role = ROLE_MAP.get(skill_name, "")
+    desc_lower = desc.lower()
+
+    # Reporter / Auditor / Mapper archetypes → read-only
+    if any(w in role for w in ["Reporter", "Auditor", "Mapper", "Curator", "Archaeologist",
+                                "Miner", "Searcher", "Librarian", "Explorer", "Journalist"]):
+        return "Does not make changes — reads and reports only."
+
+    # Launcher / Pilot / Operator archetypes → no code changes
+    if any(w in role for w in ["Pilot", "Operator", "Launcher", "Engineer", "Director",
+                                "Broadcaster"]):
+        return "Does not write or modify code — operates and manages existing systems."
+
+    # Converter / Creator archetypes → input required
+    if any(w in role for w in ["Converter", "Fetcher", "Scribe", "Refiner"]):
+        return "Does not create from scratch — requires an existing input to convert or process."
+
+    # Gatekeeper / Closer / Maintainer → narrow scope
+    if any(w in role for w in ["Gatekeeper", "Closer", "Maintainer", "Architect"]):
+        return "Does not make broad changes — stays within its narrow defined scope."
+
+    # Infer from description action verbs
+    if re.search(r'\bsearch\b|\bfind\b|\bmine\b|\bbrowse\b', desc_lower):
+        return "Does not create or modify content — searches and presents existing data only."
+    if re.search(r'\bconvert\b|\btransform\b|\btranslate\b', desc_lower):
+        return "Does not create from scratch — converts or transforms an existing input."
+    if re.search(r'\blaunch\b|\bstart\b|\brestart\b|\binstall\b', desc_lower):
+        return "Does not write code — launches and manages existing systems."
+    if re.search(r'\bmaintain\b|\bkeep\b|\bupdate the\b|\bsync\b', desc_lower):
+        return "Does not create new artefacts — maintains and syncs existing ones."
+    if re.search(r'\brecord\b|\bcapture\b|\bexport\b', desc_lower):
+        return "Does not run or produce the underlying content — records and exports only."
 
     return "Does not perform tasks outside its described scope — check the SKILL.md for boundaries."
 
@@ -177,6 +211,9 @@ def parse_skill(skill_dir: Path) -> dict:
     # body text (after closing ---) — used as trigger fallback
     body_start = text.find("---", text.find("---") + 3)
     body = text[body_start + 3:].strip() if body_start != -1 else ""
+
+    # strip outer quotes that some YAML descriptions wrap in
+    desc = desc.strip().strip('"').strip("'")
 
     return {"name": name, "slug": skill_dir.name, "desc": desc, "body": body}
 
@@ -231,19 +268,45 @@ def render_section(skill: dict, usage: dict) -> str:
             if 4 <= len(t) <= 60 and t not in triggers:
                 triggers.append(t)
 
-    # Fallback 3: mine body text for backtick phrases and quoted strings
-    # (no hardcoding — works for any future sparse-description skill)
+    # Fallback 3: mine body text for natural-language trigger phrases
+    # Strict filter: must look like something a human would say, not code
     if len(triggers) < 3:
         body = skill.get("body", "")
-        body_quoted  = re.findall(r'"([^"]{4,50})"', body[:2000])
-        body_ticked  = re.findall(r'`([^`]{4,50})`',  body[:2000])
-        body_bullets = re.findall(r'(?:Use when|Triggers on)[^\n]*?"([^"]{4,50})"', body[:2000], re.I)
-        for t in body_quoted + body_ticked + body_bullets:
+        # prefer explicit "use when" / "triggers on" bullets in body
+        use_when = re.findall(
+            r'(?:Use when|Triggers on|Invoke)[^\n]*?["\u201c]([^"\u201d]{6,60})["\u201d]',
+            body[:3000], re.I
+        )
+        # fall back to quoted strings that look like natural language
+        natural_quoted = [
+            t for t in re.findall(r'"([^"]{6,60})"', body[:3000])
+            if ' ' in t                          # must have a space (phrase, not identifier)
+            and not t.startswith('-')            # not a CLI flag
+            and not re.search(r'[:{}/\\]', t)  # not JSON/URL/path
+            and not re.match(r'[A-Z_]{3,}', t)  # not ALL_CAPS constant
+            and t[0].isupper() or ' ' in t[:4]  # starts naturally
+        ]
+        for t in (use_when + natural_quoted):
             t = t.strip()
-            if 4 <= len(t) <= 60 and t not in triggers:
+            if 6 <= len(t) <= 60 and t not in triggers:
                 triggers.append(t)
             if len(triggers) >= 5:
                 break
+
+    # Final fallback: plausible phrases derived from the slug itself
+    if len(triggers) < 3:
+        words = [w for w in re.split(r'[-_]', slug) if len(w) > 2]
+        if words:
+            variants = [
+                " ".join(words),
+                " ".join(words).replace("img", "image").replace("ascii", "ASCII art"),
+                f"{words[0]} {words[-1]}" if len(words) > 1 else None,
+            ]
+            for v in variants:
+                if v and 4 <= len(v) <= 60 and v not in triggers:
+                    triggers.append(v)
+                if len(triggers) >= 3:
+                    break
 
     trigger_str = ", ".join(f'"{t}"' for t in triggers[:7]) if triggers else '"(see SKILL.md)"'
 
