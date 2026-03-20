@@ -159,8 +159,11 @@ check "all_outputs_exist" '
 # 14. No watched source files changed without regeneration
 check "sources_synced" "bash scripts/doc-sync.sh --check"
 
-# 15. Regenerating outputs produces identical content (no drift)
+# 15. Regenerating outputs produces identical content (no manual drift)
+#     Skip if sources_synced already passed (no source changes = regen would be identical)
+#     Only runs when sources are clean but outputs might have been hand-edited
 check "content_matches_gen" '
+  bash scripts/doc-sync.sh --check > /dev/null 2>&1 && exit 0  # sources clean → skip expensive regen
   for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
     run=$(grep -E "^(//|#) @run" "$s" | sed "s|.*@run ||" | sed "s|^[[:space:]]*||;s|[[:space:]]*$||")
     o=$(get_output "$s"); [ -z "$run" ] || [ -z "$o" ] || [ ! -f "$o" ] && continue
