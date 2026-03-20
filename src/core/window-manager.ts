@@ -12,7 +12,29 @@ export type EditorWriteHook = (id: number, text: string) => boolean;
 /** Called when an editor window saves. Returns the resolved file path after save. */
 type EditorSaveHook = (id: number, filePath: string) => string;
 
-/** Manages live window records, z-order stack, focus, drag/resize, and layout. Implements WindowFacade. */
+/**
+ * Manages live window records, z-order stack, focus, drag/resize, and layout. Implements WindowFacade.
+ *
+ * SCROLLABLE CANVAS GOTCHAS — affects any microapp parenting children inside a scrollable canvas:
+ *
+ * 1. Double-subtraction bug: blessed's _getCoords() subtracts childBase (scroll offset) at every
+ *    scrollable ancestor. Grandchildren of a scrollable canvas get it subtracted TWICE — once via
+ *    frame.lpos.yi, once in _getCoords — causing yi to go negative and content to never draw.
+ *    Fix: add `fixed: true` to ALL grandchildren (titleBar, content, resize grip etc).
+ *    frame (child of canvas) → no fixed needed
+ *    titleBar/content/grip (children of frame) → fixed: true REQUIRED
+ *
+ * 2. Double-input: element.key() registers globally on program, not per-element. Layering
+ *    canvas.key + root.key + win.onInput fires 2-3x per keystroke. Use ONE listener at the
+ *    topmost element, or screen.key() with a focus guard.
+ *
+ * 3. Click routing with fixed:true: fixed children desync lpos hit-testing from visual scroll
+ *    position. Remove clickable:true from all panel children; handle mouse at screen level via
+ *    screen.on("mouse") + pointerToContent(). Blessed auto-focus for panels must be disabled.
+ *
+ * 4. Scroll-jump on refocus: screen._focus auto-scrolls to child rtop on any click. Never call
+ *    el.focus() on panel children — it triggers unwanted scroll-jump.
+ */
 export class WindowManager implements WindowFacade {
   private readonly windows: WindowRecord[] = [];
   private focusedWindow?: WindowRecord;
