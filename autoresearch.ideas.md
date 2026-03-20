@@ -1,8 +1,9 @@
+## Generator quality (no score gain, but maintainability)
+- EXTRA_TRIGGERS hardcoding is a smell — img-to-ascii and joan-stark have sparse frontmatter
+- Fix: read skill body text (beyond frontmatter) as a trigger source when description yields < 3
+- Would make generator fully self-maintaining for any future sparse-description skills
 
-## Skill index doc (like gstack's docs/skills.md)
-- Skill bloat is a real problem — skills accumulate, LLM router picks wrong ones, stale skills mislead
-- gstack has a single `docs/skills.md` that maps every skill to a role, phase, and "does NOT" boundary
-- We need an equivalent: one scannable doc listing every `.pi/skills/` entry with trigger phrases, does/does-not, and last-used date
-- Could be generated from skill frontmatter + usage-last-seen.json
-- Makes the consolidation decisions from the spike (`autoresearch` + `autoresearch-create` merge, chiptune family merge etc.) visible and auditable
-- Reference: https://raw.githubusercontent.com/garrytan/gstack/refs/heads/main/docs/skills.md
+## Benchmark extension ideas (if score ceiling needs raising)
+- Add `overlap` dimension: penalise trigger phrases shared across > 2 skills (routing ambiguity)
+- Add `body_accuracy` dimension: verify role label words appear in the actual SKILL.md body
+- Add `stale_flag` dimension: skills unused > 14 days must have ⚠️ in their entry
