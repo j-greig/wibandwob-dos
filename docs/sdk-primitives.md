@@ -1,5 +1,11 @@
 # SDK Composition Helpers
 
+> **Note:** This file documents composition helpers from the pre-refactor era
+> (`createTextViewer`, `createListPanel`, `createSplitView`, etc.). For new
+> microapps, prefer the SDK-native equivalents (`createTextBlock`,
+> `createSelectableList`, `createStack`, etc.) documented in
+> `.agents/guides/microapp/sdk-reference.md`.
+
 Themed UI primitives for microapp authors. Import from `microapp-sdk.js`:
 
 ```typescript

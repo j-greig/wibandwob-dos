@@ -1,5 +1,7 @@
 # Architecture Reference
 
+> **COAT** ("Command Once, Adapt Thin") — the WibWob-DOS architectural principle. Defined in `AGENTS.md`. All shell and microapp guidance follows COAT semantics.
+
 Full service and file inventory for WibWob-DOS.
 The app is built for a proactive autonomous agent with equal control of the OS alongside a human — every surface that matters to a human must be equally reachable by an agent.
 
@@ -24,6 +26,8 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 
 ### UI Design System (`src/ui/`)
 
+> **Docs authority:** Agent-readable canonical guides live in `.agents/guides/`. `docs/` provides narrative overviews for humans.
+
 Terminal component library. See `docs/design-system.md` for full reference.
 
 - `src/ui/types.ts` — Rect, LayoutPart, FlexBasis, TrackSize, AxisAlign
@@ -47,7 +51,7 @@ Microapp-facing surface. Stable import path: `src/services/microapp-sdk.ts`.
 ### Services
 
 - `src/services/state-service.ts` — canonical live desktop/app/window state; every window reports semantic content metadata through `describeState()`
-- `src/services/control-api.ts` — local HTTP control surface; see `.agents/shell-dev/control-api.md` for full endpoint list
+- `src/services/control-api.ts` — local HTTP control surface; see `.agents/guides/shell/control-api.md` for full endpoint list
 - `src/services/workspace-service.ts` — named workspace persistence only
 - `src/services/content-service.ts` — repo content discovery and text-file utility behaviour
 - `src/services/content-measurement.ts` — shared content measurement for primers, text, and future content types; returns content metrics, never chrome-adjusted widget math
@@ -71,6 +75,8 @@ Microapp-facing surface. Stable import path: `src/services/microapp-sdk.ts`.
 - `src/windows/backrooms-windows.ts` — Backrooms TV window and log browser
 
 ## Adding a New Window Type
+
+> **Scope: host-managed windows only.** This checklist applies to windows in `src/windows/`. Microapps do not extend `WindowKind` or touch `command-catalog.ts` — see `.agents/guides/microapp/quick-start.md` instead.
 
 Checklist — every item is mandatory:
 

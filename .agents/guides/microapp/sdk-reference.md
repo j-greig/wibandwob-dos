@@ -51,9 +51,26 @@ see `docs/building-custom-microapps.md`.
 
 For common mistakes: see `pitfalls.md`.
 
+## Advanced Components (source-level only)
+
+The following are exported from `microapp-sdk.ts` but have no stable documentation yet. Read the source before using.
+
+| Export | File | Notes |
+|---|---|---|
+| `createAnimationClock` | `src/services/microapp-sdk.ts` | Timing clock for animation loops — see source |
+| `createMessageHistory` | `src/services/microapp-sdk.ts` | Chat/history buffer — see source |
+| `createContentStack` | `src/services/microapp-sdk.ts` | Vertical content stack — see source |
+| `createCollapsibleBlock` | `src/services/microapp-sdk.ts` | Expandable section — see source |
+| `createBorderedPanel` | `src/services/microapp-sdk.ts` | Panel with border chrome — see source |
+| `createSidebarPanel` | `src/services/microapp-sdk.ts` | Fixed sidebar layout — see source |
+| `createInlineSearch` | `src/services/microapp-sdk.ts` | Inline search input — see source |
+| `createSelectableList` | `src/services/microapp-sdk.ts` | List with keyboard selection — see source |
+
 ## Manifest notes
 
 `menu.category` must be one of: `file` `edit` `view` `window` `applications` `demos` `help`
+
+**`multiInstance`** (boolean, default `false`) — allow multiple windows of this microapp to coexist. Can be set at manifest level or per-command. Priority: `registerCommand({ multiInstance })` > `manifest.multiInstance` > `false`.
 
 Optional `dependencies` in `microapp.json` declares npm packages the microapp needs.
 These must be installed in the root `package.json` via `bun add <pkg>`. The loader
@@ -135,6 +152,19 @@ host.ui.applyRect(node, rect)
 // For grid, scroll, responsive, and composition: import from microapp-sdk directly.
 ```
 
+**`direct` flag and `focusOrCreate` semantics**
+
+By default (without `direct: true`), the action is wrapped in `focusOrCreate(appType, fn, multiInstance)`:
+- If a window with this microapp's `appType` already exists, it is focused instead of creating a new one.
+- The action's return value is swallowed.
+
+Set `direct: true` to bypass `focusOrCreate` entirely — the action runs unconditionally and its return value is preserved. Use `direct: true` for commands that should always fire (e.g. query commands, toggle actions, palette-only commands).
+
+`focusOrCreate` is also available directly on the host:
+```typescript
+host.focusOrCreate(appType: string, createFn: () => void, multiInstance?: boolean): void
+```
+
 ## Runtime client helpers
 
 Use these when a microapp needs the same shared runtime inspection surface that CLI/API use:
@@ -158,6 +188,8 @@ Rules:
 - in-process microapps automatically prefer the shell's own `WIBWOB_API_BASE_URL`
 
 ## MicroappWindowHandle API
+
+> **Canonical hook definitions:** see `.agents/guides/microapp/quick-start.md` §Required hooks. The signatures here are the API reference.
 
 ```typescript
 win.id              // window id (number)
@@ -270,6 +302,8 @@ const legacyNode = someLegacyWidget;
 const panel = createNodePart(legacyNode);
 ```
 
+> **Note:** `align` on FlexChild is declared in the types but not yet implemented. Flex children always fill their cross-axis. This is a future enhancement.
+
 ### Grid: createGrid
 
 ```typescript
@@ -287,9 +321,7 @@ grid.set({ key: "stats", row: 0, column: 1, part: statsPart });
 grid.set({ key: "log",   row: 1, column: 1, part: logPart });
 ```
 
-Note: `align` on FlexChild and GridChild is declared in the types but
-not yet implemented. Grid cells always fill their track area. Flex children
-always fill their cross-axis. This is a future enhancement.
+> **Note:** `align` on GridChild is also not yet implemented. Grid cells always fill their track area.
 
 ### Responsive: pickBreakpoint
 
@@ -365,19 +397,7 @@ const sv = createScrollViewport(win.body, {
 
 ### Layout lifecycle
 
-```typescript
-function render() {
-  const w = Math.max(1, Number(win.body.width) || 0);
-  const h = Math.max(1, Number(win.body.height) || 0);
-  root.layout({ top: 0, left: 0, width: w, height: h });
-  host.screen.render();
-}
-
-render();
-win.onResize(render);
-win.onRestyle(() => { root.restyle(); host.screen.render(); });
-win.onCleanup(() => root.destroy());
-```
+> Full layout lifecycle: see `.agents/guides/microapp/layout.md` §Lifecycle.
 
 ---
 

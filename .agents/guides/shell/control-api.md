@@ -1,7 +1,9 @@
 # Control API Reference
 
+> **COAT** ("Command Once, Adapt Thin") — the WibWob-DOS architectural principle. Defined in `AGENTS.md`. All shell and microapp guidance follows COAT semantics.
+
 > Exact field names, failure modes, tui_* tool reference, and agent verification
-> patterns: `.agents/shell-dev/specs/state-and-api.md`
+> patterns: `.agents/specs/state-and-api.md`
 
 
 Local HTTP API on the configured runtime base URL.
@@ -194,9 +196,9 @@ menu.close                              {}   ← close any open dropdown/popup m
 8. `bun run wibwob state` — inspect messageCount, streaming, status
 9. Patch code and repeat
 
-## Proactive Tool Use
+## Desktop State Auto-Injection
 
-This OS belongs to the agents as much as the human. Use the desktop tools instinctively.
+This OS belongs to the agents as much as the human. Use the desktop tools directly — they are part of the agent surface, not an external integration.
 
 The pi extension `.pi/extensions/wwdos-state.ts` auto-injects a compact desktop snapshot into the system prompt before every agent turn when the app is running on port 8099:
 

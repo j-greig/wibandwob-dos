@@ -1,12 +1,12 @@
-# Module Persistence
+# Microapp Persistence
 
-How to make your module's state survive workspace save/restore cycles.
+How to make your microapp's state survive workspace save/restore cycles.
 
 ## When you need this
 
-If your module has state the user would lose on restart — selected mode,
+If your microapp has state the user would lose on restart — selected mode,
 editor content, playback position, configuration — add persistence.
-If your module is stateless or disposable, skip this.
+If your microapp is stateless or disposable, skip this.
 
 ## Setup
 
@@ -91,3 +91,8 @@ snapshot minimal semantic state, restore through the same public opening path.
   is exactly what you returned from `serialize`. Open your window with
   that state.
 - The host handles window position and size — you only persist semantic state.
+
+## See also
+
+- `.agents/guides/microapp/sdk-reference.md` — `registerSnapshot` API reference
+- `.agents/guides/microapp/quick-start.md` — bootstrap path

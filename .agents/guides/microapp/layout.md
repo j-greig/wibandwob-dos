@@ -1,4 +1,4 @@
-# Module Layout Guide
+# Microapp Layout Guide
 
 Two layout primitives: flex and grid. Everything else is a pattern or
 support helper built from them.
@@ -173,7 +173,7 @@ grid.set({ key: "doc", row: 0, column: 0, rowSpan: 2,
 });
 ```
 
-Four levels of nesting is normal for real modules. Keep each part
+Four levels of nesting is normal for real microapps. Keep each part
 responsible for one local layout problem. Do not flatten everything
 into one oversized grid.
 
@@ -250,7 +250,7 @@ on any blessed box with `scrollable: true`.
 
 ## Lifecycle
 
-Standard module pattern:
+Standard microapp pattern:
 
 ```ts
 function render() {
@@ -320,7 +320,7 @@ Flex children fill their cross-axis. This is a future enhancement.
 
 ## Agent Notes
 
-Responsive modules should expose a canonical `layoutReport` via
+Responsive microapps should expose a canonical `layoutReport` via
 `createLayoutReporter` from the SDK (see `sdk-reference.md`).
 This makes breakpoint debugging API-visible and diffable, and avoids
 screen-capture guesswork.

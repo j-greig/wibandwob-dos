@@ -1,7 +1,9 @@
 # Component Contract
 
 Every SDK component (create* function) follows this contract.
-Module authors can rely on these guarantees. SDK contributors must enforce them.
+Microapp authors can rely on these guarantees. SDK contributors must enforce them.
+
+> This follows shell invariant 12 (`.agents/guides/shell/invariants.md`): user-visible surfaces must be API-visible.
 
 ## Return type
 
@@ -115,7 +117,7 @@ type SelectEvent<T> = ChangeEvent<T> & {
 `restyle()` must re-read `theme()` and apply current tokens to all
 visual elements. Never cache theme references at creation time.
 
-Use `safeSetStyle` for scrollable/list components to avoid blessed crashes.
+The SDK internally guards style calls — you do not need to call `safeSetStyle` directly.
 
 ## Design tokens
 

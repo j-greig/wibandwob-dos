@@ -345,3 +345,5 @@ var containerURL: URL {
 - [ ] Agents explicitly signal completion
 
 **Ultimate test:** Describe an outcome in your domain that you didn't build a feature for. Can the agent figure it out in a loop until success?
+# Archived: agent-native.md
+# Moved 2026-03-20 — zero WibWob-DOS relevance (Swift/iCloud/mobile patterns). Preserved for reference only.

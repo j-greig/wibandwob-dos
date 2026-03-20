@@ -27,8 +27,22 @@ bash scripts/scaffold-microapp.sh microapps/my-app wibwob.myapp "My App" 150
 ```
 
 This creates `microapps/my-app/microapp.json` and `microapps/my-app/index.ts` with
-working boilerplate. Restart the app or run `wibwob cmd microapps.reload` and
-"My App" appears in the Applications menu and command palette.
+working boilerplate.
+
+**Register in microapp-registry.ts** — add your microapp to `src/core/microapp-registry.ts` →
+`REGISTRY` so the loader picks it up. Without this step the microapp is never loaded,
+even after a restart.
+
+```typescript
+// src/core/microapp-registry.ts → REGISTRY
+{ id: "wibwob.myapp", tier: "core" }
+// Tiers: core = menu + API  |  beta = API only  |  internal = dev/demo  |  disabled = not loaded
+```
+
+See `AGENTS.md` ("New microapp not showing?") for the full tier table.
+
+Restart the app or run `wibwob cmd microapps.reload` and "My App" appears in the
+Applications menu and command palette.
 
 Related scripts and tools:
 
@@ -295,6 +309,8 @@ Absolute path to the WibWob-DOS repo root. Use instead of hardcoding paths.
 
 ## Required lifecycle hooks
 
+> **Canonical reference:** `.agents/guides/microapp/quick-start.md` §Required hooks. The definitions here are supplementary context.
+
 Every microapp window MUST implement these four hooks:
 
 1. `win.describeState(() => ({ summary: "..." }))` — semantic state for agents
@@ -406,7 +422,7 @@ After creating your module:
 2. Restart the app
 3. Check the Applications menu for your app
 4. Open it and verify the window appears
-5. Check `curl http://127.0.0.1:8099/state` — your window should appear with
+5. Check `bun run src/cli/wibwob.ts -i <label> state` — your window should appear with
    the correct `appType` and `summary`
 6. Cycle the theme — your window should restyle correctly
 7. Close the window — no console errors, no leaked timers
@@ -433,5 +449,5 @@ After creating your module:
 ## Further reading
 
 - `src/services/microapp-sdk.ts` — full list of SDK exports
-- `.agents/microapp-dev/sdk-reference.md` — SDK API reference and advanced primitives
+- `.agents/guides/microapp/sdk-reference.md` — SDK API reference and advanced primitives
 - `scripts/scaffold-microapp.sh` — automated module scaffolding

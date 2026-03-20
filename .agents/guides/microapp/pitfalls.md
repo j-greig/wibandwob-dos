@@ -125,3 +125,9 @@ a function call.
 | Mistake | Fix |
 |---------|-----|
 | Assuming bare `Tab` is reserved by the shell for app cycling | It is microapp territory now. Use `Tab` locally when helpful. Shell-level app cycling moved to `Meta-Tab` / `Meta-Shift-Tab`. |
+
+## See also
+
+- `.agents/guides/microapp/sdk-reference.md` — full API reference
+- `.agents/guides/microapp/persistence.md` — persistence patterns
+- `.agents/guides/microapp/layout.md` — layout primitives
