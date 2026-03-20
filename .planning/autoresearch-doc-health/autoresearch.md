@@ -1,5 +1,8 @@
 # Autoresearch: Doc Health — Autopoietic Documentation Integrity
 
+> Archived final state from `autoresearch/doc-health-2026-03-20` branch.
+> 15 experiments, 15/15 structural, plateau reached. Next: tier 2+3 via subagent (see `doc-review-spec.md`).
+
 ## Objective
 
 Maximise the doc-health score (0–8) by improving the autopoietic documentation system:

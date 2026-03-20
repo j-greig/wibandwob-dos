@@ -1,18 +1,19 @@
 # Doc Health — Ideas Backlog
 
-## Active ideas
-- Pre-commit hook doesn't catch content drift in generated files (only source staleness). Would need --dry-run per gen script to compare output — expensive but correct.
-- Agent task success test: give fresh context only CAPS files + "build a microapp" task, measure pass/fail
-- Subagent GOTCHAS promotion review: periodically spawn doc-agent to suggest promotions
+## Next: implement doc-review.sh (tier 2+3)
+- Spec written: `.planning/autoresearch-doc-health/doc-review-spec.md`
+- Tier 2 (semantic): subagent delta judge per CAPS file, haiku model, ~30s
+- Tier 3 (functional): subagent builds microapp from CAPS only, sonnet model, ~60s
+- Wire tier 2 as secondary metric in autoresearch loop
 
-## Plateau reached
-- 14/14 all green, delta judge scores 8-9/10 across all CAPS files
-- Missing-output-skip bug fixed — suite now has real sensitivity
-- Stress tests pass: 4 sabotage scenarios all caught correctly
-- Adding more structural axes is diminishing returns unless source code changes introduce drift
+## Plateau — tier 1 is done
+- 15/15 structural, stress tested, content drift detection added
+- Delta judge scored all CAPS files 8-9/10
+- Pre-commit hook works, content freshness axis validates regen output
+- No more structural axes worth adding without real source code changes
 
-## Deferred (later sessions)
+## Deferred
 - MicroappHost gen: repurpose gen-sdk-surface.ts for real JSDoc + type signatures
 - Analytics JSONL: upgrade usage-pulse.ts
-- Pre-commit hook auto-install
-- doc-health --dry-run mode: run all gen scripts, compare output to committed files (expensive but catches content drift)
+- Pre-commit hook auto-install (postinstall script)
+- Headless pi agent running doc-review on schedule (cron/launchd)

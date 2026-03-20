@@ -1,0 +1,16 @@
+  ✓ script_headers
+  ✓ back_links
+  ✓ full_loop
+  ✓ parent_section
+  ✓ pd_paths_exist
+  ✓ no_orphans
+  ✓ counts_match
+  ✓ watches_cover_reads
+  ✓ word_budget
+  ✓ pd_focus
+  ✓ refs_valid
+  ✓ gen_convention_documented
+  ✓ all_outputs_exist
+  ✓ sources_synced
+  ✓ content_matches_gen
+METRIC doc_health=15
