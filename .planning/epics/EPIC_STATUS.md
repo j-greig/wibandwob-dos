@@ -7,15 +7,12 @@
 e001-codified-context-infrastructure — in-progress
 e019-rogue-tui-port — not-started
 e021-vps-multi-agent-world — blocked
-e028-responsive-column-layout — in-progress
-e034-layout-primitives-sdk — not-started
-e035-layout-sdk-buildout — done
-e036-sdk-design-system — not-started
-e037-llm-orch-cli-studio — in-progress
+e028-canvas-documents — in-progress
 e038-autoresearch-visual-scoring — in-progress
-e039-instance-lifecycle — done
-e039-unix-cli-surface — not-started
 e040-cli-music-video — not-started
-e042-solid-foundations — in-progress
-e043-session-capture — not-started
+e048-unix-cli-surface — not-started
+e049-session-capture — not-started
+e051-programmatic-tool-calling — ?
+e052-instance-lifecycle — not-started
+e053-external-config-packaging — ?
 

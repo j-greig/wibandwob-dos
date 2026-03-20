@@ -64,6 +64,7 @@ export interface AppMenuActions {
   openGallery: () => void;
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
+  navigateChromeBrowser: (args?: Record<string, unknown>) => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openCompanionWindow: () => void;
   openScrambleSmol: () => void;

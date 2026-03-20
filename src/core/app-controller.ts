@@ -1910,7 +1910,7 @@ export class TsTuiMvpApp {
         const url = typeof args?.url === "string" ? args.url.trim() : "";
         if (!url) return { ok: false, error: "url is required" };
         // Find an open browser window and navigate it
-        const browserWin = this.windowManager.list().find((w) => w.kind === "browser");
+        const browserWin = this.windowManager.getWindows().find(w => w.kind === "browser");
         if (!browserWin) return { ok: false, error: "No browser window open" };
         this.windowManager.sendInput(browserWin.id, url);
         return { ok: true, windowId: browserWin.id, url };

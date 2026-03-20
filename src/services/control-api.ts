@@ -595,8 +595,8 @@ export class ControlApiService {
     }
     // ── Browser endpoints ──
     if (request.method === "GET" && url.pathname === "/browser/state") {
-      const snapshot = this.deps.inspection.getSnapshot();
-      const browserWin = snapshot.windows.find((w: { appType?: string }) => w.appType === "web-reader");
+      const state = this.deps.inspection.getSnapshot().state;
+      const browserWin = state.windows.find(w => w.appType === "web-reader");
       if (!browserWin) return Response.json({ ok: false, error: "No browser window open" }, { status: 404 });
       return Response.json({ ok: true, ...browserWin });
     }
@@ -605,11 +605,10 @@ export class ControlApiService {
       const body = await request.json().catch(() => ({})) as Record<string, unknown>;
       const targetUrl = body.url as string | undefined;
       if (!targetUrl) return Response.json({ ok: false, error: "url is required" }, { status: 400 });
-      // Find browser window and send input (writeInput handles navigation)
-      const snapshot = this.deps.inspection.getSnapshot();
-      const browserWin = snapshot.windows.find((w: { appType?: string }) => w.appType === "web-reader");
+      const state = this.deps.inspection.getSnapshot().state;
+      const browserWin = state.windows.find(w => w.appType === "web-reader");
       if (!browserWin) return Response.json({ ok: false, error: "No browser window open" }, { status: 404 });
-      const sent = this.deps.windowManager.sendInput(browserWin.id, targetUrl);
+      const sent = this.deps.windows.sendInput(browserWin.id, targetUrl);
       return Response.json({ ok: sent, windowId: browserWin.id, url: targetUrl });
     }
 

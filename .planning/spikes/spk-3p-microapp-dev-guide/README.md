@@ -12,6 +12,8 @@ updated: 2026-03-20
 Write a comprehensive third-party developer guide for creating WibWob-DOS microapps,
 modelled on pi's `extensions.md` (see `reference/pi-extensions.md` in this spike dir).
 
+> Related reading: https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md
+
 That doc is excellent because it:
 - Starts with a quick-start that gets you running in 60 seconds
 - Shows the full capability surface up front (what can you build?)
