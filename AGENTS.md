@@ -107,7 +107,6 @@ produces binary evidence (pass/fail + artefact path). 3 small slices > 1 large o
 
 Branches: `epic/e0NN-slug` · `spike/spk-slug` · `fix/slug` · `feat/slug`
 Never commit to `main`.
-Worktrees: `git worktree add ~/Repos/wibwob-<slug> <branch>`
 
 ---
 

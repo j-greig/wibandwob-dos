@@ -3,7 +3,8 @@
 > Things LLMs get wrong here that they wouldn't get wrong in a standard repo.
 > Don't include things that an LLM would alreay know from its training data,
   eg common coding/dev knowledge.
-> Stub — add when something burns you, not preemptively.
+> Intake buffer — add when something burns you, not preemptively.
+> Review periodically: promote stable entries to their parent CAPS file, delete what's absorbed.
 
 ---
 
