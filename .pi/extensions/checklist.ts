@@ -1,27 +1,49 @@
 /**
- * checklist.ts — Interactive checklist with sections, checkboxes, and DO IT button
+ * checklist.ts — Interactive checklist with sections, checkboxes, radio items, and DO IT button
  *
- * Registers a `checklist` tool. The LLM passes a title, sections with headings,
- * and items each with a label + shell command to run when actioned.
+ * Two item types:
+ *   checkbox (default) — toggle on/off, runs command when checked + DO IT pressed
+ *   radio              — pick one of N options + always has a final "Type a command…" custom option
  *
  * Controls:
- *   ↑↓        — move cursor
- *   Space/Enter — toggle checkbox (when on an item)
- *   Tab        — move focus to/from DO IT button
- *   Enter      — execute checked commands (when DO IT is focused)
- *   Esc        — cancel
+ *   ↑↓              — move cursor between items
+ *   Space/Enter     — toggle checkbox OR open radio picker
+ *   ↑↓ in picker    — move between radio options (last = custom)
+ *   Enter in picker — confirm option; if custom, opens inline editor
+ *   Enter in editor — confirm typed command
+ *   Esc in editor   — back to radio options
+ *   Esc in picker   — close picker
+ *   Tab             — move focus to/from DO IT button
+ *   Enter on DO IT  — execute all actioned items
+ *   Esc             — cancel
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
+import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { execSync } from "node:child_process";
 
-const ItemSchema = Type.Object({
-	label: Type.String({ description: "Display label for the item" }),
-	command: Type.String({ description: "Shell command to run when this item is actioned" }),
+// ── Schema ────────────────────────────────────────────────────────────────────
+
+const RadioOptionSchema = Type.Object({
+	label: Type.String({ description: "Display label for this radio option" }),
+	command: Type.String({ description: "Shell command to run if this option is chosen" }),
+});
+
+const CheckboxItemSchema = Type.Object({
+	label: Type.String({ description: "Display label" }),
+	command: Type.String({ description: "Shell command to run when checked and DO IT is pressed" }),
 	checked: Type.Optional(Type.Boolean({ description: "Pre-check this item (default: false)" })),
 });
+
+const RadioItemSchema = Type.Object({
+	label: Type.String({ description: "Display label" }),
+	options: Type.Array(RadioOptionSchema, {
+		description: "Radio options. A final 'Type a command…' option is always appended automatically.",
+	}),
+});
+
+const ItemSchema = Type.Union([CheckboxItemSchema, RadioItemSchema]);
 
 const SectionSchema = Type.Object({
 	heading: Type.String({ description: "Section heading shown above its items" }),
@@ -33,31 +55,43 @@ const ChecklistParams = Type.Object({
 	sections: Type.Array(SectionSchema, { description: "Sections grouping related items" }),
 });
 
-interface Item {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface RadioOption { label: string; command: string }
+
+interface CheckboxItem {
+	kind: "checkbox";
 	label: string;
 	command: string;
 	checked: boolean;
 }
 
-interface Section {
-	heading: string;
-	items: Item[];
+interface RadioItem {
+	kind: "radio";
+	label: string;
+	options: RadioOption[];       // provided options
+	selected: number | null;      // index into options + 1 virtual "custom" slot
+	customCommand: string | null; // set when user types their own
 }
 
-interface ChecklistResult {
-	cancelled: boolean;
-	executed: { label: string; command: string; output: string; ok: boolean }[];
-}
+type Item = CheckboxItem | RadioItem;
+interface Section { heading: string; items: Item[] }
+interface Executed { label: string; command: string; output: string; ok: boolean }
+interface ChecklistResult { cancelled: boolean; executed: Executed[] }
+
+const CUSTOM_IDX = -1; // sentinel for the "Type a command…" slot
+
+// ── Extension ─────────────────────────────────────────────────────────────────
 
 export default function checklist(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "checklist",
 		label: "Checklist",
 		description:
-			"Show an interactive checklist with sections and checkboxes. " +
-			"User checks items then presses DO IT to execute the commands for all checked items. " +
-			"Use for presenting a batch of actions (file deletions, script runs, fixes) and letting " +
-			"the user choose which to execute.",
+			"Show an interactive checklist with sections, checkboxes, and radio items. " +
+			"Radio items always include a final 'Type a command…' option for custom input. " +
+			"User actions items then presses DO IT to execute. " +
+			"Use for batch actions (file deletions, script runs, fixes).",
 		parameters: ChecklistParams,
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -68,110 +102,182 @@ export default function checklist(pi: ExtensionAPI) {
 				};
 			}
 
-			// Build flat list of (sectionIdx, itemIdx) for cursor navigation
-			// alongside the sections data
 			const sections: Section[] = params.sections.map((s) => ({
 				heading: s.heading,
-				items: s.items.map((it) => ({
-					label: it.label,
-					command: it.command,
-					checked: it.checked ?? false,
-				})),
+				items: s.items.map((it): Item => {
+					if ("options" in it && it.options && it.options.length > 0) {
+						return {
+							kind: "radio", label: it.label, options: it.options,
+							selected: null, customCommand: null,
+						};
+					}
+					return {
+						kind: "checkbox", label: it.label,
+						command: (it as { command?: string }).command ?? "",
+						checked: (it as { checked?: boolean }).checked ?? false,
+					};
+				}),
 			}));
 
-			// Build flat navigation index: array of {sectionIdx, itemIdx}
-			type NavEntry = { sectionIdx: number; itemIdx: number };
+			type NavEntry = { si: number; ii: number };
 			const navList: NavEntry[] = [];
-			for (let si = 0; si < sections.length; si++) {
-				for (let ii = 0; ii < sections[si].items.length; ii++) {
-					navList.push({ sectionIdx: si, itemIdx: ii });
-				}
-			}
+			for (let si = 0; si < sections.length; si++)
+				for (let ii = 0; ii < sections[si].items.length; ii++)
+					navList.push({ si, ii });
 
 			const result = await ctx.ui.custom<ChecklistResult>((tui, theme, _kb, done) => {
-				let cursor = 0; // index into navList
+				let cursor = 0;
 				let buttonFocused = false;
+
+				// Radio picker state
+				let radioOpen = false;
+				let radioCursor = 0; // index within options + 1 custom slot
+
+				// Custom command editor state
+				let editorOpen = false;
+				const editorTheme: EditorTheme = {
+					borderColor: (s) => theme.fg("accent", s),
+					selectList: {
+						selectedPrefix: (t) => theme.fg("accent", t),
+						selectedText: (t) => theme.fg("accent", t),
+						description: (t) => theme.fg("muted", t),
+						scrollInfo: (t) => theme.fg("dim", t),
+						noMatch: (t) => theme.fg("warning", t),
+					},
+				};
+				const editor = new Editor(tui, editorTheme);
+
 				let cachedLines: string[] | undefined;
+				function refresh() { cachedLines = undefined; tui.requestRender(); }
 
-				function refresh() {
-					cachedLines = undefined;
-					tui.requestRender();
+				function currentItem(): Item | undefined {
+					if (!navList[cursor]) return undefined;
+					return sections[navList[cursor].si].items[navList[cursor].ii];
 				}
 
-				function checkedCount() {
-					return sections.reduce((n, s) => n + s.items.filter((it) => it.checked).length, 0);
+				function actionedCount() {
+					return sections.reduce((n, s) => n + s.items.filter((it) =>
+						it.kind === "checkbox" ? it.checked
+							: it.selected !== null || it.customCommand !== null
+					).length, 0);
 				}
+
+				// Editor submit — sets customCommand on the current radio item
+				editor.onSubmit = (value) => {
+					const cmd = value.trim();
+					const item = currentItem();
+					if (item?.kind === "radio" && cmd) {
+						item.customCommand = cmd;
+						item.selected = CUSTOM_IDX;
+					}
+					editorOpen = false;
+					radioOpen = false;
+					editor.setText("");
+					refresh();
+				};
 
 				function handleInput(data: string) {
-					// Esc always cancels
+					// ── Editor open ──────────────────────────────────────────
+					if (editorOpen) {
+						if (matchesKey(data, Key.escape)) {
+							editorOpen = false; editor.setText(""); refresh(); return;
+						}
+						editor.handleInput(data); refresh(); return;
+					}
+
 					if (matchesKey(data, Key.escape)) {
-						done({ cancelled: true, executed: [] });
+						if (radioOpen) { radioOpen = false; refresh(); return; }
+						done({ cancelled: true, executed: [] }); return;
+					}
+
+					// ── Radio picker open ────────────────────────────────────
+					if (radioOpen) {
+						const item = currentItem();
+						if (item?.kind !== "radio") { radioOpen = false; refresh(); return; }
+						const totalOpts = item.options.length + 1; // +1 for custom
+						if (matchesKey(data, Key.up)) {
+							radioCursor = Math.max(0, radioCursor - 1); refresh(); return;
+						}
+						if (matchesKey(data, Key.down)) {
+							radioCursor = Math.min(totalOpts - 1, radioCursor + 1); refresh(); return;
+						}
+						if (matchesKey(data, Key.enter) || matchesKey(data, Key.space)) {
+							if (radioCursor === item.options.length) {
+								// Custom slot — open editor
+								editor.setText(item.customCommand ?? "");
+								editorOpen = true;
+							} else {
+								item.selected = radioCursor;
+								item.customCommand = null;
+								radioOpen = false;
+							}
+							refresh(); return;
+						}
 						return;
 					}
 
-					// Tab toggles between list and button
-					if (matchesKey(data, Key.tab)) {
-						buttonFocused = !buttonFocused;
-						refresh();
-						return;
-					}
-
+					// ── Button focused ───────────────────────────────────────
 					if (buttonFocused) {
-						// Enter on DO IT executes
 						if (matchesKey(data, Key.enter)) {
-							const executed: ChecklistResult["executed"] = [];
+							const executed: Executed[] = [];
 							for (const s of sections) {
 								for (const it of s.items) {
-									if (!it.checked) continue;
+									let cmd = ""; let label = it.label;
+									if (it.kind === "checkbox") {
+										if (!it.checked || !it.command) continue;
+										cmd = it.command;
+									} else {
+										if (it.selected === null && !it.customCommand) continue;
+										if (it.selected === CUSTOM_IDX && it.customCommand) {
+											cmd = it.customCommand;
+											label = `${it.label} → (custom)`;
+										} else if (it.selected !== null) {
+											const opt = it.options[it.selected];
+											cmd = opt.command;
+											label = `${it.label} → ${opt.label}`;
+										}
+									}
+									if (!cmd) continue;
 									try {
-										const output = execSync(it.command, {
-											encoding: "utf8",
-											cwd: process.cwd(),
-											timeout: 30000,
+										const output = execSync(cmd, {
+											encoding: "utf8", cwd: process.cwd(), timeout: 30000,
 										}).trim();
-										executed.push({ label: it.label, command: it.command, output, ok: true });
+										executed.push({ label, command: cmd, output, ok: true });
 									} catch (e: unknown) {
-										const msg = e instanceof Error ? e.message : String(e);
-										executed.push({ label: it.label, command: it.command, output: msg, ok: false });
+										executed.push({ label, command: cmd, output: String(e), ok: false });
 									}
 								}
 							}
-							done({ cancelled: false, executed });
+							done({ cancelled: false, executed }); return;
 						}
-						// ↑ moves back to list
-						if (matchesKey(data, Key.up)) {
-							buttonFocused = false;
-							cursor = navList.length - 1;
-							refresh();
+						if (matchesKey(data, Key.up) || matchesKey(data, Key.shift("tab"))) {
+							buttonFocused = false; cursor = navList.length - 1; refresh(); return;
+						}
+						if (matchesKey(data, Key.tab)) {
+							buttonFocused = false; cursor = 0; refresh(); return;
 						}
 						return;
 					}
 
-					// List navigation
-					if (matchesKey(data, Key.up)) {
-						cursor = Math.max(0, cursor - 1);
-						refresh();
-						return;
-					}
+					// ── List navigation ──────────────────────────────────────
+					if (matchesKey(data, Key.tab)) { buttonFocused = true; refresh(); return; }
+					if (matchesKey(data, Key.up)) { cursor = Math.max(0, cursor - 1); refresh(); return; }
 					if (matchesKey(data, Key.down)) {
-						if (cursor < navList.length - 1) {
-							cursor++;
+						cursor < navList.length - 1 ? cursor++ : (buttonFocused = true);
+						refresh(); return;
+					}
+					if (matchesKey(data, Key.space) || matchesKey(data, Key.enter)) {
+						const item = currentItem();
+						if (!item) return;
+						if (item.kind === "checkbox") {
+							item.checked = !item.checked;
 						} else {
-							buttonFocused = true;
+							radioCursor = item.selected === CUSTOM_IDX
+								? item.options.length  // point cursor at custom slot
+								: item.selected ?? 0;
+							radioOpen = true;
 						}
 						refresh();
-						return;
-					}
-
-					// Toggle checkbox
-					if (matchesKey(data, Key.space) || matchesKey(data, Key.enter)) {
-						if (navList.length > 0) {
-							const { sectionIdx, itemIdx } = navList[cursor];
-							sections[sectionIdx].items[itemIdx].checked =
-								!sections[sectionIdx].items[itemIdx].checked;
-							refresh();
-						}
-						return;
 					}
 				}
 
@@ -184,39 +290,75 @@ export default function checklist(pi: ExtensionAPI) {
 					add(theme.fg("accent", theme.bold(` ${params.title}`)));
 					lines.push("");
 
-					let navIdx = 0;
-					for (const section of sections) {
-						// Section heading
+					for (let si = 0; si < sections.length; si++) {
+						const section = sections[si];
 						add(theme.fg("muted", ` ${section.heading}`));
 
-						for (const item of section.items) {
-							const isCursor = !buttonFocused && navList[cursor]?.sectionIdx === sections.indexOf(section)
-								&& navList[cursor]?.itemIdx === section.items.indexOf(item);
-							const box = item.checked
-								? theme.fg("success", "[x]")
-								: theme.fg("dim", "[ ]");
+						for (let ii = 0; ii < section.items.length; ii++) {
+							const item = section.items[ii];
+							const isCursor = !buttonFocused
+								&& navList[cursor]?.si === si && navList[cursor]?.ii === ii;
 							const prefix = isCursor ? theme.fg("accent", "> ") : "  ";
-							const labelColor = item.checked ? "text" : "muted";
-							add(`${prefix}${box} ${theme.fg(labelColor, item.label)}`);
-							navIdx++;
+
+							if (item.kind === "checkbox") {
+								const box = item.checked ? theme.fg("success", "[x]") : theme.fg("dim", "[ ]");
+								add(`${prefix}${box} ${theme.fg(item.checked ? "text" : "muted", item.label)}`);
+							} else {
+								const isCustom = item.selected === CUSTOM_IDX;
+								const chosenLabel = isCustom
+									? `(custom) ${item.customCommand}`
+									: item.selected !== null ? item.options[item.selected].label : null;
+								const letter = isCustom ? "?" :
+									item.selected !== null ? String.fromCharCode(65 + item.selected) : null;
+								const box = chosenLabel
+									? theme.fg("success", `(${letter})`)
+									: theme.fg("dim", "( )");
+								const suffix = chosenLabel
+									? theme.fg("dim", ` — ${chosenLabel}`)
+									: theme.fg("dim", " — pick one ↵");
+								add(`${prefix}${box} ${theme.fg(chosenLabel ? "text" : "muted", item.label)}${suffix}`);
+
+								// Inline radio picker
+								if (isCursor && radioOpen) {
+									for (let oi = 0; oi < item.options.length; oi++) {
+										const isRc = oi === radioCursor;
+										const ltr = String.fromCharCode(65 + oi);
+										const rp = isRc ? theme.fg("accent", "    > ") : "      ";
+										add(`${rp}${theme.fg(isRc ? "accent" : "muted", `${ltr}) ${item.options[oi].label}`)}`);
+									}
+									// Custom slot
+									const isCustomRc = radioCursor === item.options.length;
+									const cp = isCustomRc ? theme.fg("accent", "    > ") : "      ";
+									if (editorOpen) {
+										add(`${cp}${theme.fg("accent", "✎ Type a command:")}`);
+										for (const line of editor.render(width - 6)) add(`      ${line}`);
+										add(theme.fg("dim", "      Enter to confirm • Esc to back"));
+									} else {
+										add(`${cp}${theme.fg(isCustomRc ? "accent" : "dim", "✎ Type a command…")}`);
+									}
+								}
+							}
 						}
 						lines.push("");
 					}
 
 					// DO IT button
-					const n = checkedCount();
+					const n = actionedCount();
 					const btnLabel = n > 0 ? ` DO IT (${n} item${n !== 1 ? "s" : ""}) ` : " DO IT ";
 					const btnStyled = buttonFocused
 						? theme.bg("selectedBg", theme.fg("text", theme.bold(btnLabel)))
-						: n > 0
-						? theme.fg("success", theme.bold(btnLabel))
+						: n > 0 ? theme.fg("success", theme.bold(btnLabel))
 						: theme.fg("dim", btnLabel);
 					add(` ${btnStyled}`);
 					lines.push("");
 
-					const help = buttonFocused
-						? " Enter to execute • Tab to go back • Esc to cancel"
-						: " ↑↓ navigate • Space toggle • Tab → DO IT • Esc cancel";
+					const help = editorOpen
+						? " Enter to confirm command • Esc to go back"
+						: radioOpen
+						? " ↑↓ choose • Enter confirm • Esc back"
+						: buttonFocused
+						? " Enter to execute • Tab/↑ go back • Esc cancel"
+						: " ↑↓ navigate • Space/Enter toggle • Tab → DO IT • Esc cancel";
 					add(theme.fg("dim", help));
 					add(theme.fg("accent", "─".repeat(width)));
 
@@ -232,17 +374,11 @@ export default function checklist(pi: ExtensionAPI) {
 			});
 
 			if (result.cancelled) {
-				return {
-					content: [{ type: "text", text: "Cancelled" }],
-					details: result,
-				};
+				return { content: [{ type: "text", text: "Cancelled" }], details: result };
 			}
-
-			const lines = result.executed.map((e) =>
-				e.ok ? `✓ ${e.label}` : `✗ ${e.label}: ${e.output}`
-			);
+			const lines = result.executed.map((e) => e.ok ? `✓ ${e.label}` : `✗ ${e.label}: ${e.output}`);
 			return {
-				content: [{ type: "text", text: lines.join("\n") || "Nothing was checked." }],
+				content: [{ type: "text", text: lines.join("\n") || "Nothing was actioned." }],
 				details: result,
 			};
 		},
@@ -252,22 +388,16 @@ export default function checklist(pi: ExtensionAPI) {
 			const total = sections.reduce((n, s) => n + s.items.length, 0);
 			let text = theme.fg("toolTitle", theme.bold("checklist "));
 			text += theme.fg("muted", `${args.title} — `);
-			text += theme.fg("dim", `${total} item${total !== 1 ? "s" : ""} across ${sections.length} section${sections.length !== 1 ? "s" : ""}`);
+			text += theme.fg("dim", `${total} item${total !== 1 ? "s" : ""} in ${sections.length} section${sections.length !== 1 ? "s" : ""}`);
 			return new Text(text, 0, 0);
 		},
 
 		renderResult(result, _options, theme) {
 			const details = result.details as ChecklistResult | undefined;
-			if (!details || details.cancelled) {
-				return new Text(theme.fg("warning", "Cancelled"), 0, 0);
-			}
-			if (details.executed.length === 0) {
-				return new Text(theme.fg("dim", "Nothing executed"), 0, 0);
-			}
+			if (!details || details.cancelled) return new Text(theme.fg("warning", "Cancelled"), 0, 0);
+			if (details.executed.length === 0) return new Text(theme.fg("dim", "Nothing actioned"), 0, 0);
 			const lines = details.executed.map((e) =>
-				e.ok
-					? `${theme.fg("success", "✓")} ${e.label}`
-					: `${theme.fg("error", "✗")} ${e.label}`
+				e.ok ? `${theme.fg("success", "✓")} ${e.label}` : `${theme.fg("error", "✗")} ${e.label}`
 			);
 			return new Text(lines.join("\n"), 0, 0);
 		},
