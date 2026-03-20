@@ -592,6 +592,17 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     agent: true
   },
   {
+    id: "web-reader.navigate",
+    label: "Browse URL",
+    description: "Navigate the focused Chrome browser window to a URL. Args: url (string, required).",
+    group: "web-reader",
+    actionKey: "navigateChromeBrowser",
+    requires: ["bin.chrome"],
+    palettePlacement: { order: 111 },
+    api: true,
+    agent: true
+  },
+  {
     id: "agent.open",
     label: "Wib&Wob Chat",
     description: "Open (or focus) the native Wib&Wob Agent chat window.",
