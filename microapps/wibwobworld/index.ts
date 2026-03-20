@@ -136,6 +136,10 @@ export default function setup(host: MicroappHost) {
         saveCapture: () => void;
         saveTerrainExport: () => string | undefined;
         joinNearestChatspot: () => string | undefined;
+        /** Absolute camera placement — switches to firstperson if needed. */
+        setCameraPosition: (x: number, y: number, yaw?: number) => void;
+        /** Relative camera step — direction mirrors keyboard bindings. */
+        moveCameraStep: (direction: "forward" | "back" | "strafe-left" | "strafe-right" | "turn-left" | "turn-right", steps?: number) => void;
       }
     | undefined;
 
@@ -163,10 +167,14 @@ export default function setup(host: MicroappHost) {
     // Separate cache for the hybrid iso pane — sized to the half-window, not the contour world.
     let hybridIsoCacheKey = "";
     let hybridIsoArtifact: SavedTerrainArtifact | undefined;
+    // First-person camera — seed initial position from args if provided
     // First-person camera state (independent of focus/terrain generation)
-    let fpYaw: number | undefined; // undefined = auto-toward-peak
-    let fpCamX: number | undefined; // undefined = use focus
-    let fpCamY: number | undefined;
+    let fpYaw: number | undefined =
+      typeof args?.cameraYaw === "number" ? args.cameraYaw : undefined;
+    let fpCamX: number | undefined =
+      typeof args?.cameraX === "number" ? Math.round(args.cameraX) : undefined;
+    let fpCamY: number | undefined =
+      typeof args?.cameraY === "number" ? Math.round(args.cameraY) : undefined;
 
     function resetFpCamera() { fpYaw = undefined; fpCamX = undefined; fpCamY = undefined; }
 
@@ -584,6 +592,9 @@ export default function setup(host: MicroappHost) {
           playerY: focus.y,
           playerBiome: focus.biome,
           playerElevation: focus.elevation,
+          cameraX: camX,
+          cameraY: camY,
+          cameraYaw: fpYaw,
           chatspotsVisible: chatspots.length,
           nearestChatspotId: nearestChatspot?.id,
           nearestChatspotLabel: nearestChatspot?.label,
@@ -715,6 +726,32 @@ export default function setup(host: MicroappHost) {
       saveCapture,
       saveTerrainExport,
       joinNearestChatspot,
+      setCameraPosition(x, y, yaw) {
+        if (renderMode !== "firstperson") { renderMode = "firstperson"; initFpYaw(); }
+        const t = latestTerrain;
+        fpCamX = t ? clamp(Math.round(x), 0, t.width  - 1) : Math.round(x);
+        fpCamY = t ? clamp(Math.round(y), 0, t.height - 1) : Math.round(y);
+        if (yaw !== undefined) fpYaw = yaw;
+        render();
+        scheduleRenderFp();
+      },
+      moveCameraStep(direction, steps = 1) {
+        if (renderMode !== "firstperson") { renderMode = "firstperson"; initFpYaw(); }
+        const n = Math.max(1, Math.round(steps));
+        for (let i = 0; i < n; i++) {
+          if (direction === "turn-left")  { initFpYaw(); fpYaw = (fpYaw ?? 0) - FP_TURN; }
+          else if (direction === "turn-right") { initFpYaw(); fpYaw = (fpYaw ?? 0) + FP_TURN; }
+          else {
+            const offset = direction === "forward" ? 0
+              : direction === "back"         ? Math.PI
+              : direction === "strafe-left"  ? -Math.PI / 2
+              : Math.PI / 2; // strafe-right
+            moveFpCamera(offset);
+          }
+        }
+        render();
+        scheduleRenderFp();
+      },
     };
 
     const bindKeys = (node: blessed.Widgets.Node) => {
@@ -929,6 +966,41 @@ export default function setup(host: MicroappHost) {
       debugWibWobWorld("command:save-terrain-export");
       if (control) control.saveTerrainExport();
       else openWorld();
+    },
+  });
+
+  host.registerCommand({
+    id: "set-camera",
+    label: "WibWobWorld: Set Camera Position",
+    description: "Teleport the 3D camera to an absolute position. Args: { x: number, y: number, yaw?: number (radians) }. Switches to firstperson mode if needed.",
+    direct: true,
+    action: (args) => {
+      debugWibWobWorld("command:set-camera", args ?? {});
+      const x = Number(args?.x);
+      const y = Number(args?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const yaw = typeof args?.yaw === "number" ? args.yaw : undefined;
+      if (control) control.setCameraPosition(x, y, yaw);
+      else openWorld({ renderMode: "firstperson", cameraX: x, cameraY: y, cameraYaw: yaw });
+    },
+  });
+
+  host.registerCommand({
+    id: "move-camera",
+    label: "WibWobWorld: Move Camera",
+    description: 'Move or rotate the 3D camera. Args: { direction: "forward"|"back"|"strafe-left"|"strafe-right"|"turn-left"|"turn-right", steps?: number }. Switches to firstperson mode if needed.',
+    direct: true,
+    action: (args) => {
+      debugWibWobWorld("command:move-camera", args ?? {});
+      const dir = args?.direction as string | undefined;
+      const validDirs = ["forward", "back", "strafe-left", "strafe-right", "turn-left", "turn-right"];
+      if (!dir || !validDirs.includes(dir)) return;
+      const steps = typeof args?.steps === "number" ? Math.max(1, Math.round(args.steps)) : 1;
+      if (control) {
+        control.moveCameraStep(dir as Parameters<typeof control.moveCameraStep>[0], steps);
+      } else {
+        openWorld({ renderMode: "firstperson" });
+      }
     },
   });
 
