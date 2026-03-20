@@ -1,17 +1,13 @@
 # AGENTS.md
 
-> Philosophy: `PHILOSOPHY.md` · Architecture + build guide: `ARCHITECTURE.md` · Vocabulary: `LEXICON.md`
-
 WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + local HTTP API.
 
 ---
 
 ## How these docs work
 
-Five CAPS MD files at repo root are the entire doc surface:
+Four CAPS MD files at repo root are the entire doc surface:
 `AGENTS.md` · `PHILOSOPHY.md` · `ARCHITECTURE.md` · `LEXICON.md`
-
-
 
 `<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
 deeper generated detail. Run the script to get it:
