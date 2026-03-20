@@ -1,6 +1,0 @@
-experiment	score	max_score	pass_rate	status	description
-0	7	9	77.8%	baseline	baseline gates for demo-layout-stress-test-pi
-1	7	9	77.8%	discard	stability rerun with no code mutation (full-pass confirmation)
-2	7	9	77.8%	discard	stability rerun with no code mutation (full-pass confirmation)
-3	7	9	77.8%	discard	stability rerun with no code mutation (full-pass confirmation)
-4	7	9	77.8%	discard	stability rerun with no code mutation (full-pass confirmation)

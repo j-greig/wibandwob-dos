@@ -85,7 +85,13 @@ export default function quizme(pi: ExtensionAPI) {
 			"Interactive decision prompt — present options, let the human choose, execute. " +
 			"Checkboxes for batch actions, radio for pick-one decisions. " +
 			"If 3+ sections, auto-appends a 'What else?' free-text section for things the agent missed. " +
-			"Human presses DO IT to execute all chosen items.",
+			"Human presses DO IT to execute all chosen items. " +
+			"AGENT RULE: after DO IT, execute ONLY what the human explicitly selected — nothing more. " +
+			"Do not infer, extend, or act on unchecked items. " +
+			"CONSTRUCTING THE QUIZ: read the specificity of the request. " +
+			"If the request is explicit and detailed — transcribe it precisely, no additions. " +
+			"If the request is exploratory or open-ended ('what next?', 'quiz me on X') — use your knowledge of the codebase philosophy, project momentum, and the user's working style (smallest slice that proves the direction, delta over noise, prove it works before extending it) to surface options the user didn't think to name. " +
+			"The quiz is a decision surface, not a transcription.",
 		parameters: ChecklistParams,
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -403,10 +409,13 @@ export default function quizme(pi: ExtensionAPI) {
 		renderResult(result, _options, theme) {
 			const details = result.details as ChecklistResult | undefined;
 			if (!details || details.cancelled) return new Text(theme.fg("warning", "Cancelled"), 0, 0);
-			if (details.executed.length === 0) return new Text(theme.fg("dim", "Nothing actioned"), 0, 0);
-			const lines = details.executed.map((e) =>
-				e.ok ? `${theme.fg("success", "✓")} ${e.label}` : `${theme.fg("error", "✗")} ${e.label}`
-			);
+			if (details.executed.length === 0) return new Text(theme.fg("dim", "Nothing actioned — do not act on unchecked items"), 0, 0);
+			const lines = [
+				theme.fg("dim", `Human selected ${details.executed.length} item(s). Act on ONLY these:`),
+				...details.executed.map((e) =>
+					e.ok ? `${theme.fg("success", "✓")} ${e.label}` : `${theme.fg("error", "✗")} ${e.label}`
+				),
+			];
 			return new Text(lines.join("\n"), 0, 0);
 		},
 	});

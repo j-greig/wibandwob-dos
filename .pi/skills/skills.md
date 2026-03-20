@@ -37,19 +37,6 @@ Last used: never · See: `.pi/skills/autoresearch/SKILL.md`
 
 ---
 
-## autoresearch-microapp-migration
-**Your Migration Pilot** — Autonomous migration loop for pre-refactor microapps from microapps/.disabled into live microapps/ with binary runtime checks (wibwob CLI + API + screenshot/tex…
-
-Triggers on: "migrate disabled microapps", "restore archived microapp", "run migration loop", "revive pre-refactor microapp".
-
-Does not: Does not make runtime or code changes — optimisation loop only.
-
-> **Family:** autoresearch (see also: autoresearch-microapp-migration)
-
-Last used: never · See: `.pi/skills/autoresearch-microapp-migration/SKILL.md`
-
----
-
 ## backroom-log-explorer
 **Your Archive Curator** — Search and extract ASCII art, themes, primers, dialogue, and metadata from the Wib&Wob Backrooms raw archive (662 session logs, 57MB). Use when looking for spec…
 
@@ -130,17 +117,6 @@ Triggers on: "Read this skill before making git commits", "commit".
 Does not: Does not make broad changes — stays within its narrow defined scope.
 
 Last used: today (2026-03-20) · See: `.pi/skills/commit/SKILL.md`
-
----
-
-## composable-engines
-**Your Engine Extractor** — Extract a rendering/animation engine from a window, make it a reusable FramePlayer, and embed it as a component inside other windows or microapps. Three-phase p…
-
-Triggers on: "embedding one animation inside another window", "making a window's core logic reusable", "composing dashboard-style layouts".
-
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
-
-Last used: never · See: `.pi/skills/composable-engines/SKILL.md`
 
 ---
 
@@ -251,19 +227,6 @@ Triggers on: "create a microapp", "new microapp", "scaffold a microapp", "add a 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
 Last used: today (2026-03-20) · See: `.pi/skills/microapp-creator/SKILL.md`
-
----
-
-## pi-extension-catalogue
-**Your Extension Mapper** — Build an agent-friendly catalogue of all local Pi extensions in `.pi/extensions` by extracting top docblocks and command/tool/shortcut surfaces into a progressi…
-
-Triggers on: "asked to list extensions", "summarise extension capabilities", "map extension command surfaces", "or prepare an extension overview for handoff".
-
-Does not: Does not modify the data it reads — audit and report only.
-
-> **Family:** pi-introspection (see also: pi-extension-catalogue, pi-session-log-explorer, pi-usage-audit)
-
-Last used: never · See: `.pi/skills/pi-extension-catalogue/SKILL.md`
 
 ---
 
@@ -409,17 +372,6 @@ Last used: never · See: `.pi/skills/timeline-smoke/SKILL.md`
 
 ---
 
-## tui-smoke-test
-**Your TUI Test Writer** — Write and run headless integration tests for WibWob-DOS TUI. Covers agent window, slash commands, API errors, session logs, tool registration, and desktop state…
-
-Triggers on: "adding tests", "debugging test failures", "or extending the smoke suite", "agent window", "slash commands", "API errors", "session logs".
-
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
-
-Last used: never · See: `.pi/skills/tui-smoke-test/SKILL.md`
-
----
-
 ## vj-timeline
 **Your Show Director** — Compose and execute timed music video shows inside WibWob-DOS TUI. Declarative timeline files sync visual cues (window layout, theme changes, primer art, figlet…
 
@@ -485,7 +437,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 |-------|-----------|--------------|
 | agentic-dev-reflection | Friction Journalist | Reflect on implementation friction after sessions |
 | autoresearch | Skill Optimiser | Autonomously optimize any Claude Code skill by running it repeatedly, scoring ou |
-| autoresearch-microapp-migration | Migration Pilot | Autonomous migration loop for pre-refactor microapps from microapps/ |
 | backroom-log-explorer | Archive Curator | Search and extract ASCII art, themes, primers, dialogue, and metadata from the W |
 | changelog | Release Scribe | Maintain a CHANGELOG |
 | chiptune | Chiptune Composer | Composable audio synthesis toolkit for chiptune music, covers, and scoring |
@@ -493,7 +444,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | chiptune-studio | Studio Engineer | Composable audio synthesis toolkit for building chiptune music from numpy primit |
 | codex | Codex Delegate | Delegate tasks to OpenAI Codex CLI as a subagent |
 | commit | Commit Gatekeeper | Read this skill before making git commits |
-| composable-engines | Engine Extractor | Extract a rendering/animation engine from a window, make it a reusable FramePlay |
 | devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | doc-agent | Specialist | Autopoietic documentation agent |
@@ -504,7 +454,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | librarian | Repo Cacher | Cache and refresh remote git repositories under ~/ |
 | michel-gondry-music-video-director | Director Lens | A director-lens inspired by Michel Gondry’s public body of work and process: - h |
 | microapp-creator | Specialist | Scaffold, register, and dev-loop a new WibWob-DOS microapp end-to-end |
-| pi-extension-catalogue | Extension Mapper | Build an agent-friendly catalogue of all local Pi extensions in ` |
 | pi-session-log-explorer | Session Archaeologist | Search and extract content from pi agent session logs (~/ |
 | pi-usage-audit | Stale-Skill Auditor | Audit local Pi skill, extension, and agent usage from session logs for the curre |
 | planning-update | Planning Closer | - Update  |
@@ -517,7 +466,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | simplify-planning | Planning Simplifier | - Three-pass review of planning epics, features, stories, spikes, and refactor t |
 | skill-creator | Skill Architect | Create well-structured Agent Skills that follow the agentskills |
 | timeline-smoke | Timeline Tester | - Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs at ever |
-| tui-smoke-test | TUI Test Writer | Write and run headless integration tests for WibWob-DOS TUI |
 | vj-timeline | Show Director | Compose and execute timed music video shows inside WibWob-DOS TUI |
 | wibwob-hosting-smoke | Deployment Validator | Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VP |
 | wibwobdos | Desktop Operator | Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generat |

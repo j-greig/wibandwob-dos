@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T21:46:03.346Z",
+  "generatedAt": "2026-03-20T22:12:11.914Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -124,6 +124,13 @@
         "count": 6,
         "sources": [
           "tool:checklist"
+        ]
+      },
+      "quizme": {
+        "lastSeen": "2026-03-20T22:12:11.914Z",
+        "count": 3,
+        "sources": [
+          "tool:quizme"
         ]
       }
     },
