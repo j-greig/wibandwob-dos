@@ -1,5 +1,5 @@
 /**
- * checklist.ts — Interactive checklist with sections, checkboxes, radio items, and DO IT button
+ * quizme.ts — Interactive decision prompt with sections, checkboxes, radio items, and DO IT button
  *
  * Two item types:
  *   checkbox (default) — toggle on/off, runs command when checked + DO IT pressed
@@ -45,7 +45,7 @@ const SectionSchema = Type.Object({
 });
 
 const ChecklistParams = Type.Object({
-	title: Type.String({ description: "Title shown at the top of the checklist" }),
+	title: Type.String({ description: "Title shown at the top of the quiz" }),
 	sections: Type.Array(SectionSchema, { description: "Sections grouping related items" }),
 });
 
@@ -77,15 +77,15 @@ const CUSTOM_IDX = -1; // sentinel for the "Type a command…" slot
 
 // ── Extension ─────────────────────────────────────────────────────────────────
 
-export default function checklist(pi: ExtensionAPI) {
+export default function quizme(pi: ExtensionAPI) {
 	pi.registerTool({
-		name: "checklist",
-		label: "Checklist",
+		name: "quizme",
+		label: "Quiz Me",
 		description:
-			"Show an interactive checklist with sections, checkboxes, and radio items. " +
-			"Radio items always include a final 'Type a command…' option for custom input. " +
-			"User actions items then presses DO IT to execute. " +
-			"Use for batch actions (file deletions, script runs, fixes).",
+			"Interactive decision prompt — present options, let the human choose, execute. " +
+			"Checkboxes for batch actions, radio for pick-one decisions. " +
+			"If 3+ sections, auto-appends a 'What else?' free-text section for things the agent missed. " +
+			"Human presses DO IT to execute all chosen items.",
 		parameters: ChecklistParams,
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -112,6 +112,20 @@ export default function checklist(pi: ExtensionAPI) {
 					};
 				}),
 			}));
+
+			// Auto-append "What else?" when 3+ sections — catches things the agent missed
+			if (sections.length >= 3) {
+				sections.push({
+					heading: "What else?",
+					items: [{
+						kind: "radio" as const,
+						label: "Anything the agent missed?",
+						options: [{ label: "Nothing — looks good", command: "echo 'no additions'" }],
+						selected: null,
+						customCommand: null,
+					}],
+				});
+			}
 
 			type NavEntry = { si: number; ii: number };
 			const navList: NavEntry[] = [];
@@ -380,7 +394,7 @@ export default function checklist(pi: ExtensionAPI) {
 		renderCall(args, theme) {
 			const sections = (args.sections as Section[]) || [];
 			const total = sections.reduce((n, s) => n + s.items.length, 0);
-			let text = theme.fg("toolTitle", theme.bold("checklist "));
+			let text = theme.fg("toolTitle", theme.bold("quizme "));
 			text += theme.fg("muted", `${args.title} — `);
 			text += theme.fg("dim", `${total} item${total !== 1 ? "s" : ""} in ${sections.length} section${sections.length !== 1 ? "s" : ""}`);
 			return new Text(text, 0, 0);
