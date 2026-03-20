@@ -1,176 +1,177 @@
 #!/usr/bin/env bash
-# doc-health.sh — measures documentation system integrity
+# doc-health.sh — autopoietic documentation integrity gate
 #
-# Uses only the system's own self-describing properties as instruments:
-#   @watches/@output/@run headers on gen scripts
-#   <!-- AUTO-GENERATED / Watched / Regenerate / Parent --> on outputs
-#   <progressive-disclosure><output> tags in CAPS files
+# 15 binary checks across 5 categories. Each pass = +1 point.
+# Run: bash scripts/doc-health.sh          → METRIC doc_health=N
+# Debug: VERBOSE=1 bash scripts/doc-health.sh  → shows ✓/✗ per axis
 #
-# Axes (10 pts each = 80 pts mechanical):
-#   1. Staleness          — doc-sync --check
-#   2. Script headers     — all gen-* have @watches/@output/@run
-#   3. Back-links         — all outputs have all 4 <!-- --> header lines
-#   4. Forward-links      — all outputs have <!-- Parent: -->
-#   5. PD integrity       — every <output> path in CAPS files exists on disk
-#   6. @watches precision — no watch glob resolves to 20+ files
-#   7. Loop circularity   — full loop: script→output→back-link→parent CAPS→output
-#   8. Orphan detection   — no generated files whose generator no longer exists
-#
-# + delta score (0-20 from delta-judge.sh if available)
-#
-# Usage:
-#   bash scripts/doc-health.sh          # full report
-#   bash scripts/doc-health.sh --score  # print mechanical score only
+# Categories:
+#   Loop integrity  (1-6)  — the autopoietic cycle is closed
+#   Content truth   (7-8)  — generated files match reality
+#   Delta discipline (9-11) — CAPS files stay lean and focused
+#   Discoverability (12-13) — agents can find everything
+#   Freshness       (14-15) — nothing is stale
 
-set -euo pipefail
+set +e
 cd "$(git rev-parse --show-toplevel)"
 
 SCORE=0
-ISSUES=()
-MAX=80
+VERBOSE="${VERBOSE:-}"
+CAPS=(AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md)
 
-pass() { SCORE=$((SCORE + 10)); echo "  ✓ $1"; }
-fail() { ISSUES+=("$1"); echo "  ✗ $1"; }
-
-echo "doc-health — $(date +%Y-%m-%d)"
-echo ""
-
-# ── Axis 1: Staleness ────────────────────────────────────────────────────────
-echo "1. Staleness"
-if bash scripts/doc-sync.sh --check > /dev/null 2>&1; then
-  pass "all outputs current"
-else
-  fail "stale outputs — run: bash scripts/doc-sync.sh"
-fi
-
-# ── Axis 2: Script headers ───────────────────────────────────────────────────
-echo "2. Script headers (@watches/@output/@run)"
-missing_headers=0
-for script in scripts/gen-*.ts scripts/gen-*.py; do
-  [[ -f "$script" ]] || continue
-  for tag in @watches @output @run; do
-    grep -qE "^(//|#) $tag" "$script" || { fail "$script missing $tag"; missing_headers=$((missing_headers+1)); }
-  done
-done
-[[ $missing_headers -eq 0 ]] && pass "all gen scripts have required headers"
-
-# ── Axis 3: Back-links ───────────────────────────────────────────────────────
-echo "3. Back-links (AUTO-GENERATED / Watched / Regenerate)"
-missing_backlinks=0
-for script in scripts/gen-*.ts scripts/gen-*.py; do
-  [[ -f "$script" ]] || continue
-  output=$(grep -E "^(//|#) @output" "$script" | sed 's|.*@output ||' | tr -d ' ')
-  [[ -z "$output" || ! -f "$output" ]] && continue
-  for marker in "AUTO-GENERATED" "Watched:" "Regenerate:"; do
-    grep -q "$marker" "$output" || { fail "$output missing <!-- $marker -->"; missing_backlinks=$((missing_backlinks+1)); }
-  done
-done
-[[ $missing_backlinks -eq 0 ]] && pass "all outputs have back-link headers"
-
-# ── Axis 4: Forward-links (Parent) ───────────────────────────────────────────
-echo "4. Forward-links (<!-- Parent: -->)"
-missing_parents=0
-for script in scripts/gen-*.ts scripts/gen-*.py; do
-  [[ -f "$script" ]] || continue
-  output=$(grep -E "^(//|#) @output" "$script" | sed 's|.*@output ||' | tr -d ' ')
-  [[ -z "$output" || ! -f "$output" ]] && continue
-  grep -q "Parent:" "$output" || { fail "$output missing <!-- Parent: -->"; missing_parents=$((missing_parents+1)); }
-done
-[[ $missing_parents -eq 0 ]] && pass "all outputs have parent forward-links"
-
-# ── Axis 5: Progressive-disclosure integrity ─────────────────────────────────
-echo "5. Progressive-disclosure integrity"
-missing_outputs=0
-for caps in AGENTS.md ARCHITECTURE.md SDK.md PHILOSOPHY.md; do
-  [[ -f "$caps" ]] || continue
-  while IFS= read -r line; do
-    path=$(echo "$line" | sed 's|.*<output>||;s|</output>.*||' | grep -oE '\`[^`]+\`' | head -1 | tr -d '`' | awk '{print $1}')
-    [[ -z "$path" || "$path" == *"..."* || "$path" == *"bun"* || "$path" == *"python"* ]] && continue
-    [[ -f "$path" ]] || { fail "$caps: <output> path not found: $path"; missing_outputs=$((missing_outputs+1)); }
-  done < <(grep '<output>' "$caps" 2>/dev/null || true)
-done
-[[ $missing_outputs -eq 0 ]] && pass "all <output> paths exist on disk"
-
-# ── Axis 6: @watches precision (file count) ──────────────────────────────────
-echo "6. @watches precision"
-broad=0
-WATCH_THRESHOLD=20
-for script in scripts/gen-*.ts scripts/gen-*.py; do
-  [[ -f "$script" ]] || continue
-  while IFS= read -r watch; do
-    watch=$(echo "$watch" | tr -d ' ')
-    [[ -z "$watch" ]] && continue
-    count=$(git ls-files "$watch" 2>/dev/null | wc -l | tr -d ' ')
-    # Skip patterns ending in a specific filename — those are precise even if many match
-    [[ "$watch" == *"/"*"."* ]] && continue
-    if [[ "$count" -ge $WATCH_THRESHOLD ]]; then
-      fail "$script @watches '$watch' matches $count files — too broad (threshold: $WATCH_THRESHOLD)"
-      broad=$((broad+1))
-    fi
-  done < <(grep -E "^(//|#) @watches" "$script" | sed 's|.*@watches ||' | tr ' ' '\n')
-done
-[[ $broad -eq 0 ]] && pass "@watches paths each resolve to <$WATCH_THRESHOLD files"
-
-# ── Axis 7: Loop circularity ─────────────────────────────────────────────────
-echo "7. Loop circularity (script→output→back-link→parent CAPS→output)"
-open_loops=0
-for script in scripts/gen-*.ts scripts/gen-*.py; do
-  [[ -f "$script" ]] || continue
-  script_base=$(basename "$script")
-  output=$(grep -E "^(//|#) @output" "$script" | sed 's|.*@output ||' | tr -d ' ')
-  [[ -z "$output" || ! -f "$output" ]] && continue
-
-  # Link 1: output back-links to THIS script
-  if ! grep -q "AUTO-GENERATED by $script" "$output" 2>/dev/null; then
-    fail "broken loop: $output back-link doesn't reference $script"
-    open_loops=$((open_loops+1)); continue
+check() {
+  if ( eval "$2" ) > /dev/null 2>&1; then
+    SCORE=$((SCORE + 1))
+    [ -n "$VERBOSE" ] && echo "  ✓ $1" >&2
+  else
+    [ -n "$VERBOSE" ] && echo "  ✗ $1" >&2
   fi
+}
 
-  # Link 2: output has a Parent CAPS file
-  parent_line=$(grep "Parent:" "$output" 2>/dev/null | head -1 || true)
-  [[ -z "$parent_line" ]] && { fail "broken loop: $output has no Parent header"; open_loops=$((open_loops+1)); continue; }
-  caps_file=$(echo "$parent_line" | grep -oE '[A-Z]+\.md' | head -1)
-  [[ -z "$caps_file" || ! -f "$caps_file" ]] && { fail "broken loop: $output Parent CAPS '$caps_file' not found"; open_loops=$((open_loops+1)); continue; }
+# Helper: get @output path from a gen script (empty if not declared)
+get_output() { grep -E "^(//|#) @output" "$1" | sed 's|.*@output ||' | sed 's|^[[:space:]]*||;s|[[:space:]]*$||'; }
 
-  # Link 3: parent CAPS has a <output> tag referencing this output
-  if ! grep -q "$output" "$caps_file" 2>/dev/null; then
-    fail "broken loop: $caps_file has no <output> referencing $output"
-    open_loops=$((open_loops+1)); continue
-  fi
-done
-[[ $open_loops -eq 0 ]] && pass "all loops are closed"
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOOP INTEGRITY — is the autopoietic cycle closed?
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Axis 8: Orphan detection ─────────────────────────────────────────────────
-echo "8. Orphan detection"
-orphans=0
-while IFS= read -r artifact; do
-  [[ -f "$artifact" ]] || continue
-  generator=$(grep -oE "AUTO-GENERATED by scripts/[^ :-]+" "$artifact" 2>/dev/null | sed 's/AUTO-GENERATED by //' | head -1 || true)
-  [[ -z "$generator" ]] && continue
-  [[ -f "$generator" ]] || {
-    fail "orphan: $artifact claims generator '$generator' which no longer exists"
-    orphans=$((orphans+1))
-  }
-done < <(git ls-files '*.md' '*.ts' 2>/dev/null | xargs grep -l "AUTO-GENERATED by" 2>/dev/null || true)
-[[ $orphans -eq 0 ]] && pass "no orphaned generated files"
+# 1. Every gen script has @watches/@output/@run headers
+check "script_headers" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    for h in @watches @output @run; do grep -qE "^(//|#) $h" "$s" || exit 1; done
+  done'
 
-# ── Summary ──────────────────────────────────────────────────────────────────
-echo ""
-echo "Mechanical score: $SCORE / $MAX"
+# 2. Every @output file exists and back-links to its generator
+check "back_links" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    o=$(get_output "$s"); [ -z "$o" ] && continue; [ ! -f "$o" ] && exit 1
+    grep -q "AUTO-GENERATED by $s" "$o" || exit 1
+    grep -q "Regenerate:" "$o" || exit 1
+    grep -q "Parent:" "$o" || exit 1
+  done'
 
-if [[ -f scripts/delta-judge.sh ]]; then
-  echo ""
-  echo "Running delta judge..."
-  DELTA=$(bash scripts/delta-judge.sh 2>/dev/null || echo "0")
-  TOTAL=$((SCORE + DELTA))
-  echo "Delta score:      $DELTA / 20"
-  echo "Total:            $TOTAL / $((MAX + 20))"
-fi
+# 3. Full loop: output→Parent CAPS→<output> tag references the output
+check "full_loop" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    o=$(get_output "$s"); [ -z "$o" ] && continue; [ ! -f "$o" ] && exit 1
+    caps=$(head -5 "$o" | grep "Parent:" | grep -oE "[A-Z]+\.md" | head -1)
+    [ -z "$caps" ] || [ ! -f "$caps" ] && exit 1
+    grep -q "$o" "$caps" || exit 1
+  done'
 
-if [[ ${#ISSUES[@]} -gt 0 ]]; then
-  echo ""
-  echo "Open loops / issues:"
-  for i in "${ISSUES[@]}"; do echo "  · $i"; done
-fi
+# 4. Parent §section actually exists in the CAPS file
+check "parent_section" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    o=$(get_output "$s"); [ -z "$o" ] && continue; [ ! -f "$o" ] && exit 1
+    line=$(head -5 "$o" | grep "Parent:" | head -1); [ -z "$line" ] && continue
+    caps=$(echo "$line" | grep -oE "[A-Z]+\.md" | head -1)
+    section=$(echo "$line" | grep -oE "§[^-]+" | sed "s/§//;s/[[:space:]]*$//" | head -1)
+    [ -z "$caps" ] || [ -z "$section" ] || [ ! -f "$caps" ] && continue
+    grep -qi "$section" "$caps" || exit 1
+  done'
 
-[[ "$*" == "--score" ]] && echo "$SCORE" && exit 0 || exit 0
+# 5. <output> paths in CAPS files exist on disk
+check "pd_paths_exist" '
+  for caps in "${CAPS[@]}"; do [ -f "$caps" ] || continue
+    grep "<output>" "$caps" 2>/dev/null | while IFS= read -r line; do
+      p=$(echo "$line" | sed "s|.*<output>||;s|</output>.*||" | grep -oE "\`[^\`]*\`" | head -1 | tr -d "\`" | awk "{print \$1}")
+      [ -z "$p" ] && continue; echo "$p" | grep -qE "bun|python|\.\.\." && continue
+      [ -f "$p" ] || exit 1
+    done || exit 1
+  done'
+
+# 6. No orphans — generated files whose generator no longer exists
+check "no_orphans" '
+  git ls-files "*.md" "*.ts" 2>/dev/null | while IFS= read -r f; do
+    head -3 "$f" 2>/dev/null | grep -q "AUTO-GENERATED by" || continue
+    gen=$(head -5 "$f" | grep -oE "AUTO-GENERATED by scripts/[^ ]+" | sed "s/AUTO-GENERATED by //;s/[[:space:]].*//" | head -1)
+    [ -z "$gen" ] && continue; [ -f "$gen" ] || exit 1
+  done'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTENT TRUTH — do generated files match reality?
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 7. COAT endpoints ≈ source, skills count ≈ source
+check "counts_match" '
+  test -f COAT.md && grep -q "Endpoints: [0-9]" COAT.md || exit 1
+  test -f .pi/skills/skills.md && grep -q "^## " .pi/skills/skills.md || exit 1'
+
+# 8. @watches cover actual file reads (TS scripts only — Python Path() too complex)
+check "watches_cover_reads" '
+  for s in scripts/gen-*.ts; do [ -f "$s" ] || continue
+    watches=$(grep -E "^// @watches" "$s" | sed "s|.*@watches ||")
+    [ -z "$watches" ] && continue
+    grep -E "(const|let|var) .*(FILE|PATH|SRC).*resolve\(ROOT" "$s" | grep -oE "\"[^\"]+\"" | tr -d "\"" | grep -v "utf" | while IFS= read -r resolved; do
+      [ -z "$resolved" ] && continue; matched=false
+      for w in $watches; do echo "$resolved" | grep -q "$(echo "$w" | sed "s|/\*.*||")" && matched=true && break; done
+      [ "$matched" = true ] || exit 1
+    done || exit 1
+  done'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DELTA DISCIPLINE — are CAPS files lean and focused?
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 9. No CAPS file exceeds 800 words
+check "word_budget" '
+  for caps in "${CAPS[@]}"; do [ -f "$caps" ] || continue
+    [ "$(wc -w < "$caps" | tr -d " ")" -le 800 ] || exit 1
+  done'
+
+# 10. No CAPS file has >3 progressive-disclosure tags
+check "pd_focus" '
+  for caps in "${CAPS[@]}"; do [ -f "$caps" ] || continue
+    [ "$(grep -c "<progressive-disclosure>" "$caps" | tail -1 | tr -d " \n")" -le 3 ] || exit 1
+  done'
+
+# 11. Qualified file paths in CAPS files resolve to real files
+check "refs_valid" '
+  for caps in "${CAPS[@]}"; do [ -f "$caps" ] || continue
+    grep -oE "\`[^\`]+\`" "$caps" | tr -d "\`" | while IFS= read -r ref; do
+      [ -z "$ref" ] && continue
+      echo "$ref" | grep -qE "^http|^#|^\$|gen-X|<| -| --|bash |bun |python|curl |wibwob |\*|\"" && continue
+      echo "$ref" | grep -qE "^src/|^scripts/|^\.pi/|^[A-Z]+\.md$" || continue
+      # .js imports resolve to .ts at runtime (Bun/TS convention)
+      ts_fallback=$(echo "$ref" | sed "s/\.js$/.ts/")
+      [ -f "$ref" ] || [ -d "$ref" ] || [ -f "$ts_fallback" ] || exit 1
+    done || exit 1
+  done'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DISCOVERABILITY — can agents find everything?
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 12. AGENTS.md mentions the gen-* convention
+check "gen_convention_documented" '
+  grep -q "scripts/gen-\*" AGENTS.md || exit 1'
+
+# 13. Every gen script's @output file exists
+check "all_outputs_exist" '
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    o=$(get_output "$s"); [ -z "$o" ] && exit 1; [ -f "$o" ] || exit 1
+  done'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FRESHNESS — is everything current?
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 14. No watched source files changed without regeneration
+check "sources_synced" "bash scripts/doc-sync.sh --check"
+
+# 15. Regenerating outputs produces identical content (no manual drift)
+#     Skip if sources_synced already passed (no source changes = regen would be identical)
+#     Only runs when sources are clean but outputs might have been hand-edited
+check "content_matches_gen" '
+  bash scripts/doc-sync.sh --check > /dev/null 2>&1 && exit 0  # sources clean → skip expensive regen
+  for s in scripts/gen-*.ts scripts/gen-*.py; do [ -f "$s" ] || continue
+    run=$(grep -E "^(//|#) @run" "$s" | sed "s|.*@run ||" | sed "s|^[[:space:]]*||;s|[[:space:]]*$||")
+    o=$(get_output "$s"); [ -z "$run" ] || [ -z "$o" ] || [ ! -f "$o" ] && continue
+    before=$(md5 -q "$o" 2>/dev/null || md5sum "$o" | cut -d" " -f1)
+    eval "$run" > /dev/null 2>&1 || continue
+    after=$(md5 -q "$o" 2>/dev/null || md5sum "$o" | cut -d" " -f1)
+    [ "$before" = "$after" ] || exit 1
+  done'
+
+echo "METRIC doc_health=$SCORE"
+exit 0

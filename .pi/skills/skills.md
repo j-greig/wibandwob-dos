@@ -166,6 +166,17 @@ Last used: never · See: `.pi/skills/discord-tui-share/SKILL.md`
 
 ---
 
+## doc-agent
+**Your Specialist** — Autopoietic documentation agent. Runs in a fresh context window with delta-compressed system context. Reads AGENTS.md (system describes itself), makes one targe…
+
+Triggers on: "run the doc agent", "improve doc health", "self-maintain docs", "doc-agent", "autopoietic agent".
+
+Does not: Does not create new artefacts — maintains and syncs existing ones.
+
+Last used: today (2026-03-20) · See: `.pi/skills/doc-agent/SKILL.md`
+
+---
+
 ## figlet-videographer
 **Your Typography VJ** — Create typographic video sequences using figlet text animations in WibWob-DOS. Use when composing figlet-based title cards, animated text sequences, or typograp…
 
@@ -485,6 +496,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | composable-engines | Engine Extractor | Extract a rendering/animation engine from a window, make it a reusable FramePlay |
 | devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
+| doc-agent | Specialist | Autopoietic documentation agent |
 | figlet-videographer | Typography VJ | Create typographic video sequences using figlet text animations in WibWob-DOS |
 | git-branch-oneliners | Git Reporter | - Export recent git commits grouped by branch into a plain text report |
 | img-to-ascii | ASCII Converter | Convert images to plain-text ASCII art primers for the TUI |

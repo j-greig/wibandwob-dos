@@ -124,6 +124,7 @@ microapp.json discovered → setup(host) called
 ```
 
 <progressive-disclosure>
+  <output>`src/sdk/README.md` — full SDK export surface by stability tier</output>
   <output>`src/services/microapp-loader.ts` — discovery, host construction, tier visibility rules</output>
   <generator>read the source — manifest interfaces and host factory are ground truth</generator>
   <deeper>`PHILOSOPHY.md` — why the SDK boundary exists · `ARCHITECTURE.md` — full system context</deeper>
