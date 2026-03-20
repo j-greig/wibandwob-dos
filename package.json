@@ -63,6 +63,7 @@
     "youtube-transcript-plus": "^1.2.0"
   },
   "devDependencies": {
+    "@e9n/pi-subagent": "file:vendor/espennilsen-pi/extensions/pi-subagent",
     "@types/blessed": "^0.1.25",
     "@types/jsdom": "^28.0.0",
     "@types/node": "^24.0.0",
