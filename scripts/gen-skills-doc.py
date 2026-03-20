@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 ROOT        = Path(__file__).parent.parent
 SKILLS_DIR  = ROOT / ".pi" / "skills"
 USAGE_FILE  = ROOT / ".pi" / "metrics" / "usage-last-seen.json"
-OUTPUT      = ROOT / "docs" / "skills.md"
+OUTPUT      = ROOT / ".pi" / "skills" / "skills.md"
 
 # ── family groupings ─────────────────────────────────────────────────────────
 FAMILIES = {

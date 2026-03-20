@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T15:14:15.742Z",
+  "generatedAt": "2026-03-20T15:15:05.337Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -102,6 +102,13 @@
         "count": 1,
         "sources": [
           "command:/session-breakdown"
+        ]
+      },
+      "loop": {
+        "lastSeen": "2026-03-20T15:15:05.337Z",
+        "count": 1,
+        "sources": [
+          "tool:signal_loop_success"
         ]
       }
     },
