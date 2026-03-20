@@ -88,7 +88,6 @@ a function call.
 | Status/help line advertises keys that are not actually bound | Keep UI hints and key bindings in lockstep (e.g. if status says `q/esc close`, bind both) |
 | Assuming optional binaries always exist (e.g. `chafa`) | Catch process failures and render stable fallback text instead of noisy stack traces in UI |
 | Hand-built tab bar + key bindings | Use `createTabs` from the SDK |
-| Copy-pasting pattern generators | Import from `PATTERNS` or individual named exports |
 
 ## Persistence
 

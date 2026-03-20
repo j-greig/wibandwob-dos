@@ -61,11 +61,11 @@ export function getHostWindow(appType: string): HostWindowEntry | undefined {
   return registry.get(appType);
 }
 
-export function listHostWindows(): HostWindowEntry[] {
+function listHostWindows(): HostWindowEntry[] {
   return Array.from(registry.values());
 }
 
-export function hasHostWindow(appType: string): boolean {
+function hasHostWindow(appType: string): boolean {
   return registry.has(appType);
 }
 

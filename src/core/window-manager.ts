@@ -10,7 +10,7 @@ import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./ty
 /** Called when an editor window receives input text. Return true if handled. */
 export type EditorWriteHook = (id: number, text: string) => boolean;
 /** Called when an editor window saves. Returns the resolved file path after save. */
-export type EditorSaveHook = (id: number, filePath: string) => string;
+type EditorSaveHook = (id: number, filePath: string) => string;
 
 /** Manages live window records, z-order stack, focus, drag/resize, and layout. Implements WindowFacade. */
 export class WindowManager implements WindowFacade {

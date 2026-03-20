@@ -591,7 +591,7 @@ export function renderContourFromHills(
   return renderFromHills(w, h, opts.nLevels, opts.hills);
 }
 
-export function renderContour(
+function renderContour(
   w: number,
   h: number,
   opts: {

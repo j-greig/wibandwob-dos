@@ -13,7 +13,7 @@ export const APP_ROOT = path.resolve(SRC_ROOT, "..");
 export const REPO_ROOT = APP_ROOT;
 export const PI_DIR = path.join(APP_ROOT, ".pi");
 export const PI_APPEND_SYSTEM_PATH = path.join(PI_DIR, "APPEND_SYSTEM.md");
-export const PI_THEME_PATH = path.join(PI_DIR, "themes", "wibwob-tv.json");
+const PI_THEME_PATH = path.join(PI_DIR, "themes", "wibwob-tv.json");
 
 // ─────────────────────────────────────────────────────────────────────────
 // Runtime Data Root — mutable runtime-owned data location
@@ -180,7 +180,7 @@ export const LOGS_DIR = path.join(SCRATCH_BASE, "logs");
 export const CONTROL_API_PORT =
   Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
 export const APP_NOTES_PATH = path.join(SCRATCH_BASE, "mvp-notes.txt");
-export const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
+const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
 export const README_PATH = path.join(REPO_ROOT, "README.md");
 export const MASTER_PHILOSOPHY_PATH = path.join(REPO_ROOT, "AGENTS.md");
 

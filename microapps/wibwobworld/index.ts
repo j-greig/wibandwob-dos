@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
-  clamp,
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
@@ -13,7 +12,14 @@ import {
   type TerrainMap,
   type TerrainPoint,
   type TerrainRenderMode,
+} from "../../src/services/terrain-model.js";
+import { terrainNames } from "../../src/services/contour-engine.js";
+import {
+  clamp,
   createCanvas,
+  applyRect,
+  createNodePart,
+  resolveSidebarWidth,
 } from "../../src/services/microapp-sdk.js";
 import { debugWibWobWorld, debugWibWobWorldError } from "./debug.js";
 import type {
@@ -22,12 +28,6 @@ import type {
   Rect,
   FlexChild,
   LayoutPart,
-} from "../../src/services/microapp-sdk.js";
-import {
-  applyRect,
-  createNodePart,
-  terrainNames,
-  resolveSidebarWidth,
 } from "../../src/services/microapp-sdk.js";
 import { renderIso } from "./render-iso.js";
 

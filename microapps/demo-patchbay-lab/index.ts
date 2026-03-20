@@ -3,24 +3,27 @@ import fs from "node:fs";
 import { EMPTY_PRIMER_SELECTED } from "../../src/services/microapp-sdk.js";
 
 import {
-  clamp,
-  ContentService,
   createContourPlayer,
-  createLazyMountedPlayer,
+  readNodeViewport,
+  terrainNames,
+} from "../../src/services/contour-engine.js";
+import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
-  readNodeViewport,
   renderTerrainMap,
+  type TerrainMap,
+} from "../../src/services/terrain-model.js";
+import type { BrowserEntry, GalleryTab } from "../../src/core/types.js";
+import {
+  clamp,
+  ContentService,
+  createLazyMountedPlayer,
   resolveSidebarWidth,
-  terrainNames,
   type AnimatedPanelPlayer,
-  type BrowserEntry,
-  type GalleryTab,
   type MicroappHost,
   type MicroappSnapshotWindow,
   type Rect,
-  type TerrainMap,
   type LayoutPart,
 } from "../../src/services/microapp-sdk.js";
 

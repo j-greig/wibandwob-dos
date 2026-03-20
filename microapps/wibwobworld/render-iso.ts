@@ -2,13 +2,12 @@
  * ISO terrain renderer — SimCity 2000-inspired isometric view.
  * Renders terrain with objects (trees, houses, rocks, etc).
  */
-import {
-  BIOME_COLORS,
-  BIOME_GLYPHS,
-  type SavedTerrainArtifact,
-  type TerrainBiome,
-  type TerrainObject,
-} from "../../src/services/microapp-sdk.js";
+import { BIOME_COLORS, BIOME_GLYPHS } from "../../src/services/terrain-render.js";
+import type {
+  SavedTerrainArtifact,
+  TerrainBiome,
+  TerrainObject,
+} from "../../src/services/terrain-model.js";
 
 // Vertical exaggeration — controls height difference vs. map coverage tradeoff
 const ISO_EXAGGERATION = 6;

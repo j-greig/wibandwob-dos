@@ -5,7 +5,7 @@
  * No window or service should use raw blessed colour strings as the source of truth.
  */
 
-export type AppearanceMode = "system" | "light" | "dark";
+type AppearanceMode = "system" | "light" | "dark";
 
 /** A blessed-compatible style pair. */
 /** @primitive */

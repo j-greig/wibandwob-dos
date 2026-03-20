@@ -5,18 +5,27 @@ API surface for microapp authors. Import everything from
 
 ## Component families
 
-| Family | Components |
-|--------|-----------|
-| **Layout** | createStack, createRow, createGrid, createNodePart, pickBreakpoint, createScrollViewport, applyRect |
-| **Chrome** | createHeaderBar, createStatusBar, createButtonBar, createBorderedPanel, createSidebarPanel, createRule |
-| **Content** | createTextBlock, createFigletDisplay, createMessageHistory, createContentStack, createCollapsibleBlock |
-| **Navigation** | createTabs, createSelectableList, createInlineSearch |
-| **Forms** | createInputLine, createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl |
-| **Data Display** | createKeyValuePanel, createLogView |
-| **Feedback** | createProgressBar, createSpinner |
-| **Animation** | createAnimationClock, tween, tweenPingPong, tweenSequence, EASINGS |
-| **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
-| **Diagnostics** | createLayoutReporter (canonical responsive layout report), fetchRuntimeInspection, fetchRuntimeCommands, fetchRuntimeHealth |
+Tiers match JSDoc tags in `src/services/microapp-sdk.ts`. Prefer `@public` → `@beta` → `@internal` — reach for `@internal` only when no higher-tier primitive fits.
+
+| Tier | Family | Key exports |
+|------|--------|-------------|
+| `@public` | **Composition helpers** | `createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`, `createTextViewer`, `createListPanel`, `createSplitView`, `createScrollView`, `createCanvas` |
+| `@public` | **Animation** | `createLazyMountedPlayer` |
+| `@public` | **Runtime / diagnostics** | `createAnimationClock`, `createLayoutReporter`, `fetchRuntimeHealth`, `fetchRuntimeInspection`, `fetchRuntimeCommands`, `getRuntimeControlApiBaseUrl` |
+| `@public` | **Syntax highlighting** | `highlightCode`, `HIGHLIGHTED_LANGUAGES` |
+| `@beta` | **Grid canvas** | `blankGrid`, `paintText`, `paintCentered`, `paintLines`, `drawArrow`, `gridToText`, `waveLine`, `bar` |
+| `@beta` | **ASCII composition** | `composeAsciiLayers`, `renderAsciiTextBlock` |
+| `@beta` | **Text rendering** | `renderFiglet`, `responsiveFiglet`, `renderMarkdown`, `renderMarkdownFile`, and related helpers |
+| `@beta` | **Empty states** | `EMPTY_PRIMER_SELECTED`, `EMPTY_FILE_SELECTED`, `EMPTY_MATCHES`, `EMPTY_PLACEHOLDER`, `EMPTY_NO_MESSAGE` |
+| `@internal` | **Layout primitives** | `createStack`, `createRow`, `createGrid`, `createNodePart`, `pickBreakpoint`, `createScrollViewport`, `applyRect` |
+| `@internal` | **Chrome / content** | `createTextBlock`, `createFigletDisplay`, `createMessageHistory`, `createContentStack`, `createCollapsibleBlock`, `createBorderedPanel`, `createSidebarPanel` |
+| `@internal` | **Navigation** | `createSelectableList`, `createInlineSearch` |
+| `@internal` | **Forms** | `createButton`, `createCheckbox`, `createToggleSwitch`, `createRadioGroup`, `createSelect`, `createSegmentedControl`, `createFilterableList`, `createFormField`, `createTextArea` |
+| `@internal` | **Data display** | `createKeyValuePanel`, `createLogView`, `createDataTable` |
+| `@internal` | **Feedback** | `createProgressBar`, `createSpinner`, `createToast` |
+| `@internal` | **Motion** | `tween`, `tweenPingPong`, `tweenSequence`, `tweenWindowPosition`, `tweenWindowSize`, `EASINGS` |
+| `@internal` | **Primitives** | `createTimer`, `clearTimers`, `safeDestroy`, `safeDestroyAll`, `toEvenCellWidth`, `createScrollbar`, `scrollableStyle` |
+| `@internal` | **Widgets** | `createTreeWidget`, `createRenderMonitor` |
 
 Naming policy:
 - Prefer composition helper names (`createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`) for microapp authoring.
@@ -38,16 +47,11 @@ Use preferred names in new microapps and docs examples.
 
 All components follow the [component contract](component-contract.md).
 
-### Advanced/internal exports (use intentionally)
+### Stability note
 
-The SDK also re-exports specialised internals (e.g. Monster Cam, skeleton renderers,
-terrain/contour internals) to avoid direct `src/core/*` imports in built-ins.
+`@internal` exports are stable enough for built-in use but carry no compatibility guarantee across refactors. For domain-specific capabilities (e.g. terrain, contour, webcam) import directly from the relevant service in `src/services/` or `src/core/` — those are no longer part of the SDK surface.
 
-For most third-party microapps, treat these as out-of-path unless you have a concrete
-runtime need and are ready to own added complexity.
-
-For the basics (manifest, skeleton, lifecycle hooks, verification):
-see `docs/building-custom-microapps.md`.
+For basics (manifest, lifecycle hooks, verification): see `docs/building-custom-microapps.md`.
 
 For common mistakes: see `pitfalls.md`.
 
@@ -360,11 +364,9 @@ import { createLayoutReporter } from "../../src/services/microapp-sdk.js";
 const reporter = createLayoutReporter({
   toolbar,
   banner: bannerBox,
-  contour: contourBox,
-  clock: clockBox,
-  stats: statsBox,
-  info: infoBox,
-  cats: catBox,
+  content: contentBox,
+  sidebar: sidebarBox,
+  footer: footerBox,
 });
 
 win.describeState(() => {
@@ -821,46 +823,31 @@ const unsub = monitor.subscribe((r) => { /* periodic update */ }, 500);
 win.onCleanup(() => { unsub(); monitor.destroy(); });
 ```
 
-### Embedded animated surfaces
+### Animated surfaces — `createLazyMountedPlayer` (`@public`)
+
+For subsurfaces that drive a frame loop (animated art, live generators), use
+`createLazyMountedPlayer`. It wraps any `FramePlayer` factory behind the
+`attachTarget / setRunning / destroy` interface:
 
 ```typescript
-import { createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
+import { createLazyMountedPlayer } from "../../src/services/microapp-sdk.js";
 
-const player = createEmbeddedLivePlayer({
-  fps: 6,
-  generator: (tick, w, h) => renderFrame(tick, w, h),
-  getViewport: (target) => readNodeViewport(target, { minWidth: 8, minHeight: 4, fallbackWidth: 24, fallbackHeight: 6 }),
-  onFrame: (content) => { /* update */ },
+const player = createLazyMountedPlayer({
   render: () => host.screen.render(),
+  create(target) {
+    // Return a FramePlayer: { play(), pause(), stop(), destroy() }
+    return createMyFramePlayer(target);
+  },
 });
-player.attachTarget(box);
+
+player.attachTarget(animatedBox);
 player.setRunning(true);
 win.onCleanup(() => player.destroy());
 ```
 
-### Pattern generators
-
-11 built-in animated fill functions. Each takes `(width, height, tick)` → `string[]`.
-
-```typescript
-import { PATTERNS, patternBlockGradient, patternWave, ... } from "../../src/services/microapp-sdk.js";
-
-const fn = PATTERNS[tick % PATTERNS.length]!;
-box.setContent(fn(w, h, tick).join("\n"));
-```
-
-### Data simulation
-
-```typescript
-import { sinWave, randHistory, xLabels } from "../../src/services/microapp-sdk.js";
-```
-
-### ANSI gradient
-
-```typescript
-import { ansiGradientLine, hslToRgb } from "../../src/services/microapp-sdk.js";
-const line = ansiGradientLine(width, 0, 180);  // hue 0→180
-```
+`createEmbeddedLivePlayer` is `@internal` — host-wiring only. Domain-specific
+viewport helpers (e.g. `readNodeViewport`) are in `src/services/contour-engine.ts`,
+not on the SDK surface.
 
 ### Figlet
 

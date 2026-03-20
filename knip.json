@@ -9,9 +9,12 @@
     "src/sdk/composition-helpers.ts",
     "src/sdk/runtime-client.ts",
     "src/sdk/runtime-helpers.ts",
-    "src/sdk/microapp-host.ts"
+    "src/sdk/microapp-host.ts",
+    "src/ui/*.ts",
+    "src/core/safe-fs.ts"
   ],
   "project": ["src/**/*.ts"],
+  "ignoreExportsUsedInFile": true,
   "ignore": [
     ".pi/**",
     ".agents/**",
@@ -40,5 +43,9 @@
     "@e9n/pi-subagent",
     "madge",
     "typescript-eslint"
-  ]
+  ],
+  "ignoreBinaries": ["python3", "eslint", "scripts/gen-primitives.ts"],
+  "rules": {
+    "duplicates": "off"
+  }
 }

@@ -1,9 +1,13 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createContourPlayer,
-  createCanvas,
   readNodeViewport,
   terrainNames,
+  type ContourMode,
+  type ContourPlayer,
+} from "../../src/services/contour-engine.js";
+import {
+  createCanvas,
   createRow,
   createHeaderBar,
   createNodePart,
@@ -11,8 +15,6 @@ import {
   createRule,
   createStack,
   createStatusBar,
-  type ContourMode,
-  type ContourPlayer,
   type LayoutPart,
 } from "../../src/services/microapp-sdk.js";
 import type blessed from "blessed";

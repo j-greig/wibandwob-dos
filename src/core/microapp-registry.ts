@@ -116,7 +116,7 @@ export function isTierVisibleOn(tier: MicroappTier, surface: "menu" | "palette" 
  * Apply workspace-level overrides. Called during workspace restore.
  * Pass empty sets to clear overrides.
  */
-export function setDisabledOverrides(
+function setDisabledOverrides(
   disabledIds: string[] = [],
   disabledTiers: MicroappTier[] = [],
 ): void {
@@ -125,7 +125,7 @@ export function setDisabledOverrides(
 }
 
 /** Get current disabled overrides (for workspace save). */
-export function getDisabledOverrides(): { disabledIds: string[]; disabledTiers: MicroappTier[] } {
+function getDisabledOverrides(): { disabledIds: string[]; disabledTiers: MicroappTier[] } {
   return {
     disabledIds: [..._disabledIds],
     disabledTiers: [..._disabledTiers],
@@ -133,11 +133,11 @@ export function getDisabledOverrides(): { disabledIds: string[]; disabledTiers: 
 }
 
 /** Get all registry entries (for inspection/API). */
-export function getRegistryEntries(): Array<{ id: string; tier: MicroappTier }> {
+function getRegistryEntries(): Array<{ id: string; tier: MicroappTier }> {
   return Object.entries(REGISTRY).map(([id, tier]) => ({ id, tier }));
 }
 
 /** Get the full registry map (for check-coat and tooling). */
-export function getRegistry(): Readonly<Record<string, MicroappTier>> {
+function getRegistry(): Readonly<Record<string, MicroappTier>> {
   return REGISTRY;
 }
