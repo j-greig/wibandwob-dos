@@ -269,6 +269,274 @@ hand off via artifacts in `~/.gstack/projects/`.
 
 ---
 
+## `.pi/extensions/usage-pulse.ts` — Constructive Review
+
+_This is our existing starter for the analytics pattern. Read it against gstack's
+`skill-usage.jsonl` model to understand what it does well, what's missing, and
+what to fix._
+
+### What it does well
+
+- **Atomic writes** via tmp + rename — no partial JSON on crash. Correct.
+- **Write cooldown (5min per key)** — prevents hammering disk on busy sessions. Correct.
+- **Tool result + message_end hooks** — catches skill reads AND command invocations AND agent mentions. Broad signal coverage.
+- **Extension index auto-refresh** — scans `.pi/extensions/*.ts` for `registerCommand` and tool names. Self-discovering.
+- **Sources list (last 8)** — per-entry context showing how a skill was invoked. Useful for audit.
+- **`findRepoRoot` walk** — finds `.pi/` root correctly even from subdirectory CWDs.
+
+### The core structural problem
+
+usage-pulse writes to a **single overwritten JSON file** (`usage-last-seen.json`).
+gstack writes to an **append-only JSONL** (`skill-usage.jsonl`).
+
+This is not a minor difference. It is the difference between a **snapshot** and a
+**history**. Current state:
+
+```json
+{
+  "commit": { "lastSeen": "2026-03-19", "count": 2, "sources": ["read:SKILL.md"] }
+}
+```
+
+What we'd know from a JSONL:
+```jsonl
+{"skill":"commit","ts":"2026-03-15T10:00Z","source":"read:SKILL.md","repo":"wibandwob-dos"}
+{"skill":"commit","ts":"2026-03-19T14:00Z","source":"read:SKILL.md","repo":"wibandwob-dos"}
+```
+
+From the snapshot: "commit was seen 2 times, most recently 2026-03-19."
+From the JSONL: "commit was used on March 15 and March 19, both from reading SKILL.md.
+Between those dates: 4-day gap. No usage since March 19 (5 days). Trend: sporadic."
+
+The `pi-usage-audit` skill currently can only answer "is this stale?" (last-seen > 30 days).
+With JSONL it could answer: "trending up or down?", "weekly frequency?",
+"used every sprint or only once?", "what's the half-life of this skill?"
+
+### The 5 Whys: why the snapshot model limits us
+
+**Why 1 — Because "count" without timestamps is noise.**
+`commit: count=2` tells us nothing about cadence. Was that 2 times in one session
+or 2 times over 3 months? The number is meaningless without time distribution.
+JSONL preserves when, not just how many.
+
+**Why 2 — Because the audit skill makes the wrong cut.**
+`pi-usage-audit` flags skills unused for 30+ days. But a skill used twice in one day
+last month looks identical to a skill used once each month for 3 months. Both read
+"count=2, lastSeen=30d ago". One is healthy steady usage. One is a one-off. The
+snapshot can't distinguish them.
+
+**Why 3 — Because we can't track improvement.**
+If we consolidate `chiptune` + `chiptune-cover` + `chiptune-studio` into one skill,
+we can't verify from the snapshot whether the merged skill gets used more than its
+predecessors. JSONL lets us draw a before/after line at the merge date and compare.
+
+**Why 4 — Because the cooldown hides real usage patterns.**
+The 5-minute per-key cooldown was designed to reduce write pressure. But it also
+means rapid repeated use in a session is collapsed to a single entry. In a JSONL
+model with session-scoped dedup (one entry per session per skill), we get accurate
+"sessions touched" count without the false inflation of per-message counting.
+The cooldown is a blunt fix for a problem the JSONL model solves structurally.
+
+**Why 5 — Because audit rules need to be data-driven, not hard-coded.**
+The current "30 days = stale" threshold is a guess. With JSONL and enough history,
+we could compute the natural inter-use interval per skill and flag outliers statistically:
+"this skill's median gap is 7 days but it hasn't been used in 45 — that's a 6-sigma
+gap, likely dead." The snapshot never lets us get there.
+
+### Constructive improvement checklist
+
+#### Tier 1 — High ROI, low effort (do first)
+
+- [ ] **Add a JSONL append path alongside the snapshot**
+  - Keep `usage-last-seen.json` for backwards compat with `pi-usage-audit`
+  - Also append to `~/.pi/analytics/skill-usage.jsonl` (global, not per-repo)
+  - Entry schema: `{ skill, ts, source, repo, session }` — session = `$PPID` or random UUID per run
+  - The append should be fire-and-forget (catch all errors, never block)
+
+- [ ] **Track agents and skills separately in JSONL**
+  - Current snapshot merges surfaces (skills/extensions/agents) in one JSON
+  - JSONL entry should have a `surface` field: `"skill" | "extension" | "agent"`
+  - Enables: `jq 'select(.surface=="agent")' skill-usage.jsonl` for agent-only trends
+
+- [ ] **Add session dedup** — one JSONL entry per skill per session, not per message
+  - `Set<string>` of `${surface}:${name}` keyed per session lifetime
+  - Prevents one high-activity session from inflating counts vs many low-activity ones
+  - The 5-minute cooldown can then be removed (it's solving the same problem badly)
+
+- [ ] **Add `repo` field from `cachedRoot`** — enables cross-repo aggregation later
+  - `path.basename(repoRoot)` or `git remote get-url origin` (best-effort)
+  - Makes usage data portable if multiple repos share the same `~/.pi/`
+
+#### Tier 2 — Medium ROI, moderate effort
+
+- [ ] **Detect skill invocation via content scan, not just SKILL.md read**
+  - Currently a skill is "used" when its SKILL.md is read by the agent
+  - Better: also detect when a skill's documented trigger phrases appear in user messages
+  - Pattern: `SKILL_PATH_RE` detects file read; add `SKILL_TRIGGER_RE` detects
+    phrases like "git oneliners", "simplify this", "devlog" from skill descriptions
+
+- [ ] **Add `skill:check` equivalent — validate all SKILL.md files are well-formed**
+  - Script: `scripts/skill-check.sh` (bash port of gstack's `skill-check.ts`)
+  - For each `.pi/skills/*/SKILL.md`: check it has a description, has triggers, is < 500 lines
+  - Flag skills with no trigger phrase (they can't be auto-selected by the router)
+  - Wire into `health-full.sh`
+
+- [ ] **Emit usage metrics to `describeState()` or a diagnostic command**
+  - `wibwob cmd pi.usage.summary` → top 5 skills, last-used date, 30-day count
+  - COAT-aligned: usage data is a visible capability, not just a hidden file
+  - Currently the only way to see it is to read `.pi/metrics/usage-last-seen.json` manually
+
+- [ ] **Write cooldown: per-session, not per-key + time**
+  - The current `lastWriteByKey` Map grows unbounded in a long session
+  - Replace with a `sessionSeen: Set<string>` that's created fresh per session
+  - Simpler, bounded, semantically correct
+
+#### Tier 3 — Long-term
+
+- [ ] **`bun run pi:audit` script** — reads JSONL, computes per-skill stats
+  - Metrics: sessions_count, last_session, avg_gap_days, sessions_last_30d
+  - Flags: `stale` (gap > 2× median), `trending_down`, `never_used`
+  - Replace the current audit skill's grep-based approach with this
+
+- [ ] **LLM eval tier for skills** (gstack: `skill-llm-eval.test.ts`)
+  - Grade each skill's description on: trigger-phrase clarity, action specificity, boundary clarity
+  - Score 0–10, flag < 7 as "needs description revision"
+  - Run: `bun run pi:eval-skills` before any fleet consolidation decision
+
+- [ ] **Cross-skill dependency map**
+  - Some skills call other skills (e.g. `vj-timeline` depends on `chiptune-studio`)
+  - Map those dependencies so consolidation doesn't silently break call chains
+  - Source: grep each SKILL.md for references to other skill names
+
+---
+
+### `.pi/extensions/todos.ts` — Companion review
+
+_todos.ts is the session whiteboard system. Reviewing it here because it works
+alongside usage-pulse as part of the "how are we using things" picture, and
+because its design choices reveal what the current agent workflow actually
+looks like in practice._
+
+**Note on data maturity:** usage-pulse.ts is 1 day old. The current
+`usage-last-seen.json` shows only: 4 skills seen, 4 extensions seen, 2 agents
+seen — all from a single sprint. This is not a representative signal yet.
+**Wait ~1 week before drawing conclusions from usage-pulse data.** By then
+you'll have at least 3–5 sessions across different task types and can start
+seeing which skills are genuinely load-bearing vs which are one-offs.
+
+#### What todos.ts does well
+
+- **File-per-todo** — each todo is a standalone `.md` file with JSON frontmatter.
+  Diff-able, git-trackable, readable by any tool. Not a database.
+- **Lock files with TTL** — `<id>.lock` prevents concurrent session conflicts.
+  30-minute TTL + interactive steal prompt. Correct concurrency model for
+  multi-agent use.
+- **Session assignment** — `assigned_to_session` field lets agents claim tasks
+  before working, preventing two agents from colliding on the same todo.
+- **GC on startup** — closed todos older than `gcDays` (default 7) auto-delete.
+  No unbounded accumulation.
+- **Atomic writes** — `writeTodoFile` uses direct write (not tmp+rename), but
+  the lock file provides the same isolation guarantee for the todo content.
+- **Rich TUI** — fuzzy search, keyboard nav, action menu, scrollable detail view.
+  Human-first UX that also works for agents via the tool API. COAT-aligned.
+- **`claim`/`release` semantics** — explicit ownership handoff between sessions.
+  This is the right pattern for agent teams. gstack has nothing equivalent.
+
+#### Gaps and improvements
+
+**Gap 1 — Todos are a whiteboard, not a backlog tracker.**
+Current design: short-lived session notes (7-day GC, no planning phases, no
+priority field, no sprint/epic linkage). This is correct for its stated purpose
+("session whiteboard — two sessions max") but means there's no bridge between
+`.pi/todos/` and `.planning/` briefs. Agents create todos for in-session work
+but have no structured way to graduate them to `.planning/spikes/` or close out
+a story. The link is purely social.
+
+Improvement: add optional `planning_ref` frontmatter field — a path to a
+`.planning/` file this todo was created from. Not required. When present,
+`todo list` shows the backlink. Agents can follow it to get full context.
+
+**Gap 2 — No usage signal fed back to usage-pulse.**
+When an agent calls the `todo` tool, usage-pulse doesn't record it as
+"todos extension used" because `todos.ts` registers as a tool (`pi.registerTool`)
+not a command (`pi.registerCommand`), and usage-pulse's tool tracking maps
+tool names to extensions via `toolToExtension`. This should work — but
+`todos.ts` registers its tool as `"todo"` and usage-pulse greps for
+`name: "([a-zA-Z0-9_-]+)"` in the source. Check that the mapping is
+actually being built for `todos` → `todos.ts`.
+
+Quick verify:
+```bash
+grep -n 'registerTool\|registerCommand' .pi/extensions/todos.ts | head -5
+# should show: pi.registerTool({ name: "todo", ...
+# usage-pulse should map "todo" → "todos"
+```
+
+**Gap 3 — GC is fire-and-forget with no visibility.**
+`garbageCollectTodos` runs on `session_start`, deletes silently, returns void.
+No log, no count, no notification. If it deletes something it shouldn't
+(e.g. a closed-but-still-relevant todo), there's no trace.
+Improvement: log deleted count to stderr or to usage-pulse analytics:
+`{"event":"todo_gc","deleted":3,"ts":"..."}`.
+
+**Gap 4 — `claim` has no expiry.**
+A claimed todo stays assigned forever until explicitly released. If an agent
+session crashes mid-task, the todo stays claimed by the dead session indefinitely.
+The lock file has a 30-minute TTL; the `assigned_to_session` field does not.
+Improvement: add `claimed_at` timestamp to frontmatter. Surface a warning in
+`todo list` when a claimed todo's `claimed_at` is > 2 hours old and the
+claiming session is no longer alive (check via PID or session file existence).
+
+**Gap 5 — No bridge to `health-full.sh`.**
+The todo system is invisible to the health gate. A session could end with 6
+open claimed todos and no health check would surface it.
+Improvement: add to `health-full.sh` or `doc-drift-check.sh`:
+```bash
+OPEN=$(find .pi/todos -name '*.md' | xargs grep -l '"status": "open"' 2>/dev/null | wc -l | tr -d ' ')
+ASSIGNED=$(find .pi/todos -name '*.md' | xargs grep -l '"assigned_to_session"' 2>/dev/null | wc -l | tr -d ' ')
+echo "  todos: ${OPEN} open, ${ASSIGNED} assigned"
+```
+Not a gate — just visibility. Lets agents know outstanding work exists before
+starting a new session.
+
+#### The relationship to usage-pulse
+
+Todos and usage-pulse answer different questions:
+- **usage-pulse**: "which skills/agents/extensions are being used, how often?"
+- **todos**: "what work is in flight right now, who owns it?"
+
+Together they form a partial picture of agent workflow state. The missing
+third piece is **planning briefs** (`.planning/spikes/*/README.md`) — structured
+longer-horizon work that todos graduate into or reference.
+
+When all three are machine-readable and cross-linked, any agent opening a session
+can answer: "what's being built (planning), what's in flight (todos), and what
+tools are working (usage-pulse)." Right now each is siloed.
+
+A `wibwob-session-briefing.sh` script that summarises all three in one pass
+would be high-value — run it at session start instead of doing archaeology:
+```
+Session briefing:
+  Branch: spike/spk-codebase-health-and-automation
+  Open todos: 2 (1 assigned to this session)
+  Active spike: spk-codebase-health-and-automation (ready)
+  Usage pulse: data too fresh (1 day) — check again 2026-03-27
+  Instance: 4af (canonical, 159×54)
+```
+
+---
+
+### The upgrade in one sentence
+
+> Change `usage-last-seen.json` from a point-in-time snapshot to a session-grain
+> JSONL log, add `repo` + `surface` + `session` fields, and keep the snapshot
+> as a derived view for backward compat.
+
+That single change makes `pi-usage-audit` go from "which skills might be dead?"
+to "which skills are demonstrably dying, and at what rate?"
+
+---
+
 ## Direct adaptations — ordered by ROI for WibWob-DOS
 
 ### Tier 1: This sprint (spk-codebase-health-and-automation)
