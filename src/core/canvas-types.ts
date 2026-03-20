@@ -72,7 +72,7 @@ export interface CanvasColumnDef {
 }
 
 /** Parsed .canvas.yaml document. */
-export interface CanvasDocument {
+interface CanvasDocument {
   /** Document title (from meta.title). */
   title: string;
   /** Whether to show column headers (from meta.columnHeaders). */

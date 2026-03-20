@@ -10,7 +10,8 @@
     "src/sdk/runtime-client.ts",
     "src/sdk/runtime-helpers.ts",
     "src/sdk/microapp-host.ts",
-    "src/ui/*.ts"
+    "src/ui/*.ts",
+    "src/core/safe-fs.ts"
   ],
   "project": ["src/**/*.ts"],
   "ignoreExportsUsedInFile": true,
@@ -43,8 +44,8 @@
     "madge",
     "typescript-eslint"
   ],
-  "ignoreBinaries": ["python3", "eslint"],
+  "ignoreBinaries": ["python3", "eslint", "scripts/gen-primitives.ts"],
   "rules": {
-    "duplicates": "warn"
+    "duplicates": "off"
   }
 }

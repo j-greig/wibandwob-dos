@@ -23,14 +23,13 @@ import {
   createStack,
   createRow,
   createTimer,
-  randHistory,
   renderFiglet,
-  xLabels,
   createScrollbar,
   scrollableStyle,
   toEvenCellWidth,
   safeDestroyAll,
 } from "../../src/services/microapp-sdk.js";
+import { randHistory, xLabels } from "../../src/ui/patterns.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 

@@ -44,7 +44,7 @@ export interface SearchResult {
 
 // ── Top-level state ──────────────────────────────────────────────────────────
 
-export interface FileManagerState {
+interface FileManagerState {
   mode: FileManagerMode;
   columns: ColumnState[];
   activeColumn: number;

@@ -1,4 +1,5 @@
-import { renderFiglet, type MonsterCamFrame } from "../../src/services/microapp-sdk.js";
+import { renderFiglet } from "../../src/services/microapp-sdk.js";
+import type { MonsterCamFrame } from "../../src/services/monster-cam-service.js";
 
 export type MonsterCamPhase = "starting" | "ready" | "error";
 

@@ -16,30 +16,6 @@ import {
   createNodePart,
 } from "../core/ui-parts.js";
 import type { Rect, LayoutPart, FlexChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap, LinearLayoutOptions } from "../core/ui-parts.js";
-import type { BrowserEntry, GalleryTab } from "../core/types.js";
-import {
-  createContourPlayer,
-  readNodeViewport,
-  terrainNames,
-  renderContour,
-} from "./contour-engine.js";
-import {
-  createSavedTerrainArtifact,
-  createTerrainMap,
-  getTerrainFocusPoint,
-  type SavedTerrainArtifact,
-  type TerrainBiome,
-  type TerrainMap,
-  type TerrainObject,
-  type TerrainPoint,
-} from "./terrain-model.js";
-import {
-  BIOME_COLORS,
-  BIOME_GLYPHS,
-  findTerrainPeak,
-  renderTerrainMap,
-  type TerrainRenderMode,
-} from "./terrain-render.js";
 import {
   createEmbeddedLivePlayer,
   createLazyMountedPlayer,
@@ -99,14 +75,6 @@ export type {
   Alignment,
   Gap,
   LazyMountedPlayer,
-  SavedTerrainArtifact,
-  TerrainBiome,
-  TerrainMap,
-  TerrainObject,
-  TerrainPoint,
-  TerrainRenderMode,
-  BrowserEntry,
-  GalleryTab,
 };
 
 /** @public */
@@ -120,24 +88,9 @@ export type AnimatedPanelPlayer = LazyMountedPlayer & {
 export {
   applyRect,
   createNodePart,
-  createContourPlayer,
-  createEmbeddedLivePlayer,
   createLazyMountedPlayer,
-  readNodeViewport,
-  terrainNames,
-  renderContour,
-  createSavedTerrainArtifact,
-  createTerrainMap,
-  getTerrainFocusPoint,
-  BIOME_COLORS,
-  BIOME_GLYPHS,
-  findTerrainPeak,
-  renderTerrainMap,
-  ContentService,
 };
 
-// Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
-// See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
 // ── ui-parts — lower-level layout/chrome primitives ─────────────────────────
 // These are used by host wiring and advanced module internals.
 // For third-party microapp authoring, prefer composition helpers exported below
@@ -172,26 +125,6 @@ export {
   deferRender,
   // Tabbed container
   createLayoutTabs,
-  // Pattern generators
-  PATTERNS,
-  patternBlockGradient,
-  patternDiagonalHatch,
-  patternDiamondGrid,
-  patternBraille,
-  patternCrossStitch,
-  patternWave,
-  patternHashInterference,
-  patternCheckerboard,
-  patternPipeMaze,
-  patternBrailleDensity,
-  patternConcentricRings,
-  // Data simulation helpers
-  sinWave,
-  randHistory,
-  xLabels,
-  // Colour helpers
-  hslToRgb,
-  ansiGradientLine,
 } from "../core/ui-parts.js";
 /** @internal */
 export type {
@@ -302,6 +235,11 @@ export type { TreeNode, TreeWidgetHandle } from "../core/tree-widget.js";
 // ANIMATION — for microapps with live/animated content
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @internal — host-only animation wiring; prefer createLazyMountedPlayer (@public) */
+export { createEmbeddedLivePlayer } from "./animation-service.js";
+/** @internal — host-side content discovery and primer loading; microapps receive content via the host object */
+export { ContentService } from "./content-service.js";
+
 /** @beta */
 export type { AnimatedSurfaceTarget } from "./animation-service.js";
 
@@ -330,19 +268,6 @@ export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryF
 export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier, SetFigletFavouritesResult, ToggleFigletFavouriteResult } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/** @beta */
-export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
-/** @beta */
-export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
-/** @beta */
-export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef, CEPanelDef, PanelType } from "../core/canvas-types.js";
-/** @beta */
-export type { ZineSourceType } from "../core/canvas-types.js";
-
-// ═══════════════════════════════════════════════════════════════════════════
 // ADVANCED / BUILT-IN MODULE INTERNALS
 // Below here are exports used by specific built-in modules (Monster Cam,
 // GlitchBox, Terrain Lab, etc). Third-party modules typically do not need
@@ -358,34 +283,6 @@ export {
   EMPTY_PLACEHOLDER,
   EMPTY_NO_MESSAGE,
 } from "../core/empty-states.js";
-
-// Monster Cam / webcam
-/** @beta */
-export { MonsterCamService } from "./monster-cam-service.js";
-/** @beta */
-export type { MonsterCamFrame } from "./monster-cam-service.js";
-/** @beta */
-export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
-/** @beta */
-export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
-
-// Skeleton / pose rendering (GlitchBox)
-/** @beta */
-export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
-/** @beta */
-export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
-
-// Plasma engine
-/** @beta */
-// plasma-engine — moved to microapps/plasma/plasma-engine.ts (single consumer)
-/** @beta */
-// plasma types — moved to microapps/plasma/plasma-engine.ts
-
-// Contour / terrain engine
-/** @beta */
-export { renderContourFromHills } from "./contour-engine.js";
-/** @beta */
-export type { ContourMode, ContourPlayer } from "./contour-engine.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYNTAX HIGHLIGHTING — for code-editing microapps

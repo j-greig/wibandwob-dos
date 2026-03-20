@@ -18,13 +18,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
-  type AnimatedPanelPlayer,
   createContourPlayer,
-  createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
-  renderFiglet,
   type ContourMode,
+} from "../../src/services/contour-engine.js";
+import {
+  type AnimatedPanelPlayer,
+  createLazyMountedPlayer,
+  renderFiglet,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";
 

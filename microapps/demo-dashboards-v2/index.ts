@@ -19,22 +19,20 @@
 
 import blessed from "blessed";
 import contrib from "blessed-contrib";
-import type {
-  MicroappHost,
-  PatternGenerator,
-} from "../../src/services/microapp-sdk.js";
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,
   renderFiglet,
-  PATTERNS,
+  applyRect,
+  toEvenCellWidth,
+} from "../../src/services/microapp-sdk.js";
+import {
   sinWave,
   randHistory,
   xLabels,
   ansiGradientLine,
-  applyRect,
-  toEvenCellWidth,
-} from "../../src/services/microapp-sdk.js";
+} from "../../src/ui/patterns.js";
 
 // ── types ─────────────────────────────────────────────────────
 

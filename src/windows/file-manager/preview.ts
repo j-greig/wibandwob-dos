@@ -232,7 +232,7 @@ function renderCodePreview(entry: FileEntry, ext: string): PreviewResult {
 
 // ── Search result preview ────────────────────────────────────────────────────
 
-export function renderSearchResultPreview(
+function renderSearchResultPreview(
   result: { file: string; line: number; text: string },
 ): PreviewResult {
   const filePath = result.file;

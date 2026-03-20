@@ -51,7 +51,7 @@ export type { ZineItem, ZineLayoutResult } from "./canvas-types.js";
 export type ColumnHeader = { col: number; text: string; x: number; y: number; width: number };
 
 /** Result from layoutColumns — extends LayoutResult with header positions. */
-export type ColumnLayoutResult = LayoutResult & { headers: ColumnHeader[] };
+type ColumnLayoutResult = LayoutResult & { headers: ColumnHeader[] };
 
 /** Options for column layout. All optional — sensible defaults applied. */
 export interface ColumnLayoutOptions {

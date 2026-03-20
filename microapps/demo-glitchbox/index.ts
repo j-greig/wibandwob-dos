@@ -1,20 +1,17 @@
 import blessed from "blessed";
 import { Agent } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { renderSkeletonAt, landmarksFromPreset, type NormalisedLandmarks, type WebcamCell } from "../../src/core/skeleton-renderer.js";
+import { gridToBlessedContent } from "../../src/services/webcam-renderer.js";
 import {
   blankGrid,
   gridToText,
-  gridToBlessedContent,
   createTimer,
   clearTimers,
-  renderSkeletonAt,
-  landmarksFromPreset,
   tween,
   createButtonBar,
   createCanvas,
   type MicroappHost,
-  type NormalisedLandmarks,
-  type WebcamCell,
 } from "../../src/services/microapp-sdk.js";
 
 const FIELD_MOODS: Record<string, string[]> = {

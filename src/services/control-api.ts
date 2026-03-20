@@ -767,7 +767,7 @@ export class ControlApiService {
             })),
           }, { status: 400 });
         }
-        args = result.data;
+        args = result.data as Record<string, unknown>;
       }
       try {
         const result = this.runApiCommand(id, args);

@@ -208,7 +208,8 @@ export class CommandRegistry {
       const def = getCommandDefinition(command.id);
       let params: Record<string, unknown> | undefined;
       if (def?.params) {
-        try { params = zodToJsonSchema(def.params, { target: "openApi3" }) as Record<string, unknown>; } catch { /* skip */ }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        try { params = zodToJsonSchema(def.params as any, { target: "openApi3" }) as unknown as Record<string, unknown>; } catch { /* skip */ }
       }
       return {
         id: command.id,

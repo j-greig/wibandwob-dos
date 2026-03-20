@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T15:41:48.588Z",
+  "generatedAt": "2026-03-20T15:50:52.187Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -17,8 +17,8 @@
         ]
       },
       "commit": {
-        "lastSeen": "2026-03-20T13:25:23.994Z",
-        "count": 3,
+        "lastSeen": "2026-03-20T15:50:52.187Z",
+        "count": 4,
         "sources": [
           "read:SKILL.md"
         ]
@@ -61,8 +61,8 @@
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-20T15:41:48.588Z",
-        "count": 52,
+        "lastSeen": "2026-03-20T15:49:11.663Z",
+        "count": 50,
         "sources": [
           "tool:edit",
           "tool:multi_edit"
@@ -77,8 +77,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T15:41:18.937Z",
-        "count": 35,
+        "lastSeen": "2026-03-20T15:39:11.838Z",
+        "count": 31,
         "sources": [
           "tool:execute_code"
         ]
@@ -102,13 +102,6 @@
         "count": 1,
         "sources": [
           "command:/session-breakdown"
-        ]
-      },
-      "loop": {
-        "lastSeen": "2026-03-20T15:15:05.337Z",
-        "count": 1,
-        "sources": [
-          "tool:signal_loop_success"
         ]
       }
     },

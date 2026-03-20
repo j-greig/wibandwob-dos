@@ -371,7 +371,7 @@ export function createSavedTerrainArtifact(args: {
   };
 }
 
-export function isSavedTerrainArtifact(value: unknown): value is SavedTerrainArtifact {
+function isSavedTerrainArtifact(value: unknown): value is SavedTerrainArtifact {
   if (!value || typeof value !== "object") return false;
   const artifact = value as Partial<SavedTerrainArtifact>;
   return (

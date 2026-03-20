@@ -65,7 +65,6 @@ export interface AppMenuActions {
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
-  openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openCompanionWindow: () => void;
   openScrambleSmol: () => void;
   openScrambleFloating: () => void;
@@ -982,13 +981,6 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     palettePlacement: { order: 115 },
     api: true,
     agent: true
-  },
-  {
-    id: "microapp.wibwob.sy2chronicles.open",
-    label: "§y² Chronicles",
-    description: "Bridge command for the §y² Chronicles microapp dynamic opener.",
-    group: "surface",
-    actionKey: "openSy2Chronicles",
   },
   {
     id: "companion.open",

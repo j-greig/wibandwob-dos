@@ -360,27 +360,28 @@ function openMyApp(host: MicroappHost) {
 
 ### Embedded live animation
 
-For animated subsurfaces inside a larger module, use `createEmbeddedLivePlayer`
-instead of a handwritten timer loop:
+For animated subsurfaces inside a larger module, use `createLazyMountedPlayer`
+(`@public`) instead of a handwritten timer loop:
 
 ```typescript
-import { createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
+import { createLazyMountedPlayer } from "../../src/services/microapp-sdk.js";
 
-const player = createEmbeddedLivePlayer({
-  fps: 6,
-  generator: (tick, width, height) => renderMyFrame(tick, width, height),
-  getViewport: (target) => readNodeViewport(target, {
-    minWidth: 8, minHeight: 4,
-    fallbackWidth: 24, fallbackHeight: 6,
-  }),
-  onFrame: (content) => { /* update dependent state */ },
+const player = createLazyMountedPlayer({
   render: () => host.screen.render(),
+  create(target) {
+    // Return a FramePlayer: { play(), pause(), stop(), destroy() }
+    return createMyFramePlayer(target);
+  },
 });
 
 player.attachTarget(myAnimatedBox);
 player.setRunning(true);
 win.onCleanup(() => player.destroy());
 ```
+
+> `createEmbeddedLivePlayer` is `@internal` (host-wiring only). `readNodeViewport`
+> is a domain-specific helper in `src/services/contour-engine.ts`, not exported
+> from the SDK surface.
 
 ## SDK imports
 
