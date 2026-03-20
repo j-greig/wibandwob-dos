@@ -193,7 +193,7 @@ function renderFirstPerson(
     Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * 1.6,
     Math.max(map.width, map.height) * (alt > 0.1 ? 1.4 : 0.9),
   );
-  const STEPS = 200;
+  const STEPS = 150;
   // Sun: fixed in world space at SUN_WORLD_YAW — moves across screen as you turn
   const SUN_WORLD_YAW = 1.0; // radians from world east
   const sunFrac = (SUN_WORLD_YAW - yaw) / FOV + 0.5;
