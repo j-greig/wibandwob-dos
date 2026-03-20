@@ -1,6 +1,8 @@
 # GOTCHAS.md — Non-Obvious Failure Modes
 
 > Things LLMs get wrong here that they wouldn't get wrong in a standard repo.
+> Don't include things that an LLM would alreay know from its training data,
+  eg common coding/dev knowledge.
 > Stub — add when something burns you, not preemptively.
 
 ---
@@ -37,6 +39,13 @@ Changing it silently breaks all commands, workspace saves, and API paths for tha
 release mouse tracking escape codes. Use `SIGTERM` (`kill $PID`). If terminal mangles: `reset`.
 
 **Never commit to `main`.** Branch first. The pre-commit hook enforces this.
+
+---
+
+## CAPS files
+
+**If a CAPS file needs >3 `<progressive-disclosure>` tags, split it.** More than 3 means
+the file covers multiple concerns — create a new CAPS file at root for the second concern.
 
 ---
 

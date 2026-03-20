@@ -173,5 +173,14 @@ check "gen_discoverable" '
   done
 '
 
+# 14. PD focus — no CAPS file has >3 progressive-disclosure tags (split into new CAPS file if so)
+check "pd_focus" '
+  for caps in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md; do
+    [ -f "$caps" ] || continue
+    count=$(grep -c "<progressive-disclosure>" "$caps" 2>/dev/null | tail -1 | tr -d " \n" || echo 0)
+    [ "$count" -le 3 ] || exit 1
+  done
+'
+
 echo "METRIC doc_health=$SCORE"
 exit 0
