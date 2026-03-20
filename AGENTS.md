@@ -9,15 +9,15 @@ WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + loca
 ## How these docs work
 
 Five CAPS MD files at repo root are the entire doc surface:
-`AGENTS.md` · `PHILOSOPHY.md` · `ARCHITECTURE.md` · `LEXICON.md` · `COAT.md`
+`AGENTS.md` · `PHILOSOPHY.md` · `ARCHITECTURE.md` · `LEXICON.md`
 
-Human maintains the first four. `COAT.md` is auto-generated.
+
 
 `<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
 deeper generated detail. Run the script to get it:
 
 ```
-scripts/gen-coat.ts          → COAT.md (all endpoints + commands)
+scripts/gen-coat.ts          → (snapshot of endpoints + commands)
 scripts/gen-skills.py        → .pi/skills/skills.md (skill index + usage)
 scripts/gen-sdk-surface.ts   → (TBD) SDK export directory with tiers
 scripts/gen-primitives.ts    → src/core/primitives.ts barrel

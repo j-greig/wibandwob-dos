@@ -28,7 +28,9 @@ Four seams connect every adapter to the core:
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
 <progressive-disclosure>
-All registered endpoints and commands: run `bun scripts/gen-coat.ts` or read `COAT.md`
+Live endpoints:  curl localhost:8099/ · curl localhost:8099/help
+Live commands:   wibwob -i <label> commands · curl localhost:8099/commands/list
+Static snapshot: bun scripts/gen-coat.ts
 </progressive-disclosure>
 
 ---
