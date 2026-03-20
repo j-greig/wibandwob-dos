@@ -21,36 +21,12 @@ scripts/gen-primitives.ts    → src/core/primitives.ts barrel
 
 ---
 
-## Instance targeting (do this first, every session)
+## CLI
 
-If only one instance is running, `-i` is optional. In multi-agent or multi-human
-environments (VPS, two agents on one repo), always target explicitly:
+`wibwob --help` for full usage. `-i <label>` targets a specific instance — optional
+for single instance, required when multiple agents or humans share a machine.
 
-```bash
-bun run src/cli/wibwob.ts instances   # find running instances + labels
-```
-
-Then pin to every call:
-
-```bash
-wibwob -i <label> health                   # verify alive
-wibwob -i <label> minimap                  # visual ASCII desktop map
-wibwob -i <label> windows                  # JSON window list with IDs
-wibwob -i <label> state                    # full live desktop state
-wibwob -i <label> commands -q              # all command IDs
-```
-
-Window operations:
-
-```bash
-wibwob -i <label> cmd <command.id>
-wibwob -i <label> window <id> resize --width 120 --height 40
-wibwob -i <label> window <id> move --left 10 --top 5
-wibwob -i <label> read <id>                # semantic text from window
-echo "text" | wibwob -i <label> write <id>
-```
-
-For TUI-related work eg on the frontend, **visual verification is mandatory.** API responses are not sufficient proof.
+**Visual verification is mandatory.** API responses alone are not sufficient proof.
 
 ---
 
