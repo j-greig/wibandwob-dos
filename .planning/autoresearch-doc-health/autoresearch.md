@@ -1,22 +1,13 @@
 # Autoresearch: Doc Health — Autopoietic Documentation Integrity
 
-> Archived final state from `autoresearch/doc-health-2026-03-20` branch.
-> 15 experiments, 15/15 structural, plateau reached. Next: tier 2+3 via subagent (see `doc-review-spec.md`).
-
 ## Objective
 
-Maximise the doc-health score (0–8) by improving the autopoietic documentation system:
-gen scripts with `@watches`/`@output`/`@run` headers, generated outputs with `AUTO-GENERATED`
-back-link headers, CAPS files with `<progressive-disclosure>` forward-links, and `doc-sync.sh`
-closing the loop.
-
-The system should be self-describing, self-registering, and self-validating. Each improvement
-must close a loop, tighten a link, or remove drift — not add noise.
+Maximise the doc-health score by improving the autopoietic documentation system.
+The system is self-describing, self-registering, and self-validating.
 
 ## Metrics
 
-- **Primary**: `doc_health` (integer 0–14, higher is better) — binary pass/fail on 14 axes
-- **Secondary**: none yet
+- **Primary**: `doc_health` (integer 0–15, higher is better) — binary pass/fail on 15 axes across 5 categories
 
 ## How to Run
 
@@ -26,52 +17,45 @@ must close a loop, tighten a link, or remove drift — not add noise.
 
 | File | Purpose |
 |------|---------|
-| `scripts/doc-health.sh` | The benchmark — 8-axis integrity checker |
+| `scripts/doc-health.sh` | 15-axis integrity checker (the benchmark) |
 | `scripts/doc-sync.sh` | Diff-aware regeneration via @watches headers |
-| `scripts/gen-integration-surface.ts` | Generates COAT.md from control-api + command-catalog |
-| `scripts/gen-skills.py` | Generates .pi/skills/skills.md from skill directories |
-| `scripts/gen-sdk-surface.ts` | Generates src/sdk/README.md from microapp-sdk.ts |
-| `scripts/gen-primitives.ts` | Generates src/core/primitives.ts barrel |
-| `AGENTS.md` | CAPS file — conventions, gen script contract |
-| `PHILOSOPHY.md` | CAPS file — autopoietic homoiconicity principle |
-| `ARCHITECTURE.md` | CAPS file — COAT, subsystems |
-| `SDK.md` | CAPS file — microapp SDK reference |
-| `GOTCHAS.md` | CAPS file — non-obvious failure modes |
-| `COAT.md` | Generated output — integration surface snapshot |
-| `.pi/skills/skills.md` | Generated output — skill index |
-| `src/sdk/README.md` | Generated output — SDK export surface |
-| `src/core/primitives.ts` | Generated output — core exports barrel |
+| `scripts/gen-integration-surface.ts` | Generates COAT.md |
+| `scripts/gen-skills.py` | Generates .pi/skills/skills.md |
+| `scripts/gen-sdk-surface.ts` | Generates src/sdk/README.md |
+| `scripts/gen-primitives.ts` | Generates src/core/primitives.ts |
+| `AGENTS.md` `PHILOSOPHY.md` `ARCHITECTURE.md` `SDK.md` `GOTCHAS.md` | CAPS files |
+| `COAT.md` `.pi/skills/skills.md` `src/sdk/README.md` `src/core/primitives.ts` | Generated outputs |
 
 ## Off Limits
 
-- `src/services/control-api.ts` — source of truth, read-only
-- `src/services/microapp-sdk.ts` — source of truth, read-only
-- `src/core/command-catalog.ts` — source of truth, read-only
-- `microapps/` — microapp code, out of scope
-- `.pi/skills/*/SKILL.md` — individual skills, out of scope
+Source files read by gen scripts (control-api.ts, microapp-sdk.ts, command-catalog.ts), microapps/, individual skill SKILL.md files.
 
 ## Constraints
 
-- Generated files MUST NOT be edited directly — fix via generator script, then regenerate
-- CAPS files are hand-written delta-compressed prose — no standard knowledge restated
-- All gen scripts must have @watches/@output/@run comment headers
-- Checks must pass (`autoresearch.checks.sh`)
-- Do not add fake headers or dummy content to pass checks — that's cheating
+- Generated files NEVER edited directly — fix via generator, regenerate
+- CAPS files: delta-compressed, no standard knowledge
+- Gen scripts: must have @watches/@output/@run headers
+- No fake headers or dummy content to pass checks
 
 ## What's Been Tried
 
-- **Baseline (8/8):** Original 8 axes all green — staleness, headers, back-links, forward-links, PD integrity, watches precision, circularity, orphans
-- **Axes 9+10 (8→9→10):** Added parent section validation + @watches import match. SDK.md had stale §Microapp lifecycle ref → fixed to §Lifecycle. TS import matching works; Python Path() syntax skipped (vacuous pass)
-- **Axes 11+12 (10→12):** CAPS word-count cap (800w) + cross-ref validation. Both passed immediately
-- **Key insight:** Adding axes that all pass is diminishing returns. Real value is regression catching — the score should occasionally DROP when source changes break a loop
+- **Baseline (8/8):** Original 8 axes — staleness, headers, back-links, forward-links, PD integrity, watches precision, circularity, orphans
+- **9+10 (→10):** Parent section validation + @watches import match. Found SDK.md stale §ref.
+- **11+12 (→12):** CAPS word-count cap + cross-ref validation
+- **13+14 (→14):** Gen discoverability + PD focus (max 3 tags/file). GOTCHAS split rule.
+- **Bug fix:** Missing-output-skip — axes silently skipped missing files instead of failing. Deleting COAT.md now drops 14→9.
+- **15 (→15):** Content freshness — md5 before/after regen catches drift
+- **Rewrite:** 5 categories, helper fn, clearer names, fixed counts_match/refs_valid bugs
+- **Stress tested:** 4 sabotage scenarios all caught
+- **Delta judge:** Subagent scored CAPS files 8-9/10, identified redundancies, acted on them
 
-- **Axes 13+14 (12→14):** Gen discoverability (AGENTS.md mentions `gen-*` pattern + all @outputs exist) + PD focus (max 3 tags per CAPS file). GOTCHAS.md split rule added.
-- **Missing-output-skip bug fix:** Axes 3/4/6/7/9 silently skipped when @output file was missing instead of failing. Now deleting a generated file drops score 14→9 (5 axes catch it).
-- **Stress tested:** Deliberately broke 4 things — deleted output, removed header, added headerless gen script, bloated CAPS file. All caught correctly.
-- **Key insight at 14/14:** Adding new axes that pass is diminishing returns. Tightening existing axes to catch subtler failures is more valuable.
+## Plateau
+
+15/15 structural. Adding axes that pass is score inflation. Real value is regression catching as codebase evolves. Next tier (semantic/functional) requires subagent inference — see `.planning/autoresearch-doc-health/doc-review-spec.md`.
 
 ## Dead Ends
 
-- @watches derivation from Python Path() calls — too complex to parse reliably via grep, vacuous pass
-- Scoring exit codes in bash — fragile with set -e; switched to subshell eval + set +e
-- Adding axes that all pass immediately — score inflation, not system improvement
+- Python Path() @watches derivation — too complex for grep
+- `set -e` in measurement scripts — causes silent crashes
+- `grep -c` multiline output — always pipe through `tail -1 | tr -d "\n"` or use `|| echo 0`
+- Exact endpoint count matching — gen script regex is a subset of source patterns
