@@ -32,11 +32,14 @@ for script in scripts/gen-*.ts scripts/gen-*.py; do
   if [[ "$MODE" == "--all" ]]; then
     needs_run=true
   else
-    for watch in $watches; do
-      if echo "$CHANGED" | grep -q "^${watch%/}"; then
+    while IFS= read -r watch; do
+      [[ -z "$watch" ]] && continue
+      # Convert glob pattern to regex: * → [^/]*, ** → .*
+      watch_re=$(echo "${watch%/}" | sed 's|\.|\\.|g; s|\*\*|.*|g; s|\*|[^/]*|g')
+      if echo "$CHANGED" | grep -qE "^${watch_re}"; then
         needs_run=true; break
       fi
-    done
+    done <<< "$(echo "$watches" | tr ' ' '\n')"
   fi
 
   if [[ "$needs_run" == true ]]; then
