@@ -27,6 +27,7 @@
     "health": "bun run test && bun run typecheck && bun run check-coat && bash -c 'cycles=$(npx madge --circular --extensions ts src/ 2>&1 | grep -c \"^[0-9])\" || true); [ \"$cycles\" = \"0\" ] && echo \"✅ No circular deps\" || (echo \"❌ $cycles circular deps\"; exit 1)' && echo '✅ All health checks passed'",
     "handover": "bash scripts/handover.sh",
     "check-coat": "bun run scripts/checks/check-coat.ts",
+    "cli:install": "bun build --compile src/cli/wibwob.ts --outfile /tmp/wibwob-next && sudo mv /tmp/wibwob-next /usr/local/bin/wibwob && echo '✅ wibwob installed'",
     "check-themes": "bun run scripts/checks/check-themes.ts",
     "watch:microapp": "bun run scripts/watch-microapp.ts",
     "planning:status": "bash .claude/scripts/planning.sh status",

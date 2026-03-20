@@ -118,5 +118,5 @@ Stability tiers: `@public` (stable), `@beta` (contract may change), `@internal`
 | Understand the architecture and file map | `ARCHITECTURE.md` _(root)_ |
 | Know the invariants and anti-patterns | `.agents/guides/shell/invariants.md` |
 | Build a microapp | `.agents/guides/microapp/quick-start.md` |
-| Understand the full runtime principles (COAT) | `AGENTS.md` §Principles |
+| Understand COAT (Command Once, Adapt Thin) | `ARCHITECTURE.md` §The core idea |
 | See original with design system + status | `docs/PHILOSOPHY.md` |
