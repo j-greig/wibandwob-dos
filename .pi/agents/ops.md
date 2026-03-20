@@ -1,6 +1,6 @@
 ---
 name: ops
-description: WibWob-DOS ops lens — process lifecycle, health, debugging, screenshots. Keeps the app running, verifies state, catches orphans. Use for: start/stop/restart, health checks, screenshot verification, instance management, signal handling, socket cleanup.
+description: "WibWob-DOS ops lens — process lifecycle, health, debugging, screenshots. Keeps the app running, verifies state, catches orphans. Use for: start/stop/restart, health checks, screenshot verification, instance management, signal handling, socket cleanup."
 tools: read, write, edit, bash, grep, find, ls
 model: anthropic/claude-opus-4-6
 ---
