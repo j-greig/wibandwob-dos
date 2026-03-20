@@ -1,2 +1,3 @@
 {"type":"config","name":"Doc health — autopoietic documentation integrity","metricName":"doc_health","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"bda8fe9","metric":8,"metrics":{},"status":"keep","description":"baseline: 8/8 all axes green — staleness, headers, back-links, forward-links, PD integrity, watches precision, circularity, orphans, functional counts","timestamp":1774039687646,"segment":0}
+{"run":2,"commit":"1c260d9","metric":8,"metrics":{},"status":"keep","description":"add axes 9 (parent section validation) + 10 (watches import match) — score now 8/10, exposes SDK.md parent ref gap + watches regex needs tuning","timestamp":1774039806872,"segment":0}
