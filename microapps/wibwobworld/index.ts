@@ -51,6 +51,9 @@ const FP_PITCH_STEP = 0.06;        // radians per pitch key (~3.4°)
 const FP_ALT_STEP   = 0.05;        // altitude units per keypress
 const FP_DEFAULT_ALT   =  0.25;    // default flight altitude above terrain
 const FP_DEFAULT_PITCH = -0.10;    // slight nose-down so terrain visible ahead
+const FP_SPEED_MAX = 5;
+// Auto-fly interval ms at each throttle level (0 = stopped)
+const FP_FLIGHT_INTERVALS = [0, 600, 350, 200, 120, 80] as const;
 
 /** 8-direction compass arrow from yaw (radians, east=0, south=π/2). */
 function yawArrow(yaw: number): string {
@@ -188,10 +191,43 @@ export default function setup(host: MicroappHost) {
       typeof args?.cameraY === "number" ? Math.round(args.cameraY) : undefined;
     let fpAlt   = typeof args?.cameraAlt   === "number" ? args.cameraAlt   : FP_DEFAULT_ALT;
     let fpPitch = typeof args?.cameraPitch === "number" ? args.cameraPitch : FP_DEFAULT_PITCH;
+    let fpSpeed = 0; // throttle 0–5; 0 = stopped, 1–5 = auto-fly
+    let fpFlightTimer: ReturnType<typeof setInterval> | undefined;
 
     function resetFpCamera() {
       fpYaw = undefined; fpCamX = undefined; fpCamY = undefined;
       fpAlt = FP_DEFAULT_ALT; fpPitch = FP_DEFAULT_PITCH;
+      fpSpeed = 0; stopFlightTimer();
+    }
+    function stopFlightTimer() {
+      if (fpFlightTimer !== undefined) { clearInterval(fpFlightTimer); fpFlightTimer = undefined; }
+    }
+    function restartFlightTimer() {
+      stopFlightTimer();
+      if (fpSpeed > 0 && renderMode === "flight") {
+        fpFlightTimer = setInterval(() => {
+          if (renderMode !== "flight") { stopFlightTimer(); return; }
+          moveFpCamera(0);
+        }, FP_FLIGHT_INTERVALS[fpSpeed]!);
+      }
+    }
+    function buildFlightHUD(camX: number, camY: number): string {
+      const yaw = fpYaw ?? 0;
+      const hdgDeg = Math.round(((90 - yaw * 180 / Math.PI) % 360 + 360) % 360);
+      const hdgDir = ["N","NE","E","SE","S","SW","W","NW"][Math.round(hdgDeg / 45) % 8]!;
+      const arrow  = yawArrow(yaw);
+      const spdBar = "█".repeat(fpSpeed) + "░".repeat(FP_SPEED_MAX - fpSpeed);
+      const pitchDeg = Math.round(fpPitch * 180 / Math.PI);
+      const pitchStr = (pitchDeg >= 0 ? "+" : "") + pitchDeg + "°";
+      return [
+        `{yellow-fg}─ FLIGHT ──────{/yellow-fg}`,
+        `{white-fg}HDG{/white-fg} {cyan-fg}${arrow} ${hdgDir.padEnd(2)} ${String(hdgDeg).padStart(3,"0")}°{/cyan-fg}`,
+        `{white-fg}ALT{/white-fg} {green-fg}▲ ${fpAlt.toFixed(2)}{/green-fg}`,
+        `{white-fg}SPD{/white-fg} {yellow-fg}${spdBar} ${fpSpeed}{/yellow-fg}`,
+        `{white-fg}PCH{/white-fg} {cyan-fg}${pitchStr.padStart(5)}{/cyan-fg}`,
+        `{white-fg}POS{/white-fg} {light-black-fg}${String(camX).padStart(3)},${String(camY).padStart(3)}{/light-black-fg}`,
+        `{yellow-fg}───────────────{/yellow-fg}`,
+      ].join("\n");
     }
 
     function initFpYaw() {
@@ -249,10 +285,14 @@ export default function setup(host: MicroappHost) {
     const isoBox = createCanvas(bodyNode, { tags: true }).element;
     isoBox.style = host.theme().body;
     const isoPart = createNodePart(isoBox, { restyle: () => { isoBox.style = host.theme().body; } });
+    // Flight HUD overlay — positioned top-right of fpBox in FLIGHT mode only
+    const hudBox = createCanvas(bodyNode, { tags: true }).element;
+    hudBox.style = host.theme().body;
     const modeBarPart = host.ui.createButtonBar(
       win.body,
       MODE_BUTTONS.map(b => ({ id: b.mode, label: b.label })),
       (mode) => {
+        if (renderMode === "flight" && mode !== "flight") stopFlightTimer();
         renderMode = mode;
         if (mode === "firstperson" || mode === "flight") {
           initFpYaw();
@@ -274,6 +314,12 @@ export default function setup(host: MicroappHost) {
           applyRect(isoBox, { top: 0, left: rect.width, width: 0, height: 0 });
           fpPart.layout({ top: 0, left: 0, width: rect.width, height: rect.height });
           applyRect(infoBlock.node, { top: 0, left: rect.width, width: 0, height: 0 });
+          // HUD: top-right overlay in flight mode, hidden in 3D mode
+          if (renderMode === "flight") {
+            applyRect(hudBox, { top: 1, left: Math.max(0, rect.width - 17), width: 16, height: 7 });
+          } else {
+            applyRect(hudBox, { top: 0, left: rect.width, width: 0, height: 0 });
+          }
           return;
         }
 
@@ -282,10 +328,12 @@ export default function setup(host: MicroappHost) {
           applyRect(fpBox, { top: 0, left: rect.width, width: 0, height: 0 });
           isoPart.layout({ top: 0, left: 0, width: rect.width, height: rect.height });
           applyRect(infoBlock.node, { top: 0, left: rect.width, width: 0, height: 0 });
+          applyRect(hudBox, { top: 0, left: rect.width, width: 0, height: 0 });
           return;
         }
 
         applyRect(fpBox, { top: 0, left: rect.width, width: 0, height: 0 });
+        applyRect(hudBox, { top: 0, left: rect.width, width: 0, height: 0 });
 
         if (renderMode === "hybrid") {
           const leftW = Math.max(1, Math.floor(rect.width / 2));
@@ -325,10 +373,12 @@ export default function setup(host: MicroappHost) {
       },
       destroy() {
         if (fpRenderTimer) clearTimeout(fpRenderTimer);
+        stopFlightTimer();
         mapPart.destroy();
         fpPart.destroy();
         isoPart.destroy();
         infoBlock.destroy();
+        hudBox.destroy();
         bodyNode.destroy();
       },
     };
@@ -489,6 +539,12 @@ export default function setup(host: MicroappHost) {
           fpBox.setContent(mapRows.join("\n"));
           mapBox.setContent("");
           isoBox.setContent("");
+          // HUD overlay: only in FLIGHT mode
+          if (renderMode === "flight") {
+            hudBox.setContent(buildFlightHUD(camX, camY));
+          } else {
+            hudBox.setContent("");
+          }
           lastText = mapRows.map((row) => row.replace(/\{\/?[^}]+\}/g, "")).join("\n");
         } else if (renderMode === "hybrid") {
           const mapPaneW = Math.max(0, Math.floor(Number(mapBox.width) || 0));
@@ -597,7 +653,7 @@ export default function setup(host: MicroappHost) {
 
         modeBarPart.update({
           leftText: renderMode === "flight"
-            ? `←→:turn  ↑↓/ws:fly  ,.pitch  []:alt  m:mode  r:reseed  ${yawArrow(fpYaw ?? 0)}`
+            ? `←→:turn  ↑↓/ws:fly  +-:spd(${fpSpeed})  ,.pcH  []:alt  spc:stop  ${yawArrow(fpYaw ?? 0)}`
             : renderMode === "firstperson"
             ? `←→:turn  ↑↓/ws:move  ad:strafe  m:mode  r:reseed  ${yawArrow(fpYaw ?? 0)}`
             : `↑↓←→ move  ${tileInfo}${lastCaptureName ? `  saved:${lastCaptureName}` : ""}`,
@@ -669,6 +725,7 @@ export default function setup(host: MicroappHost) {
 
     const cycleMode = () => {
       const next = RENDER_MODES[(RENDER_MODES.indexOf(renderMode) + 1) % RENDER_MODES.length] ?? "hybrid";
+      if (renderMode === "flight" && next !== "flight") stopFlightTimer();
       renderMode = next;
       if (next === "firstperson" || next === "flight") { initFpYaw(); render(); renderFp(); }
       else render();
@@ -796,11 +853,26 @@ export default function setup(host: MicroappHost) {
       node.key(["t", "tab"], cycleTerrain);
       node.key(["r"], reseed);
       // [/] handled below with flight alt override
-      node.key(["+", "="], () => setContourLevels(levels + 1));
-      node.key(["-"], () => setContourLevels(levels - 1));
+      // +/- throttle in flight, contour levels otherwise
+      node.key(["+", "="], () => {
+        if (renderMode === "flight") { fpSpeed = Math.min(FP_SPEED_MAX, fpSpeed + 1); restartFlightTimer(); render(); }
+        else setContourLevels(levels + 1);
+      });
+      node.key(["-"], () => {
+        if (renderMode === "flight") { fpSpeed = Math.max(0, fpSpeed - 1); restartFlightTimer(); render(); }
+        else setContourLevels(levels - 1);
+      });
+      // Space = full stop in flight
+      node.key(["space"], () => {
+        if (renderMode === "flight") { fpSpeed = 0; stopFlightTimer(); render(); }
+      });
       node.key(["v"], toggleVegetation);
       node.key(["i"], toggleSidebar);
-      node.key(["s"], () => { if (renderMode !== "firstperson") saveCapture(); else moveFpCamera(Math.PI); });
+      // s = fly backward in fp/flight, save capture otherwise
+      node.key(["s"], () => {
+        if (renderMode === "firstperson" || renderMode === "flight") moveFpCamera(Math.PI);
+        else saveCapture();
+      });
       node.key(["e"], saveTerrainExport);
       node.key(["c"], joinNearestChatspot);
       node.key(["q", "escape"], () => win.close());
@@ -871,6 +943,7 @@ export default function setup(host: MicroappHost) {
         clearTimeout(resizeRenderTimer);
         resizeRenderTimer = undefined;
       }
+      stopFlightTimer();
       debugWibWobWorld("onCleanup");
       root.destroy();
       control = undefined;
