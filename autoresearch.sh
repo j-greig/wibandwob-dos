@@ -1,5 +1,4 @@
 #!/bin/bash
-# autoresearch.sh — generate docs/skills.md then score it
+# autoresearch.sh — benchmark WibWobWorld 3D (firstperson) render performance
 set -euo pipefail
-python3 scripts/gen-skills-doc.py
-python3 autoresearch-score.py
+bun run autoresearch-bench.ts

@@ -6,13 +6,15 @@ import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
-  renderTerrainMap,
-  findTerrainPeak,
   type SavedTerrainArtifact,
   type TerrainMap,
   type TerrainPoint,
-  type TerrainRenderMode,
 } from "../../src/services/terrain-model.js";
+import {
+  renderTerrainMap,
+  findTerrainPeak,
+  type TerrainRenderMode,
+} from "../../src/services/terrain-render.js";
 import { terrainNames } from "../../src/services/contour-engine.js";
 import {
   clamp,

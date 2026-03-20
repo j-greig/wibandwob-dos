@@ -568,7 +568,7 @@ function renderFirstPerson(
 
 // ---------------------------------------------------------------------------
 
-function renderTerrainMap(map: TerrainMap, opts: TerrainRenderOptions): string[] {
+export function renderTerrainMap(map: TerrainMap, opts: TerrainRenderOptions): string[] {
   if (opts.mode === "firstperson") {
     const vpW = opts.camera?.width ?? map.width;
     const vpH = opts.camera?.height ?? map.height;

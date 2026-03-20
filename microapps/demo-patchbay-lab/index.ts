@@ -11,9 +11,9 @@ import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
-  renderTerrainMap,
   type TerrainMap,
 } from "../../src/services/terrain-model.js";
+import { renderTerrainMap } from "../../src/services/terrain-render.js";
 import type { BrowserEntry, GalleryTab } from "../../src/core/types.js";
 import {
   clamp,
