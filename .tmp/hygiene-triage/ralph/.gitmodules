@@ -1,3 +1,0 @@
-[submodule "claude-plugins-official"]
-	path = claude-plugins-official
-	url = https://github.com/anthropics/claude-plugins-official.git
