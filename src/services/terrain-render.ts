@@ -260,7 +260,9 @@ function renderFirstPerson(
   }
 
   // ── Raycast ──
+  let activeCols = SW; // track filled columns for early exit
   for (let step = STEPS; step >= 1; step--) {
+    if (activeCols <= 0) break; // all columns filled — no more work to do
     const dist = (FAR * step) / STEPS;
     const d = dist / FAR; // 0=near, 1=far
     for (let col = 0; col < SW; col++) {
@@ -270,7 +272,7 @@ function renderFirstPerson(
       if (wx < 0 || wx >= map.width || wy < 0 || wy >= map.height) continue;
       const iy = Math.floor(wy);
       const ix = Math.floor(wx);
-      const cell = map.cells[iy]?.[ix];
+      const cell = map.cells[iy]![ix]; // bounds already checked above
       if (!cell) continue;
 
       // Perspective projection with distance attenuation
@@ -324,6 +326,7 @@ function renderFirstPerson(
             canvas[r]![col] = tag("light-black", fillFrac < 0.5 ? ":" : ".");
           }
         }
+        if (proj <= 0) activeCols--; // column fully filled from top
         yBuf[col] = proj;
 
         // ── Object rendering ──
