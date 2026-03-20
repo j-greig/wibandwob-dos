@@ -30,7 +30,7 @@ Four seams connect every adapter to the core:
 <progressive-disclosure>
 Live endpoints:  curl localhost:8099/ · curl localhost:8099/help
 Live commands:   wibwob -i <label> commands · curl localhost:8099/commands/list
-Static snapshot: bun scripts/gen-coat.ts
+Static snapshot: bun scripts/gen-COAT.ts
 </progressive-disclosure>
 
 ---
