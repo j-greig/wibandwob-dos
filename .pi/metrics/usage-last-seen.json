@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T22:42:24.389Z",
+  "generatedAt": "2026-03-20T22:54:44.306Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -71,6 +71,13 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "agentic-dev-reflection": {
+        "lastSeen": "2026-03-20T22:53:24.961Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
@@ -127,8 +134,8 @@
         ]
       },
       "quizme": {
-        "lastSeen": "2026-03-20T22:42:24.389Z",
-        "count": 5,
+        "lastSeen": "2026-03-20T22:54:44.306Z",
+        "count": 6,
         "sources": [
           "tool:quizme"
         ]
