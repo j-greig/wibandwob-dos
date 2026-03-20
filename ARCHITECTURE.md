@@ -130,6 +130,11 @@ from outside `src/core/`.
 **8. Command catalog is the single source of truth.** Add to `command-catalog.ts`
 first; `command-registry.ts` is execution only.
 
+<progressive-disclosure>
+  <output>`src/core/primitives.ts` — generated barrel of all shared core exports</output>
+  <generator>`bun scripts/gen-primitives.ts` — regenerate if any `src/core/*/index.ts` changed</generator>
+</progressive-disclosure>
+
 **9–14.** Microapps import only from `microapp-sdk.ts` · `describeState()` is not
 optional · host owns complexity · component contract: return `{node, destroy()}` ·
 geometry flows one direction · no inline blessed style literals.

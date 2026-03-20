@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T20:29:06.709Z",
+  "generatedAt": "2026-03-20T20:40:34.876Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -64,12 +64,19 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "doc-agent": {
+        "lastSeen": "2026-03-20T20:33:33.615Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-20T19:46:39.512Z",
-        "count": 60,
+        "lastSeen": "2026-03-20T20:40:34.876Z",
+        "count": 61,
         "sources": [
           "tool:edit",
           "tool:multi_edit"
@@ -84,8 +91,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T20:29:06.709Z",
-        "count": 47,
+        "lastSeen": "2026-03-20T20:38:12.849Z",
+        "count": 48,
         "sources": [
           "tool:execute_code"
         ]

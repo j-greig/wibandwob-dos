@@ -16,7 +16,7 @@ CAPS MD files at repo root are the entire doc surface — hand-written stable pr
 | `PHILOSOPHY.md` | Why this exists, design filters, SDK boundary |
 | `ARCHITECTURE.md` | COAT, subsystems, invariants |
 | `SDK.md` | Microapp SDK: contract, hooks, host API, lifecycle |
-| `LEXICON.md` | Vocabulary glossary — humans only, agents skip |
+| `GOTCHAS.md` | Non-obvious failure modes — add when something burns you |
 
 ### Progressive disclosure
 
@@ -25,7 +25,7 @@ Generated or deep detail lives near its source, linked from the CAPS file via `<
 ```xml
 <progressive-disclosure>
   <output>`COAT.md` — committed snapshot, read this</output>
-  <generator>`bun scripts/gen-COAT.ts` — run if control-api.ts or command-catalog.ts changed</generator>
+  <generator>`bun scripts/gen-integration-surface.ts` — run if control-api.ts or command-catalog.ts changed</generator>
 </progressive-disclosure>
 ```
 
@@ -45,7 +45,7 @@ Every `scripts/gen-*` file declares its own metadata via comment headers:
 ```typescript
 // @watches src/services/control-api.ts src/core/command-catalog.ts
 // @output  COAT.md
-// @run     bun scripts/gen-COAT.ts
+// @run     bun scripts/gen-integration-surface.ts
 ```
 
 `bash scripts/doc-sync.sh` greps these headers across all gen scripts, diffs them against changed files, and runs only what's stale. **Self-registering — add a new gen script with these headers and it participates automatically. No other files to update.**
@@ -53,7 +53,7 @@ Every `scripts/gen-*` file declares its own metadata via comment headers:
 #### When this matters
 
 - You deleted a skill → `doc-sync.sh` detects `.pi/skills/` changed → reruns `gen-skills.py` → `skills.md` stays honest
-- You added an API endpoint → `doc-sync.sh` detects `control-api.ts` changed → reruns `gen-COAT.ts` → `COAT.md` reflects it
+- You added an API endpoint → `doc-sync.sh` detects `control-api.ts` changed → reruns `gen-integration-surface.ts` → `COAT.md` reflects it
 - You added a new gen script → add `@watches`/`@output`/`@run` headers → done. Nothing else.
 - You open a generated file and consider editing it → the `<!-- AUTO-GENERATED -->` header stops you → you run the generator instead
 
@@ -75,6 +75,11 @@ for single instance, required when multiple agents or humans share a machine.
 ## Microapps
 
 Use the `microapp-creator` skill. It covers scaffold, register, hooks, and dev loop.
+
+<progressive-disclosure>
+  <output>`.pi/skills/skills.md` — full skill index with triggers, boundaries, last-used</output>
+  <generator>`python3 scripts/gen-skills.py` — regenerate if skills added, removed, or renamed</generator>
+</progressive-disclosure>
 
 The **microapp triad** workflow for any microapp work:
 
