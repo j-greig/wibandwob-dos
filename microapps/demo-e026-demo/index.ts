@@ -25,8 +25,10 @@ import type blessed from "blessed";
 import {
   createRenderMonitor,
   createBorderedPanel,
+  createCanvas,
   type BorderedPanelHandle,
   type MicroappHost,
+  safeDestroyAll,
 } from "../../src/services/microapp-sdk.js";
 import { createTreeWidget, type TreeNode, createTimer, clearTimers, tweenWindowPosition, tweenWindowSize, createNodePart } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
@@ -82,6 +84,7 @@ export default function setup(host: MicroappHost) {
 function openDemo(host: MicroappHost) {
   const win = host.createWindow({ title: "E026 Demo", width: 110, height: 36 });
   const timers = new Set<ReturnType<typeof setInterval>>();
+  let isClosing = false;
   let ticks = 0;
   let lastNode = "—";
   const monitor = createRenderMonitor(host.screen);
@@ -91,20 +94,32 @@ function openDemo(host: MicroappHost) {
   const wm = host.windows;
   const sw = () => Number(host.screen.width);
   const sh = () => Number(host.screen.height);
+  const requestClose = () => {
+    if (isClosing) return;
+    win.close();
+  };
 
   function tweenToRandom() {
+    if (isClosing) return;
     const x = Math.floor(Math.random() * Math.max(1, sw() - 80));
     const y = Math.floor(Math.random() * Math.max(1, sh() - 20));
     tweenWindowPosition(wm, win.id, x, y, 600, "elasticOut");
   }
   function resetCentre() {
+    if (isClosing) return;
     const x = Math.max(0, Math.floor((sw() - 110) / 2));
     const y = Math.max(0, Math.floor((sh() - 36) / 2));
     tweenWindowPosition(wm, win.id, x, y, 400, "easeOutCubic");
   }
   function sizeBounce() {
+    if (isClosing) return;
     tweenWindowSize(wm, win.id, 130, 40, 300, "easeOutCubic");
-    setTimeout(() => tweenWindowSize(wm, win.id, 110, 36, 350, "bounceOut"), 350);
+    const bounceTimeout = setTimeout(() => {
+      timers.delete(bounceTimeout as ReturnType<typeof setInterval>);
+      if (isClosing) return;
+      tweenWindowSize(wm, win.id, 110, 36, 350, "bounceOut");
+    }, 350);
+    timers.add(bounceTimeout as ReturnType<typeof setInterval>);
   }
 
   // ── Panels ────────────────────────────────────────────────────────────────
@@ -149,7 +164,7 @@ function openDemo(host: MicroappHost) {
       else if (id === "tween")  tweenToRandom();
       else if (id === "reset")  resetCentre();
       else if (id === "bounce") sizeBounce();
-      else if (id === "close")  win.close();
+      else if (id === "close")  requestClose();
     },
   );
 
@@ -160,6 +175,7 @@ function openDemo(host: MicroappHost) {
   ]);
 
   function render() {
+    if (isClosing) return;
     const w = Math.max(20, Number(win.body.width)  || 80);
     const h = Math.max(8,  Number(win.body.height) || 30);
     root.layout({ top: 0, left: 0, width: w, height: h });
@@ -174,6 +190,7 @@ function openDemo(host: MicroappHost) {
   const panelBtnIds: BtnId[] = ["p1", "p2", "p3", "p4"];
 
   function setFocus(idx: number) {
+    if (isClosing) return;
     activeIdx = idx;
     panels.forEach((p, i) => p.setActive(i === idx));
     bar.update({ leftText: " E026 demo — Tab to cycle panels", activeId: panelBtnIds[idx] });
@@ -197,7 +214,7 @@ function openDemo(host: MicroappHost) {
   tree.widget.key(["t"], tweenToRandom);
   tree.widget.key(["r"], resetCentre);
   tree.widget.key(["z"], sizeBounce);
-  tree.widget.key(["q"], () => win.close());
+  tree.widget.key(["q"], requestClose);
 
   // ── TOP-RIGHT panel: createTimer ticker (F06) ─────────────────────────────
 
@@ -206,6 +223,7 @@ function openDemo(host: MicroappHost) {
   const counterBoxPart = createNodePart(counterBox);
 
   createTimer(() => {
+    if (isClosing) return;
     ticks++;
     const fill = ticks % 20;
     const progressBar = "\x1b[96m" + "█".repeat(fill) + "\x1b[90m" + "░".repeat(20 - fill) + "\x1b[0m";
@@ -263,6 +281,7 @@ function openDemo(host: MicroappHost) {
   updateFps();
 
   const unsubMonitor = monitor.subscribe((r) => {
+    if (isClosing) return;
     updateFps(r.fps, r.avgFrameMs);
     host.screen.render();
   }, 500);
@@ -278,7 +297,7 @@ function openDemo(host: MicroappHost) {
   win.body.key(["t"],              tweenToRandom);
   win.body.key(["r"],              resetCentre);
   win.body.key(["z"],              sizeBounce);
-  win.body.key(["q", "escape"],    () => win.close());
+  win.body.key(["q", "escape"],    requestClose);
 
   // ── Hooks ─────────────────────────────────────────────────────────────────
 
@@ -298,11 +317,10 @@ function openDemo(host: MicroappHost) {
   });
 
   win.onCleanup(() => {
+    isClosing = true;
     clearTimers(timers);
     unsubMonitor();
-    monitor.destroy();
-    tree.destroy();
-    root.destroy();
+    safeDestroyAll(monitor, tree, root);
   });
 
   win.focus();

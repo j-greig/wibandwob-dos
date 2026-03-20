@@ -1,7 +1,9 @@
 # Control API Reference
 
+> **COAT** ("Command Once, Adapt Thin") — the WibWob-DOS architectural principle. Defined in `AGENTS.md`. All shell and microapp guidance follows COAT semantics.
+
 > Exact field names, failure modes, tui_* tool reference, and agent verification
-> patterns: `.agents/shell-dev/specs/state-and-api.md`
+> patterns: `.agents/specs/state-and-api.md`
 
 
 Local HTTP API on the configured runtime base URL.
@@ -35,12 +37,12 @@ GET /screenshot/ansi?id=…         raw ANSI crop of one window rect
   "port": 8099,
   "requestedPort": 8099,
   "host": "127.0.0.1",
-  "instanceId": "abc",
+  "instanceId": "abc12345",
+  "instanceDisplayId": "abc",
   "instanceLabel": "main",
-  "scratchBase": "/abs/.../scratch",
-  "capturesDir": "/abs/.../scratch/captures",
-  "workspacesDir": "/abs/.../scratch/workspaces",
-  "statePath": "/abs/.../scratch/app-state.json"
+  "dataRoot": "/abs/.../.wibwob",
+  "instanceRoot": "/abs/.../.wibwob/instances/abc12345",
+  "socketPath": "/abs/.../.wibwob/instances/abc12345/control.sock"
 }
 ```
 
@@ -194,9 +196,9 @@ menu.close                              {}   ← close any open dropdown/popup m
 8. `bun run wibwob state` — inspect messageCount, streaming, status
 9. Patch code and repeat
 
-## Proactive Tool Use
+## Desktop State Auto-Injection
 
-This OS belongs to the agents as much as the human. Use the desktop tools instinctively.
+This OS belongs to the agents as much as the human. Use the desktop tools directly — they are part of the agent surface, not an external integration.
 
 The pi extension `.pi/extensions/wwdos-state.ts` auto-injects a compact desktop snapshot into the system prompt before every agent turn when the app is running on port 8099:
 
@@ -225,11 +227,15 @@ bun run scripts/preview-scene.ts <timeline.json> <scene-name>
 
 Trust exported text snapshots and state captures over screenshots when debugging rendering/repaint issues.
 
-## Scratch Outputs
+## Runtime Outputs
 
-- Text captures: `scratch/captures/`
-- Desktop state JSON: `scratch/app-state.json`
-- Backrooms runs: `scratch/backrooms-runs/`
+Canonical runtime outputs live under `<DATA_ROOT>/instances/{instanceId}/...`.
+
+Typical paths:
+- Text captures: `<instanceRoot>/captures/` (or compatibility `scratch/captures/`)
+- Desktop state JSON: `<instanceRoot>/state.json`
+- Workspaces: `<instanceRoot>/workspaces/`
+- Logs: `<instanceRoot>/logs/`
 
 ## One-Liners
 

@@ -11,23 +11,66 @@ API surface for microapp authors. Import everything from
 | **Chrome** | createHeaderBar, createStatusBar, createButtonBar, createBorderedPanel, createSidebarPanel, createRule |
 | **Content** | createTextBlock, createFigletDisplay, createMessageHistory, createContentStack, createCollapsibleBlock |
 | **Navigation** | createTabs, createSelectableList, createInlineSearch |
-| **Forms** | createInputLine, createButton, createCheckbox, createRadioGroup, createSelect |
+| **Forms** | createInputLine, createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl |
 | **Data Display** | createKeyValuePanel, createLogView |
 | **Feedback** | createProgressBar, createSpinner |
-| **Animation** | createAnimationClock, tween, EASINGS |
+| **Animation** | createAnimationClock, tween, tweenPingPong, tweenSequence, EASINGS |
 | **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
 | **Diagnostics** | createLayoutReporter (canonical responsive layout report), fetchRuntimeInspection, fetchRuntimeCommands, fetchRuntimeHealth |
 
+Naming policy:
+- Prefer composition helper names (`createHeaderBar`, `createStatusBar`, `createButtonBar`, `createTabs`, `createInputLine`, `createRule`) for microapp authoring.
+- `createLayout*` names are lower-level/host-centric compatibility surfaces, marked `@deprecated` in code.
+- All public SDK exports carry `@public`, `@beta`, or `@internal` JSDoc tags indicating stability.
+
+### Preferred names vs legacy aliases
+
+| Preferred | Legacy alias (compat only) |
+|---|---|
+| `createStatusBar` | `createLayoutStatusBar` |
+| `createButtonBar` | `createLayoutButtonBar` |
+| `createHeaderBar` | `createLayoutHeaderBar` |
+| `createTabs` | `createLayoutTabs` |
+| `createInputLine` | `createLayoutInputLine` |
+| `createRule` | `createLayoutRule` |
+
+Use preferred names in new microapps and docs examples.
+
 All components follow the [component contract](component-contract.md).
+
+### Advanced/internal exports (use intentionally)
+
+The SDK also re-exports specialised internals (e.g. Monster Cam, skeleton renderers,
+terrain/contour internals) to avoid direct `src/core/*` imports in built-ins.
+
+For most third-party microapps, treat these as out-of-path unless you have a concrete
+runtime need and are ready to own added complexity.
 
 For the basics (manifest, skeleton, lifecycle hooks, verification):
 see `docs/building-custom-microapps.md`.
 
 For common mistakes: see `pitfalls.md`.
 
+## Advanced Components (source-level only)
+
+The following are exported from `microapp-sdk.ts` but have no stable documentation yet. Read the source before using.
+
+| Export | File | Notes |
+|---|---|---|
+| `createAnimationClock` | `src/services/microapp-sdk.ts` | Timing clock for animation loops — see source |
+| `createMessageHistory` | `src/services/microapp-sdk.ts` | Chat/history buffer — see source |
+| `createContentStack` | `src/services/microapp-sdk.ts` | Vertical content stack — see source |
+| `createCollapsibleBlock` | `src/services/microapp-sdk.ts` | Expandable section — see source |
+| `createBorderedPanel` | `src/services/microapp-sdk.ts` | Panel with border chrome — see source |
+| `createSidebarPanel` | `src/services/microapp-sdk.ts` | Fixed sidebar layout — see source |
+| `createInlineSearch` | `src/services/microapp-sdk.ts` | Inline search input — see source |
+| `createSelectableList` | `src/services/microapp-sdk.ts` | List with keyboard selection — see source |
+
 ## Manifest notes
 
 `menu.category` must be one of: `file` `edit` `view` `window` `applications` `demos` `help`
+
+**`multiInstance`** (boolean, default `false`) — allow multiple windows of this microapp to coexist. Can be set at manifest level or per-command. Priority: `registerCommand({ multiInstance })` > `manifest.multiInstance` > `false`.
 
 Optional `dependencies` in `microapp.json` declares npm packages the microapp needs.
 These must be installed in the root `package.json` via `bun add <pkg>`. The loader
@@ -93,6 +136,10 @@ host.ui.createAnimatedPanel(...)
 host.ui.createButtonBar(...)
 host.ui.applyRect(node, rect)
 
+// Legacy aliases still exist for compatibility:
+// host.ui.createLayoutStatusBar(...)  -> prefer createStatusBar(...)
+// host.ui.createLayoutButtonBar(...)  -> prefer createButtonBar(...)
+
 // Advanced layout helpers — direct import only (not on host.ui):
 // createGrid(parent, options)       — 2D grid layout
 // createScrollViewport(parent, opts) — fixed header/footer + scrollable middle
@@ -103,6 +150,19 @@ host.ui.applyRect(node, rect)
 //
 // host.ui is a curated subset (createStack, createRow, bars, applyRect).
 // For grid, scroll, responsive, and composition: import from microapp-sdk directly.
+```
+
+**`direct` flag and `focusOrCreate` semantics**
+
+By default (without `direct: true`), the action is wrapped in `focusOrCreate(appType, fn, multiInstance)`:
+- If a window with this microapp's `appType` already exists, it is focused instead of creating a new one.
+- The action's return value is swallowed.
+
+Set `direct: true` to bypass `focusOrCreate` entirely — the action runs unconditionally and its return value is preserved. Use `direct: true` for commands that should always fire (e.g. query commands, toggle actions, palette-only commands).
+
+`focusOrCreate` is also available directly on the host:
+```typescript
+host.focusOrCreate(appType: string, createFn: () => void, multiInstance?: boolean): void
 ```
 
 ## Runtime client helpers
@@ -128,6 +188,8 @@ Rules:
 - in-process microapps automatically prefer the shell's own `WIBWOB_API_BASE_URL`
 
 ## MicroappWindowHandle API
+
+> **Canonical hook definitions:** see `.agents/guides/microapp/quick-start.md` §Required hooks. The signatures here are the API reference.
 
 ```typescript
 win.id              // window id (number)
@@ -235,9 +297,12 @@ const body = createRow(win.body, [
 // Both accept optional { gap: N } — character-cell spacing between children
 // Gap is subtracted before flex distribution, so 1fr children still split evenly.
 
-// Wrap a raw blessed box as a LayoutPart
-const panel = createNodePart(blessed.box({ parent: win.body, style: host.theme().body }));
+// Prefer SDK parts directly; only use createNodePart when integrating legacy/raw widgets
+const legacyNode = someLegacyWidget;
+const panel = createNodePart(legacyNode);
 ```
+
+> **Note:** `align` on FlexChild is declared in the types but not yet implemented. Flex children always fill their cross-axis. This is a future enhancement.
 
 ### Grid: createGrid
 
@@ -256,9 +321,7 @@ grid.set({ key: "stats", row: 0, column: 1, part: statsPart });
 grid.set({ key: "log",   row: 1, column: 1, part: logPart });
 ```
 
-Note: `align` on FlexChild and GridChild is declared in the types but
-not yet implemented. Grid cells always fill their track area. Flex children
-always fill their cross-axis. This is a future enhancement.
+> **Note:** `align` on GridChild is also not yet implemented. Grid cells always fill their track area.
 
 ### Responsive: pickBreakpoint
 
@@ -334,19 +397,7 @@ const sv = createScrollViewport(win.body, {
 
 ### Layout lifecycle
 
-```typescript
-function render() {
-  const w = Math.max(1, Number(win.body.width) || 0);
-  const h = Math.max(1, Number(win.body.height) || 0);
-  root.layout({ top: 0, left: 0, width: w, height: h });
-  host.screen.render();
-}
-
-render();
-win.onResize(render);
-win.onRestyle(() => { root.restyle(); host.screen.render(); });
-win.onCleanup(() => root.destroy());
-```
+> Full layout lifecycle: see `.agents/guides/microapp/layout.md` §Lifecycle.
 
 ---
 
@@ -361,13 +412,14 @@ Import from `../../src/services/microapp-sdk.js`.
 ```typescript
 const btn = createButton({
   label: "Submit",
+  variant: "primary",    // optional: primary|secondary|ghost|destructive
   onPress: () => save(),
   disabled: false,        // optional
 });
-// btn.update({ label: "Saving...", disabled: true });
+// btn.update({ label: "Saving...", disabled: true, variant: "ghost" });
 ```
 
-Focusable. Enter/Space activates. Focus ring shows inverted colours.
+Focusable. Enter/Space activates. Focus ring shows inverted colours. Handler errors are isolated so one bad callback does not crash the form surface. Prefer `variant: "primary"` for main submit actions.
 
 ### createCheckbox
 
@@ -384,7 +436,25 @@ const cb = createCheckbox({
 // cb.update({ checked: false })
 ```
 
-Space toggles. Renders `[x]` or `[ ]`.
+Space toggles. Renders `[x]` or `[ ]`. Callback errors are isolated so one handler fault does not crash the form flow.
+
+### createToggleSwitch
+
+```typescript
+const live = createToggleSwitch({
+  label: "Live validation",
+  checked: true,
+  onLabel: "LIVE",       // optional, default "ON"
+  offLabel: "PAUSE",     // optional, default "OFF"
+  onChange: (e) => {
+    console.log(e.value);
+  },
+});
+// live.checked()  → boolean
+```
+
+Compact on/off switch for mode flags. Enter/Space toggles. Click toggles and focuses.
+Callback errors are isolated so one handler fault does not crash the form flow.
 
 ### createRadioGroup
 
@@ -405,7 +475,7 @@ const radio = createRadioGroup({
 ```
 
 Arrow Up/Down navigates. Enter/Space selects. Shows `(o)` selected, `( )` unselected,
-`>` focus indicator.
+`>` focus indicator. Callback errors are isolated so one handler fault does not crash the form flow.
 
 ### createSelect
 
@@ -425,6 +495,28 @@ const sel = createSelect({
 
 Inline single-row picker (not a dropdown — blessed constraint).
 Arrow Left/Right or Up/Down cycles through options. Renders `< label >`.
+Callback errors are isolated so one handler fault does not crash the form flow.
+
+### createSegmentedControl
+
+```typescript
+const density = createSegmentedControl({
+  options: [
+    { label: "Compact", value: "compact" },
+    { label: "Comfort", value: "comfort" },
+    { label: "Spacious", value: "spacious" },
+  ],
+  selected: "comfort",   // optional
+  onChange: (e) => {
+    console.log(e.value);
+  },
+});
+// density.selected()  → string | undefined
+```
+
+Inline segmented selector with all options visible.
+Arrow Left/Right or Up/Down cycles options; click advances selection.
+Callback errors are isolated so one handler fault does not crash the form flow.
 
 ---
 
@@ -499,6 +591,7 @@ const list = createFilterableList({
 
 Type to filter, Arrow Up/Down to navigate, Enter to select, Escape to clear,
 Backspace to edit query. Height = 1 (search row) + visible items.
+Callback errors (`onSelect`/`onHighlight`/`onCancel`) are isolated so handler faults do not crash the form flow.
 
 ### createFormField
 
@@ -602,12 +695,26 @@ Flex columns share remaining space proportionally. Truncates with `~` on narrow.
 ### Timers
 
 ```typescript
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, safeDestroyAll } from "../../src/services/microapp-sdk.js";
 
 const timers = new Set<ReturnType<typeof setInterval>>();
 createTimer(() => { /* runs every 500ms */ }, 500, timers);
-win.onCleanup(() => clearTimers(timers));
+win.onCleanup(() => {
+  clearTimers(timers);
+  safeDestroyAll(tree, tabs, monitor);
+});
 ```
+
+### Drawille/contrib width guard
+
+```typescript
+import { toEvenCellWidth } from "../../src/services/microapp-sdk.js";
+
+const chartWidth = toEvenCellWidth(Number(panel.width) - 2);
+// Use chartWidth before creating drawille-backed contrib canvases.
+```
+
+This avoids `Width must be multiple of 2!` crashes on odd layout widths.
 
 ### TreeWidget
 
@@ -649,20 +756,57 @@ Keys 1-9 switch tabs. Pass `{ keys: false }` as third arg to disable.
 ### Tween / motion
 
 ```typescript
-import { tweenWindowPosition, tweenWindowSize, tween, EASINGS } from "../../src/services/microapp-sdk.js";
+import {
+  tweenWindowPosition,
+  tweenWindowSize,
+  tween,
+  tweenPingPong,
+  tweenSequence,
+  EASINGS,
+} from "../../src/services/microapp-sdk.js";
 
 tweenWindowPosition(host.windows, win.id, 20, 5, 400, "easeOutCubic");
 tweenWindowSize(host.windows, win.id, 120, 36, 300, "easeOutCubic");
 
-const { cancel } = tween({
+const single = tween({
   from: 0, to: 100, duration: 600,
   easing: EASINGS.elasticOut,
   onUpdate: (v) => { box.width = Math.round(v); host.screen.render(); },
+});
+
+const pulse = tweenPingPong({
+  from: 0,
+  to: 1,
+  duration: 220,
+  cycles: 3,
+  easing: "easeInOutCubic",
+  onUpdate: (v) => {
+    box.style = { ...box.style, bg: v > 0.5 ? "blue" : "black" };
+    host.screen.render();
+  },
+});
+
+const sequence = tweenSequence({
+  from: 10,
+  steps: [
+    { to: 30, duration: 120, easing: "easeOut" },
+    { to: 22, duration: 100, easing: "easeInOut" },
+    { to: 26, duration: 90, easing: "easeOut" },
+  ],
+  onUpdate: (v) => { box.left = Math.round(v); host.screen.render(); },
 });
 ```
 
 Easings: `linear` `easeIn` `easeOut` `easeInOut` `easeInCubic` `easeOutCubic`
 `easeInOutCubic` `elasticOut` `bounceOut`
+
+Tip: use `tweenPingPong` for pulse/breathe emphasis and `tweenSequence` for
+small choreography without hand-written timer chains.
+
+**Reliability:** All motion callbacks (`onUpdate`, `onComplete`, `onCycle`, `onStepComplete`)
+are isolated internally — a throw in your callback logs `[motion] <fn> threw: <err>` and
+lets the loop continue. `tweenSequence` with an empty `steps` array emits a `console.warn`
+and no-ops. There are no API surface changes; this is engine-level resilience.
 
 ### RenderMonitor
 

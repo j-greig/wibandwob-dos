@@ -2,7 +2,7 @@
 name: joan-stark-ascii-art
 description: "Library of 500+ ASCII art pieces by Joan G. Stark (jgs), legendary ASCII artist 1996-2001. Use to find period-authentic ASCII art for primers, decoration, and composition. Browse the examples directory and open as primer windows. Art covers animals, birds, holidays, food, people, borders and more."
 source: "https://github.com/oldcompcz/jgs/tree/master/joan_stark"
-examples_path: "/Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples"
+examples_path: "microapps-private/joanstark-primers/primers"
 ---
 
 # Joan Stark ASCII Art Library
@@ -12,12 +12,14 @@ active 1996-2001. 500+ pieces, all named `{subject}-{MMYY}.txt`.
 
 ## Examples directory
 
-/Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples/
+microapps-private/joanstark-primers/primers/
+
+(Repo-relative path from the WibWob-DOS root.)
 
 ## Find relevant art
 
 ```bash
-ls /Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples/ | grep -i <subject>
+ls microapps-private/joanstark-primers/primers/ | grep -i <subject>
 ```
 
 ## Open as a primer window in WibWob-DOS
@@ -25,7 +27,7 @@ ls /Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples/ | gr
 ```bash
 curl -s -X POST http://127.0.0.1:8100/commands/run \
   -H "Content-Type: application/json" \
-  -d '{"id":"primer.open","args":{"filePath":"/Users/james/Repos/symbient-skills/skills/joan-stark-ascii-art/examples/<file>.txt","x":10,"y":5}}'
+  -d '{"id":"primer.open","args":{"filePath":"microapps-private/joanstark-primers/primers/<file>.txt","x":10,"y":5}}'
 ```
 
 ## Notable files for fart / wind / gas / animals

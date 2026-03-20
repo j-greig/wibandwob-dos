@@ -6,23 +6,49 @@ import { createStatusBar, createTextViewer } from "../../src/services/microapp-s
  * One buffer. Read/write via plumb. No frills.
  */
 export default function setup(host: MicroappHost) {
-  const writeHandlers = new Map<number, (text: string) => void>();
+  const notepadControllers = new Map<number, {
+    setText: (text: string) => void;
+    setTitle: (title: string) => void;
+  }>();
 
   host.registerCommand({
     id: "write",
     label: "Write to Notepad",
     description:
-      "Set the text content of an open notepad. Args: text (string), windowId (number).",
+      "Set the text content of an open notepad. Args: text (string), windowId (number), title (string, optional).",
     action: (args) => {
       const text = args?.text as string | undefined;
       const windowId = args?.windowId as number | undefined;
+      const title = args?.title as string | undefined;
       if (text === undefined) return { error: "text is required" };
       if (windowId === undefined) return { error: "windowId is required" };
-      const handler = writeHandlers.get(windowId);
-      if (!handler)
+      const controller = notepadControllers.get(windowId);
+      if (!controller)
         return { error: `no notepad window with id ${windowId}` };
-      handler(text);
-      return { ok: true, windowId, bytesWritten: text.length };
+      controller.setText(text);
+      if (title !== undefined) controller.setTitle(title);
+      return { ok: true, windowId, bytesWritten: text.length, title: title ?? null };
+    },
+    palette: false,
+    menu: false,
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "retitle",
+    label: "Retitle Notepad",
+    description:
+      "Update notepad window title. Args: windowId (number), title (string).",
+    action: (args) => {
+      const windowId = args?.windowId as number | undefined;
+      const title = args?.title as string | undefined;
+      if (windowId === undefined) return { error: "windowId is required" };
+      if (title === undefined) return { error: "title is required" };
+      const controller = notepadControllers.get(windowId);
+      if (!controller)
+        return { error: `no notepad window with id ${windowId}` };
+      controller.setTitle(title);
+      return { ok: true, windowId, title };
     },
     palette: false,
     menu: false,
@@ -42,9 +68,19 @@ export default function setup(host: MicroappHost) {
     },
   });
 
+  function formatTitle(title: string): string {
+    const trimmed = title.trim();
+    if (!trimmed) return "Notepad";
+    if (trimmed === "Notepad" || trimmed.startsWith("Notepad ") || trimmed.startsWith("Notepad-")) {
+      return trimmed;
+    }
+    return `Notepad — ${trimmed}`;
+  }
+
   function openNotepad(initialText: string, title: string) {
+    let currentTitle = formatTitle(title);
     const win = host.createWindow({
-      title,
+      title: currentTitle,
       width: 60,
       height: 20,
     });
@@ -64,7 +100,7 @@ export default function setup(host: MicroappHost) {
       const lines = buffer.split("\n").length;
       const chars = buffer.length;
       statusBar.update({
-        left: ` ${title}  │  ${lines} lines  ${chars} chars`,
+        left: ` ${currentTitle}  │  ${lines} lines  ${chars} chars`,
       });
     }
 
@@ -72,7 +108,7 @@ export default function setup(host: MicroappHost) {
     win.captureText(() => buffer);
 
     win.describeState(() => ({
-      title,
+      title: currentTitle,
       lines: buffer.split("\n").length,
       chars: buffer.length,
       preview: buffer.slice(0, 200),
@@ -84,15 +120,23 @@ export default function setup(host: MicroappHost) {
       statusBar.update({});
     });
 
-    writeHandlers.set(win.id, (newText: string) => {
-      buffer = newText;
-      viewer.update({ content: newText });
-      updateStatus();
-      host.screen.render();
+    notepadControllers.set(win.id, {
+      setText(newText: string) {
+        buffer = newText;
+        viewer.update({ content: newText });
+        updateStatus();
+        host.screen.render();
+      },
+      setTitle(newTitle: string) {
+        currentTitle = formatTitle(newTitle);
+        win.setTitle(currentTitle);
+        updateStatus();
+        host.screen.render();
+      },
     });
 
     win.onCleanup(() => {
-      writeHandlers.delete(win.id);
+      notepadControllers.delete(win.id);
       viewer.destroy();
       statusBar.destroy();
     });

@@ -1,6 +1,6 @@
 ---
 name: haiku
-description: Fast, cheap Claude Haiku 4.5 agent for simple tasks: file listing, grep, quick checks, status reads, trivial edits, one-liners. Use when speed matters and the task doesn't need deep reasoning.
+description: "Fast, cheap Claude Haiku 4.5 agent for simple tasks: file listing, grep, quick checks, status reads, trivial edits, one-liners. Use when speed matters and the task doesn't need deep reasoning."
 model: anthropic/claude-haiku-4-5
 ---
 

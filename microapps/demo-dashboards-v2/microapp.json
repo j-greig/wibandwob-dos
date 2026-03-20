@@ -1,0 +1,23 @@
+{
+  "name": "demo-dashboards-v2",
+  "version": "0.1.0",
+  "description": "Combined responsive dashboard hub — Overview (metrics), XXL Canvas (pannable mosaic), Creative Lab (figlet/gradient/emoji)",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dependencies": {
+    "blessed-contrib": "^4.11.0"
+  },
+  "microapp": {
+    "id": "wibwob.demo-dashboards-v2",
+    "title": "Dashboards V2",
+    "description": "Responsive multi-view dashboard hub: compact system metrics (Overview), exhibition-scale pannable mosaic (XXL Canvas), and figlet/gradient/emoji Creative Lab",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 57, "label": "Dashboards V2" }
+    ],
+    "palette": { "order": 222, "label": "Dashboards V2" },
+    "agent": true,
+    "api": true
+  }
+}

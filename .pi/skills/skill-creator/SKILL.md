@@ -44,99 +44,107 @@ Must match parent directory name.
 The body is loaded when the skill activates. Keep it **under 500 lines / 5000 tokens**.
 
 **Include:**
-- Step-by-step instructions the agent needs on every run
-- Key settings, commands, examples
-- Links to `references/` files for deeper content
+- Step-by-step instructions needed on every run
+- Defaults + fallback paths
+- Validation loop and done criteria
+- Links to `references/` files for deep detail
 
 **Omit:**
-- Things the agent already knows (what a PDF is, how HTTP works)
-- Exhaustive edge cases — let the agent's judgment handle most
-- Long reference material — put it in `references/` instead
+- Things the agent already knows
+- Exhaustive optional edge cases without strong evidence
+- Long reference material better placed under `references/`
 
-### 4. Write the description (the most important field)
+**The LLM-known test:** before writing any instruction, ask — would an LLM already
+know this from training data? General TypeScript conventions, standard git workflow,
+common CLI patterns — these waste tokens without adding orientation. Only write what
+is genuinely non-obvious about *this* repo or *this* tool.
 
-The description carries the **entire burden of triggering**. If the agent doesn't
-load your skill, nothing else matters.
+### 4. Write the description (the trigger gate)
 
-**Principles:**
-- **Imperative phrasing:** "Use when..." not "This skill does..."
-- **Focus on user intent:** what the user is trying to achieve, not internals
-- **Be pushy:** list specific trigger phrases and near-miss phrasings
-- **Include non-obvious triggers:** "even if they don't mention X explicitly"
-- **Stay concise:** a few sentences to a short paragraph
+The description carries the entire burden of triggering.
 
-**Good:**
-```yaml
-description: >
-  Extract text and tables from PDF files, fill PDF forms, merge multiple PDFs.
-  Use when working with PDF documents, even if the user doesn't explicitly
-  mention "PDF". Triggers on: "extract from this doc", "fill out this form",
-  "merge these files", "parse this document".
-```
+Principles:
+- **Imperative:** "Use when..."
+- **Intent-focused:** user goal, not internal mechanics
+- **Pushy:** include likely and non-obvious trigger phrasings
+- **Concise:** short paragraph quality > long text quantity
 
-**Bad:**
-```yaml
-description: Helps with PDFs.
-```
+### 5. Add a required Gotchas section
 
-### 5. Structure for progressive disclosure
+Every production skill should include a `Gotchas` section containing:
+- recurring failure symptom
+- likely cause
+- detection step
+- canonical fix
+
+Keep this updated from real execution traces.
+
+### 6. Progressive disclosure structure
 
 Three tiers of context loading:
 
 | Tier | What | When loaded | Budget |
 |------|------|-------------|--------|
-| Metadata | `name` + `description` | Always (startup) | ~100 tokens |
+| Metadata | `name` + `description` | Always | ~100 tokens |
 | Instructions | SKILL.md body | On activation | < 5000 tokens |
 | Resources | `references/`, `scripts/`, `assets/` | On demand | As needed |
 
-Move detailed docs to `references/` and tell the agent *when* to load them:
-"Read `references/api-errors.md` if the API returns a non-200 status code."
+Tell the agent **when** to load each reference file.
 
-### 6. Bundle scripts properly
+### 7. Bundle scripts for deterministic work
 
 Scripts in `scripts/` should be:
-- **Self-contained** — inline dependencies where possible (PEP 723 for Python, npm: for Deno)
-- **Non-interactive** — no TTY prompts, accept all input via flags/env/stdin
-- **Helpful on failure** — say what went wrong, what was expected, what to try
-- **Documented** — `--help` output is how the agent learns the interface
+- non-interactive (flags/env/stdin only)
+- self-contained where possible
+- explicit on failure (what failed, expected, next step)
+- documented via `--help`
 
-Use relative paths from skill root: `bash scripts/process.sh "$INPUT"`
+Use relative paths from skill root.
 
-### 7. Validate
+### 8. Description eval loop (minimum)
 
-Check against the spec:
-- Name matches directory, lowercase, no bad hyphens
-- Description exists and is under 1024 chars
-- SKILL.md has valid YAML frontmatter
-- Body under 500 lines
-- File references are relative and one level deep
+Before finalising, run a small trigger test set:
+- ~8 should-trigger prompts
+- ~8 should-not-trigger near-misses
+
+Refine description based on misses.
+Avoid keyword overfitting.
+
+### 9. Output-quality eval loop (minimum)
+
+For at least 2–3 real tasks:
+- run with skill
+- run without skill (or previous version)
+- compare pass quality + time/token cost
+
+Keep only skills that add clear value.
 
 ## Quick Checklist
 
 ```
-- [ ] Directory name matches `name` field (lowercase, hyphens)
-- [ ] Description is intent-focused with trigger phrases
-- [ ] Description under 1024 chars
-- [ ] SKILL.md body under 500 lines
-- [ ] Core instructions only — reference docs in references/
-- [ ] Scripts are self-contained with --help and good errors
-- [ ] Relative paths throughout
-- [ ] Tested: does the skill trigger on realistic prompts?
+- [ ] Directory name matches `name` field
+- [ ] Description is intent-focused and trigger-strong
+- [ ] Description <= 1024 chars
+- [ ] SKILL.md <= 500 lines
+- [ ] Includes defaults + validation loop + done criteria
+- [ ] Includes Gotchas section
+- [ ] Scripts are non-interactive with --help
+- [ ] References are linked with explicit load conditions
+- [ ] Trigger eval run completed
+- [ ] Output-quality eval run completed
 ```
 
 ## References
 
-Read these for deeper guidance on specific topics:
-
-- [references/best-practices.md](references/best-practices.md) — scoping, calibrating control, patterns for effective instructions
-- [references/optimizing-descriptions.md](references/optimizing-descriptions.md) — eval-driven description testing with train/validation splits
-- [references/evaluating-skills.md](references/evaluating-skills.md) — test cases, assertions, grading, iteration loops
-- [references/using-scripts.md](references/using-scripts.md) — one-off commands, inline deps, agentic script design
-- [references/specification.md](references/specification.md) — full format spec (frontmatter, directories, validation)
+Read these for deeper guidance:
+- [references/best-practices.md](references/best-practices.md)
+- [references/optimizing-descriptions.md](references/optimizing-descriptions.md)
+- [references/evaluating-skills.md](references/evaluating-skills.md)
+- [references/using-scripts.md](references/using-scripts.md)
+- [references/specification.md](references/specification.md)
 
 ## Canonical Sources
 
-All guidance distilled from the Agent Skills standard:
 - Spec: https://agentskills.io/specification.md
 - Best practices: https://agentskills.io/skill-creation/best-practices.md
 - Descriptions: https://agentskills.io/skill-creation/optimizing-descriptions.md
@@ -144,4 +152,5 @@ All guidance distilled from the Agent Skills standard:
 - Scripts: https://agentskills.io/skill-creation/using-scripts.md
 - Index: https://agentskills.io/llms.txt
 
-Pi-specific skill docs: `/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/docs/skills.md`
+Pi-specific skills docs:
+`/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/docs/skills.md`

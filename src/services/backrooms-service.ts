@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 
-import { REPO_ROOT, SPIKE_ROOT } from "../core/config.js";
+import { REPO_ROOT } from "../core/config.js";
 import type { BackroomsChannel, BrowserEntry } from "../core/types.js";
 
 export class BackroomsService {
@@ -93,7 +93,7 @@ export class BackroomsService {
 
   prepareRunRoot(channel: BackroomsChannel): string {
     const runId = new Date().toISOString().replace(/[:.]/g, "-");
-    const runRoot = path.join(SPIKE_ROOT, "scratch", "backrooms-runs", runId);
+    const runRoot = path.join(REPO_ROOT, "scratch", "backrooms-runs", runId);
     const primersDir = path.join(runRoot, "primers");
     const outputsDir = path.join(runRoot, "outputs");
     const logsDir = path.join(runRoot, "logs");

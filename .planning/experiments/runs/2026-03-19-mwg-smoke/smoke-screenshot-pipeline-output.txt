@@ -1,0 +1,5 @@
+Screenshot Pipeline Smoke Test
+==============================
+
+App running: instance=mwg
+

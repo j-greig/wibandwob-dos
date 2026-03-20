@@ -78,3 +78,29 @@ export function clearTimers(timers: Set<ReturnType<typeof setInterval>>): void {
   for (const id of timers) clearInterval(id);
   timers.clear();
 }
+
+/**
+ * Clamp a width to a safe even cell count for drawille/canvas widgets.
+ * Useful for blessed-contrib charts which can throw on odd widths.
+ * @primitive
+ */
+export function toEvenCellWidth(width: number, min = 2): number {
+  const clamped = Math.max(min, Math.floor(width));
+  return clamped % 2 === 0 ? clamped : clamped - 1;
+}
+
+/** Best-effort destroy for widgets/handles with optional destroy(). @primitive */
+export function safeDestroy(node: { destroy?: () => void } | null | undefined): void {
+  try {
+    node?.destroy?.();
+  } catch {
+    // teardown should be exception-tolerant
+  }
+}
+
+/** Best-effort destroy for multiple widgets/handles. @primitive */
+export function safeDestroyAll(...nodes: Array<{ destroy?: () => void } | null | undefined>): void {
+  for (const node of nodes) {
+    safeDestroy(node);
+  }
+}

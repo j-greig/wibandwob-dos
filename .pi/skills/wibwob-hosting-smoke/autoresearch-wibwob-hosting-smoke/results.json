@@ -1,0 +1,32 @@
+{
+  "skill_name": "wibwob-hosting-smoke",
+  "status": "complete",
+  "current_experiment": 7,
+  "baseline_score": 87.5,
+  "best_score": 100.0,
+  "experiments": [
+    {"id": 0, "score": 7, "max_score": 8, "pass_rate": 87.5, "status": "baseline", "description": "baseline hosting-agnostic skill clone"},
+    {"id": 1, "score": 8, "max_score": 8, "pass_rate": 100.0, "status": "keep", "description": "add explicit adapter preconditions (FLY_APP_NAME, npm pack/tgz, WIBWOB_DATA_DIR)"},
+    {"id": 2, "score": 8, "max_score": 8, "pass_rate": 100.0, "status": "discard", "description": "added adapter quick-map table (no gain)"},
+    {"id": 3, "score": 8, "max_score": 8, "pass_rate": 100.0, "status": "discard", "description": "added anti-pattern section (no gain)"},
+    {"id": 4, "score": 9, "max_score": 10, "pass_rate": 90.0, "status": "baseline", "description": "eval-suite v2 baseline (adds persistent-history requirement)"},
+    {"id": 5, "score": 10, "max_score": 10, "pass_rate": 100.0, "status": "keep", "description": "add persistent run-history contract"},
+    {"id": 6, "score": 10, "max_score": 13, "pass_rate": 76.9, "status": "baseline", "description": "eval-suite v3 baseline (adds taxonomy/remediation/dynamic-port guidance)"},
+    {"id": 7, "score": 13, "max_score": 13, "pass_rate": 100.0, "status": "keep", "description": "add failure taxonomy enum + remediation_attempted contract + dynamic tunnel-port guidance"}
+  ],
+  "eval_breakdown": [
+    {"name": "adapter model", "pass_count": 1, "total": 1},
+    {"name": "dispatcher command", "pass_count": 1, "total": 1},
+    {"name": "binary gates", "pass_count": 1, "total": 1},
+    {"name": "no-core-edit microapp", "pass_count": 1, "total": 1},
+    {"name": "artifact expectations", "pass_count": 1, "total": 1},
+    {"name": "missing adapter is fail", "pass_count": 1, "total": 1},
+    {"name": "fly + npm prerequisites", "pass_count": 1, "total": 1},
+    {"name": "no legacy path", "pass_count": 1, "total": 1},
+    {"name": "severity policy", "pass_count": 1, "total": 1},
+    {"name": "persistent history mentions", "pass_count": 1, "total": 1},
+    {"name": "failure taxonomy enum", "pass_count": 1, "total": 1},
+    {"name": "remediation event contract", "pass_count": 1, "total": 1},
+    {"name": "dynamic tunnel ports guidance", "pass_count": 1, "total": 1}
+  ]
+}

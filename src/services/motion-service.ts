@@ -47,6 +47,31 @@ export interface TweenOpts {
   onComplete?: () => void;
 }
 
+export interface TweenPingPongOpts {
+  from: number;
+  to: number;
+  duration: number; // per half cycle (ms)
+  cycles?: number; // default 1
+  easing?: EasingFn | string;
+  onUpdate: (value: number) => void;
+  onCycle?: (cycleIndex: number) => void;
+  onComplete?: () => void;
+}
+
+export interface TweenSequenceStep {
+  to: number;
+  duration: number;
+  easing?: EasingFn | string;
+}
+
+export interface TweenSequenceOpts {
+  from: number;
+  steps: TweenSequenceStep[];
+  onUpdate: (value: number) => void;
+  onStepComplete?: (stepIndex: number, value: number) => void;
+  onComplete?: () => void;
+}
+
 function resolveEasing(easing?: EasingFn | string): EasingFn {
   if (typeof easing === "function") {
     return easing;
@@ -55,6 +80,16 @@ function resolveEasing(easing?: EasingFn | string): EasingFn {
     return EASINGS[easing];
   }
   return EASINGS.easeOutCubic;
+}
+
+/** Isolate user callbacks so a throw doesn't kill the tween loop. */
+function safeCall(fn: (() => void) | undefined, label: string): void {
+  if (!fn) return;
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[motion] ${label} threw:`, err);
+  }
 }
 
 export function tween(opts: TweenOpts): { cancel: () => void } {
@@ -80,29 +115,129 @@ export function tween(opts: TweenOpts): { cancel: () => void } {
   };
 
   if (duration === 0) {
-    opts.onUpdate(to);
-    opts.onComplete?.();
+    safeCall(() => opts.onUpdate(to), "tween.onUpdate");
+    safeCall(opts.onComplete, "tween.onComplete");
     return { cancel };
   }
 
   const start = Date.now();
   const delta = to - from;
 
-  opts.onUpdate(from);
+  safeCall(() => opts.onUpdate(from), "tween.onUpdate");
 
   interval = setInterval(() => {
     const elapsed = Date.now() - start;
     const t = clamp01(elapsed / duration);
     const eased = clamp01(easing(t));
-    opts.onUpdate(from + delta * eased);
+    safeCall(() => opts.onUpdate(from + delta * eased), "tween.onUpdate");
 
     if (t >= 1) {
       finish();
-      opts.onComplete?.();
+      safeCall(opts.onComplete, "tween.onComplete");
     }
   }, 16);
 
   return { cancel };
+}
+
+/**
+ * Animate from A→B then B→A for N cycles.
+ * Useful for pulse/breathe effects and focus attention hints.
+ */
+export function tweenPingPong(opts: TweenPingPongOpts): { cancel: () => void } {
+  const cycles = Math.max(1, Math.floor(opts.cycles ?? 1));
+  let cancelled = false;
+  let active: { cancel: () => void } | null = null;
+
+  const runHalf = (from: number, to: number, onDone: () => void) => {
+    active = tween({
+      from,
+      to,
+      duration: opts.duration,
+      easing: opts.easing,
+      onUpdate: (v) => safeCall(() => opts.onUpdate(v), "tweenPingPong.onUpdate"),
+      onComplete: () => {
+        if (cancelled) return;
+        onDone();
+      },
+    });
+  };
+
+  let cycleIndex = 0;
+  const runCycle = () => {
+    if (cancelled) return;
+    runHalf(opts.from, opts.to, () => {
+      runHalf(opts.to, opts.from, () => {
+        if (cancelled) return;
+        safeCall(() => opts.onCycle?.(cycleIndex), "tweenPingPong.onCycle");
+        cycleIndex += 1;
+        if (cycleIndex >= cycles) {
+          safeCall(opts.onComplete, "tweenPingPong.onComplete");
+          return;
+        }
+        runCycle();
+      });
+    });
+  };
+
+  runCycle();
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      active?.cancel();
+    },
+  };
+}
+
+/**
+ * Run a chained tween sequence from a start value through key steps.
+ */
+export function tweenSequence(opts: TweenSequenceOpts): { cancel: () => void } {
+  if (opts.steps.length === 0) {
+    console.warn("[motion] tweenSequence called with empty steps — no-op");
+    safeCall(() => opts.onUpdate(opts.from), "tweenSequence.onUpdate");
+    safeCall(opts.onComplete, "tweenSequence.onComplete");
+    return { cancel: () => {} };
+  }
+
+  let cancelled = false;
+  let active: { cancel: () => void } | null = null;
+  let stepIndex = 0;
+  let current = opts.from;
+
+  const runStep = () => {
+    if (cancelled) return;
+    const step = opts.steps[stepIndex];
+    if (!step) {
+      opts.onComplete?.();
+      return;
+    }
+
+    active = tween({
+      from: current,
+      to: step.to,
+      duration: step.duration,
+      easing: step.easing,
+      onUpdate: (v) => safeCall(() => opts.onUpdate(v), "tweenSequence.onUpdate"),
+      onComplete: () => {
+        if (cancelled) return;
+        current = step.to;
+        safeCall(() => opts.onStepComplete?.(stepIndex, current), "tweenSequence.onStepComplete");
+        stepIndex += 1;
+        runStep();
+      },
+    });
+  };
+
+  runStep();
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      active?.cancel();
+    },
+  };
 }
 
 type WindowFrame = { left: number; top: number; width: number; height: number };

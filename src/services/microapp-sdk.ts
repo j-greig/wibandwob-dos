@@ -138,10 +138,11 @@ export {
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
 // See microapps/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
-// ── ui-parts — layout primitives, directly importable ────────────────────────
-// These are also available on host.ui.* but can be imported directly for
-// cleaner module-level imports. host.ui.createLayoutButtonBar(...) and
-// import { createLayoutButtonBar } from "microapp-sdk" are equivalent.
+// ── ui-parts — lower-level layout/chrome primitives ─────────────────────────
+// These are used by host wiring and advanced module internals.
+// For third-party microapp authoring, prefer composition helpers exported below
+// (`createHeaderBar`, `createStatusBar`, `createButtonBar`, etc).
+// `createLayout*` names remain for compatibility but are not the preferred API.
 /** @internal */
 export {
   clamp,
@@ -235,9 +236,9 @@ export type {
 // CORE MODULE AUTHORING — start here when building a new microapp
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Timers — use instead of raw setInterval for proper cleanup
+// Timers + teardown helpers — use instead of raw setInterval and brittle destroy chains
 /** @internal */
-export { createTimer, clearTimers } from "../core/ui-primitives.js";
+export { createTimer, clearTimers, toEvenCellWidth, safeDestroy, safeDestroyAll } from "../core/ui-primitives.js";
 
 // Scroll helpers — use with scrollable blessed boxes
 /** @internal */
@@ -245,12 +246,14 @@ export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
 // Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
 /** @internal */
-export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
+export { createButton, createCheckbox, createToggleSwitch, createRadioGroup, createSelect, createSegmentedControl, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
 /** @internal */
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  ToggleSwitchOptions, ToggleSwitchHandle,
   RadioOption, RadioGroupOptions, RadioGroupHandle,
   SelectOption, SelectOptions, SelectHandle,
+  SegmentedControlOptions, SegmentedControlHandle,
   ChangeEvent, SelectEvent,
   FilterableItem, FilterableListOptions, FilterableListHandle,
   FormFieldOptions, FormFieldHandle,
@@ -279,9 +282,9 @@ export type {
 
 // Motion / tween — animate values, window position and size smoothly
 /** @internal */
-export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
+export { tween, tweenPingPong, tweenSequence, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 /** @internal */
-export type { EasingFn, TweenOpts } from "./motion-service.js";
+export type { EasingFn, TweenOpts, TweenPingPongOpts, TweenSequenceStep, TweenSequenceOpts } from "./motion-service.js";
 
 // Render monitoring — track frame rate and render pressure
 /** @internal */
@@ -322,9 +325,9 @@ export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG, DEFAULT_FIGLE
 /** @beta */
 export type { RenderMarkdownOptions, FigletHeadingConfig } from "./markdown-service.js";
 /** @beta */
-export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize } from "./figlet-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE, getFigletCatalogue, getFigletFontChoices, getDefaultFigletFont, getFigletWindowContentSize, setFigletFavourites, toggleFigletFavourite } from "./figlet-service.js";
 /** @beta */
-export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier } from "./figlet-service.js";
+export type { FigletMeasurement, FigletWindowContentSize, FigletCatalogue, FontCascadeTier, SetFigletFavouritesResult, ToggleFigletFavouriteResult } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)

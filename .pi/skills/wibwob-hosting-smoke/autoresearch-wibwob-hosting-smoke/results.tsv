@@ -1,0 +1,9 @@
+experiment	score	max_score	pass_rate	status	description
+0	7	8	87.5%	baseline	baseline hosting-agnostic skill clone
+1	8	8	100.0%	keep	add explicit adapter preconditions (FLY_APP_NAME, npm pack/tgz, WIBWOB_DATA_DIR)
+2	8	8	100.0%	discard	added adapter quick-map table (no score gain; reverted to keep doc lean)
+3	8	8	100.0%	discard	added anti-pattern section (no score gain; reverted to avoid extra verbosity)
+4	9	10	90.0%	baseline	eval-suite v2 baseline (adds persistent-history requirement)
+5	10	10	100.0%	keep	add persistent run-history contract (results.tsv/results.json/experiments.jsonl/SESSION_LOG.md)
+6	10	13	76.9%	baseline	eval-suite v3 baseline (adds taxonomy/remediation/dynamic-port guidance)
+7	13	13	100.0%	keep	add failure taxonomy enum + remediation_attempted contract + dynamic tunnel-port guidance

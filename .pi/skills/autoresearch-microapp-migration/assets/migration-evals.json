@@ -1,0 +1,113 @@
+{
+  "version": 2,
+  "name": "microapp-migration-binary-evals",
+  "defaultTarget": {
+    "slug": "demo-layout-stress-test-pi",
+    "targetDir": "microapps/demo-layout-stress-test-pi",
+    "commandId": "microapp.wibwob.layout-stress-test-pi.open",
+    "expectedSignals": ["layout", "stress", "pi"]
+  },
+  "evals": [
+    {
+      "id": "typecheck_passes",
+      "question": "Does `bun run typecheck` exit 0 after this migration slice?",
+      "passCondition": "Exit code 0",
+      "commands": [
+        "bun run typecheck"
+      ]
+    },
+    {
+      "id": "runtime_health_ok",
+      "question": "Does a running instance report healthy via CLI/API?",
+      "passCondition": "`wibwob health` succeeds and `/health` has ok=true",
+      "commands": [
+        "wibwob health",
+        "wibwob health --json | jq -e '.ok == true'"
+      ]
+    },
+    {
+      "id": "command_discoverable",
+      "question": "Is the microapp open command discoverable in CLI command list?",
+      "passCondition": "`wibwob commands -q` contains the expected command id",
+      "commands": [
+        "wibwob commands -q | grep -F '{commandId}'"
+      ]
+    },
+    {
+      "id": "command_executes",
+      "question": "Can the microapp be opened through the command surface?",
+      "passCondition": "`wibwob cmd {commandId}` returns success",
+      "commands": [
+        "wibwob cmd {commandId}"
+      ]
+    },
+    {
+      "id": "window_in_state",
+      "question": "After open command, does desktop state show a corresponding window?",
+      "passCondition": "`wibwob state` contains expected appType/title/token",
+      "commands": [
+        "wibwob state | jq -e '.windows | length > 0'"
+      ]
+    },
+    {
+      "id": "screenshot_text_signal",
+      "question": "Does `/screenshot/text` include a recognizable signal from the migrated microapp?",
+      "passCondition": "At least one expected signal token appears in screenshot text",
+      "commands": [
+        "curl -sS ${WIBWOB_API_BASE_URL:-http://127.0.0.1:8099}/screenshot/text | grep -Ei '{signalRegex}'"
+      ]
+    },
+    {
+      "id": "applications_visibility_signal",
+      "question": "Is there proof that the microapp is visible through Applications/menu surfaces (not API-only)?",
+      "passCondition": "Command/menu metadata includes menu/API surface and screenshot/state confirms user-visible path",
+      "commands": [
+        "curl -sS ${WIBWOB_API_BASE_URL:-http://127.0.0.1:8099}/commands/list | jq -e '.commands[] | select(.id == \"{commandId}\") | (.surfaces | index(\"menu\")) != null'"
+      ]
+    },
+    {
+      "id": "default_size_logical",
+      "question": "At default window size, is the microapp layout mode/size logical for its content?",
+      "passCondition": "Responsive default-size script exits 0",
+      "commands": [
+        "bash .pi/skills/autoresearch-microapp-migration/scripts/check-responsive-sizes.sh default {commandId}"
+      ]
+    },
+    {
+      "id": "medium_size_adapts",
+      "question": "After medium resize, does layout adapt to the expected responsive mode?",
+      "passCondition": "Responsive medium-size script exits 0",
+      "commands": [
+        "bash .pi/skills/autoresearch-microapp-migration/scripts/check-responsive-sizes.sh medium {commandId}"
+      ]
+    },
+    {
+      "id": "fullscreen_size_adapts",
+      "question": "At fullscreen/maximized size, does layout adapt and remain readable?",
+      "passCondition": "Responsive fullscreen script exits 0",
+      "commands": [
+        "bash .pi/skills/autoresearch-microapp-migration/scripts/check-responsive-sizes.sh fullscreen {commandId}"
+      ]
+    },
+    {
+      "id": "microapp_import_boundary",
+      "question": "Does migrated microapp stay within SDK host boundaries (no src/core or src/windows imports)?",
+      "passCondition": "Boundary check script exits 0",
+      "commands": [
+        "bash .pi/skills/autoresearch-microapp-migration/scripts/check-microapp-imports.sh {targetDir}"
+      ]
+    },
+    {
+      "id": "sdk_docs_sync",
+      "question": "If SDK surface changed, are SDK docs updated in the same slice?",
+      "passCondition": "SDK doc sync script exits 0",
+      "commands": [
+        "bash .pi/skills/autoresearch-microapp-migration/scripts/check-sdk-doc-sync.sh"
+      ]
+    }
+  ],
+  "scoring": {
+    "mode": "binary",
+    "keepRule": "keep only if total_pass_count strictly improves"
+  }
+}

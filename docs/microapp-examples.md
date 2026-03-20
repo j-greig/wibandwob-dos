@@ -74,6 +74,6 @@ win.onCleanup(() => clearInterval(timer));
 | notepad | `microapps/notepad/` |
 | runtime-inspector | `microapps/runtime-inspector/` |
 | figlet-banner | `microapps/figlet-banner/` |
-| layout-stress-test | `microapps/demo-layout-stress-test-pi/` |
+| layout-stress-test | `microapps/demo-layout-stress-test/` |
 | data-dashboard | `microapps/data-dashboard/` |
 | file-manager | `microapps/file-manager/` (delegates to `src/windows/file-manager-window.ts`) |

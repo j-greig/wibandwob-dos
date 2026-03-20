@@ -421,6 +421,17 @@ Results are returned as strings (text content from the tool).`,
 
       const { stdout, stderr } = await executeInSandbox(code, cachedTools, extensionToolExecutor, signal);
 
+      // Log every run to .tmp/ptc/{timestamp}.log for inspection
+      try {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const logDir = path.join(ctx?.cwd ?? process.cwd(), ".tmp", "ptc");
+        fs.mkdirSync(logDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(logDir, `${ts}.log`),
+          `=== CODE ===\n${code}\n\n=== STDOUT ===\n${stdout || "(none)"}\n\n=== STDERR ===\n${stderr || "(none)"}\n`
+        );
+      } catch (_) { /* never break execution due to logging */ }
+
       const parts: string[] = [];
       if (stdout) parts.push(stdout);
       if (stderr) parts.push(`\n[stderr]\n${stderr}`);

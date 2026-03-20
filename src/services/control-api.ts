@@ -36,11 +36,33 @@ import { log } from "./app-logger.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
+
+function trimTrailingBlankLines(text: string): string {
+  return text.replace(/[ \t]+$/gm, "").replace(/\n{3,}$/g, "\n\n");
+}
+
+function isTinyScreenshot(text: string): boolean {
+  const t = text.trim();
+  return t.length <= 2;
+}
+
+function formatPrettyScreenshot(text: string, kind: "text" | "ansi"): string {
+  const stamp = new Date().toISOString();
+  const title = kind === "ansi" ? "WibWob Screenshot (ANSI)" : "WibWob Screenshot (text)";
+  const body = trimTrailingBlankLines(text);
+  const safeBody = body.length > 0 ? body : "(empty screenshot)";
+  return [
+    `╭─ ${title} ─ ${stamp} ─╮`,
+    safeBody,
+    "╰─ tip: use /state and /windows/text?id=N for semantic inspection ─╯",
+  ].join("\n");
+}
 import { setActualControlApiPort } from "../runtime/runtime-node.js";
 import type { RuntimeCommandService } from "../application/runtime-command-service.js";
 import type { RuntimeInspectionService } from "../application/runtime-inspection-service.js";
 import type { RuntimeWindowService } from "../application/runtime-window-service.js";
 import type { RuntimeWorkspaceService } from "../application/runtime-workspace-service.js";
+import type { RateLimitService } from "../application/rate-limit-service.js";
 import type { InstanceDescriptor } from "../domain/instance-descriptor.js";
 
 interface ControlApiDeps {
@@ -53,10 +75,14 @@ interface ControlApiDeps {
 type RuntimeControlApiIdentity = Pick<
   InstanceDescriptor,
   | "instanceId"
+  | "instanceDisplayId"
   | "instanceLabel"
   | "host"
   | "apiPort"
   | "scratchBase"
+  | "dataRoot"
+  | "instanceRoot"
+  | "exportsDir"
   | "capturesDir"
   | "workspacesDir"
   | "statePath"
@@ -83,6 +109,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
+  { method: "GET",  path: "/screenshot",                    description: "Friendly screenshot alias. Defaults to clean text output." },
   { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
   { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
@@ -179,6 +206,10 @@ export class ControlApiService {
   private actualPort?: number;
   private socketPath?: string;
   private pidPath?: string;
+  private discoveryPath?: string;
+  private legacySocketPath?: string;
+  private legacyPidPath?: string;
+  private runtimeManifestPath?: string;
   private readonly startedAt = Date.now();
   private enabled = false;
   private getScreenSize?: () => { width: number; height: number };
@@ -187,6 +218,7 @@ export class ControlApiService {
     private readonly port: number,
     private readonly deps: ControlApiDeps,
     private readonly identity: RuntimeControlApiIdentity,
+    private readonly rateLimiter?: RateLimitService,
   ) {}
 
   /** Inject screen size getter (set by app-controller after construction). */
@@ -197,6 +229,42 @@ export class ControlApiService {
   /** Whether a socket is currently registered for discovery. */
   hasSocket(): boolean {
     return this.socketPath != null;
+  }
+
+  private writeRuntimeControlManifest(socketPath: string): void {
+    if (!this.identity.dataRoot) return;
+    const manifestPath = path.join(this.identity.dataRoot, "runtime", "control-manifest.json");
+    this.runtimeManifestPath = manifestPath;
+    safeWriteFile(
+      manifestPath,
+      `${JSON.stringify({
+        instanceId: this.identity.instanceId,
+        instanceDisplayId: this.identity.instanceDisplayId,
+        instanceLabel: this.identity.instanceLabel ?? null,
+        pid: process.pid,
+        host: this.identity.host,
+        apiPort: this.actualPort ?? this.port,
+        socketPath,
+        instanceRoot: this.identity.instanceRoot,
+        dataRoot: this.identity.dataRoot,
+        updatedAt: new Date().toISOString(),
+      }, null, 2)}\n`,
+    );
+  }
+
+  private cleanupRuntimeControlManifest(): void {
+    const manifestPath = this.runtimeManifestPath;
+    if (!manifestPath) return;
+    try {
+      const current = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { instanceId?: string; pid?: number };
+      const sameProcess = current?.pid === process.pid;
+      const sameInstance = current?.instanceId === this.identity.instanceId;
+      if (sameProcess || sameInstance) {
+        try { fs.unlinkSync(manifestPath); } catch {}
+      }
+    } catch {
+      // Ignore parse/read errors on cleanup.
+    }
   }
 
   /** Start HTTP server + unix socket (normal startup). */
@@ -238,9 +306,9 @@ export class ControlApiService {
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
-          hostname: "127.0.0.1",
+          hostname: this.identity.host,
           port,
-          fetch: async (request) => this.handleRequest(request),
+          fetch: async (request) => this.handleWithIngressLimit(request),
         });
         this.actualPort = port;
         this.enabled = true;
@@ -260,12 +328,17 @@ export class ControlApiService {
 
     // ── Clean shutdown: delete socket + PID sidecar ──
     const cleanup = () => {
-      if (this.socketPath) {
-        try { fs.unlinkSync(this.socketPath); } catch {}
+      for (const fp of [
+        this.socketPath,
+        this.pidPath,
+        this.discoveryPath,
+        this.legacySocketPath,
+        this.legacyPidPath,
+      ]) {
+        if (!fp) continue;
+        try { fs.unlinkSync(fp); } catch {}
       }
-      if (this.pidPath) {
-        try { fs.unlinkSync(this.pidPath); } catch {}
-      }
+      this.cleanupRuntimeControlManifest();
     };
     process.on("SIGTERM", cleanup);
     process.on("SIGINT", cleanup);
@@ -275,26 +348,69 @@ export class ControlApiService {
   /** Register unix socket + PID sidecar for CLI discovery. */
   registerSocket(): void {
     if (this.socketServer) return; // already registered
-    if (!this.identity.scratchBase) return;
+    if (!this.identity.instanceRoot) return;
     const bunRuntime = (globalThis as any).Bun;
     if (!bunRuntime) return;
+
+    const instanceRoot = this.identity.instanceRoot;
+    const canonicalSockPath = path.join(instanceRoot, "control.sock");
+    const canonicalPidPath = path.join(instanceRoot, "control.pid");
+    const discoveryPath = path.join(instanceRoot, "discovery.json");
+
+    // Legacy compatibility aliases (temporary)
     const label = this.identity.instanceLabel || this.identity.instanceId;
-    const instancesDir = path.join(this.identity.scratchBase, "instances");
-    const sockPath = path.join(instancesDir, `${label}.sock`);
-    const pidFilePath = path.join(instancesDir, `${label}.pid`);
+    const legacyInstancesDir = this.identity.scratchBase
+      ? path.join(this.identity.scratchBase, "instances")
+      : undefined;
+    const legacySockPath = legacyInstancesDir
+      ? path.join(legacyInstancesDir, `${label}.sock`)
+      : undefined;
+    const legacyPidPath = legacyInstancesDir
+      ? path.join(legacyInstancesDir, `${label}.pid`)
+      : undefined;
+
     try {
-      fs.mkdirSync(instancesDir, { recursive: true });
-      // Clean stale socket from previous run
-      try { fs.unlinkSync(sockPath); } catch {}
+      fs.mkdirSync(instanceRoot, { recursive: true });
+      if (legacyInstancesDir) fs.mkdirSync(legacyInstancesDir, { recursive: true });
+
+      // Clean stale canonical socket from previous run
+      try { fs.unlinkSync(canonicalSockPath); } catch {}
+
       this.socketServer = bunRuntime.serve({
-        unix: sockPath,
-        fetch: async (request: Request) => this.handleRequest(request),
+        unix: canonicalSockPath,
+        fetch: async (request: Request) => this.handleWithIngressLimit(request),
       });
-      this.socketPath = sockPath;
-      // Write PID sidecar for CLI liveness checks
-      fs.writeFileSync(pidFilePath, String(process.pid));
-      this.pidPath = pidFilePath;
-      log.app(`control API socket at ${sockPath} (pid ${process.pid})`);
+
+      this.socketPath = canonicalSockPath;
+      this.pidPath = canonicalPidPath;
+      this.discoveryPath = discoveryPath;
+      this.legacySocketPath = legacySockPath;
+      this.legacyPidPath = legacyPidPath;
+
+      fs.writeFileSync(canonicalPidPath, String(process.pid));
+      fs.writeFileSync(
+        discoveryPath,
+        `${JSON.stringify({
+          instanceId: this.identity.instanceId,
+          instanceDisplayId: this.identity.instanceDisplayId,
+          instanceLabel: this.identity.instanceLabel ?? null,
+          socketPath: canonicalSockPath,
+          pid: process.pid,
+          updatedAt: new Date().toISOString(),
+        }, null, 2)}\n`,
+      );
+
+      // Legacy compatibility: alias socket path + pid file under scratch/instances.
+      if (legacySockPath && legacyPidPath) {
+        try { fs.unlinkSync(legacySockPath); } catch {}
+        try { fs.symlinkSync(canonicalSockPath, legacySockPath); } catch {
+          // symlink may fail on some systems; fallback to leaving no alias
+        }
+        try { fs.writeFileSync(legacyPidPath, String(process.pid)); } catch {}
+      }
+
+      this.writeRuntimeControlManifest(canonicalSockPath);
+      log.app(`control API socket at ${canonicalSockPath} (pid ${process.pid})`);
     } catch (err) {
       log.err(`control API socket failed: ${err}`);
       // HTTP still works — socket is best-effort
@@ -307,14 +423,22 @@ export class ControlApiService {
       this.socketServer.stop(true);
       this.socketServer = undefined;
     }
-    if (this.socketPath) {
-      try { fs.unlinkSync(this.socketPath); } catch {}
-      this.socketPath = undefined;
+    for (const fp of [
+      this.socketPath,
+      this.pidPath,
+      this.discoveryPath,
+      this.legacySocketPath,
+      this.legacyPidPath,
+    ]) {
+      if (!fp) continue;
+      try { fs.unlinkSync(fp); } catch {}
     }
-    if (this.pidPath) {
-      try { fs.unlinkSync(this.pidPath); } catch {}
-      this.pidPath = undefined;
-    }
+    this.socketPath = undefined;
+    this.pidPath = undefined;
+    this.discoveryPath = undefined;
+    this.legacySocketPath = undefined;
+    this.legacyPidPath = undefined;
+    this.cleanupRuntimeControlManifest();
     log.app("control API socket deregistered");
   }
 
@@ -327,7 +451,7 @@ export class ControlApiService {
   }
 
   getStatus(): { enabled: boolean; port?: number; host?: string; baseUrl?: string; socketPath?: string } {
-    const host = "127.0.0.1";
+    const host = this.identity.host;
     const baseUrl = this.enabled && this.actualPort ? `http://${host}:${this.actualPort}` : undefined;
     return {
       enabled: this.enabled,
@@ -336,6 +460,36 @@ export class ControlApiService {
       baseUrl,
       socketPath: this.socketPath,
     };
+  }
+
+  private async handleWithIngressLimit(request: Request): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    const decision = this.rateLimiter?.ingress(request.method, pathname);
+    if (decision && !decision.allowed) {
+      const retrySeconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "rate_limited",
+          retryAfterMs: decision.retryAfterMs,
+          surface: "api",
+          path: pathname,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Retry-After": String(retrySeconds),
+          },
+        },
+      );
+    }
+
+    try {
+      return await this.handleRequest(request);
+    } finally {
+      decision?.lease?.release();
+    }
   }
 
   private runApiCommand(id: string, args?: Record<string, unknown>) {
@@ -387,6 +541,7 @@ export class ControlApiService {
       return Response.json({
         ok: true,
         instanceId: this.identity.instanceId,
+        instanceDisplayId: this.identity.instanceDisplayId,
         instanceLabel: this.identity.instanceLabel ?? null,
         pid: process.pid,
         startedAt: new Date(this.startedAt).toISOString(),
@@ -394,6 +549,8 @@ export class ControlApiService {
         port: this.actualPort,
         host: this.identity.host,
         socketPath: this.socketPath ?? null,
+        dataRoot: this.identity.dataRoot,
+        instanceRoot: this.identity.instanceRoot,
         screen: screen ? { width: screen.width, height: screen.height } : null,
       });
     }
@@ -403,6 +560,9 @@ export class ControlApiService {
         instanceId: this.identity.instanceId,
         requestedPort: this.identity.apiPort,
         scratchBase: this.identity.scratchBase,
+        dataRoot: this.identity.dataRoot,
+        instanceRoot: this.identity.instanceRoot,
+        exportsDir: this.identity.exportsDir,
         capturesDir: this.identity.capturesDir,
         workspacesDir: this.identity.workspacesDir,
         statePath: this.identity.statePath,
@@ -494,6 +654,13 @@ export class ControlApiService {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
+    // ── /screenshot — friendly alias to /screenshot/text ──────────────────
+    if (request.method === "GET" && url.pathname === "/screenshot") {
+      const next = new URL(request.url);
+      next.pathname = "/screenshot/text";
+      return this.handleRequest(new Request(next.toString(), request));
+    }
+
     // ── /screenshot/text — clean readable text (default) ──────────────────
     if (request.method === "GET" && url.pathname === "/screenshot/text") {
       const rawId = url.searchParams.get("id");
@@ -505,7 +672,8 @@ export class ControlApiService {
         const semantic = this.deps.windows.captureText(id);
         if (semantic !== undefined) {
           // captureText may include ANSI styling (e.g. syntax-highlighted editor content)
-          return new Response(stripAnsi(semantic), { headers: TEXT_HEADERS });
+          const cleaned = trimTrailingBlankLines(stripAnsi(semantic));
+          return new Response(cleaned, { headers: TEXT_HEADERS });
         }
         // Fallback: crop from blessed screen dump + strip
         const raw = this.deps.inspection.screenshotText();
@@ -519,13 +687,15 @@ export class ControlApiService {
           const cropped = lines.slice(y, y + h).map((line: string) => {
             return stripBlessedChrome(line).slice(x, x + w);
           });
-          return new Response(cropped.join("\n"), { headers: TEXT_HEADERS });
+          return new Response(trimTrailingBlankLines(cropped.join("\n")), { headers: TEXT_HEADERS });
         }
         return new Response("window not found", { status: 404, headers: TEXT_HEADERS });
       }
-      // Full screen: strip everything
-      const text = stripBlessedChrome(this.deps.inspection.screenshotText());
-      return new Response(text, { headers: TEXT_HEADERS });
+      // Full screen: strip everything + add friendly framing on tiny/empty outputs
+      const raw = stripBlessedChrome(this.deps.inspection.screenshotText());
+      const text = trimTrailingBlankLines(raw);
+      const pretty = isTinyScreenshot(text) ? formatPrettyScreenshot(text, "text") : text;
+      return new Response(pretty, { headers: TEXT_HEADERS });
     }
 
     // ── /screenshot/ansi — raw blessed dump (preserves escapes) ─────────
@@ -553,7 +723,10 @@ export class ControlApiService {
           text = cropped.join("\n");
         }
       }
-      return new Response(text, { headers: TEXT_HEADERS });
+      const out = rawId === null && isTinyScreenshot(stripAnsi(text))
+        ? formatPrettyScreenshot(text, "ansi")
+        : text;
+      return new Response(out, { headers: TEXT_HEADERS });
     }
 
     if (request.method === "GET" && url.pathname === "/windows/text") {

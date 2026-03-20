@@ -1,0 +1,17 @@
+========================================
+Suite run: 2026-03-19T12:12:53Z
+Scripts: smoke-screenshot-pipeline
+Instance: 444b0758:8099
+Output: /Users/james/Repos/wibwob-zine-moodboard/.planning/experiments/runs/2026-03-19-mwg-initial
+========================================
+
+.planning/experiments/suite-runner.sh: line 92: declare: -A: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]
+========================================
+Suite run: 2026-03-19T12:13:34Z
+Scripts: smoke-screenshot-pipeline
+Instance: 444b0758:8099
+Output: /Users/james/Repos/wibwob-zine-moodboard/.planning/experiments/runs/2026-03-19-mwg-initial
+========================================
+
+--- smoke-screenshot-pipeline ---

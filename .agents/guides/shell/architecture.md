@@ -1,5 +1,7 @@
 # Architecture Reference
 
+> **COAT** ("Command Once, Adapt Thin") — the WibWob-DOS architectural principle. Defined in `AGENTS.md`. All shell and microapp guidance follows COAT semantics.
+
 Full service and file inventory for WibWob-DOS.
 The app is built for a proactive autonomous agent with equal control of the OS alongside a human — every surface that matters to a human must be equally reachable by an agent.
 
@@ -24,6 +26,8 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 
 ### UI Design System (`src/ui/`)
 
+> **Docs authority:** Agent-readable canonical guides live in `.agents/guides/`. `docs/` provides narrative overviews for humans.
+
 Terminal component library. See `docs/design-system.md` for full reference.
 
 - `src/ui/types.ts` — Rect, LayoutPart, FlexBasis, TrackSize, AxisAlign
@@ -47,7 +51,7 @@ Microapp-facing surface. Stable import path: `src/services/microapp-sdk.ts`.
 ### Services
 
 - `src/services/state-service.ts` — canonical live desktop/app/window state; every window reports semantic content metadata through `describeState()`
-- `src/services/control-api.ts` — local HTTP control surface; see `.agents/shell-dev/control-api.md` for full endpoint list
+- `src/services/control-api.ts` — local HTTP control surface; see `.agents/guides/shell/control-api.md` for full endpoint list
 - `src/services/workspace-service.ts` — named workspace persistence only
 - `src/services/content-service.ts` — repo content discovery and text-file utility behaviour
 - `src/services/content-measurement.ts` — shared content measurement for primers, text, and future content types; returns content metrics, never chrome-adjusted widget math
@@ -71,6 +75,8 @@ Microapp-facing surface. Stable import path: `src/services/microapp-sdk.ts`.
 - `src/windows/backrooms-windows.ts` — Backrooms TV window and log browser
 
 ## Adding a New Window Type
+
+> **Scope: host-managed windows only.** This checklist applies to windows in `src/windows/`. Microapps do not extend `WindowKind` or touch `command-catalog.ts` — see `.agents/guides/microapp/quick-start.md` instead.
 
 Checklist — every item is mandatory:
 
@@ -189,8 +195,8 @@ Running two WibWob-DOS instances on one machine requires three isolations:
 | Resource | Conflict | Fix |
 |----------|----------|-----|
 | HTTP API port | both bind 8099 → EADDRINUSE | `CONTROL_API_PORT=8098` for alt |
-| Workspace + state | both read/write `scratch/workspaces/`, `scratch/app-state.json` | `SCRATCH_DIR=scratch/alt` for alt |
-| World-chat log | both append to same file | same `SCRATCH_DIR` fix covers this |
+| Runtime data root | both read/write same `DATA_ROOT` | set distinct `WIBWOB_DATA_DIR` per instance when isolation is required |
+| Legacy scratch aliases | compatibility sockets/paths can collide if reused | optional `SCRATCH_DIR=scratch/alt` while legacy paths exist |
 | IRC nick | both try same nick → 433 | `WIBWOB_INSTANCE_LABEL=zuk` for alt |
 | TTY | blessed crashes without a real PTY | each instance needs its own tmux window |
 
@@ -210,20 +216,19 @@ bun run wibwob --instance zuk health     # alt
 does not make "alt" a valid target. Always capture the index:
 `WIN=$(tmux new-window -t wibwob -P -F '#{window_index}')`
 
-`dev:world:alt` sets `WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt`.
+`dev:world:alt` currently sets `WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt`.
 
-The alt instance will NOT restore the main workspace on first run (no `scratch/alt/workspaces/default.json`
-exists) — it falls back to Scramble. That is fine for smoke tests.
+For e053+ flows, prefer explicit data-root isolation:
 
-**Scratch paths** — `SCRATCH_DIR` env var (config.ts) controls:
-- `WORKSPACES_DIR` → `<SCRATCH_BASE>/workspaces`
-- `STATE_PATH`     → `<SCRATCH_BASE>/app-state.json`
-- `CAPTURES_DIR`   → `<SCRATCH_BASE>/captures`
-- `LOGS_DIR`       → `<SCRATCH_BASE>/logs`
-- `PI_AGENT_HOME`  → `<SCRATCH_BASE>/pi-agent-home`
-- `APP_NOTES_PATH` → `<SCRATCH_BASE>/mvp-notes.txt`
+```bash
+WIBWOB_INSTANCE_LABEL=main WIBWOB_DATA_DIR=$HOME/.wibwob-main bun run dev:world
+WIBWOB_INSTANCE_LABEL=zuk  WIBWOB_DATA_DIR=$HOME/.wibwob-zuk  CONTROL_API_PORT=8098 bun run dev:world
+```
 
-Paths NOT yet covered by `SCRATCH_DIR` (hard-coded in individual windows):
-`scratch/captures` in contour/plasma/terrain windows, `scratch/generated/smear` in
-app-controller. These are captures only (not read on startup) — they don't cause
-dual-instance conflicts in practice.
+Canonical runtime state lives under:
+- `<DATA_ROOT>/instances/{instanceId}/state.json`
+- `<DATA_ROOT>/instances/{instanceId}/workspaces/`
+- `<DATA_ROOT>/instances/{instanceId}/logs/`
+- `<DATA_ROOT>/instances/{instanceId}/control.sock`
+
+`SCRATCH_DIR` paths are retained as temporary compatibility aliases during migration.

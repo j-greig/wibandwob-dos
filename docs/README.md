@@ -6,8 +6,8 @@ Start at `AGENTS.md` (project root) — that's the entry point for every session
 Run `bash scripts/discover.sh` for a lens-organized index of scripts, skills, and docs.
 
 Deeper agent docs live in `.agents/`:
-- `.agents/microapp-dev/` — build microapps (7 docs, start with `quick-start.md`)
-- `.agents/shell-dev/` — host runtime internals (specs, architecture, devlog)
+- `.agents/guides/microapp/` — build microapps (7 docs, start with `quick-start.md`)
+- `.agents/guides/shell/` — host runtime internals (specs, architecture, devlog)
 
 ## For humans
 

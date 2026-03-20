@@ -17,6 +17,9 @@ Terminology:
 
 ## Quick start
 
+For the absolute shortest bootstrap path, use `.agents/guides/microapp/quick-start.md`.
+This document is the deeper build guide (structure, lifecycle, persistence, patterns).
+
 Use the scaffold script to create a new microapp package:
 
 ```bash
@@ -24,8 +27,22 @@ bash scripts/scaffold-microapp.sh microapps/my-app wibwob.myapp "My App" 150
 ```
 
 This creates `microapps/my-app/microapp.json` and `microapps/my-app/index.ts` with
-working boilerplate. Restart the app or run `wibwob cmd microapps.reload` and
-"My App" appears in the Applications menu and command palette.
+working boilerplate.
+
+**Register in microapp-registry.ts** — add your microapp to `src/core/microapp-registry.ts` →
+`REGISTRY` so the loader picks it up. Without this step the microapp is never loaded,
+even after a restart.
+
+```typescript
+// src/core/microapp-registry.ts → REGISTRY
+{ id: "wibwob.myapp", tier: "core" }
+// Tiers: core = menu + API  |  beta = API only  |  internal = dev/demo  |  disabled = not loaded
+```
+
+See `AGENTS.md` ("New microapp not showing?") for the full tier table.
+
+Restart the app or run `wibwob cmd microapps.reload` and "My App" appears in the
+Applications menu and command palette.
 
 Related scripts and tools:
 
@@ -73,6 +90,7 @@ microapps/
 Key fields:
 
 - `id` — globally unique microapp identifier, used as `appType` in state
+  - Open command id convention: `microapp.<microapp.id>.open` (derived from manifest id, not folder name)
 - `multiInstance` — true if multiple windows of this type can coexist
 - `persist` — true if window state should survive workspace save/restore
 - `menu` — where the app appears in the menu bar
@@ -99,8 +117,8 @@ Example:
 ## The entry point: index.ts
 
 ```typescript
-import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { createTextBlock } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -116,14 +134,10 @@ export default function setup(host: MicroappHost) {
 function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "My App", width: 60, height: 20 });
 
-  const content = blessed.box({
-    parent: win.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    content: "Hello from My App!",
-    style: host.theme().body,
+  const content = createTextBlock(win.body, {
+    text: "Hello from My App!",
+    paddingLeft: 1,
+    paddingTop: 1,
   });
 
   // Required lifecycle hooks:
@@ -132,10 +146,10 @@ function openMyApp(host: MicroappHost) {
     summary: "My App — running.",
   }));
 
-  win.captureText(() => content.getContent());
+  win.captureText(() => "Hello from My App!");
 
   win.onRestyle(() => {
-    content.style = host.theme().body;
+    content.restyle();
     host.screen.render();
   });
 
@@ -295,6 +309,8 @@ Absolute path to the WibWob-DOS repo root. Use instead of hardcoding paths.
 
 ## Required lifecycle hooks
 
+> **Canonical reference:** `.agents/guides/microapp/quick-start.md` §Required hooks. The definitions here are supplementary context.
+
 Every microapp window MUST implement these four hooks:
 
 1. `win.describeState(() => ({ summary: "..." }))` — semantic state for agents
@@ -316,29 +332,29 @@ Every microapp window MUST implement these four hooks:
 Use `createTimer` from the SDK for interval-based updates:
 
 ```typescript
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, safeDestroyAll, safeDestroy, createTextBlock } from "../../src/services/microapp-sdk.js";
 
 function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "Animated", width: 40, height: 10 });
   const timers = new Set<ReturnType<typeof setInterval>>();
 
-  const display = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 0,
-    style: host.theme().body,
-  });
+  const display = createTextBlock(win.body, { text: "Tick: 0" });
 
   let tick = 0;
   createTimer(() => {
     tick++;
-    display.setContent(`Tick: ${tick}`);
+    display.update({ text: `Tick: ${tick}` });
     host.screen.render();
   }, 100, timers);
 
   win.describeState(() => ({ summary: `Animated — tick ${tick}` }));
   win.captureText(() => `Tick: ${tick}`);
-  win.onRestyle(() => { display.style = host.theme().body; host.screen.render(); });
-  win.onCleanup(() => clearTimers(timers));
+  win.onRestyle(() => { display.restyle(); host.screen.render(); });
+  win.onCleanup(() => {
+    clearTimers(timers);
+    safeDestroyAll(content, statusBar, sidebar);
+    safeDestroy(optionalThirdPartyWidget);
+  });
 }
 ```
 
@@ -406,7 +422,7 @@ After creating your module:
 2. Restart the app
 3. Check the Applications menu for your app
 4. Open it and verify the window appears
-5. Check `curl http://127.0.0.1:8099/state` — your window should appear with
+5. Check `bun run src/cli/wibwob.ts -i <label> state` — your window should appear with
    the correct `appType` and `summary`
 6. Cycle the theme — your window should restyle correctly
 7. Close the window — no console errors, no leaked timers
@@ -433,5 +449,5 @@ After creating your module:
 ## Further reading
 
 - `src/services/microapp-sdk.ts` — full list of SDK exports
-- `.agents/microapp-dev/sdk-reference.md` — SDK API reference and advanced primitives
+- `.agents/guides/microapp/sdk-reference.md` — SDK API reference and advanced primitives
 - `scripts/scaffold-microapp.sh` — automated module scaffolding

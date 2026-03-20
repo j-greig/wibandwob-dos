@@ -1,7 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import { LOGS_DIR } from "../core/config.js";
+import { LOGS_DIR, DATA_ROOT } from "../core/config.js";
 import { createWorldChatTransport, type WorldChatTransport, type WorldChatTransportStatus } from "./world-chat-transport.js";
+
+// Lazily resolve log path - prefers instance-scoped path if DATA_ROOT is set and different from legacy
+function resolveWorldChatLogPath(): string {
+  // If DATA_ROOT is set and LOGS_DIR points to the legacy scratch path, use instance-scoped
+  const instanceLogDir = DATA_ROOT ? path.join(DATA_ROOT, "instances") : null;
+  const legacyScratchLogDir = path.join(path.dirname(path.dirname(LOGS_DIR)), "scratch", "logs");
+  
+  // Check if LOGS_DIR looks like the legacy scratch path
+  if (LOGS_DIR?.includes("scratch") && instanceLogDir && instanceLogDir !== legacyScratchLogDir) {
+    // Use instance-scoped path
+    const instanceId = process.env.WIBWOB_INSTANCE_ID || "default";
+    return path.join(instanceLogDir, instanceId, "world-chat.log");
+  }
+  
+  // Fall back to legacy path
+  return path.join(LOGS_DIR, "world-chat.log");
+}
 
 export interface Chatspot {
   id: string;
@@ -99,7 +116,7 @@ function defaultChatspots(width: number, height: number): Chatspot[] {
   ];
 }
 
-const WORLD_CHAT_LOG_PATH = path.join(LOGS_DIR, "world-chat.log");
+const WORLD_CHAT_LOG_PATH = resolveWorldChatLogPath();
 const WORLD_CHAT_IDENTITY = [
   process.env.WIBWOB_INSTANCE_LABEL?.trim(),
   process.env.WIBWOB_INSTANCE_ID?.trim(),

@@ -1,17 +1,24 @@
 {
-  "name": "wibandwob-dos",
-  "private": true,
+  "name": "wibwob-dos",
+  "private": false,
   "version": "0.2.0",
   "description": "WibWob-DOS — terminal-native TypeScript TUI shell",
   "type": "module",
+  "bin": {
+    "wibwob": "src/cli/wibwob.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "bun run src/app.ts --dev",
     "dev:world": "WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=main bun run src/app.ts --dev",
     "dev:world:alt": "WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt bun run src/app.ts --dev",
     "start": "bun run src/app.ts",
-    "dev-irc-server": "bun run .agents/skills/ww-room-chat/scripts/dev-irc-server.ts",
-    "dev-irc-bot-burst": "python3 .agents/skills/ww-room-chat/scripts/dev-irc-bot-burst.py",
-    "gen-primitives": "bun scripts/gen-primitives.ts",
+    "dev-irc-server": "bun run .pi/skills/ww-room-chat/scripts/dev-irc-server.ts",
+    "dev-irc-bot-burst": "python3 .pi/skills/ww-room-chat/scripts/dev-irc-bot-burst.py",
+    "gen-primitives": "bun .pi/skills/ww-primitives/scripts/gen-primitives.ts",
+    "gen-skills": "python3 scripts/gen-skills-doc.py",
     "scaffold:microapp": "bash scripts/scaffold-microapp.sh",
     "check-surface-parity": "bun run scripts/.archive/check-surface-parity.ts",
     "test": "bun test src/tests/unit/",
@@ -19,14 +26,16 @@
     "test:all": "bun test src/tests/",
     "typecheck": "node_modules/.bin/tsc --noEmit",
     "health": "bun run test && bun run typecheck && bun run check-coat && bash -c 'cycles=$(npx madge --circular --extensions ts src/ 2>&1 | grep -c \"^[0-9])\" || true); [ \"$cycles\" = \"0\" ] && echo \"✅ No circular deps\" || (echo \"❌ $cycles circular deps\"; exit 1)' && echo '✅ All health checks passed'",
+    "health-full": "bash scripts/health-full.sh",
     "handover": "bash scripts/handover.sh",
-    "check-coat": "bun run scripts/checks/check-coat.ts",
-    "check-themes": "bun run scripts/checks/check-themes.ts",
+    "check-coat": "bun run .pi/skills/tui-smoke-test/scripts/check-coat.ts",
+    "cli:install": "bun build --compile src/cli/wibwob.ts --outfile /tmp/wibwob-next && sudo mv /tmp/wibwob-next /usr/local/bin/wibwob && echo '✅ wibwob installed'",
+    "check-themes": "bun run .pi/skills/tui-smoke-test/scripts/check-themes.ts",
     "watch:microapp": "bun run scripts/watch-microapp.ts",
     "planning:status": "bash .claude/scripts/planning.sh status",
     "planning:sync": "bash .claude/scripts/planning.sh sync",
     "planning:branch": "git branch --show-current && git log --oneline -5",
-    "planning:inbox": "bun run scripts/planning-inbox.ts",
+    "planning:inbox": "echo 'planning-inbox.ts removed — use wibwob CLI or .planning/ directly'",
     "prepare": "git config core.hooksPath .githooks",
     "lint": "npx eslint 'microapps/**/index.ts'",
     "wibwob": "bun run src/cli/wibwob.ts"
@@ -37,7 +46,9 @@
     "@mariozechner/pi-coding-agent": "^0.55.3",
     "@mediapipe/tasks-vision": "^0.10.32",
     "@mozilla/readability": "^0.6.0",
+    "@sinclair/typebox": "^0.34.48",
     "@skitee3000/bun-pty": "^0.3.3",
+    "@xterm/headless": "^6.0.0",
     "ascii-data-image": "^1.0.7852",
     "ascii-raytracer": "^0.0.154",
     "blessed": "^0.1.81",
@@ -53,13 +64,19 @@
     "term.js": "^0.0.7",
     "turndown": "^7.2.2",
     "turndown-plugin-gfm": "^1.0.2",
-    "youtube-transcript-plus": "^1.2.0"
+    "yaml": "^2.8.2",
+    "youtube-transcript-plus": "^1.2.0",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
+    "@e9n/pi-subagent": "file:vendor/espennilsen-pi/extensions/pi-subagent",
     "@types/blessed": "^0.1.25",
     "@types/jsdom": "^28.0.0",
     "@types/node": "^24.0.0",
     "@types/turndown": "^5.0.6",
+    "knip": "^6.0.0",
+    "madge": "^8.0.0",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.57.0"
   }

@@ -1,0 +1,42 @@
+# Keep npm package focused on runtime + CLI, exclude repo-only artifacts
+
+# VCS / CI
+.git/
+.github/
+.gitmodules
+.dockerignore
+.githooks/
+.claude/
+
+# Agent/planning/internal workspaces
+.agents/
+.pi/
+.planning/
+.tmp/
+
+# Local/runtime artifacts
+scratch/
+.trash/
+logs/
+
+# Tests and captures
+tests/
+
+# Deployment recipes (not needed in npm runtime package)
+deploy/
+
+# Vendored upstream repos and local experiments
+vendor/
+
+# Private microapps and prompts should never be in public npm tarball
+microapps-private/
+
+# Misc
+.codex-logs/
+.ralph/
+*.tgz
+-D
+
+# Never publish local env files
+.env
+.env.*

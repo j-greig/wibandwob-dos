@@ -2,6 +2,13 @@
 
 Scaffold, edit, run. Under 60 seconds to a working microapp.
 
+Scope of this doc:
+- shortest path to first working microapp,
+- mandatory hooks and verification,
+- no exhaustive API reference (see `sdk-reference.md`).
+
+> **Authority:** This is the fastest bootstrap path. For full narrative context, see `docs/building-custom-microapps.md`.
+
 ## 1. Scaffold
 
 ```bash
@@ -14,17 +21,27 @@ Repo naming note:
 - files live under `microapps/`
 - the runtime surface is a microapp
 
-## 2. The five imports you always need
+## 2. Register in microapp-registry.ts
+
+Add your microapp to `src/core/microapp-registry.ts` → `REGISTRY`:
 
 ```typescript
-import blessed from "blessed";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
+{ id: "wibwob.myapp", tier: "beta" }  // beta = API only; core = menu+API
 ```
 
+See `AGENTS.md` for full tier definitions (`core | beta | internal | disabled`).
+
+## 3. The core imports you usually need
+
+```typescript
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { createTimer, clearTimers, createTextBlock } from "../../src/services/microapp-sdk.js";
+```
+
+Prefer SDK components first. Only drop to raw `blessed` when no SDK primitive fits.
 Add more from the SDK as needed — see `sdk-reference.md` for the full surface.
 
-## 3. The pattern
+## 4. The pattern
 
 ```typescript
 export default function setup(host: MicroappHost) {
@@ -41,24 +58,27 @@ function openMyApp(host: MicroappHost) {
   const win = host.createWindow({ title: "My App", width: 60, height: 20 });
   const timers = new Set<ReturnType<typeof setInterval>>();
 
-  const content = blessed.box({
-    parent: win.body,
-    top: 0, left: 0, right: 0, bottom: 0,
-    content: "Hello from My App!",
-    style: host.theme().body,
+  const content = createTextBlock(win.body, {
+    text: "Hello from My App!",
+    paddingLeft: 1,
+    paddingTop: 1,
   });
 
   // Four required hooks:
   win.describeState(() => ({ summary: "My App — running." }));
-  win.captureText(() => content.getContent());
-  win.onRestyle(() => { content.style = host.theme().body; host.screen.render(); });
+  win.captureText(() => "Hello from My App!");
+  win.onRestyle(() => { content.restyle(); host.screen.render(); });
   win.onCleanup(() => clearTimers(timers));
 
   win.focus();
 }
 ```
 
-## 4. Verify
+> If you use any layout primitive (`createStack`, `createRow`, `createGrid`), add `win.onResize(render)` as a fifth required hook — without it the window never reflows on resize.
+
+## 5. Verify
+
+Command id reminder: use `microapp.<microapp.json:microapp.id>.open` (not the directory name) when writing gate commands.
 
 ```bash
 bun run typecheck
@@ -86,11 +106,20 @@ Treat `--strategy reload` as experimental. The reliable default is restart+reope
 
 ## Next steps
 
+### Routing hints
+
+- If your microapp uses animation → see `sdk-reference.md` §Animation
+- If your microapp needs persistence → see `persistence.md`
+- If you're building a custom component → see `component-contract.md`
+
+### Further reading
+
 - Full guide: `docs/building-custom-microapps.md`
 - Pick an example by complexity: `examples-by-tier.md`
 - Advanced SDK primitives: `sdk-reference.md`
 - Workspace persistence: `persistence.md`
 - Common mistakes: `pitfalls.md`
+- Custom component SDK contract: `.agents/guides/microapp/component-contract.md` — required reading before building custom components
 - Visual TUI proof: `tmux attach -t wibwob`
 - Stable scaffold: `scripts/scaffold-microapp.sh`
 - Experimental reload loop: `scripts/watch-microapp.ts`

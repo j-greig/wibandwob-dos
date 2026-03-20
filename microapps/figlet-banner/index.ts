@@ -6,12 +6,14 @@ import {
   getFigletFontChoices,
   getFigletCatalogue,
   getFigletWindowContentSize,
+  toggleFigletFavourite,
 } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
 
 export default function setup(host: MicroappHost) {
   // Track open windows for write command
   const writeHandlers = new Map<number, (text: string) => void>();
+
   // ── "fonts" command — pure data, no window ──
   host.registerCommand({
     id: "fonts",
@@ -27,6 +29,29 @@ export default function setup(host: MicroappHost) {
         fonts: catalogue.allFontsSorted.map((font) => ({
           name: font,
           favourite: catalogue.favourites.includes(font),
+          meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
+        })),
+      };
+    },
+    palette: false,
+    menu: false,
+    direct: true,
+  });
+
+  // ── "favourites" command — pure data, no window ──
+  host.registerCommand({
+    id: "favourites",
+    label: "Figlet Favourite Fonts",
+    description:
+      "List favourite FIGlet fonts with metadata.",
+    action: () => {
+      const catalogue = getFigletCatalogue();
+      const favourites = catalogue.favourites;
+      return {
+        defaultFont: getDefaultFigletFont(),
+        count: favourites.length,
+        favourites: favourites.map((font) => ({
+          name: font,
           meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
         })),
       };
@@ -59,6 +84,50 @@ export default function setup(host: MicroappHost) {
     direct: true,
   });
 
+  // ── "view-all" command — render one text in all available fonts ──
+  host.registerCommand({
+    id: "view-all",
+    label: "Figlet View All Fonts",
+    description:
+      "Open a scrollable viewer with the current text rendered in every available FIGlet font. Args: text (string, optional).",
+    action: (args) => {
+      const textArg = (args?.text as string | undefined)?.trim();
+      if (textArg) {
+        openAllFontsWindow(textArg);
+      } else {
+        host.promptValue("Figlet Text (All Fonts)", "WIB WOB", (value) => {
+          openAllFontsWindow(value.trim() || "WIB WOB");
+        });
+      }
+      return { ok: true };
+    },
+    palette: { order: 51, label: "Figlet: View All Fonts" },
+    menu: false,
+    direct: true,
+  });
+
+  // ── "view-favourites" command — render one text in favourite fonts only ──
+  host.registerCommand({
+    id: "view-favourites",
+    label: "Figlet View Favourite Fonts",
+    description:
+      "Open a scrollable viewer with the current text rendered only in favourite FIGlet fonts. Args: text (string, optional).",
+    action: (args) => {
+      const textArg = (args?.text as string | undefined)?.trim();
+      if (textArg) {
+        openAllFontsWindow(textArg, true);
+      } else {
+        host.promptValue("Figlet Text (Favourite Fonts)", "WIB WOB", (value) => {
+          openAllFontsWindow(value.trim() || "WIB WOB", true);
+        });
+      }
+      return { ok: true };
+    },
+    palette: { order: 52, label: "Figlet: View Favourite Fonts" },
+    menu: false,
+    direct: true,
+  });
+
   // ── "write" command — update text on an existing window ──
   host.registerCommand({
     id: "write",
@@ -79,6 +148,99 @@ export default function setup(host: MicroappHost) {
     menu: false,
     direct: true,
   });
+
+  // ── All/favourite fonts window ──
+  function openAllFontsWindow(rawText: string, favouritesOnly = false) {
+    const text = rawText.trim() || "WIB WOB";
+    const catalogue = getFigletCatalogue();
+    const fonts = favouritesOnly ? catalogue.favourites : catalogue.allFontsSorted;
+    const modeLabel = favouritesOnly ? "Favourites" : "All Fonts";
+
+    const win = host.createWindow({
+      title: `${modeLabel}: ${text.slice(0, 18) || "Banner"}`,
+      width: Math.max(90, Math.min(140, (host.geometry?.width ?? 160) - 8)),
+      height: Math.max(24, Math.min(50, (host.geometry?.height ?? 70) - 6)),
+    });
+
+    const header = blessed.box({
+      parent: win.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: host.theme().header,
+      content: ` Rendering ${fonts.length} ${favouritesOnly ? "favourite" : "fonts"} for \"${text}\"... `,
+    });
+
+    const viewer = blessed.box({
+      parent: win.body,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      mouse: true,
+      keys: true,
+      vi: true,
+      tags: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: {
+        ch: "▐",
+        track: { bg: "default" },
+        style: { bg: "default", fg: "grey" },
+      },
+      style: host.theme().body,
+      content: "Rendering…",
+    });
+
+    let renderedContent = "";
+
+    function renderAllFonts() {
+      if (fonts.length === 0) {
+        renderedContent = `${text}\n\n(no figlet fonts discovered)`;
+      } else {
+        const sections: string[] = [];
+        for (const font of fonts) {
+          sections.push(`{bold}${font}{/bold}`);
+          sections.push(renderFiglet(text, font));
+          sections.push("");
+        }
+        renderedContent = sections.join("\n").trimEnd();
+      }
+
+      viewer.setContent(renderedContent || text);
+      header.setContent(` ${modeLabel} · ${fonts.length} · \"${text}\" · scroll with ↑↓/PgUp/PgDn `);
+      host.screen.render();
+    }
+
+    win.describeState(() => ({
+      summary: `Figlet ${favouritesOnly ? "favourites" : "all-fonts"}: \"${text}\" (${fonts.length} fonts)`,
+      appType: favouritesOnly ? "figlet-banner.favourites" : "figlet-banner.all-fonts",
+      inputText: text,
+      fontCount: fonts.length,
+      contentPreview: viewer
+        .getContent()
+        .split("\n")
+        .slice(0, 12)
+        .join("\n"),
+    }));
+
+    win.captureText(() => viewer.getContent());
+
+    win.onRestyle(() => {
+      const nt = host.theme();
+      header.style = nt.header;
+      viewer.style = nt.body;
+      host.screen.render();
+    });
+
+    win.setFocusTarget(viewer);
+    win.focus();
+
+    // Let the loading state paint before doing potentially heavy rendering.
+    host.screen.render();
+    setTimeout(renderAllFonts, 0);
+  }
 
   // ── Banner window ──
   function openBanner(text: string, initialFont: string) {
@@ -114,13 +276,37 @@ export default function setup(host: MicroappHost) {
       parent: toolbar,
       top: 0,
       left: 6,
-      right: 24,
+      right: 48,
       height: 1,
       mouse: true,
       keys: true,
       inputOnFocus: true,
       style: t.input,
       value: text,
+    });
+
+    const viewAllBtn = blessed.box({
+      parent: toolbar,
+      top: 0,
+      right: 36,
+      width: 12,
+      height: 1,
+      mouse: true,
+      clickable: true,
+      content: " [V] All ",
+      style: { ...t.footer, hover: t.selected },
+    });
+
+    const favsBtn = blessed.box({
+      parent: toolbar,
+      top: 0,
+      right: 24,
+      width: 12,
+      height: 1,
+      mouse: true,
+      clickable: true,
+      content: " [S] Favs",
+      style: { ...t.footer, hover: t.selected },
     });
 
     const fontBtn = blessed.box({
@@ -212,8 +398,16 @@ export default function setup(host: MicroappHost) {
       textInput.readInput();
     }
 
+    function viewAllFonts() {
+      openAllFontsWindow(currentText || "WIB WOB");
+    }
+
+    function viewFavouriteFonts() {
+      openAllFontsWindow(currentText || "WIB WOB", true);
+    }
+
     function pickFont() {
-      const allChoices = getFigletFontChoices();
+      let allChoices = getFigletFontChoices();
       let filtered = allChoices;
       let query = "";
       const idx = Math.max(0, allChoices.findIndex((c) => c.value === currentFont));
@@ -235,7 +429,7 @@ export default function setup(host: MicroappHost) {
         width: "40%",
         bottom: 0,
         border: "line",
-        label: " Fonts ",
+        label: " Fonts (SPACE=★) ",
         style: {
           ...host.theme().body,
           border: { fg: host.theme().accent.fg },
@@ -291,23 +485,36 @@ export default function setup(host: MicroappHost) {
         preview.setContent(renderFiglet(currentText || "WIB WOB", initialChoice.value));
       }
 
-      function updatePreview() {
+      function getSelectedChoice(): { value: string; label: string } | undefined {
         const selIdx = (fontList as unknown as { selected: number }).selected ?? 0;
-        const choice = filtered[selIdx];
+        return filtered[selIdx];
+      }
+
+      function updatePreview(status?: string) {
+        const choice = getSelectedChoice();
         if (choice) {
           preview.setContent(renderFiglet(currentText || "WIB WOB", choice.value));
+          preview.setLabel(status ?? ` Preview · ${choice.value} `);
+        } else {
+          preview.setContent("No matching fonts");
+          preview.setLabel(status ?? " Preview ");
         }
       }
 
-      function refilter() {
+      function refilter(preferredFont?: string) {
         const q = query.toLowerCase();
         filtered = q
           ? allChoices.filter((c) => c.label.toLowerCase().includes(q))
           : allChoices;
         fontList.setItems(filtered.map((c) => c.label) as unknown as blessed.Widgets.BlessedElement[]);
-        fontList.select(0);
+        let nextIndex = 0;
+        if (preferredFont) {
+          const preferredIndex = filtered.findIndex((c) => c.value === preferredFont);
+          if (preferredIndex >= 0) nextIndex = preferredIndex;
+        }
+        fontList.select(Math.max(0, Math.min(nextIndex, Math.max(0, filtered.length - 1))));
         updatePreview();
-        leftPane.setLabel(query ? ` Search: ${query}_ ` : " Fonts ");
+        leftPane.setLabel(query ? ` Search: ${query}_ ` : " Fonts (SPACE=★) ");
         host.screen.render();
       }
 
@@ -335,6 +542,19 @@ export default function setup(host: MicroappHost) {
         closePicker();
       });
 
+      // SPACE = toggle favourite and persist to private fonts.json
+      fontList.key(["space"], () => {
+        const choice = getSelectedChoice();
+        if (!choice) return;
+        const result = toggleFigletFavourite(choice.value);
+        allChoices = getFigletFontChoices();
+        refilter(choice.value);
+        updatePreview(result.ok
+          ? ` Preview · ${choice.value}${result.isFavourite ? " ★" : ""} `
+          : ` Preview · save failed: ${result.error ?? "unknown"} `);
+        host.screen.render();
+      });
+
       // Escape = close (clear search first if active)
       fontList.key(["escape"], () => {
         if (query) {
@@ -358,7 +578,7 @@ export default function setup(host: MicroappHost) {
         if (ch && ch.length === 1 && !key.ctrl && ch.charCodeAt(0) >= 32
           && key.name !== "enter" && key.name !== "return"
           && key.name !== "up" && key.name !== "down"
-          && key.name !== "escape") {
+          && key.name !== "escape" && key.name !== "space") {
           query += ch;
           refilter();
         }
@@ -382,10 +602,14 @@ export default function setup(host: MicroappHost) {
     });
     editBtn.on("click", editText);
     fontBtn.on("click", pickFont);
+    viewAllBtn.on("click", viewAllFonts);
+    favsBtn.on("click", viewFavouriteFonts);
 
     // Keyboard shortcuts on the viewer
     viewer.key(["e"], editText);
     viewer.key(["f"], pickFont);
+    viewer.key(["v"], viewAllFonts);
+    viewer.key(["s"], viewFavouriteFonts);
 
     // ── SDK hooks ──
     win.describeState(() => ({
@@ -412,6 +636,8 @@ export default function setup(host: MicroappHost) {
       toolbar.style = nt.header;
       toolbarLabel.style = nt.header;
       textInput.style = nt.input;
+      viewAllBtn.style = { ...nt.footer, hover: nt.selected };
+      favsBtn.style = { ...nt.footer, hover: nt.selected };
       fontBtn.style = { ...nt.footer, hover: nt.selected };
       editBtn.style = { ...nt.footer, hover: nt.selected };
       viewer.style = nt.body;

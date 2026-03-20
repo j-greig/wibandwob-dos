@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { safeReadFile } from "../core/safe-fs.js";
+import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -30,17 +30,58 @@ let figletAvailableCache: boolean | undefined;
 let figletFontDirCache: string | undefined;
 
 const FALLBACK_FONT = "standard";
+const FONT_FILE_RE = /\.(flf|tlf)$/i;
+
+function resolvePrivateFontJsonPath(): string {
+  return path.join(REPO_ROOT, "microapps-private", "wibwob-figlet-fonts", "fonts.json");
+}
+
+function resolveSharedFontJsonPath(): string {
+  return path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json");
+}
 
 function resolveFontJsonPath(): string {
-  for (const candidate of [
-    path.join(REPO_ROOT, "microapps-private", "wibwob-figlet-fonts", "fonts.json"),
-    path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json")
-  ]) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
+  const privatePath = resolvePrivateFontJsonPath();
+  if (fs.existsSync(privatePath)) {
+    return privatePath;
   }
-  return path.join(REPO_ROOT, "microapps", "wibwob-figlet-fonts", "fonts.json");
+  const sharedPath = resolveSharedFontJsonPath();
+  if (fs.existsSync(sharedPath)) {
+    return sharedPath;
+  }
+  return sharedPath;
+}
+
+function parseFontHeightFromFile(fontPath: string): number {
+  try {
+    const raw = fs.readFileSync(fontPath, "utf8");
+    const firstLine = raw.split("\n", 1)[0] ?? "";
+    const parts = firstLine.trim().split(/\s+/u);
+    const height = Number(parts[1] ?? 0);
+    return Number.isFinite(height) ? height : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function discoverInstalledFigletFonts(): Array<{ name: string; height: number }> {
+  const fontDir = getFigletFontDir();
+  if (!fontDir || !fs.existsSync(fontDir)) return [];
+
+  const entries = fs.readdirSync(fontDir, { withFileTypes: true });
+  const fonts = entries
+    .filter((entry) => entry.isFile() && FONT_FILE_RE.test(entry.name))
+    .map((entry) => {
+      const name = entry.name.replace(FONT_FILE_RE, "");
+      return {
+        name,
+        height: parseFontHeightFromFile(path.join(fontDir, entry.name))
+      };
+    })
+    .filter((item) => item.name.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return fonts;
 }
 
 export function getFigletCatalogue(): FigletCatalogue {
@@ -48,14 +89,14 @@ export function getFigletCatalogue(): FigletCatalogue {
     return catalogueCache;
   }
 
-  const raw = safeReadFile(resolveFontJsonPath()) ?? "[]";
+  const raw = safeReadFile(resolveFontJsonPath()) ?? "{}";
   const parsed = JSON.parse(raw) as {
     categories?: Array<{ id?: string; name?: string; description?: string; fonts?: string[] }>;
     favourites?: string[];
     font_metadata?: Record<string, { height?: number; width?: number }>;
   };
 
-  const fontMetadata = Object.fromEntries(
+  const fontMetadata: Record<string, FigletFontMeta> = Object.fromEntries(
     Object.entries(parsed.font_metadata ?? {}).map(([name, meta]) => [
       name,
       {
@@ -65,16 +106,55 @@ export function getFigletCatalogue(): FigletCatalogue {
     ])
   );
 
-  catalogueCache = {
-    categories: (parsed.categories ?? []).map((category) => ({
+  const discovered = discoverInstalledFigletFonts();
+  const installedSet = new Set(discovered.map((entry) => entry.name));
+  for (const { name, height } of discovered) {
+    if (!fontMetadata[name]) {
+      fontMetadata[name] = { height, width: 0 };
+    }
+  }
+
+  const allKnownFonts = Object.keys(fontMetadata).sort((a, b) => a.localeCompare(b));
+  const allFontsSorted = installedSet.size > 0
+    ? allKnownFonts.filter((font) => installedSet.has(font))
+    : allKnownFonts;
+
+  const categories = (parsed.categories ?? [])
+    .map((category) => ({
       id: category.id ?? "",
       name: category.name ?? "",
       description: category.description ?? "",
-      fonts: Array.isArray(category.fonts) ? [...category.fonts] : []
-    })),
-    favourites: Array.isArray(parsed.favourites) ? [...parsed.favourites] : [],
+      fonts: Array.isArray(category.fonts)
+        ? category.fonts.filter((font) => allFontsSorted.includes(font))
+        : []
+    }))
+    .filter((category) => category.fonts.length > 0);
+
+  if (categories.length === 0 && allFontsSorted.length > 0) {
+    categories.push({
+      id: "installed",
+      name: "Installed",
+      description: "Fonts discovered from local figlet installation",
+      fonts: [...allFontsSorted]
+    });
+  }
+
+  let favourites = Array.isArray(parsed.favourites)
+    ? parsed.favourites.filter((font) => allFontsSorted.includes(font))
+    : [];
+
+  if (favourites.length === 0 && allFontsSorted.includes(FALLBACK_FONT)) {
+    favourites = [FALLBACK_FONT];
+  }
+  if (favourites.length === 0 && allFontsSorted.length > 0) {
+    favourites = [allFontsSorted[0] ?? FALLBACK_FONT];
+  }
+
+  catalogueCache = {
+    categories,
+    favourites,
     fontMetadata,
-    allFontsSorted: Object.keys(fontMetadata).sort((a, b) => a.localeCompare(b))
+    allFontsSorted
   };
 
   return catalogueCache;
@@ -95,6 +175,110 @@ export function getFigletFontChoices(): Array<{ value: string; label: string }> 
 export function getDefaultFigletFont(): string {
   const catalogue = getFigletCatalogue();
   return catalogue.favourites[0] ?? FALLBACK_FONT;
+}
+
+interface FigletCatalogueJson {
+  categories?: Array<{ id?: string; name?: string; description?: string; fonts?: string[] }>;
+  favourites?: string[];
+  font_metadata?: Record<string, { height?: number; width?: number }>;
+  [key: string]: unknown;
+}
+
+export interface SetFigletFavouritesResult {
+  ok: boolean;
+  favourites: string[];
+  filePath: string;
+  error?: string;
+}
+
+export interface ToggleFigletFavouriteResult extends SetFigletFavouritesResult {
+  font: string;
+  isFavourite: boolean;
+}
+
+function parseFigletCatalogueJson(raw: string): FigletCatalogueJson {
+  try {
+    const parsed = JSON.parse(raw) as FigletCatalogueJson;
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch {
+    // fall through
+  }
+  return {};
+}
+
+function normaliseFavouriteList(input: string[], allFonts: string[]): string[] {
+  const known = new Set(allFonts);
+  const deduped: string[] = [];
+  for (const item of input) {
+    const font = item.trim();
+    if (!font || !known.has(font) || deduped.includes(font)) continue;
+    deduped.push(font);
+  }
+  if (deduped.length > 0) return deduped;
+  if (known.has(FALLBACK_FONT)) return [FALLBACK_FONT];
+  if (allFonts.length > 0) return [allFonts[0] ?? FALLBACK_FONT];
+  return [];
+}
+
+/** Persist favourites, preferring microapps-private/wibwob-figlet-fonts/fonts.json. */
+export function setFigletFavourites(nextFavourites: string[]): SetFigletFavouritesResult {
+  const currentPath = resolveFontJsonPath();
+  const targetPath = currentPath.includes(`${path.sep}microapps-private${path.sep}`)
+    ? currentPath
+    : resolvePrivateFontJsonPath();
+
+  const allFonts = getFigletCatalogue().allFontsSorted;
+  const favourites = normaliseFavouriteList(nextFavourites, allFonts);
+  const sourceRaw = safeReadFile(currentPath) ?? "{}";
+  const payload = parseFigletCatalogueJson(sourceRaw);
+  payload.favourites = favourites;
+
+  const ok = safeWriteFile(targetPath, `${JSON.stringify(payload, null, 2)}\n`);
+  if (ok) {
+    catalogueCache = undefined;
+    const refreshed = getFigletCatalogue();
+    return { ok: true, favourites: refreshed.favourites, filePath: targetPath };
+  }
+
+  return {
+    ok: false,
+    favourites: getFigletCatalogue().favourites,
+    filePath: targetPath,
+    error: "Failed to write favourites file",
+  };
+}
+
+export function toggleFigletFavourite(font: string, preferred?: boolean): ToggleFigletFavouriteResult {
+  const targetFont = font.trim();
+  const catalogue = getFigletCatalogue();
+  const allFonts = catalogue.allFontsSorted;
+  const current = [...catalogue.favourites];
+
+  if (!allFonts.includes(targetFont)) {
+    return {
+      ok: false,
+      font: targetFont,
+      isFavourite: false,
+      favourites: current,
+      filePath: resolvePrivateFontJsonPath(),
+      error: `Unknown figlet font: ${targetFont}`,
+    };
+  }
+
+  const already = current.includes(targetFont);
+  const nextIsFavourite = preferred ?? !already;
+  const next = nextIsFavourite
+    ? [targetFont, ...current.filter((item) => item !== targetFont)]
+    : current.filter((item) => item !== targetFont);
+
+  const saved = setFigletFavourites(next);
+  return {
+    ...saved,
+    font: targetFont,
+    isFavourite: saved.favourites.includes(targetFont),
+  };
 }
 
 export function getFigletFontHeight(font: string): number {

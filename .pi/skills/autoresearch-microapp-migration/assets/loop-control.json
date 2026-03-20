@@ -1,0 +1,7 @@
+{
+  "maxLoops": 20,
+  "consecutiveFullPassesToStop": 2,
+  "noImprovementStreakStop": 6,
+  "stopOnTypecheckFailure": false,
+  "notes": "Tune maxLoops upward for broad migrations; keep low for one-off microapp revivals."
+}

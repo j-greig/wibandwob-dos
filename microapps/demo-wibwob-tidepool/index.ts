@@ -34,6 +34,10 @@ const KEY_TO_SPECIES: Record<string, SpeciesId> = {
 const DEFAULT_TICK_MS = 500;
 const MIN_TICK_MS = 200;
 const MAX_TICK_MS = 2000;
+const INACTIVITY_PAUSE_MS = (() => {
+  const raw = Number.parseInt(process.env.WIBWOB_TIDEPOOL_IDLE_PAUSE_MS ?? "", 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 5 * 60 * 1000;
+})();
 
 type TideMode = "all" | SpeciesId;
 
@@ -42,10 +46,17 @@ export default function setup(host: MicroappHost) {
     // All mutable runtime state is per-window, not module-global.
     // This keeps multiInstance: true honest.
     let tickTimer: ReturnType<typeof setTimeout> | null = null;
+    let idlePauseTimer: ReturnType<typeof setTimeout> | null = null;
+    let bootTimer: ReturnType<typeof setTimeout> | null = null;
     let tickMs = DEFAULT_TICK_MS;
     let speed = 1;
     let shannonHistory: number[] = [];
     let highlight: SpeciesId | null = null;
+    let lastInteractionAt = Date.now();
+    let autoPaused = false;
+    let destroyed = false;
+    let tickGeneration = 0;
+    let idleGeneration = 0;
 
     const win = host.createWindow({
       title: "Tide Pool",
@@ -91,6 +102,7 @@ export default function setup(host: MicroappHost) {
         { id: "barnacle", label: "✶Bar" },
       ],
       (id) => {
+        noteInteraction({ autoResume: true });
         highlight = id === "all" ? null : id;
         render();
         host.screen.render();
@@ -153,13 +165,63 @@ export default function setup(host: MicroappHost) {
     }
 
     // -- Tick loop (setTimeout chain to avoid event-loop starvation) --
+    function clearIdlePauseTimer() {
+      if (idlePauseTimer) {
+        clearTimeout(idlePauseTimer);
+        idlePauseTimer = null;
+      }
+    }
+
+    function stopTicking() {
+      tickGeneration += 1;
+      if (tickTimer) {
+        clearTimeout(tickTimer);
+        tickTimer = null;
+      }
+    }
+
+    function scheduleIdlePause() {
+      clearIdlePauseTimer();
+      const generation = ++idleGeneration;
+      idlePauseTimer = setTimeout(() => {
+        if (destroyed || generation !== idleGeneration || !engine) return;
+        const idleFor = Date.now() - lastInteractionAt;
+        if (idleFor < INACTIVITY_PAUSE_MS) {
+          scheduleIdlePause();
+          return;
+        }
+        if (engine.running) {
+          engine.toggle();
+          stopTicking();
+          autoPaused = true;
+          render();
+        }
+      }, INACTIVITY_PAUSE_MS);
+    }
+
+    function noteInteraction(opts?: { autoResume?: boolean }) {
+      lastInteractionAt = Date.now();
+      scheduleIdlePause();
+
+      const autoResume = opts?.autoResume ?? true;
+      if (autoResume && autoPaused && engine && !engine.running) {
+        engine.start();
+        autoPaused = false;
+        startTicking();
+        render();
+      }
+    }
+
     function startTicking() {
+      if (destroyed || !engine || !engine.running) return;
       stopTicking();
       scheduleTick();
     }
 
     function scheduleTick() {
+      const generation = ++tickGeneration;
       tickTimer = setTimeout(() => {
+        if (destroyed || generation !== tickGeneration) return;
         if (!engine || !engine.running) return;
         engine.tick();
         shannonHistory.push(engine.shannonDiversity);
@@ -168,13 +230,6 @@ export default function setup(host: MicroappHost) {
         // Chain next tick — gives event loop a chance to breathe
         if (engine?.running) scheduleTick();
       }, tickMs);
-    }
-
-    function stopTicking() {
-      if (tickTimer) {
-        clearTimeout(tickTimer);
-        tickTimer = null;
-      }
     }
 
     function setSpeed(newSpeed: number) {
@@ -186,10 +241,13 @@ export default function setup(host: MicroappHost) {
     // -- Keyboard --
     win.onInput((ch, key) => {
       if (!engine) return;
+      const isSpaceToggle = key?.name === "space" || ch === " ";
+      noteInteraction({ autoResume: !isSpaceToggle });
 
       // Space: play/pause
-      if (key?.name === "space" || ch === " ") {
+      if (isSpaceToggle) {
         engine.toggle();
+        autoPaused = false;
         if (engine.running) startTicking();
         else stopTicking();
         render();
@@ -200,6 +258,7 @@ export default function setup(host: MicroappHost) {
       if (ch === "r" || ch === "R") {
         engine.reset();
         engine.start();
+        autoPaused = false;
         shannonHistory = [];
         startTicking();
         render();
@@ -210,6 +269,7 @@ export default function setup(host: MicroappHost) {
       if (ch === "s" || ch === "S") {
         engine.reset(Date.now() & 0xffffffff);
         engine.start();
+        autoPaused = false;
         shannonHistory = [];
         startTicking();
         render();
@@ -279,6 +339,8 @@ export default function setup(host: MicroappHost) {
         extinct: [...engine.extinct],
         totalPopulation: engine.totalPopulation,
         running: engine.running,
+        autoPaused,
+        idleSeconds: Math.floor((Date.now() - lastInteractionAt) / 1000),
         speed,
         seed: engine.seed,
         gridSize: `${engine.width}x${engine.height}`,
@@ -305,7 +367,14 @@ export default function setup(host: MicroappHost) {
 
     // -- Cleanup --
     win.onCleanup(() => {
+      destroyed = true;
       stopTicking();
+      idleGeneration += 1;
+      clearIdlePauseTimer();
+      if (bootTimer) {
+        clearTimeout(bootTimer);
+        bootTimer = null;
+      }
       engine = undefined;
     });
 
@@ -313,7 +382,11 @@ export default function setup(host: MicroappHost) {
     resizeEngine();
     render();
     win.focus();
-    setTimeout(() => startTicking(), 500);
+    scheduleIdlePause();
+    bootTimer = setTimeout(() => {
+      if (destroyed) return;
+      startTicking();
+    }, 500);
 
     // Return snapshot data for workspace persistence
     return {

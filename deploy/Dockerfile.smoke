@@ -1,7 +1,7 @@
 # WibWob-DOS VPS smoke image
 # Ubuntu 24.04 + Bun — mirrors wibwob1 Hetzner (aarch64, Ubuntu 24.04)
-# Build: docker build --platform linux/arm64 -t wibwob-vps-smoke -f deploy/Dockerfile.smoke .
-# Run:  docker run -d -t -p 127.0.0.1:2849:22 --platform linux/arm64 --name wibwob-smoke wibwob-vps-smoke
+# Build: docker build --platform linux/arm64 -t wibwob-smoke-image -f deploy/Dockerfile.smoke .
+# Run:  docker run -d -t -p 127.0.0.1:2849:22 --platform linux/arm64 --name wibwob-smoke wibwob-smoke-image
 
 FROM ubuntu:24.04
 

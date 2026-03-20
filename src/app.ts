@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { parseAppFlags, printHelp } from "./core/cli.js";
 import { createRuntimeNode } from "./runtime/runtime-node.js";
+import { DATA_ROOT, ensureDirectoryExists } from "./core/config.js";
 
 if (!process.env.TERM || process.env.TERM.includes("ghostty")) {
   process.env.TERM = "xterm-256color";
@@ -33,24 +34,53 @@ if (flags.help) {
   process.exit(0);
 }
 
+/** Generate a short random instance ID (8 chars, URL-safe).
+ * Uses first 8 chars of UUID for better collision resistance. */
 function randomInstanceId(): string {
-  return Math.random().toString(36).slice(2, 5).padEnd(3, "0");
+  // crypto.randomUUID() is available in Bun and Node 19+
+  return crypto.randomUUID().slice(0, 8);
+}
+
+/** Derive a short display ID from instance ID (first 3 chars).
+ * Used in TUI chrome for compact display. */
+function deriveDisplayId(instanceId: string): string {
+  return instanceId.slice(0, 3);
+}
+
+/** Get or generate instance ID.
+ * Priority: WIBWOB_INSTANCE_ID env > generated
+ * Validates format - must be non-empty and URL-safe. */
+function resolveInstanceId(): string {
+  const envId = process.env.WIBWOB_INSTANCE_ID?.trim();
+  if (envId && envId.length > 0) {
+    // Validate: alphanumeric + hyphens only for safety
+    if (!/^[a-zA-Z0-9-]+$/.test(envId)) {
+      throw new Error(`Invalid instance ID "${envId}" - must be alphanumeric with hyphens only`);
+    }
+    return envId;
+  }
+  return randomInstanceId();
 }
 
 const instanceLabel = process.env.WIBWOB_INSTANCE_LABEL?.trim() || undefined;
-const instanceId = randomInstanceId();
-const runtimeNode = createRuntimeNode({ instanceLabel, instanceId });
+const instanceId = resolveInstanceId();
+const instanceDisplayId = deriveDisplayId(instanceId);
+
+// Ensure runtime data root exists before any file operations
+ensureDirectoryExists(DATA_ROOT);
+
+const runtimeNode = createRuntimeNode({ instanceLabel, instanceId, instanceDisplayId });
 process.env.WIBWOB_INSTANCE_ID = runtimeNode.instanceId;
 process.env.WIBWOB_API_BASE_URL = runtimeNode.apiBaseUrl;
 
 // Set process title so `pkill wibwob-dos` works and ps output is readable.
-// Include instance label so dual-instance is distinguishable: wibwob-dos-main, wibwob-dos-zuk
-// Process title includes instance label + instance id so ps/htop and pkill match what you see in the TUI top-right.
-// e.g. "wibwob-dos-main-jp9" — pkill wibwob-dos-jp9 kills exactly that runtime node.
+// Include instance label + full instanceId so ps/htop and pkill match uniquely.
+// e.g. "wibwob-dos-main-abc12345" — uses full ID for machine-facing discrimination.
+// The TUI display uses short displayId for compactness.
 process.title = [
   "wibwob-dos",
   instanceLabel,
-  runtimeNode.instanceId,
+  instanceId,
 ].filter(Boolean).join("-");
 
 // Write PID file so agents can kill cleanly: kill $(cat scratch/wibwob.pid)
@@ -101,9 +131,11 @@ const { TsTuiMvpApp } = await import("./core/app-controller.js");
 const app = new TsTuiMvpApp({ runtimeNode });
 
 // SIGHUP = terminal died. Save workspace as orphan, then clean exit.
+// Use instanceLabel if set, otherwise instanceDisplayId
+const orphanLabel = runtimeNode.instanceLabel ?? runtimeNode.instanceDisplayId;
 process.once("SIGHUP", () => {
   try {
-    app.saveWorkspaceNamed(`orphan-${runtimeNode.instanceLabel}`);
+    app.saveWorkspaceNamed(`orphan-${orphanLabel}`);
   } catch {}
   cleanup();
   process.exit(0);

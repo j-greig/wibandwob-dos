@@ -112,6 +112,15 @@ Plus demos: Heartbeat, Hello World, Patchbay Lab, TouchLab, layout stress tests.
 
 ---
 
+## Going deeper
+
+- **[PHILOSOPHY.md](PHILOSOPHY.md)** — the symbient worldview, design principles, and north star
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — how it's built, the four seams, subsystem map, key files
+- **[AGENTS.md](AGENTS.md)** — for AI agents operating the system
+- **[CHANGELOG.md](CHANGELOG.md)** — what's changed, human-readable
+
+---
+
 ## Architecture
 
 ```
@@ -260,15 +269,18 @@ Theme files live in `src/core/theme/` (built-in) and `microapps/` (external). Us
 ## Project Structure
 
 ```
+PHILOSOPHY.md     # why this exists — symbient worldview, design principles
+ARCHITECTURE.md   # how it's built — subsystems, file map, design rules
+AGENTS.md         # for AI agents operating the system
+CHANGELOG.md      # human-readable release notes
+
 src/
   core/           # window manager, commands, themes, chrome, types
   services/       # browser, state, API, agent, markdown, audio
   windows/        # built-in window types (chat, browser, editor, etc.)
-microapps/          # microapps (self-contained, hot-reloadable)
-primers/          # ASCII art library — the visual vocabulary that feeds the Backrooms,
-                  #   the gallery, and the agent's aesthetic sense
+microapps/        # microapps (self-contained, hot-reloadable)
+primers/          # ASCII art library — the visual vocabulary
 .planning/        # epics, features, stories — the canonical roadmap
-.agents/          # agent constitution, module-dev docs, shell-dev specs
 scripts/          # restart, scaffold, screenshot helpers
 scratch/          # runtime data, compositions, audio, workspace saves
 docs/             # full microapp authoring and architecture docs

@@ -1,6 +1,6 @@
 ---
 name: opus
-description: Deep reasoning Claude Opus 4.6 agent for hard problems: security reviews, architecture decisions, complex debugging, adversarial analysis, multi-file refactors. Use when Haiku isn't enough and the task needs genuine thinking.
+description: "Deep reasoning Claude Opus 4.6 agent for hard problems: security reviews, architecture decisions, complex debugging, adversarial analysis, multi-file refactors. Use when Haiku isn't enough and the task needs genuine thinking."
 tools: read, bash, grep, find, ls, edit, write
 model: anthropic/claude-opus-4-6
 ---

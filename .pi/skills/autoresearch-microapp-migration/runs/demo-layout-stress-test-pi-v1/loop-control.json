@@ -1,0 +1,5 @@
+{
+  "maxLoops": 12,
+  "consecutiveFullPassesToStop": 2,
+  "noImprovementStreakStop": 4
+}

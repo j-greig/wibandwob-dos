@@ -30,6 +30,7 @@ export interface ButtonOptions {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  variant?: "primary" | "secondary" | "ghost" | "destructive";
 }
 
 export type ButtonHandle = LayoutPart<Partial<ButtonOptions>>;
@@ -43,7 +44,7 @@ export type ButtonHandle = LayoutPart<Partial<ButtonOptions>>;
  * const root = createStack(parent, [{ key: "btn", basis: 1, part: btn }]);
  */
 export function createButton(opts: ButtonOptions): ButtonHandle {
-  let { label, onPress, disabled = false } = opts;
+  let { label, onPress, disabled = false, variant = "secondary" } = opts;
 
   const node = blessed.box({
     width: 0,
@@ -62,8 +63,24 @@ export function createButton(opts: ButtonOptions): ButtonHandle {
   function getStyle(focused: boolean) {
     const t = theme();
     if (disabled) return { fg: t.muted.fg, bg: t.muted.bg ?? t.body.bg };
-    if (focused) return { fg: t.body.bg, bg: t.body.fg, bold: true };
-    return { fg: t.body.fg, bg: t.body.bg };
+
+    const base = (() => {
+      if (variant === "primary") {
+        return { fg: t.accent.bg ?? t.body.bg, bg: t.accent.fg };
+      }
+      if (variant === "ghost") {
+        return { fg: t.body.fg, bg: t.body.bg };
+      }
+      if (variant === "destructive") {
+        return { fg: "white", bg: "red" };
+      }
+      return { fg: t.body.fg, bg: t.body.bg };
+    })();
+
+    if (focused) {
+      return { fg: base.bg ?? t.body.bg, bg: base.fg ?? t.body.fg, bold: true };
+    }
+    return base;
   }
 
   function applyVisuals() {
@@ -72,20 +89,29 @@ export function createButton(opts: ButtonOptions): ButtonHandle {
     node.setContent(renderLabel());
   }
 
+  function triggerPress(): void {
+    if (disabled) return;
+    try {
+      onPress?.();
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
+  }
+
   node.on("focus", applyVisuals);
   node.on("blur", applyVisuals);
 
   node.on("keypress", (_ch: string, key: { name: string; full: string }) => {
     if (disabled || !key) return;
     if (key.name === "enter" || key.name === "space" || key.full === "enter" || key.full === "space") {
-      onPress?.();
+      triggerPress();
     }
   });
 
   node.on("click", () => {
     if (disabled) return;
     node.focus();
-    onPress?.();
+    triggerPress();
   });
 
   return {
@@ -109,6 +135,7 @@ export function createButton(opts: ButtonOptions): ButtonHandle {
         disabled = props.disabled;
         node.focusable = !disabled;
       }
+      if (props.variant !== undefined) variant = props.variant;
       applyVisuals();
     },
   };
@@ -126,6 +153,19 @@ export interface CheckboxOptions {
 }
 
 export type CheckboxHandle = LayoutPart<Partial<CheckboxOptions>> & {
+  checked(): boolean;
+};
+
+export interface ToggleSwitchOptions {
+  label: string;
+  checked?: boolean;
+  onChange?: (event: ChangeEvent<boolean>) => void;
+  disabled?: boolean;
+  onLabel?: string;
+  offLabel?: string;
+}
+
+export type ToggleSwitchHandle = LayoutPart<Partial<ToggleSwitchOptions>> & {
   checked(): boolean;
 };
 
@@ -173,7 +213,11 @@ export function createCheckbox(opts: CheckboxOptions): CheckboxHandle {
     const prev = checked;
     checked = !checked;
     applyVisuals();
-    onChange?.({ value: checked, previousValue: prev });
+    try {
+      onChange?.({ value: checked, previousValue: prev });
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
   }
 
   node.on("focus", applyVisuals);
@@ -209,6 +253,107 @@ export function createCheckbox(opts: CheckboxOptions): CheckboxHandle {
     update(props: Partial<CheckboxOptions>) {
       if (props.label !== undefined) label = props.label;
       if (props.onChange !== undefined) onChange = props.onChange;
+      if (props.disabled !== undefined) {
+        disabled = props.disabled;
+        node.focusable = !disabled;
+      }
+      if (props.checked !== undefined) checked = props.checked;
+      applyVisuals();
+    },
+    checked() { return checked; },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createToggleSwitch
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * A compact on/off switch with optional label.
+ * Enter/Space toggles. Returns LayoutPart for composition.
+ */
+export function createToggleSwitch(opts: ToggleSwitchOptions): ToggleSwitchHandle {
+  let { label, onChange, disabled = false, onLabel = "ON", offLabel = "OFF" } = opts;
+  let checked = opts.checked ?? false;
+
+  const node = blessed.box({
+    width: 0,
+    height: 1,
+    content: renderContent(),
+    focusable: !disabled,
+    mouse: true,
+    keys: true,
+    style: getStyle(false),
+  });
+
+  function renderContent(): string {
+    const stateText = checked ? onLabel : offLabel;
+    const visual = checked ? `[ ${stateText} ]` : `( ${stateText} )`;
+    return ` ${visual} ${label}`;
+  }
+
+  function getStyle(focused: boolean) {
+    const t = theme();
+    if (disabled) return { fg: t.muted.fg, bg: t.muted.bg ?? t.body.bg };
+    if (checked && focused) return { fg: t.accent.bg ?? t.body.bg, bg: t.accent.fg, bold: true };
+    if (checked) return { fg: t.accent.fg, bg: t.body.bg, bold: true };
+    if (focused) return { fg: t.body.bg, bg: t.body.fg, bold: true };
+    return { fg: t.body.fg, bg: t.body.bg };
+  }
+
+  function applyVisuals() {
+    const focused = node.screen?.focused === node;
+    node.style = getStyle(focused);
+    node.setContent(renderContent());
+  }
+
+  function toggle() {
+    if (disabled) return;
+    const prev = checked;
+    checked = !checked;
+    applyVisuals();
+    try {
+      onChange?.({ value: checked, previousValue: prev });
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
+  }
+
+  node.on("focus", applyVisuals);
+  node.on("blur", applyVisuals);
+
+  node.on("keypress", (_ch: string, key: { name: string; full: string }) => {
+    if (disabled || !key) return;
+    if (key.name === "space" || key.name === "enter" || key.full === "space" || key.full === "enter") {
+      toggle();
+    }
+  });
+
+  node.on("click", () => {
+    if (disabled) return;
+    node.focus();
+    toggle();
+  });
+
+  return {
+    node,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      node.height = 1;
+    },
+    restyle() {
+      applyVisuals();
+    },
+    destroy() {
+      node.destroy();
+    },
+    update(props: Partial<ToggleSwitchOptions>) {
+      if (props.label !== undefined) label = props.label;
+      if (props.onChange !== undefined) onChange = props.onChange;
+      if (props.onLabel !== undefined) onLabel = props.onLabel;
+      if (props.offLabel !== undefined) offLabel = props.offLabel;
       if (props.disabled !== undefined) {
         disabled = props.disabled;
         node.focusable = !disabled;
@@ -292,7 +437,11 @@ export function createRadioGroup(opts: RadioGroupOptions): RadioGroupHandle {
     const prev = selectedValue;
     selectedValue = options[focusIndex]!.value;
     applyVisuals();
-    onChange?.({ value: selectedValue, previousValue: prev, index: focusIndex });
+    try {
+      onChange?.({ value: selectedValue, previousValue: prev, index: focusIndex });
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
   }
 
   node.on("focus", applyVisuals);
@@ -367,6 +516,17 @@ export type SelectHandle = LayoutPart<Partial<SelectOptions>> & {
   selected(): string | undefined;
 };
 
+export interface SegmentedControlOptions {
+  options: SelectOption[];
+  selected?: string;
+  onChange?: (event: SelectEvent<string>) => void;
+  disabled?: boolean;
+}
+
+export type SegmentedControlHandle = LayoutPart<Partial<SegmentedControlOptions>> & {
+  selected(): string | undefined;
+};
+
 /**
  * An inline select picker. Arrow Left/Right cycles through options.
  * Single-row control (not a dropdown — blessed terminal constraint).
@@ -424,11 +584,15 @@ export function createSelect(opts: SelectOptions): SelectHandle {
       selectedIndex = ((selectedIndex + dir) + options.length) % options.length;
     }
     applyVisuals();
-    onChange?.({
-      value: options[selectedIndex]!.value,
-      previousValue: prev,
-      index: selectedIndex,
-    });
+    try {
+      onChange?.({
+        value: options[selectedIndex]!.value,
+        previousValue: prev,
+        index: selectedIndex,
+      });
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
   }
 
   node.on("focus", applyVisuals);
@@ -477,6 +641,102 @@ export function createSelect(opts: SelectOptions): SelectHandle {
       applyVisuals();
     },
     selected() { return selectedIndex >= 0 ? options[selectedIndex]!.value : undefined; },
+  };
+}
+
+/**
+ * Inline segmented control. Arrow Left/Right cycles options.
+ * Single-row control with all options visible.
+ */
+export function createSegmentedControl(opts: SegmentedControlOptions): SegmentedControlHandle {
+  let { options, onChange, disabled = false } = opts;
+  let selectedIndex = opts.selected ? options.findIndex((o) => o.value === opts.selected) : 0;
+  if (selectedIndex < 0 && options.length > 0) selectedIndex = 0;
+
+  const node = blessed.box({
+    width: 0,
+    height: 1,
+    content: renderContent(),
+    focusable: !disabled,
+    mouse: true,
+    keys: true,
+    style: getStyle(false),
+  });
+
+  function renderContent(): string {
+    if (options.length === 0) return " [ no options ]";
+    return options
+      .map((opt, i) => (i === selectedIndex ? ` [${opt.label}] ` : `  ${opt.label}  `))
+      .join("│");
+  }
+
+  function getStyle(focused: boolean) {
+    const t = theme();
+    if (disabled) return { fg: t.muted.fg, bg: t.muted.bg ?? t.body.bg };
+    if (focused) return { fg: t.body.bg, bg: t.body.fg, bold: true };
+    return { fg: t.body.fg, bg: t.body.bg };
+  }
+
+  function applyVisuals() {
+    const focused = node.screen?.focused === node;
+    node.style = getStyle(focused);
+    node.setContent(renderContent());
+  }
+
+  function navigate(dir: number) {
+    if (disabled || options.length === 0) return;
+    const prev = selectedIndex >= 0 ? options[selectedIndex]!.value : undefined;
+    selectedIndex = ((selectedIndex + dir) + options.length) % options.length;
+    applyVisuals();
+    try {
+      onChange?.({ value: options[selectedIndex]!.value, previousValue: prev, index: selectedIndex });
+    } catch {
+      // Keep form surfaces resilient if a caller callback throws.
+    }
+  }
+
+  node.on("focus", applyVisuals);
+  node.on("blur", applyVisuals);
+
+  node.on("keypress", (_ch: string, key: { name: string; full: string }) => {
+    if (disabled || !key) return;
+    if (key.name === "left" || key.name === "up") navigate(-1);
+    else if (key.name === "right" || key.name === "down") navigate(1);
+  });
+
+  node.on("click", () => {
+    if (disabled) return;
+    node.focus();
+    navigate(1);
+  });
+
+  return {
+    node,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      node.height = 1;
+    },
+    restyle() { applyVisuals(); },
+    destroy() { node.destroy(); },
+    update(props: Partial<SegmentedControlOptions>) {
+      if (props.options !== undefined) {
+        options = props.options;
+        selectedIndex = Math.min(Math.max(0, selectedIndex), Math.max(0, options.length - 1));
+      }
+      if (props.selected !== undefined) {
+        const idx = options.findIndex((o) => o.value === props.selected);
+        selectedIndex = idx >= 0 ? idx : selectedIndex;
+      }
+      if (props.onChange !== undefined) onChange = props.onChange;
+      if (props.disabled !== undefined) {
+        disabled = props.disabled;
+        node.focusable = !disabled;
+      }
+      applyVisuals();
+    },
+    selected() { return selectedIndex >= 0 ? options[selectedIndex]?.value : undefined; },
   };
 }
 
@@ -564,7 +824,11 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
   function emitHighlight() {
     if (filtered.length > 0 && focusIndex < filtered.length) {
       const item = filtered[focusIndex]!;
-      onHighlight?.({ value: item.value, index: items.indexOf(item) });
+      try {
+        onHighlight?.({ value: item.value, index: items.indexOf(item) });
+      } catch {
+        // Keep form surfaces resilient if a caller callback throws.
+      }
     }
   }
 
@@ -590,7 +854,11 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
     } else if (key.name === "enter") {
       if (filtered.length > 0 && focusIndex < filtered.length) {
         const item = filtered[focusIndex]!;
-        onSelect?.({ value: item.value, index: items.indexOf(item) });
+        try {
+          onSelect?.({ value: item.value, index: items.indexOf(item) });
+        } catch {
+          // Keep form surfaces resilient if a caller callback throws.
+        }
       }
     } else if (key.name === "backspace") {
       if (query.length > 0) {
@@ -605,7 +873,11 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
         refilter();
         applyVisuals();
       } else {
-        onCancel?.();
+        try {
+          onCancel?.();
+        } catch {
+          // Keep form surfaces resilient if a caller callback throws.
+        }
       }
     } else if (ch && ch.length === 1 && !key.ctrl && ch.charCodeAt(0) >= 32) {
       query += ch;

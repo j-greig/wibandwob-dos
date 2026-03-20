@@ -3,9 +3,17 @@
   "entry": [
     "src/app.ts",
     "src/cli/*.ts",
-    "microapps/*/index.ts"
+    "microapps/*/index.ts",
+    "src/services/microapp-sdk.ts",
+    "src/sdk/index.ts",
+    "src/sdk/composition-helpers.ts",
+    "src/sdk/runtime-client.ts",
+    "src/sdk/runtime-helpers.ts",
+    "src/sdk/microapp-host.ts",
+    "src/ui/*.ts"
   ],
   "project": ["src/**/*.ts"],
+  "ignoreExportsUsedInFile": true,
   "ignore": [
     ".pi/**",
     ".agents/**",
@@ -16,7 +24,27 @@
     "autoresearch/**",
     "deploy/**",
     "scratch/**",
-    "src/tests/**"
+    "src/tests/**",
+    "microapps/pi-sessions/**",
+    "microapps/zine/**"
   ],
-  "ignoreDependencies": ["blessed"]
+  "ignoreDependencies": [
+    "blessed",
+    "@anthropic-ai/claude-code",
+    "@mediapipe/tasks-vision",
+    "@skitee3000/bun-pty",
+    "@xterm/headless",
+    "ascii-data-image",
+    "ascii-raytracer",
+    "blessed-xterm",
+    "node-pty",
+    "term.js",
+    "@e9n/pi-subagent",
+    "madge",
+    "typescript-eslint"
+  ],
+  "ignoreBinaries": ["python3", "eslint"],
+  "rules": {
+    "duplicates": "warn"
+  }
 }

@@ -22,12 +22,13 @@ import {
 
 import {
   CONTROL_API_PORT,
+  DATA_ROOT,
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
+  APP_NOTES_PATH,
+  APP_ROOT,
   REPO_ROOT,
   SCRATCH_BASE,
-  SPIKE_NOTES_PATH,
-  SPIKE_ROOT,
 } from "./config.js";
 import { appFlags } from "./cli.js";
 import { loadMicroapps, reloadMicroapps } from "../services/microapp-loader.js";
@@ -139,6 +140,10 @@ import {
   type RuntimeCommandService,
 } from "../application/runtime-command-service.js";
 import {
+  RateLimitService,
+  resolveRateLimitConfig,
+} from "../application/rate-limit-service.js";
+import {
   createRuntimeInspectionService,
   type RuntimeInspectionService,
 } from "../application/runtime-inspection-service.js";
@@ -207,6 +212,7 @@ export class TsTuiMvpApp {
   private readonly runtimeInspection: RuntimeInspectionService;
   private readonly runtimeWindows: RuntimeWindowService;
   private readonly runtimeWorkspace: RuntimeWorkspaceService;
+  private readonly rateLimiter: RateLimitService;
   private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
@@ -214,21 +220,26 @@ export class TsTuiMvpApp {
   private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
+  private readonly instanceDisplayId: string;
   private readonly runtimeNode: RuntimeNodeDescriptor;
+  private readonly bootedAtMs = Date.now();
   private microappReloadEpoch = 0;
   private microappDeps?: MicroappHostDeps;
 
   constructor(opts?: {
     instanceLabel?: string;
     instanceId?: string;
+    instanceDisplayId?: string;
     runtimeNode?: RuntimeNodeDescriptor;
   }) {
     this.runtimeNode = opts?.runtimeNode ?? createRuntimeNode({
       instanceLabel: opts?.instanceLabel,
       instanceId: opts?.instanceId?.trim() || "???",
+      instanceDisplayId: opts?.instanceDisplayId || "???",
     });
     this.instanceLabel = this.runtimeNode.instanceLabel;
     this.instanceId = this.runtimeNode.instanceId;
+    this.instanceDisplayId = this.runtimeNode.instanceDisplayId;
     log.setIdentity(this.getInstanceDisplayLabel());
     patchBlessedUnicode();
     this.screen = blessed.screen({
@@ -351,9 +362,10 @@ export class TsTuiMvpApp {
       screen: this.screen,
       isMenuOpen: () => this.menuUi.isAnyMenuOpen(),
       invalidation: this.invalidation,
-      defaultDir: SPIKE_ROOT,
-      editorStartDir: path.dirname(SPIKE_NOTES_PATH),
+      defaultDir: APP_ROOT,
+      editorStartDir: path.dirname(APP_NOTES_PATH),
     });
+    this.rateLimiter = new RateLimitService(resolveRateLimitConfig());
     this.runtimeCommands = createRuntimeCommandService({
       listCommands: (
         surface?: CommandSurface,
@@ -361,6 +373,7 @@ export class TsTuiMvpApp {
       ) => this.commands.list(surface, opts),
       runCommand: (id: string, args?: Record<string, unknown>) =>
         this.commands.run(id, args),
+      rateLimiter: this.rateLimiter,
     });
     this.runtimeInspection = createRuntimeInspectionService({
       getState: () => this.getDesktopState(),
@@ -395,6 +408,7 @@ export class TsTuiMvpApp {
             content: m.content,
             timestamp: m.timestamp,
           })),
+          rateLimit: this.rateLimiter.snapshot(),
         };
       },
     });
@@ -420,6 +434,7 @@ export class TsTuiMvpApp {
         workspace: this.runtimeWorkspace,
       },
       this.runtimeNode,
+      this.rateLimiter,
     );
     this.state = new StateService(
       {
@@ -534,11 +549,73 @@ export class TsTuiMvpApp {
     this.menus.push(...this.commands.buildMenus());
   }
 
+  private collectReloadInvalidationFiles(limit = 6): string[] {
+    const hostSensitiveDirs = [
+      path.join(REPO_ROOT, "src", "core"),
+      path.join(REPO_ROOT, "src", "services"),
+      path.join(REPO_ROOT, "src", "windows"),
+      path.join(REPO_ROOT, "src", "sdk"),
+      path.join(REPO_ROOT, "src", "ui"),
+    ];
+    const hostSensitiveFiles = [
+      path.join(REPO_ROOT, "package.json"),
+      path.join(REPO_ROOT, "bun.lock"),
+      path.join(REPO_ROOT, "bun.lockb"),
+      path.join(REPO_ROOT, "tsconfig.json"),
+    ];
+
+    const changed: string[] = [];
+    const visit = (targetPath: string) => {
+      if (changed.length >= limit) return;
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(targetPath);
+      } catch {
+        return;
+      }
+
+      if (stat.isDirectory()) {
+        let entries: string[];
+        try {
+          entries = fs.readdirSync(targetPath);
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          visit(path.join(targetPath, entry));
+          if (changed.length >= limit) return;
+        }
+        return;
+      }
+
+      if (!stat.isFile()) return;
+      if (stat.mtimeMs <= this.bootedAtMs) return;
+      changed.push(path.relative(REPO_ROOT, targetPath));
+    };
+
+    for (const file of hostSensitiveFiles) visit(file);
+    for (const dir of hostSensitiveDirs) visit(dir);
+    return changed;
+  }
+
   private async reloadMicroappsFromDisk(): Promise<{
     reloaded: number;
     clearedCommands: number;
     clearedSnapshots: number;
+    requiresRestart?: boolean;
+    blockedFiles?: string[];
   }> {
+    const blockedFiles = this.collectReloadInvalidationFiles();
+    if (blockedFiles.length > 0) {
+      return {
+        reloaded: 0,
+        clearedCommands: 0,
+        clearedSnapshots: 0,
+        requiresRestart: true,
+        blockedFiles,
+      };
+    }
+
     this.microappDeps ??= this.buildMicroappDeps();
     try {
       const result = await reloadMicroapps(this.microappDeps);
@@ -571,7 +648,9 @@ export class TsTuiMvpApp {
     }
 
     // Auto-detect orphan workspace if no flag given
-    const orphanName = `orphan-${this.runtimeNode.instanceLabel}`;
+    // Use instanceLabel if set, otherwise instanceDisplayId, otherwise instanceId
+    const idForOrphan = this.instanceLabel ?? this.runtimeNode.instanceDisplayId ?? this.instanceId;
+    const orphanName = `orphan-${idForOrphan}`;
     const orphanPath = path.join(this.runtimeNode.workspacesDir, `${orphanName}.json`);
     if (fs.existsSync(orphanPath)) {
       log.app(`orphan workspace detected: ${orphanName}`);
@@ -611,9 +690,10 @@ export class TsTuiMvpApp {
 
   private getInstanceDisplayLabel(): string {
     const pid = process.pid;
+    // Use short display ID (3 chars) for TUI, full ID for machine contexts
     return this.instanceLabel
-      ? `${this.instanceLabel} · ${this.instanceId} · ${pid}`
-      : `${this.instanceId} · ${pid}`;
+      ? `${this.instanceLabel} · ${this.instanceDisplayId} · ${pid}`
+      : `${this.instanceDisplayId} · ${pid}`;
   }
 
   private toggleTheme(): void {
@@ -1663,6 +1743,15 @@ export class TsTuiMvpApp {
           });
       },
       reloadMicroapps: () => {
+        const blockedFiles = this.collectReloadInvalidationFiles();
+        if (blockedFiles.length > 0) {
+          const files = blockedFiles.join(", ");
+          this.overlays.flash(
+            `Reload blocked: host files changed since boot. Restart required${files ? ` (${files})` : ""}`,
+          );
+          return { ok: false, error: "restart required", requiresRestart: true, blockedFiles };
+        }
+
         void this.reloadMicroappsFromDisk()
           .then((result) => {
             this.overlays.flash(
@@ -2145,27 +2234,70 @@ export class TsTuiMvpApp {
     this.state.persistAndNotify();
   }
 
-  /** Scan scratch/instances/ and delete stale sockets whose PID is dead. */
+  /** Scan instance discovery sockets and delete stale sidecars whose PID is dead.
+   * Checks new instance-scoped layout first, then legacy scratch layout. */
   private cleanStaleSockets(): void {
-    const instancesDir = path.join(SCRATCH_BASE, "instances");
-    let entries: string[];
-    try { entries = fs.readdirSync(instancesDir); } catch { return; }
-    for (const file of entries) {
-      if (!file.endsWith(".pid")) continue;
-      const pidFile = path.join(instancesDir, file);
-      const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
-      if (isNaN(pid)) {
-        try { fs.unlinkSync(pidFile); } catch {}
-        continue;
+    const roots = [
+      path.join(this.runtimeNode.dataRoot ?? DATA_ROOT, "instances"),
+      path.join(SCRATCH_BASE, "instances"), // legacy fallback
+    ];
+
+    for (const instancesDir of new Set(roots)) {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(instancesDir, { withFileTypes: true }); } catch { continue; }
+
+      // New layout: <instances>/<instanceId>/control.pid + control.sock
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const instanceRoot = path.join(instancesDir, entry.name);
+        const controlPidPath = path.join(instanceRoot, "control.pid");
+        const runtimePidPath = path.join(instanceRoot, "wibwob.pid");
+        const controlSockPath = path.join(instanceRoot, "control.sock");
+
+        if (!fs.existsSync(controlSockPath)) continue;
+
+        const controlPid = Number(fs.existsSync(controlPidPath)
+          ? fs.readFileSync(controlPidPath, "utf8").trim()
+          : "NaN");
+        const runtimePid = Number(fs.existsSync(runtimePidPath)
+          ? fs.readFileSync(runtimePidPath, "utf8").trim()
+          : "NaN");
+        const pid = Number.isFinite(controlPid) ? controlPid : runtimePid;
+
+        if (!Number.isFinite(pid)) {
+          try { fs.unlinkSync(controlSockPath); } catch {}
+          try { fs.unlinkSync(controlPidPath); } catch {}
+          try { fs.unlinkSync(path.join(instanceRoot, "discovery.json")); } catch {}
+          continue;
+        }
+
+        try {
+          process.kill(pid, 0); // alive — leave it
+        } catch {
+          try { fs.unlinkSync(controlSockPath); } catch {}
+          try { fs.unlinkSync(controlPidPath); } catch {}
+          try { fs.unlinkSync(path.join(instanceRoot, "discovery.json")); } catch {}
+          log.app(`cleaned stale control socket for dead pid ${pid}: ${entry.name}`);
+        }
       }
-      try {
-        process.kill(pid, 0); // alive — leave it
-      } catch {
-        // Dead process — clean up socket + pid sidecar
-        try { fs.unlinkSync(pidFile); } catch {}
-        const sockFile = path.join(instancesDir, file.replace(".pid", ".sock"));
-        try { fs.unlinkSync(sockFile); } catch {}
-        log.app(`cleaned stale socket for dead pid ${pid}: ${file.replace(".pid", "")}`);
+
+      // Legacy layout: <instances>/<label>.pid + <label>.sock
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".pid")) continue;
+        const pidFile = path.join(instancesDir, entry.name);
+        const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+        if (isNaN(pid)) {
+          try { fs.unlinkSync(pidFile); } catch {}
+          continue;
+        }
+        try {
+          process.kill(pid, 0); // alive — leave it
+        } catch {
+          try { fs.unlinkSync(pidFile); } catch {}
+          const sockFile = path.join(instancesDir, entry.name.replace(".pid", ".sock"));
+          try { fs.unlinkSync(sockFile); } catch {}
+          log.app(`cleaned stale legacy socket for dead pid ${pid}: ${entry.name.replace(".pid", "")}`);
+        }
       }
     }
   }

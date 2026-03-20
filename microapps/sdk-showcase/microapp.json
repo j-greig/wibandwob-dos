@@ -7,7 +7,7 @@
   "microapp": {
     "id": "wibwob.sdk-showcase",
     "title": "SDK Showcase",
-    "description": "Interactive reference for all SDK composition helpers. Auto-generated from exports.",
+    "description": "Interactive reference for SDK authoring patterns, including motion helpers and layout primitives.",
     "multiInstance": false,
     "persist": false,
     "menu": [

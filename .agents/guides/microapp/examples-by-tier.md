@@ -1,9 +1,11 @@
 # Microapp Examples by Tier
 
-Pick the example that matches what you're building. Start at the lowest
-tier that covers your needs.
+> **Note:** "Complexity Level" here refers to example complexity, not the microapp registry tier (`core`/`beta`/`internal`/`disabled`). See `AGENTS.md` for registry tiers.
 
-## Tier 1: Static — `microapps/demo-hello-world/`
+Pick the example that matches what you're building. Start at the lowest
+complexity level that covers your needs.
+
+## Complexity Level 1: Static — `microapps/demo-hello-world/`
 
 A window with a responsive figlet banner. No timers, no state, no persistence.
 
@@ -15,20 +17,22 @@ with no animation or background updates.
 
 **Copy from it:** the responsive figlet pattern, the onResize → rerender flow.
 
-## Tier 2: Animated — `microapps/demo-heartbeat/`
+## Complexity Level 2: Animated — `microapps/demo-wibwob-tidepool/`
 
-An ASCII heartbeat monitor with two timers (fast waveform + slow BPM counter).
+A cellular automaton tide pool with species simulation, timers, and live
+render loop (separate engine.ts + renderer.ts pattern).
 
-**Shows:** createTimer/clearTimers, multiple blessed boxes, structured
-describeState with semantic fields (bpm, uptime, frame, beat), proper
-onCleanup that clears all timers.
+**Shows:** createTimer/clearTimers, engine/renderer separation, structured
+describeState with semantic state fields, proper onCleanup, keyboard input
+wired to simulation state.
 
 **Start here if:** your microapp has animation, polling, or any background
 update loop.
 
-**Copy from it:** the timer set pattern, the structured describeState shape.
+**Copy from it:** the timer set pattern, the engine/renderer split, the
+structured describeState shape.
 
-## Tier 3: Persistent + AI — `microapps/demo-wibwob-poetry-clock/`
+## Complexity Level 3: Persistent + AI — `microapps/demo-wibwob-poetry-clock/`
 
 A poetry clock with multiple modes, voices, AI-generated poems, and
 workspace persistence via registerSnapshot.
@@ -43,7 +47,7 @@ or calls external services.
 **Copy from it:** the registerSnapshot pattern (see also `persistence.md`),
 the mode/voice switching pattern.
 
-## Tier 4: SDK sampler — `microapps/demo-e026-demo/`
+## Complexity Level 4: SDK sampler — `microapps/demo-e026-demo/`
 
 A broad feature demo exercising most SDK primitives in one window.
 
@@ -56,7 +60,7 @@ in real code. This is a reference catalogue, not a starting template.
 **Copy from it:** individual primitive usage patterns — grep for the
 one you need.
 
-## Tier 4b: Runtime utility — `microapps/command-lab/`
+## Complexity Level 4b: Runtime utility — `microapps/command-lab/`
 
 A small operator-first microapp that runs shared runtime commands and
 persists its own selected command/log state through workspace restore.
@@ -72,7 +76,7 @@ snapshot/restore without external APIs.
 **Copy from it:** shared-command invocation, minimal snapshot payloads,
 utility-first text capture.
 
-## Tier 4c: Runtime inspection — `microapps/runtime-inspector/`
+## Complexity Level 4c: Runtime inspection — `microapps/runtime-inspector/`
 
 A proof microapp that reads the shared runtime inspection seam and
 renders it through tabs and scrollable panes.
@@ -92,6 +96,6 @@ tabbed operator UI.
 | Microapp | What it shows |
 |--------|--------------|
 | `microapps/demo-glitchbox/` | Complex animation, multiple commands, `direct: true` for query commands |
-| `microapps/dashboard/` | Tabbed container (`createTabs`), multi-panel layout |
+| `microapps/demo-dashboards-v2/` | Tabbed container (`createTabs`), multi-panel layout (Overview/XXL/Creative tabs, blessed-contrib charts) |
 | `microapps/wibwob-tr808/` | Audio + persistence, structured state |
 | `microapps/zine/` | Panel layout, scrollable canvas, content composition |

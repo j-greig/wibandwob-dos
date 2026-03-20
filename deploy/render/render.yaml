@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: wibwob-dos-render
+    env: docker
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: WIBWOB_INSTANCE_LABEL
+        value: render-disposable
+      - key: WIBWOB_CONTROL_HOST
+        value: 0.0.0.0
+      - key: TERM
+        value: xterm-256color
+      - key: COLORTERM
+        value: truecolor
+    disk:
+      name: wibwob-data
+      mountPath: /var/data
+      sizeGB: 1
