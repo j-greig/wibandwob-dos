@@ -1,8 +1,0 @@
-{"experiment": "0", "score": "7", "max_score": "8", "pass_rate": "87.5%", "status": "baseline", "description": "baseline hosting-agnostic skill clone", "seq": 0}
-{"experiment": "1", "score": "8", "max_score": "8", "pass_rate": "100.0%", "status": "keep", "description": "add explicit adapter preconditions (FLY_APP_NAME, npm pack/tgz, WIBWOB_DATA_DIR)", "seq": 1}
-{"experiment": "2", "score": "8", "max_score": "8", "pass_rate": "100.0%", "status": "discard", "description": "added adapter quick-map table (no score gain; reverted to keep doc lean)", "seq": 2}
-{"experiment": "3", "score": "8", "max_score": "8", "pass_rate": "100.0%", "status": "discard", "description": "added anti-pattern section (no score gain; reverted to avoid extra verbosity)", "seq": 3}
-{"experiment": "4", "score": "9", "max_score": "10", "pass_rate": "90.0%", "status": "baseline", "description": "eval-suite v2 baseline (adds persistent-history requirement)", "seq": 4}
-{"experiment": "5", "score": "10", "max_score": "10", "pass_rate": "100.0%", "status": "keep", "description": "add persistent run-history contract (results.tsv/results.json/experiments.jsonl/SESSION_LOG.md)", "seq": 5}
-{"experiment": "6", "score": "10", "max_score": "13", "pass_rate": "76.9%", "status": "baseline", "description": "eval-suite v3 baseline (adds taxonomy/remediation/dynamic-port guidance)", "seq": 6}
-{"experiment": "7", "score": "13", "max_score": "13", "pass_rate": "100.0%", "status": "keep", "description": "add failure taxonomy enum + remediation_attempted contract + dynamic tunnel-port guidance", "seq": 7}

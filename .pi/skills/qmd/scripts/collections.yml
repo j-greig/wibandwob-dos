@@ -1,7 +1,0 @@
-- name: wwdos-planning
-  path: /Users/james/Repos/wibandwob-dos/.planning
-  mask: "**/*.md"
-
-- name: ww-memories
-  path: /Users/james/Repos/wibandwob-heartbeat/memories
-  mask: "**/*.md"
