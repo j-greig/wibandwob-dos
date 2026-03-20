@@ -1,9 +1,5 @@
 # WibWob-DOS — Architecture
 
-> Design filters: `PHILOSOPHY.md` · Vocabulary: `LEXICON.md`
-
----
-
 ## COAT — Command Once, Adapt Thin
 
 WibWob-DOS is a **shared terminal desktop** where a human and agents have equal
@@ -29,15 +25,14 @@ Four seams connect every adapter to the core:
   <generator>`bun scripts/gen-COAT.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
 </progressive-disclosure>
 
+
+> Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).
+
 ---
 
-## Why Bun + blessed
+## Runtime note
 
-**Bun** — single-process, fast startup, native TypeScript, built-in HTTP server.
-No compilation step in development. The bottleneck is always terminal rendering.
-
-**blessed** — handles raw input, mouse events, box model, screen diffing. Not
-designed for composition, which is why `src/ui/` exists as a layer above it.
+blessed isn't designed for composition — `src/ui/` exists as a layer above it.
 Microapps never touch blessed directly — they code against the SDK Handle interface.
 
 ---
