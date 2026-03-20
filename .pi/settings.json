@@ -1,0 +1,10 @@
+{
+  "packages": [
+    ".pi/extensions/pi-subagent"
+  ],
+  "pi-subagent": {
+    "maxConcurrent": 4,
+    "maxTotal": 8,
+    "timeoutMs": 300000
+  }
+}
