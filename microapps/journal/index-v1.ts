@@ -260,7 +260,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "import-devlog",
     label: "Import Agentic Devlog",
-    description: "Parse .agents/shell-dev/agentic-devlog.md into journal entries. Args: { filePath?, journalName? }",
+    description: "Parse .pi/reflections/ devlog into journal entries. Args: { filePath?, journalName? }",
     direct: true,
     action: (args: any) => {
       const filePath = args?.filePath || join(host.repoRoot, ".agents", "shell-dev", "agentic-devlog.md");

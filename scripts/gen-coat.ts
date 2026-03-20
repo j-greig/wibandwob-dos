@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // @name    gen-integration-surface
-// @desc    Auto-generate .agents/reference/COAT.md from command-catalog + control-api
+// @desc    Auto-generate COAT snapshot from command-catalog + control-api
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";

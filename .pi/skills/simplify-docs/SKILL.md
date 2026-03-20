@@ -1,100 +1,102 @@
 ---
 name: simplify-docs
 description: >-
-  Three-pass review of PRDs, specifications, architecture docs, and technical
-  handovers. Use when you need DRY definitions, agent-readable build instructions,
-  and high-scanability docs. Triggers on: "simplify docs", "tighten specs",
-  "agent-friendly docs", "progressive disclosure", "dedupe docs".
+  Radically simplify documentation by applying the system-knowledge test: if a
+  script, skill, CLI, or the running system already tells you something, don't
+  write it down. Docs contain decisions, constraints, and conventions only.
+  Use when: "simplify docs", "tighten specs", "agent-friendly docs",
+  "progressive disclosure", "dedupe docs", "too many docs", "doc cleanup".
 ---
 
 # Simplify Docs
 
-Review technical documents for DRYness, agent legibility, and human scanability.
-Fix issues directly.
+## Core rule
 
-Design target: **minimal words, maximal semantic precision**.
+> If the system already knows it, don't write it down.
+> Docs contain decisions, constraints, and conventions — not procedures,
+> file lists, or command references that `--help` already covers.
 
-## Quick run
+---
 
-1. Build target set (user paths or recently changed `.md` files).
-2. Run pass 1 (DRY ownership).
-3. Run pass 2 (agent decidability).
-4. Run pass 3 (human scanability).
-5. Apply fixes.
-6. Run a **fresh-eyes pass** before finalising.
+## The method
 
-## Scope
+### Pass 1 — System knowledge test
 
-If user gives files/dirs, use those.
-If no target, review recently changed docs first.
-Read each target doc fully before editing.
+For each section in each doc, ask:
 
-## Pass 1 — DRY / single-source ownership
+1. Does a **skill** already cover this? → cut, point to skill
+2. Does the **CLI help** tell you this? → cut, mention `--help`
+3. Does the **running system** expose this? → cut, add `<progressive-disclosure>` tag
+4. Does `ls` show you this? → cut file/key-file listings
+5. Does **source JSDoc** document this? → cut, reference the source file
 
-1. Cross-doc duplication
-   - One concept/type/rule = one canonical owner file.
-   - Secondary docs should link, not restate.
+If yes to any: the section does not belong in the doc.
 
-2. Doc-vs-code drift
-   - If source code already defines a contract, link the source path.
-   - Remove stale duplicated sketches unless needed for explanation.
+### Pass 2 — Overlap check
 
-3. Restated guardrails
-   - Replace repeated epic-level constraints with cross-references.
+Cross-reference every doc against:
+- Other docs (same concept in two places → one dies)
+- Skills (doc restates what a skill's SKILL.md says → doc section dies)
+- `scripts/gen-*` generators (doc restates generated output → replace with `<progressive-disclosure>` tag)
 
-4. Missing source-of-truth references
-   - Add concrete file references where behaviour is implemented.
+### Pass 3 — DRY / single-source ownership
 
-## Pass 2 — Agent readability / build decidability
+1. One concept = one canonical owner file.
+2. Secondary docs link, never restate.
+3. If source code defines a contract, link the source path.
+4. Remove stale duplicated content unless needed for explanation.
 
-1. Decidability
-   - Remove soft ambiguity (`should/could`) where direction is known.
-   - If unresolved, mark explicitly: `DECISION NEEDED:`
+### Pass 4 — Agent decidability
 
-2. Naming/path consistency
-   - File paths, command IDs, type names must match repo reality.
+1. Remove soft ambiguity (`should/could`) where direction is known.
+2. File paths, command IDs, type names must match repo reality.
+3. Prefer stepwise instructions over abstract statements.
+4. Pick one default approach; list alternatives only as fallbacks.
 
-3. Dependency direction clarity
-   - Make import/ownership direction explicit when architecture is described.
+### Pass 5 — Human scanability
 
-4. Procedure over declarations
-   - Prefer stepwise build/verify instructions over abstract statements.
+1. Status clarity: active/in-progress/done/stale must be obvious.
+2. Structure: convert prose into headers, lists, tables.
+3. Signal-to-noise: move historical context under `Background` or delete.
 
-5. Defaults over menus
-   - Pick one default approach; list alternatives only as fallbacks.
+---
 
-## Pass 3 — Human scanability / operator usability
+## Progressive disclosure convention
 
-1. Status clarity
-   - Active/in-progress/done/stale must be obvious.
+`<progressive-disclosure>` tags in docs contain a one-liner describing what
+a `scripts/gen-*` script provides, plus the command to run it.
 
-2. Structure
-   - Convert wall prose into headers, lists, tables, checklists.
+```markdown
+<progressive-disclosure>
+Full SDK export directory with stability tiers: run `bun scripts/gen-sdk-surface.ts`
+</progressive-disclosure>
+```
 
-3. Signal-to-noise
-   - Move historical/exploratory context under `Background`.
+Human maintains the doc. Agent maintains the generator script.
+The tag bridges the two.
 
-4. Comment-block seeding
-   - Preserve concise module purpose text usable as top-of-file comments.
+---
 
-## Fresh-eyes pass (mandatory)
+## CAPS MD governance
 
-Run this prompt against the updated docs:
+Root CAPS MD files (`AGENTS.md`, `PHILOSOPHY.md`, etc.) are the entire doc surface.
+Max 7 — above that triggers human review. If a proposed doc doesn't earn CAPS
+status, it either belongs in a skill, a script, or the running system.
 
-`Review this with fresh eyes. Assume current output is serviceable but suboptimal. Find the top 3 clarity gaps, top 3 reliability risks, and top 3 simplifications. Then propose smallest safe edits.`
-
-Apply worthwhile changes.
+---
 
 ## Fix policy
 
-- Keep information; do not orphan it.
-- Prefer move/restructure/link over delete.
-- Preserve canon terms and command IDs exactly.
+- **Delete over summarise.** If the system knows it, remove the section entirely.
+- **Point don't restate.** Replace with a skill name or `<progressive-disclosure>` tag.
+- **Preserve decisions.** Human rationale, design constraints, and invariants stay.
 
-## Output summary format
+---
 
-For each edited doc, report:
-- what was deduplicated
-- what became canonical owner
-- what ambiguity was resolved
-- what remains `DECISION NEEDED`
+## Output summary
+
+For each edited doc:
+- What was deleted (system already knew it)
+- What was replaced with a skill pointer
+- What got a `<progressive-disclosure>` tag
+- What remains as human-only knowledge
