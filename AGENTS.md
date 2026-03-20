@@ -23,13 +23,14 @@ scripts/gen-primitives.ts    → src/core/primitives.ts barrel
 
 ## Instance targeting (do this first, every session)
 
-Every `wibwob` command needs `-i <label>`. Find your label:
+If only one instance is running, `-i` is optional. In multi-agent or multi-human
+environments (VPS, two agents on one repo), always target explicitly:
 
 ```bash
-bun run src/cli/wibwob.ts instances
+bun run src/cli/wibwob.ts instances   # find running instances + labels
 ```
 
-Then pin it to every call:
+Then pin to every call:
 
 ```bash
 wibwob -i <label> health                   # verify alive
