@@ -20,6 +20,10 @@ Endpoints: 24 · Commands: 84
 
 Default: `http://127.0.0.1:8099`. **Prefer `wibwob` CLI over `curl`.**
 
+<progressive-disclosure>
+Live endpoint list: curl localhost:8099/ or curl localhost:8099/help
+</progressive-disclosure>
+
 ### /
 
 - `GET /` — Service info + endpoint list (this response)
@@ -97,6 +101,10 @@ Default: `http://127.0.0.1:8099`. **Prefer `wibwob` CLI over `curl`.**
 ## Commands (command-catalog.ts)
 
 Execute via `bun run wibwob cmd <id>` or `POST /commands/run {"id":"<id>"}`.
+
+<progressive-disclosure>
+Live command list: wibwob -i <label> commands or curl localhost:8099/commands/list
+</progressive-disclosure>
 
 ### primer
 
