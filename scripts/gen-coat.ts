@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const ROOT = resolve(import.meta.dirname, "../../../..");
+const ROOT = resolve(import.meta.dirname, "..");
 const API_FILE = resolve(ROOT, "src/services/control-api.ts");
 const CATALOG_FILE = resolve(ROOT, "src/core/command-catalog.ts");
 const OUTPUT = resolve(ROOT, "COAT.md");
