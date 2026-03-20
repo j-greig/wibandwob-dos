@@ -249,15 +249,24 @@ function renderFirstPerson(
   };
   const CLIFF_FAR: string[] = ["│", ":", "."];
 
+  // ── Precompute per-column ray directions (cos/sin only needed once per column) ──
+  const rayDX = new Float64Array(SW);
+  const rayDY = new Float64Array(SW);
+  const SW1 = SW - 1;
+  for (let col = 0; col < SW; col++) {
+    const ang = yaw + FOV * (col / SW1 - 0.5);
+    rayDX[col] = Math.cos(ang);
+    rayDY[col] = Math.sin(ang);
+  }
+
   // ── Raycast ──
   for (let step = STEPS; step >= 1; step--) {
     const dist = (FAR * step) / STEPS;
     const d = dist / FAR; // 0=near, 1=far
     for (let col = 0; col < SW; col++) {
       if (yBuf[col]! <= 0) continue;
-      const ang = yaw + FOV * (col / (SW - 1) - 0.5);
-      const wx = cam.x + Math.cos(ang) * dist;
-      const wy = cam.y + Math.sin(ang) * dist;
+      const wx = cam.x + rayDX[col]! * dist;
+      const wy = cam.y + rayDY[col]! * dist;
       if (wx < 0 || wx >= map.width || wy < 0 || wy >= map.height) continue;
       const iy = Math.floor(wy);
       const ix = Math.floor(wx);
