@@ -11,7 +11,7 @@ One scannable index of every `.pi/skills/` entry — who they are, when to invok
 ## agentic-dev-reflection
 **Your Friction Journalist** — Reflect on implementation friction after sessions. Write for yourself and future agents. Focus on pain → why → fix. Skip git-log style entries.
 
-Triggers on: "Reflect on implementation friction after sessions".
+Triggers on: "Reflect on implementation friction after sessions", "unknown command", "## Entry format", "Example (real entry):", "wibwob cmd microapp.wibwob.theattyr.open".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -109,7 +109,7 @@ Last used: never · See: `.pi/skills/chiptune-studio/SKILL.md`
 ## codex
 **Your Codex Delegate** — Delegate tasks to OpenAI Codex CLI as a subagent. Two agents — codex-standard (gpt-5.3-codex, general-purpose) and codex-heavy (gpt-5.4, complex tasks). USAGE R…
 
-Triggers on: "the human explicitly requests Codex", "Delegate tasks to OpenAI Codex CLI as a subagent".
+Triggers on: "the human explicitly requests Codex", "Delegate tasks to OpenAI Codex CLI as a subagent", "codex-heavy:", "diagnose the race condition in app/engine.cpp", "refactor error handling in app/api_ipc.cpp".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -120,7 +120,7 @@ Last used: today (2026-03-20) · See: `.pi/skills/codex/SKILL.md`
 ## commit
 **Your Commit Gatekeeper** — "Read this skill before making git commits. Enforces WibWob-DOS conventional commit format."
 
-Triggers on: "Read this skill before making git commits".
+Triggers on: "Read this skill before making git commits", "<subject>", "<body>", "<type>(<scope>): <imperative summary>", "feat".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -153,7 +153,9 @@ Last used: never · See: `.pi/skills/devlog-briefing/SKILL.md`
 ## discord-tui-share
 **Your TUI Broadcaster** — "Share WibWob-DOS TUI to a Discord channel. Two modes: (1) PNG screenshot of the full TUI or a single window, rendered as a styled terminal image; (2) ASCII min…
 
-Triggers on: "Share WibWob-DOS TUI to a Discord channel".
+Triggers on: "Share WibWob-DOS TUI to a Discord channel", "WibWob-DOS", "Uses", "bash
+pip install Pillow
+# or: pip3 install Pillow", "DISCORD_WEBHOOK_URL".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -186,7 +188,7 @@ Last used: never · See: `.pi/skills/git-branch-oneliners/SKILL.md`
 ## img-to-ascii
 **Your ASCII Converter** — Convert images to plain-text ASCII art primers for the TUI. Covers sourcing images, tuning conversion parameters, and opening the result as a primer window in t…
 
-Triggers on: "Convert images to plain-text ASCII art primers for the TUI", "convert image to ASCII", "image to primer", "img-to-ascii", "turn this image into text art".
+Triggers on: "Convert images to plain-text ASCII art primers for the TUI", ".txt", "-f symbols", "--symbols ascii", "-c none".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -197,7 +199,7 @@ Last used: never · See: `.pi/skills/img-to-ascii/SKILL.md`
 ## joan-stark-ascii-art
 **Your Art Librarian** — "Library of 500+ ASCII art pieces by Joan G. Stark (jgs), legendary ASCII artist 1996-2001. Use to find period-authentic ASCII art for primers, decoration, and…
 
-Triggers on: "Library of 500+ ASCII art pieces by Joan G", "find ASCII art", "Joan Stark art", "period-authentic ASCII", "jgs art", "ASCII animal".
+Triggers on: "Library of 500+ ASCII art pieces by Joan G", "Content-Type: application/json", "primer.open", "args", "filePath".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -208,7 +210,7 @@ Last used: today (2026-03-19) · See: `.pi/skills/joan-stark-ascii-art/SKILL.md`
 ## librarian
 **Your Repo Cacher** — "Cache and refresh remote git repositories under ~/.cache/checkouts/<host>/<org>/<repo> so future references can reuse a local copy. Use this skill when the use…
 
-Triggers on: "Cache and refresh remote git repositories under ~/".
+Triggers on: "Cache and refresh remote git repositories under ~/", "git@...", "owner/repo", "--filter=blob:none", "~/.cache/checkouts/<host>/<org>/<repo>".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -407,7 +409,7 @@ Last used: never · See: `.pi/skills/vj-timeline/SKILL.md`
 ## wibwob-hosting-smoke
 **Your Deployment Validator** — Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VPS/Fly.io/npm-global style deployments using adapter runners + shared binary gate…
 
-Triggers on: "(see SKILL.md)".
+Triggers on: ".pi/skills/wibwob-hosting-smoke/feedback.log", "feedback.log", "wibwob -i <instanceId> ...", "WIBWOB_DATA_DIR", "docker-vps".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
@@ -457,7 +459,9 @@ Last used: today (2026-03-19) · See: `.pi/skills/ww-ops/SKILL.md`
 ## ww-primitives
 **Your Primitives Maintainer** — Maintain the generated WibWob-DOS primitives index for shared reusable exports. Use when adding or updating shared building blocks that should be imported from…
 
-Triggers on: "(see SKILL.md)".
+Triggers on: "../../src/core/primitives.js", "src/core/primitives.ts", "## Rules
+
+- Never hand-edit", "@primitive", "/** @primitive */".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 

@@ -174,7 +174,11 @@ def parse_skill(skill_dir: Path) -> dict:
         raw = re.sub(r'^[|>-]\s*', '', raw, flags=re.M)
         desc = " ".join(raw.split())
 
-    return {"name": name, "slug": skill_dir.name, "desc": desc}
+    # body text (after closing ---) — used as trigger fallback
+    body_start = text.find("---", text.find("---") + 3)
+    body = text[body_start + 3:].strip() if body_start != -1 else ""
+
+    return {"name": name, "slug": skill_dir.name, "desc": desc, "body": body}
 
 
 # ── usage data ────────────────────────────────────────────────────────────────
@@ -214,28 +218,32 @@ def render_section(skill: dict, usage: dict) -> str:
     triggers  = extract_triggers(desc)
     doesnot   = extract_doesnot(desc, slug)
 
-    # Fallback triggers from description keywords if extraction came up short
+    # Fallback 1: quoted phrases in description
     if len(triggers) < 3:
-        # pull quoted phrases from the description directly
         extras = [q for q in re.findall(r'"([^"]{4,50})"', desc) if q not in triggers]
         triggers += extras
+
+    # Fallback 2: first sentence split on commas
     if len(triggers) < 3:
-        # last resort: first sentence split on commas
         first = desc.split(".")[0]
         for chunk in first.split(","):
             t = chunk.strip().strip('"').strip()
             if 4 <= len(t) <= 60 and t not in triggers:
                 triggers.append(t)
 
-    # hard-coded extras for skills with sparse frontmatter
-    EXTRA_TRIGGERS = {
-        "img-to-ascii":       ["convert image to ASCII", "image to primer", "img-to-ascii", "turn this image into text art"],
-        "joan-stark-ascii-art": ["find ASCII art", "Joan Stark art", "period-authentic ASCII", "jgs art", "ASCII animal"],
-    }
-    if slug in EXTRA_TRIGGERS:
-        for t in EXTRA_TRIGGERS[slug]:
-            if t not in triggers:
+    # Fallback 3: mine body text for backtick phrases and quoted strings
+    # (no hardcoding — works for any future sparse-description skill)
+    if len(triggers) < 3:
+        body = skill.get("body", "")
+        body_quoted  = re.findall(r'"([^"]{4,50})"', body[:2000])
+        body_ticked  = re.findall(r'`([^`]{4,50})`',  body[:2000])
+        body_bullets = re.findall(r'(?:Use when|Triggers on)[^\n]*?"([^"]{4,50})"', body[:2000], re.I)
+        for t in body_quoted + body_ticked + body_bullets:
+            t = t.strip()
+            if 4 <= len(t) <= 60 and t not in triggers:
                 triggers.append(t)
+            if len(triggers) >= 5:
+                break
 
     trigger_str = ", ".join(f'"{t}"' for t in triggers[:7]) if triggers else '"(see SKILL.md)"'
 
