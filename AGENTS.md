@@ -7,16 +7,20 @@ WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + loca
 ## How these docs work
 
 Four CAPS MD files at repo root are the entire doc surface:
-`AGENTS.md` · `PHILOSOPHY.md` · `ARCHITECTURE.md` · `LEXICON.md`
+
+- `AGENTS.md` — conventions, workflow, posture (this file)
+- `PHILOSOPHY.md` — why this exists, design filters, SDK boundary
+- `ARCHITECTURE.md` — COAT (Command Once, Adapt Thin), subsystems, invariants
+- `LEXICON.md` — vocabulary
 
 `<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
 deeper generated detail. Run the script to get it:
 
 ```
-scripts/gen-COAT.ts          → (snapshot of endpoints + commands)
-scripts/gen-skills.py        → .pi/skills/skills.md (skill index + usage)
-scripts/gen-sdk-surface.ts   → (TBD) SDK export directory with tiers
-scripts/gen-primitives.ts    → src/core/primitives.ts barrel
+`scripts/gen-COAT.ts`          → snapshot of endpoints + commands
+`scripts/gen-skills.py`        → `.pi/skills/skills.md` (skill index + usage)
+`scripts/gen-sdk-surface.ts`   → (TBD) SDK export directory with tiers
+`scripts/gen-primitives.ts`    → `src/core/primitives.ts` barrel
 ```
 
 ---
@@ -30,57 +34,24 @@ for single instance, required when multiple agents or humans share a machine.
 
 ---
 
-## Building a microapp
+## Microapps
 
-```bash
-bash .pi/skills/microapp-creator/scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
-```
+Use the `microapp-creator` skill. It covers scaffold, register, hooks, and dev loop.
 
-**Non-obvious:** the microapp won't appear until you add it to
-`src/core/microapp-registry.ts` → `REGISTRY`.
-Tiers: `core` = menu + API visible, `beta` = API only.
-
-Full guide: `ARCHITECTURE.md §The microapp model`
-
----
-
-## Lifecycle + ops
-
-```bash
-bun install && bun run typecheck && bun run dev:world  # start fresh
-bash scripts/restart.sh                                 # restart (preferred)
-kill $(cat scratch/wibwob.pid)                         # stop — SIGTERM, never -9
-bash scripts/reload-microapp.sh <id>                   # hot reload one microapp
-wibwob clean --kill                                    # kill orphan instances
-bun run health                                         # gate: tests + typecheck + COAT
-```
-
----
-
-## Agent resources
-
-**Microapp triad** — use for any microapp, SDK, or microapp-doc work:
+The **microapp triad** workflow for any microapp work:
 
 1. **microapp-product-owner** — scope + keep/cut decisions (always goes first)
 2. **microapp-developer** — implements one slice only
 3. **microapp-doc-refiner** — updates canonical docs for that slice
 
-Rules: product-owner defines the slice before developer touches code. Every slice
+Product-owner defines the slice before developer touches code. Every slice
 produces binary evidence (pass/fail + artefact path). 3 small slices > 1 large one.
 
-Other subagents (`.pi/agents/`): `ops` (runtime/health/debug), `arch-reviewer`
-(COAT compliance), `code-reviewer` (quality + type safety).
+---
 
-**PTC** — `.pi/extensions/ptc.ts` registers `execute_code`. Write JS calling pi
-tools as async functions; only `console.log()` returns to context. Use when
-chaining 3+ non-bash tool calls.
+## Ops
 
-**Devlog** — `scripts/devlog.sh "note"` → `.pi/reflections/2026-W{nn}.md`.
-Write friction, patterns that confused, things that worked.
-
-<progressive-disclosure>
-Full skill index with usage data: run `python3 scripts/gen-skills.py`
-</progressive-disclosure>
+Use the `ww-ops` skill. It covers start, restart, reload, health, screenshots, tmux.
 
 ---
 
@@ -102,7 +73,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 
 - Something breaks → diagnose, fix, verify, commit
 - Docs are wrong → fix in the same commit
-- A pattern confuses → write a devlog entry
+- A pattern confuses → write a devlog entry (`scripts/devlog.sh "note"`)
 - "It typechecks" is not done — run the thing
 - Bun-first. No Node-only assumptions.
 
