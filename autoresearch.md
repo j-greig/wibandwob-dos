@@ -53,7 +53,14 @@ Does not: what this skill explicitly avoids or defers to another skill.
 ```
 
 ## What's Been Tried
-- Baseline: docs/skills.md does not exist → score=0
+- **Baseline** (run 1): docs/skills.md does not exist → score=0
+- **Run 2** (score=96): Generator script created. Coverage maxed (41/41). 2 skills short on triggers due to digit-start roles ("8-bit", "MIDI"); 5 missing role labels.
+- **Run 3** (score=100): Fixed digit-start roles (8-bit→Chiptune, MIDI→Sequencer). Added EXTRA_TRIGGERS hardcoding for img-to-ascii and joan-stark as quick fix.
+- **Run 4** (score=100): Eliminated EXTRA_TRIGGERS hardcoding. Body text fallback mines backtick/quoted phrases from skill SKILL.md body — fully self-maintaining for any new sparse-description skill.
+- **Run 5** (score=100): Role-based does-not inference. 27/41 generic fallbacks replaced with archetype-aware boundaries (Reporter→read-only, Pilot→no-code, Converter→input-required, etc).
+
+## Final State
+Score ceiling hit at 100/100 across all 5 experiments. Benchmark has no remaining headroom. Generator (`scripts/gen-skills-doc.py`) is fully self-maintaining — run `python3 scripts/gen-skills-doc.py` any time to regenerate `docs/skills.md` from live skill data.
 
 ## Family Groups (consolidation candidates)
 - **Chiptune family**: chiptune, chiptune-cover, chiptune-studio (3 skills, significant overlap)
