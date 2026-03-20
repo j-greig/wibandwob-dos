@@ -82,6 +82,16 @@ function resolveEasing(easing?: EasingFn | string): EasingFn {
   return EASINGS.easeOutCubic;
 }
 
+/** Isolate user callbacks so a throw doesn't kill the tween loop. */
+function safeCall(fn: (() => void) | undefined, label: string): void {
+  if (!fn) return;
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[motion] ${label} threw:`, err);
+  }
+}
+
 export function tween(opts: TweenOpts): { cancel: () => void } {
   const from = Number.isFinite(opts.from) ? opts.from : 0;
   const to = Number.isFinite(opts.to) ? opts.to : 0;
@@ -105,25 +115,25 @@ export function tween(opts: TweenOpts): { cancel: () => void } {
   };
 
   if (duration === 0) {
-    opts.onUpdate(to);
-    opts.onComplete?.();
+    safeCall(() => opts.onUpdate(to), "tween.onUpdate");
+    safeCall(opts.onComplete, "tween.onComplete");
     return { cancel };
   }
 
   const start = Date.now();
   const delta = to - from;
 
-  opts.onUpdate(from);
+  safeCall(() => opts.onUpdate(from), "tween.onUpdate");
 
   interval = setInterval(() => {
     const elapsed = Date.now() - start;
     const t = clamp01(elapsed / duration);
     const eased = clamp01(easing(t));
-    opts.onUpdate(from + delta * eased);
+    safeCall(() => opts.onUpdate(from + delta * eased), "tween.onUpdate");
 
     if (t >= 1) {
       finish();
-      opts.onComplete?.();
+      safeCall(opts.onComplete, "tween.onComplete");
     }
   }, 16);
 
@@ -145,7 +155,7 @@ export function tweenPingPong(opts: TweenPingPongOpts): { cancel: () => void } {
       to,
       duration: opts.duration,
       easing: opts.easing,
-      onUpdate: opts.onUpdate,
+      onUpdate: (v) => safeCall(() => opts.onUpdate(v), "tweenPingPong.onUpdate"),
       onComplete: () => {
         if (cancelled) return;
         onDone();
@@ -159,10 +169,10 @@ export function tweenPingPong(opts: TweenPingPongOpts): { cancel: () => void } {
     runHalf(opts.from, opts.to, () => {
       runHalf(opts.to, opts.from, () => {
         if (cancelled) return;
-        opts.onCycle?.(cycleIndex);
+        safeCall(() => opts.onCycle?.(cycleIndex), "tweenPingPong.onCycle");
         cycleIndex += 1;
         if (cycleIndex >= cycles) {
-          opts.onComplete?.();
+          safeCall(opts.onComplete, "tweenPingPong.onComplete");
           return;
         }
         runCycle();
@@ -185,8 +195,9 @@ export function tweenPingPong(opts: TweenPingPongOpts): { cancel: () => void } {
  */
 export function tweenSequence(opts: TweenSequenceOpts): { cancel: () => void } {
   if (opts.steps.length === 0) {
-    opts.onUpdate(opts.from);
-    opts.onComplete?.();
+    console.warn("[motion] tweenSequence called with empty steps — no-op");
+    safeCall(() => opts.onUpdate(opts.from), "tweenSequence.onUpdate");
+    safeCall(opts.onComplete, "tweenSequence.onComplete");
     return { cancel: () => {} };
   }
 
@@ -208,11 +219,11 @@ export function tweenSequence(opts: TweenSequenceOpts): { cancel: () => void } {
       to: step.to,
       duration: step.duration,
       easing: step.easing,
-      onUpdate: opts.onUpdate,
+      onUpdate: (v) => safeCall(() => opts.onUpdate(v), "tweenSequence.onUpdate"),
       onComplete: () => {
         if (cancelled) return;
         current = step.to;
-        opts.onStepComplete?.(stepIndex, current);
+        safeCall(() => opts.onStepComplete?.(stepIndex, current), "tweenSequence.onStepComplete");
         stepIndex += 1;
         runStep();
       },
