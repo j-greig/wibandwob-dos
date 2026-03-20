@@ -138,7 +138,7 @@ function connectPiSession(socketPath: string) {
 
 ## Your Job
 
-Build the bridge. Start with Slice 0 (pi-sessions microapp). Read the planning at `.planning/epics/e047-wibwob-pi.md` for the full scope. Read `docs/building-custom-microapps.md` for microapp patterns. Use `bash scripts/scaffold-microapp.sh` to scaffold.
+Build the bridge. Start with Slice 0 (pi-sessions microapp). Read the planning at `.planning/epics/e047-wibwob-pi.md` for the full scope. Read `.agents/guides/microapp.md` for microapp patterns. Use `bash scripts/scaffold-microapp.sh` to scaffold.
 
 When building socket clients: handle ECONNREFUSED (dead sessions), buffer partial JSON lines, clean up on window close.
 

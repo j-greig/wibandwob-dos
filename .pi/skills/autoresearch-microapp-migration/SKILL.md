@@ -168,7 +168,7 @@ Run these on every experiment:
 - `scripts/check-sdk-doc-sync.sh`
   - if SDK surface changed (`src/sdk/*` or `src/services/microapp-sdk.ts`), requires updates in:
     - `.agents/guides/microapp/sdk-reference.md`
-    - `docs/building-custom-microapps.md`
+    - `.agents/guides/microapp.md`
 - `bun run typecheck`
 - targeted runtime checks (CLI + API + screenshot)
 

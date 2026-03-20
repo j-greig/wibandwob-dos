@@ -190,7 +190,7 @@ function openTerminal(host: MicroappHost, termWriteHandlers: Map<number, (text: 
     width: "100%",
     height: "100%",
     // input + keys required for blessed.box keypress events to fire
-    // (same gotcha as music player — see .agents/shell-dev/specs/window-system.md)
+    // (same gotcha as music player — see WindowManager JSDoc in src/core/window-manager.ts)
     input: true,
     keys: true,
     mouse: true,

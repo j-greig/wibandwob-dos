@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 // @name    gen-integration-surface
-// @desc    Auto-generate .agents/reference/integration-surface.md from command-catalog + control-api
+// @desc    Auto-generate COAT snapshot from command-catalog + control-api
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const ROOT = resolve(import.meta.dirname, "../..");
+const ROOT = resolve(import.meta.dirname, "..");
 const API_FILE = resolve(ROOT, "src/services/control-api.ts");
 const CATALOG_FILE = resolve(ROOT, "src/core/command-catalog.ts");
-const OUTPUT = resolve(ROOT, ".agents/reference/integration-surface.md");
+const OUTPUT = resolve(ROOT, "COAT.md");
 
 // Extract endpoint table from control-api.ts
 const apiSrc = readFileSync(API_FILE, "utf-8");
@@ -29,10 +29,10 @@ while ((m = cmdRegex.exec(catSrc))) {
 
 // Generate markdown
 const lines: string[] = [
-  "# WibWob-DOS Integration Surface",
+  "# COAT.md — Live proof of Command Once, Adapt Thin",
   "",
-  "> **Auto-generated** by `scripts/checks/gen-integration-surface.ts`.",
-  "> Do not edit by hand. Regenerate: `bun run scripts/checks/gen-integration-surface.ts`",
+  "> Every endpoint and command flows through the same registry. This file is that claim made concrete.",
+  "> Auto-generated — do not edit. Regenerate: `bun scripts/gen-coat.ts`",
   "",
   `Generated: ${new Date().toISOString().split("T")[0]}`,
   `Endpoints: ${endpoints.length} · Commands: ${commands.length}`,
@@ -83,15 +83,15 @@ for (const [group, cmds] of cmdGroups) {
 }
 
 const output = lines.join("\n");
-const existing = readFileSync(OUTPUT, "utf-8").trim();
+const existing = existsSync(OUTPUT) ? readFileSync(OUTPUT, "utf-8").trim() : "";
 const generated = output.trim();
 
 if (existing === generated) {
-  console.log("✅ integration-surface.md is up to date");
+  console.log("✅ COAT.md is up to date");
   process.exit(0);
 }
 
 writeFileSync(OUTPUT, output);
 const oldLines = existing.split("\n").length;
 const newLines = generated.split("\n").length;
-console.log(`✏️  integration-surface.md regenerated (${oldLines}→${newLines} lines)`);
+console.log(`✏️  COAT.md regenerated (${oldLines}→${newLines} lines)`);

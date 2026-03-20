@@ -4,7 +4,17 @@ import path from "node:path";
 import type { WindowSnapshot } from "../core/types.js";
 import { safeReadJSON, safeWriteFile } from "../core/safe-fs.js";
 
-/** Workspace file envelope. Backward-compatible: old files are bare arrays. */
+/**
+ * Workspace file envelope. Backward-compatible: old files are bare arrays.
+ *
+ * Restore failure modes:
+ *   - Windows don't restore: default.json missing/corrupt — check scratch/workspaces/default.json
+ *   - Wrong position: geometry saved as blessed "%" strings — use Number(frame.left) not raw frame.left
+ *   - Type missing: describeState() absent or returns wrong appType — every persistable window needs it
+ *   - Theme not restored: theme field missing from WorkspaceFile — pass currentTheme to save()
+ *   - Focus wrong: focus() called mid-restore — move focus() call after the full restore loop
+ *   - Alt instance uses main workspace: SCRATCH_DIR not set — set SCRATCH_DIR=scratch/alt
+ */
 export interface WorkspaceFile {
   version: 2;
   theme?: string;

@@ -1,94 +1,57 @@
 # AGENTS.md
 
-> Philosophy: `PHILOSOPHY.md` · Architecture + file map: `ARCHITECTURE.md`
-
 WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + local HTTP API.
 
 ---
 
-## Instance targeting (do this first, every session)
+## How these docs work
 
-Every `wibwob` command needs `-i <label>`. Find your label:
+Four CAPS MD files at repo root are the entire doc surface:
 
-```bash
-bun run src/cli/wibwob.ts instances
+- `AGENTS.md` — conventions, workflow, posture (this file)
+- `PHILOSOPHY.md` — why this exists, design filters, SDK boundary
+- `ARCHITECTURE.md` — COAT (Command Once, Adapt Thin), subsystems, invariants
+- `LEXICON.md` — vocabulary
+
+`<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
+deeper generated detail. Run the script to get it:
+
 ```
-
-Then pin it to every call:
-
-```bash
-bun run src/cli/wibwob.ts -i 8pr health    # verify alive
-bun run src/cli/wibwob.ts -i 8pr minimap   # visual ASCII desktop map
-bun run src/cli/wibwob.ts -i 8pr windows   # JSON window list with IDs
-bun run src/cli/wibwob.ts -i 8pr state     # full live desktop state
-bun run src/cli/wibwob.ts -i 8pr commands -q  # all command IDs
-```
-
-Window operations:
-
-```bash
-wibwob -i <label> cmd <command.id>
-wibwob -i <label> window <id> resize --width 120 --height 40
-wibwob -i <label> window <id> move --left 10 --top 5
-wibwob -i <label> read <id>                # semantic text from window
-echo "text" | wibwob -i <label> write <id>
-```
-
-**Visual verification is mandatory.** API responses are not sufficient proof.
-
-> **Doc hygiene test:** before adding anything here — would an LLM already know this
-> from training data, or can they find it from `ls` + reading PHILOSOPHY.md + ARCHITECTURE.md?
-> If yes, it doesn't belong in this file.
-
----
-
-## Building a microapp
-
-```bash
-bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
-```
-
-**Non-obvious:** the microapp won't appear until you add it to
-`src/core/microapp-registry.ts` → `REGISTRY`.
-Tiers: `core` = menu + API visible, `beta` = API only.
-
-Full guide: `.agents/guides/microapp/` (7 docs)
-
----
-
-## Lifecycle + ops
-
-```bash
-bun install && bun run typecheck && bun run dev:world  # start fresh
-bash scripts/restart.sh                                 # restart (preferred)
-kill $(cat scratch/wibwob.pid)                         # stop — SIGTERM, never -9
-bash scripts/reload-microapp.sh <id>                   # hot reload one microapp
-wibwob clean --kill                                    # kill orphan instances
-bun run health                                         # gate: tests + typecheck + COAT
+`scripts/gen-COAT.ts`          → snapshot of endpoints + commands
+`scripts/gen-skills.py`        → `.pi/skills/skills.md` (skill index + usage)
+`scripts/gen-sdk-surface.ts`   → (TBD) SDK export directory with tiers
+`scripts/gen-primitives.ts`    → `src/core/primitives.ts` barrel
 ```
 
 ---
 
-## Agent resources
+## CLI
 
-**Microapp triad** — use for any microapp, SDK, or microapp-doc work:
+`wibwob --help` for full usage. `-i <label>` targets a specific instance — optional
+for single instance, required when multiple agents or humans share a machine.
+
+**Visual verification is mandatory.** API responses alone are not sufficient proof.
+
+---
+
+## Microapps
+
+Use the `microapp-creator` skill. It covers scaffold, register, hooks, and dev loop.
+
+The **microapp triad** workflow for any microapp work:
 
 1. **microapp-product-owner** — scope + keep/cut decisions (always goes first)
 2. **microapp-developer** — implements one slice only
 3. **microapp-doc-refiner** — updates canonical docs for that slice
 
-Rules: product-owner defines the slice before developer touches code. Every slice
+Product-owner defines the slice before developer touches code. Every slice
 produces binary evidence (pass/fail + artefact path). 3 small slices > 1 large one.
 
-Other subagents (`.pi/agents/`): `ops` (runtime/health/debug), `arch-reviewer`
-(COAT compliance), `code-reviewer` (quality + type safety).
+---
 
-**PTC** — `.pi/extensions/ptc.ts` registers `execute_code`. Write JS calling pi
-tools as async functions; only `console.log()` returns to context. Use when
-chaining 3+ non-bash tool calls.
+## Ops
 
-**Devlog** — `scripts/devlog.sh "note"` → `.agents/reflections/2026-W{nn}.md`.
-Write friction, patterns that confused, things that worked.
+Use the `ww-ops` skill. It covers start, restart, reload, health, screenshots, tmux.
 
 ---
 
@@ -110,7 +73,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 
 - Something breaks → diagnose, fix, verify, commit
 - Docs are wrong → fix in the same commit
-- A pattern confuses → codify in `.agents/` or write a devlog entry
+- A pattern confuses → write a devlog entry (`scripts/devlog.sh "note"`)
 - "It typechecks" is not done — run the thing
 - Bun-first. No Node-only assumptions.
 
