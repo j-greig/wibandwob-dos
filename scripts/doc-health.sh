@@ -84,8 +84,8 @@ check "orphans" '
 # 8. Functional — COAT endpoint count matches source, skills count matches source
 check "functional" '
   if [ -f COAT.md ] && [ -f src/services/control-api.ts ]; then
-    src=$(grep -c "\"path\":" src/services/control-api.ts 2>/dev/null || echo 0)
-    doc=$(grep -oE "Endpoints: [0-9]+" COAT.md | grep -oE "[0-9]+" | head -1 || echo 0)
+    src=$(grep -c "\"path\":" src/services/control-api.ts 2>/dev/null | tail -1 | tr -d " \n" || echo 0)
+    doc=$(grep -oE "Endpoints: [0-9]+" COAT.md | grep -oE "[0-9]+" | head -1 | tr -d " \n" || echo 0)
     [ "$doc" -ge "$src" ] || [ "$((src - doc))" -le 2 ] || exit 1
   fi
   if [ -f .pi/skills/skills.md ]; then
@@ -110,23 +110,25 @@ check "parent_section" '
   done
 '
 
-# 10. @watches import match — declared watches contain files the script actually reads
+# 10. @watches import match — declared watches cover the actual source files read by the script
 check "watches_match" '
   for s in scripts/gen-*.ts; do
     [ -f "$s" ] || continue
     watches=$(grep -E "^// @watches" "$s" | sed "s|.*@watches ||")
     [ -z "$watches" ] && continue
-    while IFS= read -r imp; do
-      imp=$(echo "$imp" | tr -d "\"" | tr -d "'\'' ")
-      [ -z "$imp" ] && continue
-      # Check that at least one @watches entry is a prefix of this import
+    # Resolve const *_FILE = resolve(ROOT, "path") patterns
+    while IFS= read -r resolved; do
+      [ -z "$resolved" ] && continue
       matched=false
       for w in $watches; do
-        echo "$imp" | grep -q "$w" && matched=true && break
+        # Check if watched path is a prefix of or matches the resolved path
+        echo "$resolved" | grep -q "$(echo "$w" | sed "s|/\*.*||")" && matched=true && break
       done
       [ "$matched" = true ] || exit 1
-    done < <(grep -oE "readFileSync\([^)]+\)" "$s" | grep -oE "\"[^\"]+\"" | grep -v "utf" || true)
+    done < <(grep -E "(const|let|var) .*(FILE|PATH|SRC).*resolve\(ROOT" "$s" | grep -oE "\"[^\"]+\"" | tr -d "\"" | grep -v "utf" || true)
   done
+  # Python gen scripts use Path() division — skip for now, TS covers the pattern
+
 '
 
 echo "METRIC doc_health=$SCORE"
