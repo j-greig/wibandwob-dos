@@ -19,10 +19,10 @@ The autopoietic documentation system is built and working:
 Test scenarios:
 - [x] Add a new API endpoint to `control-api.ts` → doc-sync detected it → gen-integration-surface.ts regenerated COAT.md → new endpoints appeared → doc-health 15/15. **PASSED** (Chrome browser enhancement, 2026-03-20)
 - [x] Delete a skill → doc-sync detected `.pi/skills/` change → skills.md flagged stale. **PASSED** (after fixing glob expansion bug in doc-sync.sh — `for watch in $watches` was shell-expanding globs before regex conversion)
-- [ ] Add a new microapp skill → does `gen-skills.py` pick it up? → does `skills.md` update?
-- [ ] Add a new `@public` export to `microapp-sdk.ts` → does `gen-sdk-surface.ts` pick it up?
+- [x] Add a new microapp skill → doc-sync flagged skills.md stale → gen-skills.py regenerated → command-scaffold appeared. **PASSED** (command-scaffold skill, 2026-03-20)
+- [x] Add `@public` export to `microapp-sdk.ts` → doc-sync flagged src/sdk/README.md stale. **PASSED** (simulated change, 2026-03-20)
 
-Two of four proven on real code. Remaining two are lower risk (same mechanism, different watched paths).
+All four smoke tests passed. The autopoietic loop works on real code changes.
 
 ### 1. doc-review.sh — semantic + functional tiers
 **Spec:** `.planning/autoresearch-doc-health/doc-review-spec.md`

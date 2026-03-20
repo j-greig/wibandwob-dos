@@ -61,6 +61,14 @@ release mouse tracking escape codes. Use `SIGTERM` (`kill $PID`). If terminal ma
 
 ---
 
+## Gen scripts
+
+**Gen scripts don't auto-run on save.** They run at commit time via the pre-commit hook.
+A `doc-sync.sh --watch` mode (fswatch/fs.watch on `@watches` paths) would make docs
+always-current. Standard pattern (webpack, tsc --watch, tailwind). Not built yet.
+
+---
+
 ## CAPS files
 
 **If a CAPS file needs >3 `<progressive-disclosure>` tags, split it.** More than 3 means
