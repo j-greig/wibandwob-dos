@@ -30,20 +30,14 @@ const RadioOptionSchema = Type.Object({
 	command: Type.String({ description: "Shell command to run if this option is chosen" }),
 });
 
-const CheckboxItemSchema = Type.Object({
-	label: Type.String({ description: "Display label" }),
-	command: Type.String({ description: "Shell command to run when checked and DO IT is pressed" }),
+const ItemSchema = Type.Object({
+	label: Type.String({ description: "Display label for the item" }),
+	command: Type.Optional(Type.String({ description: "Shell command (checkbox items). Omit when using options." })),
 	checked: Type.Optional(Type.Boolean({ description: "Pre-check this item (default: false)" })),
+	options: Type.Optional(Type.Array(RadioOptionSchema, {
+		description: "Providing options makes this a radio item. A 'Type a command…' slot is always appended.",
+	})),
 });
-
-const RadioItemSchema = Type.Object({
-	label: Type.String({ description: "Display label" }),
-	options: Type.Array(RadioOptionSchema, {
-		description: "Radio options. A final 'Type a command…' option is always appended automatically.",
-	}),
-});
-
-const ItemSchema = Type.Union([CheckboxItemSchema, RadioItemSchema]);
 
 const SectionSchema = Type.Object({
 	heading: Type.String({ description: "Section heading shown above its items" }),

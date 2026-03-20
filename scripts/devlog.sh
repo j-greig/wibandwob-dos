@@ -1,7 +1,7 @@
 #!/bin/bash
 # devlog.sh — zero-friction weekly devlog entries
 # @name    devlog
-# @desc    Append pain→why→fix reflection to weekly .agents/reflections/ file
+# @desc    Append pain→why→fix reflection to weekly .pi/reflections/ file
 # Usage:
 #   scripts/devlog.sh                     # open this week's devlog in $EDITOR
 #   scripts/devlog.sh "one-liner note"    # append timestamped entry
