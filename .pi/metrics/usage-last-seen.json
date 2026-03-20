@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T18:03:02.615Z",
+  "generatedAt": "2026-03-20T20:29:06.709Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -10,15 +10,15 @@
         ]
       },
       "ww-ops": {
-        "lastSeen": "2026-03-19T19:24:34.949Z",
-        "count": 1,
+        "lastSeen": "2026-03-20T19:01:13.499Z",
+        "count": 2,
         "sources": [
           "read:SKILL.md"
         ]
       },
       "commit": {
-        "lastSeen": "2026-03-20T15:50:52.187Z",
-        "count": 4,
+        "lastSeen": "2026-03-20T19:31:02.947Z",
+        "count": 5,
         "sources": [
           "read:SKILL.md"
         ]
@@ -57,12 +57,19 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "microapp-creator": {
+        "lastSeen": "2026-03-20T19:29:39.514Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-20T18:02:05.323Z",
-        "count": 54,
+        "lastSeen": "2026-03-20T19:46:39.512Z",
+        "count": 60,
         "sources": [
           "tool:edit",
           "tool:multi_edit"
@@ -77,8 +84,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T17:51:39.919Z",
-        "count": 40,
+        "lastSeen": "2026-03-20T20:29:06.709Z",
+        "count": 47,
         "sources": [
           "tool:execute_code"
         ]
@@ -91,8 +98,8 @@
         ]
       },
       "todos": {
-        "lastSeen": "2026-03-20T18:03:02.615Z",
-        "count": 2,
+        "lastSeen": "2026-03-20T19:42:04.138Z",
+        "count": 3,
         "sources": [
           "command:/todos",
           "tool:todo"
@@ -106,8 +113,8 @@
         ]
       },
       "checklist": {
-        "lastSeen": "2026-03-20T18:00:35.862Z",
-        "count": 4,
+        "lastSeen": "2026-03-20T19:38:17.795Z",
+        "count": 5,
         "sources": [
           "tool:checklist"
         ]

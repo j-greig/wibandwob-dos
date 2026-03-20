@@ -1,9 +1,5 @@
 # WibWob-DOS — Architecture
 
-> Design filters: `PHILOSOPHY.md` · Vocabulary: `LEXICON.md`
-
----
-
 ## COAT — Command Once, Adapt Thin
 
 WibWob-DOS is a **shared terminal desktop** where a human and agents have equal
@@ -25,20 +21,18 @@ Four seams connect every adapter to the core:
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
 <progressive-disclosure>
-Live endpoints:  curl localhost:8099/ · curl localhost:8099/help
-Live commands:   wibwob -i <label> commands · curl localhost:8099/commands/list
-Static snapshot: `bun scripts/gen-COAT.ts`
+  <output>`COAT.md` — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)</output>
+  <generator>`bun scripts/gen-integration-surface.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
 </progressive-disclosure>
+
+
+> Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).
 
 ---
 
-## Why Bun + blessed
+## Runtime note
 
-**Bun** — single-process, fast startup, native TypeScript, built-in HTTP server.
-No compilation step in development. The bottleneck is always terminal rendering.
-
-**blessed** — handles raw input, mouse events, box model, screen diffing. Not
-designed for composition, which is why `src/ui/` exists as a layer above it.
+blessed isn't designed for composition — `src/ui/` exists as a layer above it.
 Microapps never touch blessed directly — they code against the SDK Handle interface.
 
 ---
@@ -109,9 +103,7 @@ win.onRestyle(() => { /* re-apply host.theme() */ })
 **Import rule:** only `import from "../../src/services/microapp-sdk.js"`.
 Importing from `src/core/` or `src/services/` directly is a COAT violation.
 
-<progressive-disclosure>
-Full SDK export directory with stability tiers: run `bun scripts/gen-sdk-surface.ts`
-</progressive-disclosure>
+
 
 ---
 
