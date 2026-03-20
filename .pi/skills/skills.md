@@ -267,6 +267,17 @@ Last used: never · See: `.pi/skills/planning-update/SKILL.md`
 
 ---
 
+## qmd
+**Your Knowledge Searcher** — Search markdown knowledge bases, notes, and documentation using QMD. Use when users ask to search notes, find documents, or look up information.
+
+Triggers on: "users ask to search notes", "find documents", "or look up information".
+
+Does not: Does not make changes — reads and reports only.
+
+Last used: never · See: `.pi/skills/qmd/SKILL.md`
+
+---
+
 ## repo-hygiene
 **Your Repo Janitor** — - Monthly repo health check — branch census, worktree audit, stale docs, planning drift, GH issue triage. Run when branches pile up, worktrees sprawl, or planni…
 
@@ -275,6 +286,17 @@ Triggers on: "repo hygiene", "branch cleanup", "jubilee", "audit branches", "sta
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
 Last used: never · See: `.pi/skills/repo-hygiene/SKILL.md`
+
+---
+
+## session-archaeology
+**Your Confusion Miner** — Mine pi agent session logs (~/.pi/agent/sessions/) to find which subsystems cause the most agent confusion, regressions, and repeated human re-explanation. Thre…
+
+Triggers on: "auditing agent experience", "planning which subsystems need specs first", "building trigger tables", "investigating why agents keep getting something wrong", "or feeding a codified context infrastructure (E001 pattern)".
+
+Does not: Does not make changes — reads and reports only.
+
+Last used: never · See: `.pi/skills/session-archaeology/SKILL.md`
 
 ---
 
@@ -361,6 +383,17 @@ Last used: never · See: `.pi/skills/vj-timeline/SKILL.md`
 
 ---
 
+## wibwob-hosting-smoke
+**Your Deployment Validator** — Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VPS/Fly.io/npm-global style deployments using adapter runners + shared binary gate…
+
+Triggers on: "wibwob hosting smoke", "wibwob smoke".
+
+Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+
+Last used: never · See: `.pi/skills/wibwob-hosting-smoke/SKILL.md`
+
+---
+
 ## wibwobdos
 **Your Desktop Operator** — Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windo…
 
@@ -424,7 +457,9 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | pi-session-log-explorer | Session Archaeologist | Search and extract content from pi agent session logs (~/ |
 | pi-usage-audit | Stale-Skill Auditor | Audit local Pi skill, extension, and agent usage from session logs for the curre |
 | planning-update | Planning Closer | - Update  |
+| qmd | Knowledge Searcher | Search markdown knowledge bases, notes, and documentation using QMD |
 | repo-hygiene | Repo Janitor | - Monthly repo health check — branch census, worktree audit, stale docs, plannin |
+| session-archaeology | Confusion Miner | Mine pi agent session logs (~/ |
 | signls | Sequencer Pilot | Manage the signls generative MIDI sequencer |
 | simplify | Code Simplifier | - Three-pass code review and cleanup after a batch of changes |
 | simplify-docs | Docs Simplifier | - Radically simplify documentation by applying the system-knowledge test: if a s |
@@ -432,6 +467,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | skill-creator | Skill Architect | Create well-structured Agent Skills that follow the agentskills |
 | timeline-smoke | Timeline Tester | - Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs at ever |
 | vj-timeline | Show Director | Compose and execute timed music video shows inside WibWob-DOS TUI |
+| wibwob-hosting-smoke | Deployment Validator | Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VP |
 | wibwobdos | Desktop Operator | Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generat |
 | wibwobdos-cinema | Reel Director | Record choreographed WibWob-DOS TUI sessions as retina GIF/MP4 with synced chipt |
 | youtube-transcript | Transcript Fetcher | Fetch the transcript of any YouTube video as plain text |
