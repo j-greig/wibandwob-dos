@@ -15,9 +15,7 @@ echo ""
 for section in \
   "Root:." \
   ".agents:.agents" \
-  ".agents/guides:.agents/guides" \
-  ".agents/specs:.agents/specs" \
-  ".agents/reflections:.agents/reflections" \
+  ".pi/reflections:.pi/reflections" \
   "docs:docs" \
   ".planning:.planning" \
   ".planning/epics:.planning/epics" \

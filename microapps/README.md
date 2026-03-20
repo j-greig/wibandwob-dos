@@ -16,12 +16,7 @@ visible to everyone.
 
 Canonical docs:
 
-- Quick start: `.agents/microapp-dev/quick-start.md`
-- Full guide: `.agents/guides/microapp.md`
-- SDK reference: `.agents/microapp-dev/sdk-reference.md`
-- Examples by tier: `.agents/microapp-dev/examples-by-tier.md`
-- Persistence: `.agents/microapp-dev/persistence.md`
-- Pitfalls: `.agents/microapp-dev/pitfalls.md`
+- Guide (scaffold, SDK, pitfalls): `ARCHITECTURE.md §microapp model`
 
 Import types and helpers from `../../src/services/microapp-sdk.js`.
 Do not import directly from `src/core/*` — if something is missing,

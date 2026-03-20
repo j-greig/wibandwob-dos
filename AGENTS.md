@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> Philosophy: `PHILOSOPHY.md` · Architecture + file map: `ARCHITECTURE.md`
+> Philosophy: `PHILOSOPHY.md` · Architecture + build guide: `ARCHITECTURE.md` · Vocabulary: `LEXICON.md`
 
 WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + local HTTP API.
 
@@ -17,11 +17,11 @@ bun run src/cli/wibwob.ts instances
 Then pin it to every call:
 
 ```bash
-bun run src/cli/wibwob.ts -i 8pr health    # verify alive
-bun run src/cli/wibwob.ts -i 8pr minimap   # visual ASCII desktop map
-bun run src/cli/wibwob.ts -i 8pr windows   # JSON window list with IDs
-bun run src/cli/wibwob.ts -i 8pr state     # full live desktop state
-bun run src/cli/wibwob.ts -i 8pr commands -q  # all command IDs
+wibwob -i <label> health                   # verify alive
+wibwob -i <label> minimap                  # visual ASCII desktop map
+wibwob -i <label> windows                  # JSON window list with IDs
+wibwob -i <label> state                    # full live desktop state
+wibwob -i <label> commands -q              # all command IDs
 ```
 
 Window operations:
@@ -36,10 +36,6 @@ echo "text" | wibwob -i <label> write <id>
 
 **Visual verification is mandatory.** API responses are not sufficient proof.
 
-> **Doc hygiene test:** before adding anything here — would an LLM already know this
-> from training data, or can they find it from `ls` + reading PHILOSOPHY.md + ARCHITECTURE.md?
-> If yes, it doesn't belong in this file.
-
 ---
 
 ## Building a microapp
@@ -52,7 +48,7 @@ bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOr
 `src/core/microapp-registry.ts` → `REGISTRY`.
 Tiers: `core` = menu + API visible, `beta` = API only.
 
-Full guide: `.agents/guides/microapp/` (7 docs)
+Full guide: `ARCHITECTURE.md §The microapp model`
 
 ---
 
@@ -87,8 +83,13 @@ Other subagents (`.pi/agents/`): `ops` (runtime/health/debug), `arch-reviewer`
 tools as async functions; only `console.log()` returns to context. Use when
 chaining 3+ non-bash tool calls.
 
-**Devlog** — `scripts/devlog.sh "note"` → `.agents/reflections/2026-W{nn}.md`.
+**Devlog** — `scripts/devlog.sh "note"` → `.pi/reflections/2026-W{nn}.md`.
 Write friction, patterns that confused, things that worked.
+
+<prog-disclosure>
+Live index of every script, skill, and doc in the repo — organised by
+agent lens (shell-architect, microapp-builder, ops, quality, creative).
+</prog-disclosure>
 
 ---
 
@@ -110,7 +111,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 
 - Something breaks → diagnose, fix, verify, commit
 - Docs are wrong → fix in the same commit
-- A pattern confuses → codify in `.agents/` or write a devlog entry
+- A pattern confuses → write a devlog entry
 - "It typechecks" is not done — run the thing
 - Bun-first. No Node-only assumptions.
 

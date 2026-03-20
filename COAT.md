@@ -1,10 +1,10 @@
-# WibWob-DOS Integration Surface
+# COAT.md — Live proof of Command Once, Adapt Thin
 
-> **Auto-generated** by `.pi/skills/ww-primitives/scripts/gen-integration-surface.ts`.
-> Do not edit by hand. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`
+> Every endpoint and command flows through the same registry. This file is that claim made concrete.
+> Auto-generated — do not edit. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`
 
-Generated: 2026-03-17
-Endpoints: 23 · Commands: 85
+Generated: 2026-03-20
+Endpoints: 24 · Commands: 84
 
 ---
 
@@ -66,6 +66,7 @@ Default: `http://127.0.0.1:8099`. **Prefer `wibwob` CLI over `curl`.**
 
 ### /screenshot
 
+- `GET /screenshot` — Friendly screenshot alias. Defaults to clean text output.
 - `GET /screenshot/text` — Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome.
 - `GET /screenshot/ansi` — Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect.
 
@@ -210,10 +211,6 @@ Execute via `bun run wibwob cmd <id>` or `POST /commands/run {"id":"<id>"}`.
 ### music-player
 
 - `music-player.open` — Open the music player. Pass filePath to auto-load a track.
-
-### microapp
-
-- `microapp.wibwob.sy2chronicles.open` — Bridge command for the §y² Chronicles microapp dynamic opener.
 
 ### companion
 

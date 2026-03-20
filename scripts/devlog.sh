@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEVLOG_DIR="$REPO_ROOT/.agents/reflections"
+DEVLOG_DIR="$REPO_ROOT/.pi/reflections"
 JOURNAL_DIR="$REPO_ROOT/scratch/journal"
 
 # ISO week number (Monday start)

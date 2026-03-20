@@ -42,19 +42,15 @@ new abstraction. If a proposed change fails more than one filter, pause.
 
 **1. Radical simplicity**
 Does this add a new primitive, or compose from existing ones?
-Prefer composition. Constraints are the creative material — they generate the
-aesthetic, not just preserve simplicity. Small systems are easier for agents
-to reason about than large ones.
+Prefer composition. Constraints are the creative material.
 
 **2. Constrained expressiveness**
 Does this enlarge the SDK surface, or express more through existing primitives?
-Complexity should emerge from composition, sequencing, and state relationships —
-not from API growth.
+Complexity should emerge from composition and state relationships — not API growth.
 
 **3. Legibility over cleverness**
 Is this explicit and readable, or magical and implicit?
-Agents cannot debug hidden state. Prefer obvious ownership, clear boundaries,
-no surprising side-effects.
+Agents cannot debug hidden state. Prefer obvious ownership, clear boundaries.
 
 **4. Host owns complexity**
 Is this the host's responsibility or the microapp's?
@@ -88,12 +84,13 @@ microapp authors. Stable surface, mutable implementation:
 └─────────────────────────────────────────────┘
 ```
 
-Microapps code against the Handle interface. The host can change, optimise, or
-replace the entire rendering engine without breaking a single microapp — so long
-as the Handle contract holds.
+Stability tiers: `@public` (stable) · `@beta` (may change) · `@internal` (host only).
 
-Stability tiers: `@public` (stable), `@beta` (contract may change), `@internal`
-(host-only, never for microapp consumption).
+<prog-disclosure>
+Every export from microapp-sdk.ts with its stability tier, type signature, and
+one-line description — the full surface an agent needs to pick the right component
+without reading source.
+</prog-disclosure>
 
 ---
 
@@ -106,15 +103,3 @@ Stability tiers: `@public` (stable), `@beta` (contract may change), `@internal`
 > to evolve. The outcomes remain unexpectedly rich.
 >
 > **Every interface is just another client of the runtime.**
-
----
-
-## Where to go next
-
-| I want to… | Read… |
-|------------|-------|
-| Understand the architecture and file map | `ARCHITECTURE.md` _(root)_ |
-| Know the invariants and anti-patterns | `.agents/guides/shell.md` |
-| Build a microapp | `.agents/guides/microapp.md` |
-| Understand COAT (Command Once, Adapt Thin) | `ARCHITECTURE.md` §The core idea |
-
