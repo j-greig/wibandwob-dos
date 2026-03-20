@@ -32,7 +32,7 @@ const lines: string[] = [
   "# COAT.md — Live proof of Command Once, Adapt Thin",
   "",
   "> Every endpoint and command flows through the same registry. This file is that claim made concrete.",
-  "> Auto-generated — do not edit. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`",
+  "> Auto-generated — do not edit. Regenerate: `bun scripts/gen-coat.ts`",
   "",
   `Generated: ${new Date().toISOString().split("T")[0]}`,
   `Endpoints: ${endpoints.length} · Commands: ${commands.length}`,

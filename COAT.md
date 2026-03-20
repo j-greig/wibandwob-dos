@@ -1,7 +1,15 @@
 # COAT.md — Live proof of Command Once, Adapt Thin
 
 > Every endpoint and command flows through the same registry. This file is that claim made concrete.
-> Auto-generated — do not edit. Regenerate: `bun run .pi/skills/ww-primitives/scripts/gen-integration-surface.ts`
+> Auto-generated — do not edit. Regenerate: `bun scripts/gen-coat.ts`
+
+<progressive-disclosure>
+Live proof from a running instance:
+  wibwob -i <label> commands       — all registered commands
+  wibwob -i <label> commands -q    — just command IDs
+  curl localhost:8099/             — service info + endpoint list
+  curl localhost:8099/commands/list — live API command surface
+</progressive-disclosure>
 
 Generated: 2026-03-20
 Endpoints: 24 · Commands: 84
