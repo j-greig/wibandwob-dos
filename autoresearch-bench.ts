@@ -33,21 +33,16 @@ for (let i = 0; i < FRAMES; i++) {
 }
 const raycasterMs = (performance.now() - t0) / FRAMES;
 
-// ── Bench 2: full round-trip (createTerrainMap + render) ─────────────────
+// ── Bench 2: createTerrainMap cost alone (cold path on reseed/mode change) ──
 for (let i = 0; i < 3; i++) {
-  const t = createTerrainMap({ width: 80, height: 80, seed: 42, terrainIdx: 0, seaLevel: 0.4, vegetationEnabled: true });
-  renderTerrainMap(t, { mode: "firstperson", levels: 8, tags: true,
-    camera: { centerX: cam.x, centerY: cam.y, width: VP_W, height: VP_H },
-    firstPersonCamera: cam });
+  createTerrainMap({ width: 80, height: 80, seed: 42, terrainIdx: 0, seaLevel: 0.4, vegetationEnabled: true });
 }
 const t1 = performance.now();
 for (let i = 0; i < FRAMES; i++) {
-  const t = createTerrainMap({ width: 80, height: 80, seed: 42, terrainIdx: 0, seaLevel: 0.4, vegetationEnabled: true });
-  renderTerrainMap(t, { mode: "firstperson", levels: 8, tags: true,
-    camera: { centerX: cam.x, centerY: cam.y, width: VP_W, height: VP_H },
-    firstPersonCamera: cam });
+  createTerrainMap({ width: 80, height: 80, seed: 42, terrainIdx: 0, seaLevel: 0.4, vegetationEnabled: true });
 }
-const fullMs = (performance.now() - t1) / FRAMES;
+const terrainMs = (performance.now() - t1) / FRAMES;
+const fullMs = raycasterMs + terrainMs; // worst-case: reseed + render
 
 const frameUs = Math.round(raycasterMs * 1000);
 const fullUs  = Math.round(fullMs * 1000);

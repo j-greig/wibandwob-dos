@@ -169,6 +169,11 @@ export default function setup(host: MicroappHost) {
     // Separate cache for the hybrid iso pane — sized to the half-window, not the contour world.
     let hybridIsoCacheKey = "";
     let hybridIsoArtifact: SavedTerrainArtifact | undefined;
+    // Terrain cache — keyed on the params that actually change the map.
+    // Camera moves (fpCamX/fpCamY/fpYaw) never affect terrain, so we skip
+    // createTerrainMap on every camera-only render. Zero visual difference.
+    let terrainCacheKey = "";
+    let terrainCache: TerrainMap | undefined;
     // First-person camera — seed initial position from args if provided
     // First-person camera state (independent of focus/terrain generation)
     let fpYaw: number | undefined =
@@ -378,14 +383,19 @@ export default function setup(host: MicroappHost) {
               return { width: n, height: n };
             })()
           : worldDimensions(mapViewport);
-        const terrain = createTerrainMap({
-          width: worldSize.width,
-          height: worldSize.height,
-          seed,
-          terrainIdx,
-          seaLevel,
-          vegetationEnabled,
-        });
+        const newTerrainKey = `${seed}:${terrainIdx}:${seaLevel.toFixed(4)}:${vegetationEnabled}:${worldSize.width}x${worldSize.height}`;
+        if (newTerrainKey !== terrainCacheKey || !terrainCache) {
+          terrainCache = createTerrainMap({
+            width: worldSize.width,
+            height: worldSize.height,
+            seed,
+            terrainIdx,
+            seaLevel,
+            vegetationEnabled,
+          });
+          terrainCacheKey = newTerrainKey;
+        }
+        const terrain = terrainCache;
         const focus = getTerrainFocusPoint(terrain);
         latestTerrain = terrain;
         latestFocus = focus;
