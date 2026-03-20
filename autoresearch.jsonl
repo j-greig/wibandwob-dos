@@ -2,3 +2,4 @@
 {"run":1,"commit":"bda8fe9","metric":8,"metrics":{},"status":"keep","description":"baseline: 8/8 all axes green — staleness, headers, back-links, forward-links, PD integrity, watches precision, circularity, orphans, functional counts","timestamp":1774039687646,"segment":0}
 {"run":2,"commit":"1c260d9","metric":8,"metrics":{},"status":"keep","description":"add axes 9 (parent section validation) + 10 (watches import match) — score now 8/10, exposes SDK.md parent ref gap + watches regex needs tuning","timestamp":1774039806872,"segment":0}
 {"run":3,"commit":"f40e229","metric":9,"metrics":{},"status":"keep","description":"fix SDK.md parent section ref: §Microapp lifecycle → §Lifecycle — axis 9 now passes, 9/10","timestamp":1774039860522,"segment":0}
+{"run":4,"commit":"f0fb871","metric":10,"metrics":{},"status":"keep","description":"add axes 9+10, fix parent section ref, fix functional count parsing, fix subshell eval — 10/10","timestamp":1774040006184,"segment":0}

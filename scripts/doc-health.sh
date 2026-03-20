@@ -131,4 +131,31 @@ check "watches_match" '
 
 '
 
+# 11. CAPS file size — delta principle: no CAPS file should exceed 800 words
+check "caps_size" '
+  MAX_WORDS=800
+  for caps in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md; do
+    [ -f "$caps" ] || continue
+    words=$(wc -w < "$caps" | tr -d " ")
+    [ "$words" -le "$MAX_WORDS" ] || exit 1
+  done
+'
+
+# 12. CAPS file cross-refs — file paths mentioned in CAPS files actually exist
+check "caps_refs" '
+  for caps in AGENTS.md ARCHITECTURE.md SDK.md GOTCHAS.md; do
+    [ -f "$caps" ] || continue
+    while IFS= read -r ref; do
+      [ -z "$ref" ] && continue
+      # skip URLs, anchors, globs, env vars, examples
+      echo "$ref" | grep -qE "^http|^#|^\*|^\$|gen-X|example|<" && continue
+      # skip script commands (contain spaces or flags)
+      echo "$ref" | grep -qE " -| --|bash |bun |python|curl |wibwob " && continue
+      # only check fully-qualified paths (start with src/, scripts/, .pi/, or are root .md files)
+      echo "$ref" | grep -qE "^src/|^scripts/|^\.pi/|^[A-Z]+\.md$" || continue
+      [ -f "$ref" ] || [ -d "$ref" ] || exit 1
+    done < <(grep -oE "`[^`]+`" "$caps" | tr -d "`" || true)
+  done
+'
+
 echo "METRIC doc_health=$SCORE"
