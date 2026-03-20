@@ -22,7 +22,6 @@ export type MicroappTier = "core" | "beta" | "internal" | "disabled";
 const REGISTRY: Record<string, MicroappTier> = {
   // ── Core: polished, always-on ──────────────────────────────────────
   "wibwob.figlet":             "core",
-  "wibwob.contour":            "core",
   "wibwob.command-lab":        "core",
   "wibwob.runtime-inspector":  "core",
   "wibwob.world":              "core",
@@ -41,7 +40,6 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.wiretext":           "beta",
   "wibwob.zine":               "core",
   "wibwob.terrarium":          "beta",
-  "wibwob.terrarium-life":     "core",
   "wibwob.tidepool":           "core",
   "wibwob.glitchbox":          "core",
   "wibwob.patchbay":           "core",

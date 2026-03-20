@@ -354,7 +354,6 @@ const legacyAppTypeRemap: Record<string, string> = {
   "reader": "text-editor",
   // E039 — microapp owns its own snapshot now
   "figlet-banner": "wibwob.figlet",
-  "contour-studio": "wibwob.contour",
   // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
   "world-chatroom": "wibwob.chatroom",
   "wibwobworld": "wibwob.world",
