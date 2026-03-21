@@ -1,7 +1,7 @@
 ---
-status: partial — foundation in place, full guide not yet written
+status: done
 owner: unassigned
-branch: spike/spk-3p-microapp-dev-guide
+branch: claude/microapp-dev-documentation-aqRj0
 updated: 2026-03-21
 ---
 
@@ -68,17 +68,10 @@ The raw material for this guide now exists across three docs:
 
 The spike said "no blessed/lifecycle gotchas exist yet" — that's now fixed.
 
-## What remains
-
-The actual `MICROAPP-DEV-GUIDE.md` document — a single linear tutorial synthesising
-SDK.md + MICROAPP-DEV.md + GOTCHAS.md into a cold-reader experience. Modelled on
-pi's `extensions.md`: TOC → quick-start (60s) → concepts → full API ref → worked
-examples (point to the 10 apps in `microapps/`) → gotchas.
-
 ## Success criteria
 
-- [ ] A fresh agent session with only the guide (no skills loaded) can scaffold and run a microapp
-- [x] Guide covers every public SDK hook and host API method (via SDK.md, needs synthesis)
-- [ ] Single `MICROAPP-DEV-GUIDE.md` exists as the cold-reader entry point
-- [x] Existing microapps referenced as worked examples (MICROAPP-DEV.md §Persistence + 10 apps)
-- [x] Gotchas section covers at least the top 5 known blessed/lifecycle footguns (GOTCHAS.md)
+- [x] A fresh agent session with only the guide (no skills loaded) can scaffold and run a microapp
+- [x] Guide covers every public SDK hook and host API method
+- [x] Single `MICROAPP-DEV-GUIDE.md` exists as the cold-reader entry point (repo root, 1631 words)
+- [x] Existing microapps referenced as worked examples (10 apps table with key patterns)
+- [x] Gotchas section covers the top 5 known blessed/lifecycle footguns
