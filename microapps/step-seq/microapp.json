@@ -1,0 +1,24 @@
+{
+  "name": "step-seq",
+  "version": "0.1.0",
+  "description": "Step Sequencer microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.step-seq.open"
+  },
+  "microapp": {
+    "id": "wibwob.step-seq",
+    "title": "Step Sequencer",
+    "description": "Step Sequencer microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 209, "label": "Step Sequencer" }
+    ],
+    "palette": { "order": 209, "label": "Open Step Sequencer" },
+    "agent": true,
+    "api": true
+  }
+}
