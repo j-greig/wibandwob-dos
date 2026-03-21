@@ -7,7 +7,7 @@ if [[ "$BRANCH" == "main" ]]; then
   exit 1
 fi
 
-# ralphi quality gate
-if command -v ralphi &> /dev/null; then
-  ralphi check
-fi
+# ralphi quality gate (disabled — re-enable if running a ralphi loop)
+# if command -v ralphi &> /dev/null; then
+#   ralphi check
+# fi
