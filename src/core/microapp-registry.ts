@@ -76,6 +76,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.color-palette":               "beta",
   "wibwob.ascii-studio":                "beta",
   "wibwob.chat-sim":                    "beta",
+  "wibwob.kanban":                      "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */
