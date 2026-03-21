@@ -49,6 +49,13 @@ export function paintText(grid: string[][], x: number, y: number, text: string):
   }
 }
 
+/**
+ * Flatten a grid to a single string. Use as captureText output.
+ *
+ * Performance note: avoid ANSI escape codes in grid cells — they create massive
+ * strings that blessed must diff on every render. At >10fps this saturates the
+ * event loop. Use plain characters for grid content.
+ */
 export function gridToText(grid: string[][]): string {
   return grid.map((row) => row.join("")).join("\n");
 }

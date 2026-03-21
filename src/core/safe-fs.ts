@@ -1,8 +1,12 @@
 /**
  * safe-fs.ts — Thin wrappers for synchronous fs operations.
  *
- * All call sites in src/ should use these instead of raw readFileSync/writeFileSync.
- * Provides consistent error handling (returns undefined/false on failure).
+ * All call sites should use these instead of raw fs.*. Microapp authors:
+ * import `safeWriteFile`, `safeReadJSON` etc. from microapp-sdk.js (they're @public).
+ * Never use `import fs from "node:fs"` in microapp code.
+ *
+ * Returns undefined/false on failure — correct posture for I/O in microapps.
+ * safeWriteFile creates parent directories automatically.
  */
 import fs from "node:fs";
 import path from "node:path";

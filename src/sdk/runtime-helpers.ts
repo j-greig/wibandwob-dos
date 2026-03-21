@@ -1,3 +1,9 @@
+/**
+ * runtime-helpers.ts — Runtime utilities for microapp authors.
+ *
+ * Exports: createAnimationClock, createLayoutReporter, registerMicroappHooks.
+ * Import via microapp-sdk.js, not directly.
+ */
 import type blessed from "blessed";
 
 export interface AnimationClock {

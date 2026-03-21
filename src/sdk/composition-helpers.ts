@@ -2,7 +2,12 @@
  * composition-helpers.ts — SDK composition helpers for microapp authors.
  *
  * Each helper creates a themed blessed widget with sensible defaults.
+ * Takes `parent: BoxElement` as first arg, self-positions within it.
  * Returns a handle: { element, update(opts), destroy() }.
+ *
+ * These are the @public recommended building blocks for microapp UI.
+ * Do NOT pass these handles to createStack — they lack .node/.layout()
+ * and will silently produce a blank window. See GOTCHAS.md.
  *
  * Import via: import { createStatusBar, ... } from "../../src/services/microapp-sdk.js";
  */

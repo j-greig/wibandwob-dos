@@ -1,3 +1,14 @@
+/**
+ * microapp-host.ts — Host interface for microapp authors.
+ *
+ * MicroappHost is passed to your setup(host) function. It provides window creation,
+ * command registration, theming, persistence, and desktop utilities.
+ *
+ * Import the type only:
+ *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+ *
+ * See SDK-FOR-MICROAPP-DEV.md for the full tutorial.
+ */
 import type blessed from "blessed";
 
 import type { DynamicCommandDefinition } from "../core/command-registry.js";
@@ -28,6 +39,7 @@ import type {
 import type { WorldChatTransportStatus } from "../services/world-chat-transport.js";
 
 export interface MicroappHost {
+  /** Create a desktop window. Returns a handle with `.body` (blessed BoxElement) to render into. */
   createWindow(init: {
     title: string;
     width?: number;
@@ -36,6 +48,7 @@ export interface MicroappHost {
     top?: number;
   }): MicroappWindowHandle;
 
+  /** Register a command. `id` is prefixed: microapp.<appId>.<id>. */
   registerCommand(def: {
     id: string;
     label: string;
@@ -47,6 +60,7 @@ export interface MicroappHost {
     palette?: { order: number; label?: string };
   }): void;
 
+  /** Workspace persistence — serialize state on save, restore on workspace reload. Pair with `"persist": true` in microapp.json. */
   registerSnapshot(handlers: {
     serialize: (window: WindowRecord) => Record<string, unknown> | undefined;
     restore: (snapshot: WindowSnapshot, payload: Record<string, unknown>) => void;
@@ -61,6 +75,11 @@ export interface MicroappHost {
   readonly theme: () => ThemeTokens;
   readonly windows: WindowFacade;
   readonly worldChat: WorldChatHostAccess;
+  /**
+   * Layout primitives accessor. Prefer top-level SDK imports over host.ui.*
+   * — this accessor mixes CompositionHelpers (createHeaderBar) with LayoutParts
+   * (createStack), which are NOT interchangeable. See GOTCHAS.md.
+   */
   readonly ui: {
     createStack: typeof createStack;
     createRow: typeof createRow;
@@ -88,15 +107,28 @@ export interface MicroappHost {
 
 export type MicroappSnapshotWindow = { describeState?: () => Record<string, unknown> };
 
+/**
+ * Window handle returned by `host.createWindow()`.
+ *
+ * Four hooks are required — prefer `registerMicroappHooks(win, {...})` from the SDK
+ * to wire all four in one typed call. Missing hooks fail silently at runtime.
+ */
 export interface MicroappWindowHandle {
   readonly id: number;
+  /** The blessed BoxElement to render into. Pass as `parent` to CompositionHelpers. */
   readonly body: blessed.Widgets.BoxElement;
 
+  /** Called on window close. Stop all timers, destroy all handles. */
   onCleanup(fn: () => void): void;
+  /** Called on theme switch. Re-apply `host.theme()` colours to every styled node. */
   onRestyle(fn: () => void): void;
+  /** Called on window resize. Recalculate layouts if needed. */
   onResize(fn: () => void): void;
+  /** Receives text injected via the API (agent input). NOT keyboard input. */
   onInput(fn: (input: string) => void): void;
+  /** Structured state for `/state` API. Include a meaningful `summary` field. */
   describeState(fn: () => MicroappStateDetails): void;
+  /** Plain text for `wibwob read <id>`. Return non-empty text even on blank state. */
   captureText(fn: () => string): void;
 
   focus(): void;
