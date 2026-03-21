@@ -10,7 +10,6 @@ e021-vps-multi-agent-world — blocked
 e028-canvas-documents — in-progress
 e038-autoresearch-visual-scoring — in-progress
 e040-cli-music-video — not-started
-e048-unix-cli-surface — not-started
 e049-session-capture — not-started
 e051-programmatic-tool-calling — ?
 e052-instance-lifecycle — not-started
