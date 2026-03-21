@@ -20,7 +20,17 @@ set -o pipefail
 
 # ── Defaults ────────────────────────────────────────────────────────
 WW_ROOT="${WW_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-WW_MODE="${WW_MODE:-direct}"
+# Auto-detect: use tmux in headless/cloud environments unless explicitly overridden.
+# Rationale: --direct mode uses macOS `script` syntax that fails on Linux containers.
+# PHILOSOPHY.md: "whatever the human can do, the agent must be able to do."
+if [[ -z "${WW_MODE:-}" ]]; then
+  if [[ ! -t 0 ]] || [[ "${TERM:-dumb}" == "dumb" ]]; then
+    WW_MODE="tmux"
+    echo "  (auto-detected headless environment — using tmux mode)" >&2
+  else
+    WW_MODE="direct"
+  fi
+fi
 WW_SESSION="${TMUX_SESSION:-wibwob}"
 WW_PORT="${CONTROL_API_PORT:-8099}"
 WW_COLS="${WW_COLS:-${TMUX_COLS:-205}}"
@@ -120,10 +130,16 @@ ww_start_app() {
     echo "  log: $WW_LOG_FILE"
 
     # Use `script` to provide a real PTY for blessed.
-    # -q = quiet, /dev/null = don't save typescript file (we use our own log).
-    # COLUMNS/LINES set the PTY dimensions.
+    # macOS: script -q /dev/null bash -c "CMD"
+    # Linux: script -qfc "CMD" /dev/null  (different flag convention)
+    local script_cmd
+    if [[ "$(uname)" == "Darwin" ]]; then
+      script_cmd="script -q /dev/null bash -c 'cd $WW_ROOT && $cmd'"
+    else
+      script_cmd="script -qfc 'bash -c \"cd $WW_ROOT && $cmd\"' /dev/null"
+    fi
     COLUMNS="$WW_COLS" LINES="$WW_ROWS" \
-      nohup script -q /dev/null bash -c "cd $WW_ROOT && $cmd" \
+      nohup bash -c "$script_cmd" \
       > "$WW_LOG_FILE" 2>&1 &
     local bg_pid=$!
     # The actual bun process is a child of script; we'll rely on PID file

@@ -40,7 +40,7 @@ first wins, rest see "already running."
 ```bash
 tmux new-session -d -s wibwob -x 205 -y 55
 tmux send-keys -t wibwob 'bun run dev:world' Enter
-sleep 10 && curl -s http://127.0.0.1:8099/health
+sleep 10 && curl -sf --max-time 5 http://127.0.0.1:8099/health
 ```
 
 ### ⚠ Multi-agent rule
@@ -67,7 +67,7 @@ Use `bash scripts/restart.sh` (preferred). Manual pattern:
 APP_PID=$(ps aux | grep "bun run src/app.ts" | grep -v grep | awk '{print $2}')
 kill $APP_PID && sleep 3
 tmux send-keys -t wibwob 'bun run dev:world' Enter
-sleep 10 && curl -s http://127.0.0.1:8099/health
+sleep 10 && curl -sf --max-time 5 http://127.0.0.1:8099/health
 ```
 
 Use SIGTERM (`kill $PID`), never `kill -9` as first resort — blessed needs
@@ -87,7 +87,7 @@ If terminal is mangled after crash: `reset`
 ### Full TUI text dump
 
 ```bash
-curl -sf -X POST http://127.0.0.1:8099/screenshot \
+curl -sf --max-time 5 -X POST http://127.0.0.1:8099/screenshot \
   -H "Content-Type: application/json" \
   -d '{"path":"scratch/captures/snap.txt"}'
 ```
@@ -157,7 +157,7 @@ docker build --platform linux/arm64 -t wibwob-smoke-image -f deploy/Dockerfile.s
 docker run --platform linux/arm64 -t -d \
   -p 127.0.0.1:2849:22 -p 127.0.0.1:7681:7681 \
   --name wibwob-smoke wibwob-smoke-image
-sleep 15 && curl -sf http://127.0.0.1:7681/ && echo "ttyd OK"
+sleep 15 && curl -sf --max-time 5 http://127.0.0.1:7681/ && echo "ttyd OK"
 # SSH: ssh -i deploy/test_agent_key -p 2849 -o StrictHostKeyChecking=no wibwob@127.0.0.1
 # Cleanup: docker stop wibwob-smoke && docker rm wibwob-smoke
 ```

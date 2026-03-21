@@ -278,6 +278,23 @@ curl -sf --max-time 5 -X POST http://127.0.0.1:8099/commands/run \
 **Do NOT batch-verify in a loop.** Rapid curl churn overwhelms the
 single-threaded bun runtime.
 
+### Automated blank-app check
+
+Use `scripts/validate-microapp.sh` for a single-command PASS/FAIL verdict:
+
+```bash
+bash scripts/validate-microapp.sh microapp.wibwob.your-app.open
+# ✓ PASS — microapp.wibwob.your-app.open (143 chars)
+# ✗ FAIL — captureText returned 3 chars (< 50 minimum)
+```
+
+A **passing app** produces ≥50 chars of readable text from `captureText`.
+A **blank app** returns an empty string or a minimal stub like `"(empty)"`.
+If validate-microapp fails, check that your `captureText` hook returns real content.
+
+> The validate script opens the app, waits 1s, screenshots text, checks length,
+> closes the window, and exits 0 (PASS) or 1 (FAIL).
+
 ---
 
 ## Performance gotchas

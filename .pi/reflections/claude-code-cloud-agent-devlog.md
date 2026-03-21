@@ -345,7 +345,7 @@ Reasoning:
 
 ---
 
-## 10. Quick Reference Commands
+## 12. Quick Reference Commands
 
 ```bash
 # Start:           bash scripts/ensure-running.sh --tmux

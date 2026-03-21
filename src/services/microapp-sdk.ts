@@ -33,6 +33,8 @@ import type {
 export {
   createAnimationClock,
   createLayoutReporter,
+  /** Register all four required hooks in one typed call — preferred pattern for new microapps. */
+  registerMicroappHooks,
 } from "../sdk/runtime-helpers.js";
 /** @public */
 export {
@@ -92,10 +94,12 @@ export {
 };
 
 // ── ui-parts — lower-level layout/chrome primitives ─────────────────────────
-// These are used by host wiring and advanced module internals.
-// For third-party microapp authoring, prefer composition helpers exported below
-// (`createHeaderBar`, `createStatusBar`, `createButtonBar`, etc).
-// `createLayout*` names remain for compatibility but are not the preferred API.
+// @model LayoutPart
+//   These do NOT take a parent argument. They return a LayoutPart with
+//   `.node`, `.layout(rect)`, `.restyle()`, and `.destroy()`. Position them
+//   via `createStack(win.body, [{ key, basis, part }])` or `createRow(...)`.
+//   Prefer CompositionHelpers (bottom of file) for new microapps.
+// ────────────────────────────────────────────────────────────────────────────
 /** @internal */
 export {
   clamp,
@@ -300,6 +304,13 @@ export type { ThemeVariant } from "../core/theme/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SDK COMPOSITION HELPERS — themed UI primitives for microapp authors
+// @model CompositionHelper
+//   These take `parent: blessed.Widgets.BoxElement` as their first argument,
+//   position themselves within the parent using top/bottom offsets, and return
+//   a handle with `.element`, `.update()`, and `.destroy()`.
+//   Use these when building a new microapp — they are stable @public API.
+//   Contrast with @internal LayoutPart components (createStack/createRow area
+//   above) which do NOT take a parent and need createStack for positioning.
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** @public */

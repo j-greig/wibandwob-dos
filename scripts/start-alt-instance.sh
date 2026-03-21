@@ -59,8 +59,15 @@ else
   echo "Alt instance launching (direct mode, port $WW_PORT, label $LABEL)"
   echo "  log: $WW_LOG_FILE"
 
+  # Cross-platform PTY allocation (see process-manager.sh for rationale)
+  local script_cmd
+  if [[ "$(uname)" == "Darwin" ]]; then
+    script_cmd="script -q /dev/null bash -c 'cd $ROOT && $CMD'"
+  else
+    script_cmd="script -qfc 'bash -c \"cd $ROOT && $CMD\"' /dev/null"
+  fi
   COLUMNS="$WW_COLS" LINES="$WW_ROWS" \
-    nohup script -q /dev/null bash -c "cd $ROOT && $CMD" \
+    nohup bash -c "$script_cmd" \
     > "$WW_LOG_FILE" 2>&1 &
   disown $! 2>/dev/null || true
 fi

@@ -6,12 +6,14 @@ WibWob-DOS — terminal desktop, equal human/agent control. Bun + blessed + loca
 
 ## How these docs work
 
-Four CAPS MD files at repo root are the entire doc surface:
+Six CAPS MD files at repo root are the entire doc surface:
 
 - `AGENTS.md` — conventions, workflow, posture (this file)
 - `PHILOSOPHY.md` — why this exists, design filters, SDK boundary
 - `ARCHITECTURE.md` — COAT (Command Once, Adapt Thin), subsystems, invariants
 - `LEXICON.md` — vocabulary
+- `MICROAPP-DEV.md` — agent dev workflow: install, start, scaffold, verify, gotchas
+- `PATCHNOTES.md` — script patches for cross-platform (cloud + local) compatibility
 
 `<progressive-disclosure>` tags mark where a `scripts/gen-*` script provides
 deeper generated detail. Run the script to get it:
