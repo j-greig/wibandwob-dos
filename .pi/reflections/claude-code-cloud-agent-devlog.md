@@ -422,3 +422,49 @@ The Linux `script -qfc` path is NOT exercised (auto-detect picks tmux before rea
   returning `"x".repeat(10)` would pass. Good enough for now.
 - The `host.ui.*` accessor exposes LayoutPart components through a third path
   (e.g. `host.ui.createStack`). Not documented, not removed — just undiscovered.
+
+---
+
+## 13. Full validation pass — all 10 CCC run-1 apps (2026-03-21)
+
+> Ran validate-microapp.sh across all 10 apps built by CCC run 1.
+
+### Results
+
+| App | chars | Result | Notes |
+|-----|-------|--------|-------|
+| click-counter | 8 | ✓ PASS | |
+| pomodoro | 21 | ✓ PASS | |
+| dice-roller | 12 | ✓ PASS | |
+| md-preview | 14 | ✓ PASS | |
+| sys-monitor | 231 | ✓ PASS | **was BLANK — fixed** |
+| color-palette | 72 | ✓ PASS | |
+| ascii-studio | 43 | ✓ PASS | **was 0 — fixed** |
+| chat-sim | 62 | ✓ PASS | |
+| kanban | 77 | ✓ PASS | |
+| step-seq | 234 | ✓ PASS | |
+
+### What was fixed
+
+**sys-monitor** — blank window caused by mixing `createStack` (LayoutPart model)
+with `createHeaderBar`/`createStatusBar` (CompositionHelper model). `createStack`
+calls `part.layout(rect)` which CompositionHelper handles don't have → silently
+skips those parts → nothing renders. TypeScript didn't catch this because
+`FlexChild.part: LayoutPart<any>` with `any` creates structural type leakage.
+Fix: rewrote using pure CompositionHelpers, dropped `createStack` entirely.
+Also migrated to `registerMicroappHooks()` typed helper.
+
+**ascii-studio** — `captureText` returned `gridToText(emptyGrid)` = spaces/newlines
+= 0 meaningful chars. Added fallback: `"ASCII Studio — WxH blank canvas. brush: X"`.
+Also fixed: replaced `fs.writeFileSync` with `safeWriteFile` from SDK.
+
+### Critical TypeScript gap discovered
+
+`FlexChild.part: LayoutPart<any>` allows CompositionHelper handles to pass type
+checking when passed to `createStack`, because `any` absorbs the missing `.node`,
+`.layout()`, `.restyle()` requirements. The mixed-model bug is invisible at compile
+time. It only manifests as a blank window at runtime.
+
+**Prevention**: use `registerMicroappHooks` (forces correct hooks), avoid `createStack`
+unless all children are genuine LayoutParts from `createProgressBar`/`createKeyValuePanel`
+etc. If mixing, TypeScript won't save you — your only signal is a blank window.
