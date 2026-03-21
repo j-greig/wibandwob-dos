@@ -3,19 +3,17 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,
-  createStack,
   createHeaderBar,
   createStatusBar,
-  createProgressBar,
-  createKeyValuePanel,
+  createTextViewer,
+  registerMicroappHooks,
 } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "System Monitor";
 
 function getCpuUsage(): number {
   const cpus = os.cpus();
-  let totalIdle = 0;
-  let totalTick = 0;
+  let totalIdle = 0, totalTick = 0;
   for (const cpu of cpus) {
     const { user, nice, sys, idle, irq } = cpu.times;
     totalTick += user + nice + sys + idle + irq;
@@ -35,6 +33,11 @@ function getMemUsage(): { used: number; total: number; pct: number } {
   };
 }
 
+function bar(pct: number, width = 30): string {
+  const filled = Math.round((pct / 100) * width);
+  return "[" + "█".repeat(filled) + "░".repeat(width - filled) + `] ${pct}%`;
+}
+
 function formatUptime(secs: number): string {
   const d = Math.floor(secs / 86400);
   const h = Math.floor((secs % 86400) / 3600);
@@ -42,41 +45,36 @@ function formatUptime(secs: number): string {
   return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
 }
 
+function buildContent(cpuPct: number, mem: ReturnType<typeof getMemUsage>): string {
+  return [
+    `CPU      ${bar(cpuPct)}`,
+    `Memory   ${bar(mem.pct)}`,
+    `         ${mem.used}MB / ${mem.total}MB`,
+    ``,
+    `Hostname  ${os.hostname()}`,
+    `Platform  ${os.platform()} ${os.arch()}`,
+    `CPUs      ${os.cpus().length} cores`,
+    `Uptime    ${formatUptime(os.uptime())}`,
+    `Runtime   ${process.version}`,
+  ].join("\n");
+}
+
 export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: APP_TITLE,
-    description: "Live system monitor with CPU, memory, and OS info.",
+    description: "Live system monitor — CPU, memory, OS info. Refreshes every 2s.",
     menu: [{ category: "applications", order: 204, label: APP_TITLE }],
     palette: { order: 204, label: `Open ${APP_TITLE}` },
     action: () => {
       const timers = new Set<ReturnType<typeof setInterval>>();
 
-      const win = host.createWindow({ title: APP_TITLE, width: 60, height: 18 });
+      const win = host.createWindow({ title: APP_TITLE, width: 60, height: 14 });
 
-      const header = createHeaderBar(win.body);
-      const cpuBar = createProgressBar({ label: "CPU", value: 0, max: 100 });
-      const memBar = createProgressBar({ label: "MEM", value: 0, max: 100 });
-      const info = createKeyValuePanel({
-        entries: [
-          { key: "Hostname", value: os.hostname() },
-          { key: "Platform", value: `${os.platform()} ${os.arch()}` },
-          { key: "CPUs", value: `${os.cpus().length} cores` },
-          { key: "Uptime", value: formatUptime(os.uptime()) },
-          { key: "Node", value: process.version },
-        ],
-        border: true,
-        label: "System Info",
-      });
-      const statusBar = createStatusBar(win.body);
-
-      const root = createStack(win.body, [
-        { key: "header", basis: 1, part: header },
-        { key: "cpu", basis: 1, part: cpuBar },
-        { key: "mem", basis: 1, part: memBar },
-        { key: "info", basis: "1fr" as const, part: info },
-        { key: "status", basis: 1, part: statusBar },
-      ]);
+      // Pure CompositionHelpers — all self-position, no createStack needed
+      const header = createHeaderBar(win.body, { left: APP_TITLE });
+      const viewer = createTextViewer(win.body, { top: 1, bottom: 1 });
+      const status = createStatusBar(win.body);
 
       let cpuPct = 0;
       let memInfo = getMemUsage();
@@ -84,63 +82,44 @@ export default function setup(host: MicroappHost) {
       const refresh = () => {
         cpuPct = getCpuUsage();
         memInfo = getMemUsage();
-
+        const content = buildContent(cpuPct, memInfo);
         header.update({ left: APP_TITLE, right: new Date().toLocaleTimeString() });
-        cpuBar.update({ value: cpuPct });
-        memBar.update({ value: memInfo.pct });
-        info.update({
-          entries: [
-            { key: "Hostname", value: os.hostname() },
-            { key: "Platform", value: `${os.platform()} ${os.arch()}` },
-            { key: "CPUs", value: `${os.cpus().length} cores` },
-            { key: "Uptime", value: formatUptime(os.uptime()) },
-            { key: "Memory", value: `${memInfo.used}MB / ${memInfo.total}MB` },
-          ],
-        });
-        statusBar.update({
+        viewer.update({ content });
+        status.update({
           left: `CPU: ${cpuPct}%  MEM: ${memInfo.pct}%`,
           right: formatUptime(os.uptime()),
         });
         host.screen.render();
       };
 
-      const doLayout = () => {
-        const w = Math.max(1, Number(win.body.width) || 0);
-        const h = Math.max(1, Number(win.body.height) || 0);
-        root.layout({ top: 0, left: 0, width: w, height: h });
-      };
-
       createTimer(refresh, 2000, timers);
       refresh();
 
-      win.onResize(doLayout);
-
-      win.describeState(() => ({
-        summary: `System Monitor — CPU ${cpuPct}%, MEM ${memInfo.pct}%`,
-        cpu: cpuPct,
-        memoryUsedMB: memInfo.used,
-        memoryTotalMB: memInfo.total,
-        memoryPercent: memInfo.pct,
-        uptime: formatUptime(os.uptime()),
-      }));
-
-      win.captureText(() =>
-        `CPU: ${cpuPct}%\nMemory: ${memInfo.used}MB / ${memInfo.total}MB (${memInfo.pct}%)\nUptime: ${formatUptime(os.uptime())}`
-      );
-
-      win.onRestyle(() => {
-        root.restyle();
-        host.screen.render();
-      });
-
-      win.onCleanup(() => {
-        clearTimers(timers);
-        root.destroy();
+      registerMicroappHooks(win, {
+        captureText: () => buildContent(cpuPct, memInfo),
+        describeState: () => ({
+          summary: `System Monitor — CPU ${cpuPct}%, MEM ${memInfo.pct}%`,
+          cpu: cpuPct,
+          memoryUsedMB: memInfo.used,
+          memoryTotalMB: memInfo.total,
+          memoryPercent: memInfo.pct,
+          uptime: formatUptime(os.uptime()),
+        }),
+        onCleanup: () => {
+          clearTimers(timers);
+          header.destroy();
+          viewer.destroy();
+          status.destroy();
+        },
+        onRestyle: () => {
+          header.update({});
+          viewer.update({});
+          status.update({});
+          host.screen.render();
+        },
       });
 
       win.focus();
-      doLayout();
-
       return { ok: true, windowId: win.id };
     },
   });
