@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T12:09:40.670Z",
+  "generatedAt": "2026-03-21T12:13:06.558Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -77,8 +77,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-20T17:51:39.919Z",
-        "count": 40,
+        "lastSeen": "2026-03-21T12:13:06.558Z",
+        "count": 41,
         "sources": [
           "tool:execute_code"
         ]

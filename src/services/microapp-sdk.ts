@@ -355,3 +355,29 @@ export type {
   CanvasOptions,
   CanvasHandle,
 } from "../sdk/composition-helpers.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAFE FILE I/O — use these instead of raw fs.* in microapps
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Architecture invariant: all filesystem I/O must go through safe-fs.ts.
+// These helpers swallow errors and return undefined/false on failure, which
+// is the correct posture for microapp-level file operations.
+//
+// Persistence decision tree:
+//   Workspace restore (survive window close, reload with workspace):
+//     → host.registerSnapshot({ serialize, restore })
+//   File-based persistence (survive process restart, user-readable):
+//     → safeWriteFile / safeReadJSON at host.repoRoot + /scratch/microapps/<id>/
+//   Never: raw fs.* or fs/promises in microapp code
+//
+/** @public */
+export {
+  safeReadFile,
+  safeReadJSON,
+  safeWriteFile,
+  safeAppendFile,
+  safeUnlink,
+  listDir,
+  pathExists,
+} from "../core/safe-fs.js";

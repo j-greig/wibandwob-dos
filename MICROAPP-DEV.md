@@ -320,6 +320,96 @@ with complex content, this saturates the event loop and blocks HTTP request hand
 
 ---
 
+## Discovering command IDs — COAT.md
+
+Before opening or interacting with any microapp via curl, generate the live
+command/endpoint snapshot:
+
+```bash
+bun scripts/gen-coat.ts   # writes COAT.md — 80+ commands, all IDs listed
+```
+
+Then grep COAT.md for your app's command IDs rather than guessing:
+
+```bash
+grep "world-clock" COAT.md
+# → microapp.wibwob.world-clock.open
+```
+
+COAT.md is auto-generated — never edit it. Regenerate whenever you add a microapp.
+
+---
+
+## Persistence
+
+**Decision tree — choose one:**
+
+| Need | Pattern | How |
+|------|---------|-----|
+| Restore window state when workspace reloads | `registerSnapshot` | `host.registerSnapshot({ serialize, restore })` |
+| File-based persistence (survives process restart) | `safeWriteFile` + `safeReadJSON` | From SDK — see below |
+| Never | raw `fs.*` / `fs/promises` | ARCHITECTURE invariant 7 violation |
+
+### `registerSnapshot` — workspace persistence
+
+```typescript
+// In setup(host):
+host.registerSnapshot({
+  serialize: () => ({ items }),           // called on workspace save
+  restore: (_snap, payload) => {
+    items = payload.items as Item[];       // called on workspace restore
+    host.runCommand("open", payload);      // re-open with restored state
+  },
+});
+```
+
+Pair with `"persist": true` in `microapp.json`.
+
+### `safeWriteFile` / `safeReadJSON` — file persistence
+
+```typescript
+import { safeWriteFile, safeReadJSON } from "../../src/services/microapp-sdk.js";
+import path from "node:path";
+
+const dataDir = path.join(host.repoRoot, "scratch", "microapps", "my-app");
+const dataFile = path.join(dataDir, "data.json");
+
+// Save
+safeWriteFile(dataFile, JSON.stringify(state));
+
+// Load
+const saved = safeReadJSON<MyState>(dataFile);
+if (saved) state = saved;
+```
+
+`safeWriteFile` / `safeReadJSON` swallow errors and return `undefined`/`false` —
+correct posture for microapp-level I/O.
+
+---
+
+## microapp.json key fields
+
+```jsonc
+{
+  "microapp": {
+    "id": "wibwob.your-app",       // must match registry key
+    "title": "Your App",
+    "multiInstance": false,         // true = multiple windows allowed
+    "persist": false,               // true = workspace save/restore via registerSnapshot
+    "agent": true,                  // expose via agent tools
+    "api": true,                    // expose via HTTP API
+    "menu": [
+      { "category": "applications", "order": 200, "label": "Your App" }
+    ],
+    "palette": { "order": 200, "label": "Open Your App" }
+  }
+}
+```
+
+`persist: true` requires `host.registerSnapshot(...)` to be called in `setup()`.
+
+---
+
 ## gen-* scripts (all work headlessly)
 
 These are pure file-I/O — no running instance needed:
@@ -365,6 +455,21 @@ for i in {1..10}; do
 done
 # Test one microapp at a time with proper delays.
 ```
+
+### Don't use raw `fs.*` in microapps
+
+```typescript
+// VIOLATION — raw Node fs in a microapp:
+import fs from "node:fs";
+fs.writeFileSync(path, data);
+
+// CORRECT — use SDK safe-fs:
+import { safeWriteFile } from "../../src/services/microapp-sdk.js";
+safeWriteFile(path, data);
+```
+
+Raw `fs.*` bypasses error handling and violates ARCHITECTURE invariant 7.
+`safeWriteFile` and friends swallow errors safely and are now `@public` in the SDK.
 
 ### Don't rely on background commands for API calls
 Commands that `curl` the API may run in background when the tool executor

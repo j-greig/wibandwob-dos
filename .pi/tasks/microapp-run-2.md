@@ -27,6 +27,10 @@ bash scripts/ensure-running.sh --tmux
 
 # 3. Confirm
 curl -sf --max-time 5 http://127.0.0.1:8099/health
+
+# 4. Generate live command/endpoint snapshot (discover all IDs)
+bun scripts/gen-coat.ts
+# → writes COAT.md — grep it to find any microapp command ID
 ```
 
 ---
@@ -53,9 +57,12 @@ Build exactly these three apps, in this order, one at a time.
 - **Menu order:** 111
 - **Behaviour:** Add items via `createInputLine`, display them in `createScrollView`
   or `createListPanel`, mark complete with a keypress, delete with another keypress.
-  Persist state via `host.registerSnapshot` so items survive window close/reopen.
+  Persist via `host.registerSnapshot` (workspace restore) AND `safeWriteFile` / `safeReadJSON`
+  at `host.repoRoot + /scratch/microapps/todo-list/data.json` (survives restart).
+  Set `"persist": true` in `microapp.json`.
 - **captureText** must return all todo items as text (≥50 chars once at least one item exists).
   Use `describeState` to return `{ summary: "N items, M done" }`.
+- **Never use raw `fs.*`** — use `safeWriteFile` / `safeReadJSON` from the SDK.
 
 ### App 3 — `ascii-clock`
 
@@ -90,10 +97,11 @@ TypeScript will error if you miss any of the four — this is intentional.
 
 ```typescript
 // ONLY ever import from this path:
-import { createHeaderBar, createCanvas, ... } from "../../src/services/microapp-sdk.js";
+import { createHeaderBar, createCanvas, safeWriteFile, safeReadJSON, ... } from "../../src/services/microapp-sdk.js";
 
-// NEVER import from src/core/*, src/ui/*, or any other src/services/* file.
+// NEVER import from src/core/*, src/ui/*, node:fs, or any other src/services/* file.
 // This is a COAT violation (ARCHITECTURE.md).
+// safe-fs helpers (safeWriteFile, safeReadJSON, etc.) are now @public in the SDK.
 ```
 
 ### Animation clocks
