@@ -212,9 +212,16 @@ export default function (pi: ExtensionAPI) {
   let repoRoot                     = process.cwd();
   const autoSync                   = process.env.COAT_AUTOSYNC === "1";
 
-  // Improvement 4: track last reminder timestamp per gen script
-  // Key: gen.file → timestamp of last reminder. Cleared when output is refreshed.
-  const lastRemindedAt = new Map<string, number>();
+  const lastRemindedAt  = new Map<string, number>();
+  // Key: gen.file → timestamp when agent ran that generator via bash this turn.
+  // If set and output is fresh at agent_end, reminder is suppressed.
+  // If set but output is still stale (agent ran gen then made more edits), reminder fires.
+  const ranThisTurn     = new Map<string, number>();
+
+  function addPath(p: string) {
+    // Always store as absolute so fs.statSync works regardless of process.cwd()
+    modifiedPaths.add(path.isAbsolute(p) ? p : path.resolve(repoRoot, p));
+  }
 
   pi.on("session_start", async (_event, ctx) => {
     repoRoot   = ctx.cwd;
@@ -224,39 +231,48 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("agent_start", async () => {
     modifiedPaths = new Set();
+    ranThisTurn.clear();
   });
 
   pi.on("tool_call", async (event) => {
     if (isToolCallEventType("write", event)) {
       const p = event.input.path as string | undefined;
-      if (p) modifiedPaths.add(p);
+      if (p) addPath(p);
     }
     if (isToolCallEventType("edit", event)) {
       const p = event.input.path as string | undefined;
-      if (p) modifiedPaths.add(p);
+      if (p) addPath(p);
     }
     if (isToolCallEventType("multi_edit", event)) {
       const input = event.input as Record<string, unknown>;
-      if (typeof input.path === "string") modifiedPaths.add(input.path);
+      if (typeof input.path === "string") addPath(input.path);
       if (Array.isArray(input.multi)) {
         for (const item of input.multi as Array<{ path?: string }>) {
-          if (item.path) modifiedPaths.add(item.path);
+          if (item.path) addPath(item.path);
         }
       }
       if (typeof input.patch === "string") {
         for (const line of (input.patch as string).split("\n")) {
           const m = line.match(/^\*\*\* (?:Update File|Add File|Delete File): (.+)/);
-          if (m) modifiedPaths.add(m[1]!.trim());
+          if (m) addPath(m[1]!.trim());
         }
       }
     }
-    // Improvement 1: track bash-mediated file writes
     if (isToolCallEventType("bash", event)) {
       const cmd = event.input.command as string | undefined;
       if (cmd) {
+        // Track bash-mediated file writes (redirects, tee, sed -i, cp, mv)
         for (const p of extractBashWritePaths(cmd)) {
-          // Resolve relative paths against cwd; keep absolute as-is
-          modifiedPaths.add(path.isAbsolute(p) ? p : path.resolve(repoRoot, p));
+          addPath(p);
+        }
+        // Detect direct generator execution — if this bash command ran a gen script,
+        // record the timestamp so agent_end can suppress the reminder when output is fresh.
+        const now = Date.now();
+        for (const gen of genScripts) {
+          // Match if the command contains the run string (e.g. "bun scripts/gen-sdk-surface.ts")
+          if (cmd.includes(gen.run)) {
+            ranThisTurn.set(gen.file, now);
+          }
         }
       }
     }
@@ -276,7 +292,7 @@ export default function (pi: ExtensionAPI) {
       );
       if (triggered.length === 0) continue;
 
-      // Improvement 2 + 3: check actual staleness
+      // Check actual staleness via mtime (paths are now always absolute → reliable)
       const staleness = checkStaleness(gen.output, triggered, repoRoot);
       if (staleness === "fresh") continue;
 
@@ -316,9 +332,13 @@ export default function (pi: ExtensionAPI) {
     if (toReport.length > 0) {
       lines.push("📄 **Doc-sync reminder:** files changed this turn match generator @watches.", "");
       for (const { gen, staleness } of toReport) {
-        // Improvement 3: differentiate missing vs. stale
-        const badge = staleness === "missing" ? "❌ MISSING — run now" : "⚠️  possibly stale";
-        lines.push(`• ${badge}  \`${gen.run}\` → \`${gen.output}\`  _(${gen.file})_`);
+        const badge = staleness === "missing" ? "❌ MISSING" : "⚠️  stale";
+        // If the generator ran this turn but is still stale, say so explicitly —
+        // source was edited after the gen ran, so another run is needed.
+        const note = ranThisTurn.has(gen.file)
+          ? " _(ran this turn but sources changed after — run again)_"
+          : "";
+        lines.push(`• ${badge}  \`${gen.run}\` → \`${gen.output}\`${note}`);
       }
       lines.push("", "Run the commands above to keep generated docs in sync.");
     }
