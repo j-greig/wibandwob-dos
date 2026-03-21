@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
@@ -9,6 +8,7 @@ import {
   createCanvas,
   createHeaderBar,
   createStatusBar,
+  safeWriteFile,
 } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "ASCII Studio";
@@ -95,12 +95,11 @@ export default function setup(host: MicroappHost) {
 
       const saveArt = () => {
         const text = gridToText(grid);
-        const dir = path.join(host.repoRoot, "scratch", "ascii-art");
-        fs.mkdirSync(dir, { recursive: true });
-        const name = `art_${Date.now()}.txt`;
-        fs.writeFileSync(path.join(dir, name), text, "utf8");
-        host.flash(`Saved: ${name}`);
-        status.update({ left: `saved: ${name}` });
+        const filePath = path.join(host.repoRoot, "scratch", "ascii-art", `art_${Date.now()}.txt`);
+        const ok = safeWriteFile(filePath, text);
+        const name = path.basename(filePath);
+        host.flash(ok ? `Saved: ${name}` : "Save failed");
+        status.update({ left: ok ? `saved: ${name}` : "save failed" });
         host.screen.render();
       };
 
@@ -131,7 +130,12 @@ export default function setup(host: MicroappHost) {
         brush: BRUSH_CHARS[brushIdx],
       }));
 
-      win.captureText(() => gridToText(grid));
+      win.captureText(() => {
+        const content = gridToText(grid).trim();
+        return content.length > 0
+          ? content
+          : `ASCII Studio — ${gridW}x${gridH} blank canvas. brush: ${BRUSH_CHARS[brushIdx]}`;
+      });
 
       win.onResize(() => {
         // Preserve existing art on resize
