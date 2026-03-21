@@ -94,7 +94,7 @@ export default function setup(host: MicroappHost) {
 
 | Hook | What it's for | Consequence if missing |
 |------|--------------|------------------------|
-| `captureText` | `wibwob read <id>` — plain text snapshot | API returns empty; validation fails |
+| `captureText` | `wibwob read <id>` — semantic text snapshot | Falls back to screen crop; register for richer output |
 | `describeState` | `/state` API — structured window metadata | Agents can't understand what's open |
 | `onCleanup` | Called on window close | Timer/interval leaks, zombie processes |
 | `onRestyle` | Called on theme switch | Window stays wrong colours after theme change |

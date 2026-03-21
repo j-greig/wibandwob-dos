@@ -56,7 +56,7 @@ TypeScript will error if you omit any of the four. Individual methods still work
 
 | Hook | Purpose |
 |------|---------|
-| `captureText` | Powers `wibwob read <id>` — must return >0 non-whitespace chars |
+| `captureText` | Powers `wibwob read <id>` — semantic snapshot. Falls back to screen crop if not registered; prefer explicit registration for clean output |
 | `describeState` | Agents read this via `/state` API — include a meaningful `summary` |
 | `onCleanup` | Called on close — stop every timer, destroy every handle |
 | `onRestyle` | Called on theme switch — re-apply every `host.theme()` colour |
