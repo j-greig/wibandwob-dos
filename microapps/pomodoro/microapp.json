@@ -1,0 +1,24 @@
+{
+  "name": "pomodoro",
+  "version": "0.1.0",
+  "description": "Pomodoro microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.pomodoro.open"
+  },
+  "microapp": {
+    "id": "wibwob.pomodoro",
+    "title": "Pomodoro",
+    "description": "Pomodoro microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 201, "label": "Pomodoro" }
+    ],
+    "palette": { "order": 201, "label": "Open Pomodoro" },
+    "agent": true,
+    "api": true
+  }
+}

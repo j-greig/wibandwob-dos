@@ -69,6 +69,7 @@ const REGISTRY: Record<string, MicroappTier> = {
 
   // ── SDK dev documentation mapps ──────────────────────────────────
   "wibwob.click-counter":               "beta",
+  "wibwob.pomodoro":                    "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */
