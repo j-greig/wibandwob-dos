@@ -40,6 +40,18 @@ export interface TextViewerOptions {
   vi?: boolean;
   /** Reserve bottom rows for other elements. Default: 0 */
   bottomOffset?: number;
+  /** Position from top. Accepts numbers or string percentages (e.g. "40%"). Default: 0 */
+  top?: number | string;
+  /** Position from bottom. Accepts numbers or string percentages. Overrides bottomOffset when set. */
+  bottom?: number | string;
+  /** Position from left. Accepts numbers or string percentages. Default: 0 */
+  left?: number | string;
+  /** Position from right. Accepts numbers or string percentages. Default: 0 */
+  right?: number | string;
+  /** Width. Accepts numbers or string percentages. */
+  width?: number | string;
+  /** Height. Accepts numbers or string percentages. */
+  height?: number | string;
 }
 
 export interface TextViewerHandle {
@@ -169,10 +181,12 @@ export function createTextViewer(
 
   const el = blessed.box({
     parent,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: bottomOffset,
+    top: opts.top ?? 0,
+    left: opts.left ?? 0,
+    right: opts.right ?? 0,
+    bottom: opts.bottom ?? bottomOffset,
+    ...(opts.width !== undefined && { width: opts.width }),
+    ...(opts.height !== undefined && { height: opts.height }),
     keys: true,
     mouse: true,
     vi: opts.vi ?? true,
@@ -748,8 +762,8 @@ export function createRule(
 export interface InputLineOptions {
   /** Placeholder text. Default: "" */
   placeholder?: string;
-  /** Reserve bottom rows. Default: 0 (sits at bottom by default) */
-  bottom?: number;
+  /** Reserve bottom rows. Default: 0 (sits at bottom by default). Accepts numbers or string percentages. */
+  bottom?: number | string;
 }
 
 export interface InputLineHandle {
