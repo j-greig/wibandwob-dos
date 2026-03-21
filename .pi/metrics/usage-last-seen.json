@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T12:45:10.304Z",
+  "generatedAt": "2026-03-21T17:07:21.713Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -98,8 +98,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-21T12:45:10.304Z",
-        "count": 50,
+        "lastSeen": "2026-03-21T17:07:21.713Z",
+        "count": 51,
         "sources": [
           "tool:execute_code"
         ]
@@ -112,8 +112,8 @@
         ]
       },
       "todos": {
-        "lastSeen": "2026-03-20T19:42:04.138Z",
-        "count": 3,
+        "lastSeen": "2026-03-21T12:47:51.674Z",
+        "count": 4,
         "sources": [
           "command:/todos",
           "tool:todo"
