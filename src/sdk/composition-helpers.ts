@@ -285,6 +285,151 @@ export function createListPanel(
   };
 }
 
+// ── ManagedList ───────────────────────────────────────────────────────────
+
+export interface ManagedListOptions {
+  /** Initial items. Default: [] */
+  items?: string[];
+  /** Enable vi keys (j/k). Default: true */
+  vi?: boolean;
+  /** Enable mouse. Default: true */
+  mouse?: boolean;
+  /** Position from top. Accepts numbers or string percentages. Default: 0 */
+  top?: number | string;
+  /** Position from bottom. Accepts numbers or string percentages. Default: 0 */
+  bottom?: number | string;
+  /** Position from left. Accepts numbers or string percentages. Default: 0 */
+  left?: number | string;
+  /** Position from right. Accepts numbers or string percentages. Default: 0 */
+  right?: number | string;
+  /** Width. Accepts numbers or string percentages. */
+  width?: number | string;
+  /** Height. Accepts numbers or string percentages. */
+  height?: number | string;
+  /** Style overrides (merged with theme defaults). */
+  style?: Record<string, unknown>;
+}
+
+export interface ManagedListHandle {
+  /** The underlying blessed list element. */
+  element: blessed.Widgets.ListElement;
+  /** Set items — recursion-guarded (setItems will not re-fire select callbacks). */
+  setItems(items: string[]): void;
+  /** Programmatically select an index. */
+  select(index: number): void;
+  /** Currently selected index (typed — no cast needed). */
+  readonly selected: number;
+  /** Register a select callback. Not fired during setItems calls. */
+  onSelect(cb: (index: number, item: string) => void): void;
+  /** Restyle with safe item/scrollbar keys (prevents theme-switch crash). */
+  update(opts?: Partial<ManagedListOptions>): void;
+  destroy(): void;
+}
+
+/**
+ * Typed, recursion-safe, theme-resilient list helper.
+ *
+ * Eliminates three gotchas:
+ * 1. `(list as any).setItems()` / `.selected` casts — typed here
+ * 2. `setItems` fires `select item` → recursion — guarded by inSetItems flag
+ * 3. Theme-switch crash (missing `item`/`scrollbar` style keys) — always injected
+ *
+ * @public
+ */
+export function createManagedList(
+  parent: blessed.Widgets.BoxElement,
+  opts: ManagedListOptions = {},
+): ManagedListHandle {
+  const t = theme();
+  const selectCallbacks: ((index: number, item: string) => void)[] = [];
+  let currentItems: string[] = opts.items ?? [];
+  let inSetItems = false;
+
+  // Always inject item + scrollbar style keys — omitting them causes blessed
+  // to crash when accessing style.item[name] during theme switch.
+  const safeStyle = {
+    fg: t.body.fg,
+    bg: t.body.bg,
+    selected: { fg: t.selected.fg, bg: t.selected.bg },
+    item: { fg: t.body.fg, bg: t.body.bg },
+    ...opts.style,
+  };
+
+  const listOpts: Record<string, unknown> = {
+    parent,
+    top: opts.top ?? 0,
+    left: opts.left ?? 0,
+    right: opts.right ?? 0,
+    bottom: opts.bottom ?? 0,
+    keys: true,
+    mouse: opts.mouse ?? true,
+    vi: opts.vi ?? true,
+    items: currentItems,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: {
+      ch: "▐",
+      track: { bg: t.scrollbar.track },
+      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
+    },
+    style: safeStyle,
+  };
+
+  if (opts.width !== undefined) listOpts.width = opts.width;
+  if (opts.height !== undefined) listOpts.height = opts.height;
+
+  const el = blessed.list(listOpts);
+
+  el.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => {
+    if (inSetItems) return; // suppress recursion during setItems
+    const text = currentItems[index] ?? "";
+    for (const cb of selectCallbacks) cb(index, text);
+  });
+
+  return {
+    element: el,
+
+    setItems(items: string[]) {
+      inSetItems = true;
+      try {
+        currentItems = items;
+        (el as unknown as { setItems(items: string[]): void }).setItems(items);
+      } finally {
+        inSetItems = false;
+      }
+    },
+
+    select(index: number) {
+      (el as unknown as { select(i: number): void }).select(index);
+    },
+
+    get selected(): number {
+      return (el as unknown as { selected: number }).selected ?? 0;
+    },
+
+    onSelect(cb) {
+      selectCallbacks.push(cb);
+    },
+
+    update(o = {}) {
+      if (o.items !== undefined) {
+        this.setItems(o.items);
+      }
+      const t2 = theme();
+      // Always restore item + scrollbar keys — prevents theme-switch crash
+      (el.style as Record<string, unknown>).fg = t2.body.fg;
+      (el.style as Record<string, unknown>).bg = t2.body.bg;
+      (el.style as Record<string, unknown>).selected = { fg: t2.selected.fg, bg: t2.selected.bg };
+      (el.style as Record<string, unknown>).item = { fg: t2.body.fg, bg: t2.body.bg };
+    },
+
+    destroy() {
+      selectCallbacks.length = 0;
+      el.destroy();
+    },
+  };
+}
+
 /**
  * Split view — two panes side-by-side (horizontal) or stacked (vertical).
  */

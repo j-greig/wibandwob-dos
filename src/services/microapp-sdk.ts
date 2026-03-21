@@ -318,6 +318,7 @@ export {
   createStatusBar,
   createTextViewer,
   createListPanel,
+  createManagedList,
   createSplitView,
   createButtonBar,
   createHeaderBar,

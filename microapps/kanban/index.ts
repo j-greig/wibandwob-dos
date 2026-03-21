@@ -1,11 +1,14 @@
-import fs from "node:fs";
 import path from "node:path";
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createHeaderBar,
   createStatusBar,
+  createManagedList,
+  safeReadJSONOrDefault,
+  safeWriteFile,
 } from "../../src/services/microapp-sdk.js";
+import type { ManagedListHandle } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "Kanban";
 const COLUMNS = ["Todo", "In Progress", "Done"] as const;
@@ -21,27 +24,21 @@ interface KanbanData {
   columns: Record<ColumnName, KanbanCard[]>;
 }
 
+const DEFAULT_DATA: KanbanData = {
+  nextId: 1,
+  columns: { Todo: [], "In Progress": [], Done: [] },
+};
+
 function getDataPath(repoRoot: string): string {
   return path.join(repoRoot, "scratch", "kanban-data.json");
 }
 
 function loadData(repoRoot: string): KanbanData {
-  const file = getDataPath(repoRoot);
-  try {
-    const raw = fs.readFileSync(file, "utf8");
-    return JSON.parse(raw) as KanbanData;
-  } catch {
-    return {
-      nextId: 1,
-      columns: { Todo: [], "In Progress": [], Done: [] },
-    };
-  }
+  return safeReadJSONOrDefault<KanbanData>(getDataPath(repoRoot), DEFAULT_DATA);
 }
 
 function saveData(repoRoot: string, data: KanbanData): void {
-  const dir = path.dirname(getDataPath(repoRoot));
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(getDataPath(repoRoot), JSON.stringify(data, null, 2), "utf8");
+  safeWriteFile(getDataPath(repoRoot), JSON.stringify(data, null, 2));
 }
 
 export default function setup(host: MicroappHost) {
@@ -62,10 +59,9 @@ export default function setup(host: MicroappHost) {
         right: `${totalCards()} cards`,
       });
 
-      // Create 3 column boxes with list widgets
-      const colWidth = () => Math.max(15, Math.floor((Number(win.body.width) || 75) / 3));
+      // Create 3 column boxes with managed list widgets
       const colBoxes: blessed.Widgets.BoxElement[] = [];
-      const colLists: blessed.Widgets.ListElement[] = [];
+      const colManagedLists: ManagedListHandle[] = [];
 
       for (let i = 0; i < COLUMNS.length; i++) {
         const box = blessed.box({
@@ -82,24 +78,13 @@ export default function setup(host: MicroappHost) {
           },
         });
 
-        const list = blessed.list({
-          parent: box,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          keys: true,
-          mouse: true,
-          vi: true,
+        const managed = createManagedList(box, {
           items: data.columns[COLUMNS[i]].map(c => c.text),
-          style: {
-            ...host.theme().body,
-            selected: { fg: "black", bg: "cyan" },
-          },
-        } as Record<string, unknown>);
+          style: { selected: { fg: "black", bg: "cyan" } },
+        });
 
         colBoxes.push(box);
-        colLists.push(list as unknown as blessed.Widgets.ListElement);
+        colManagedLists.push(managed);
       }
 
       const status = createStatusBar(win.body, {
@@ -114,7 +99,7 @@ export default function setup(host: MicroappHost) {
       function refreshLists() {
         for (let i = 0; i < COLUMNS.length; i++) {
           const items = data.columns[COLUMNS[i]].map(c => c.text);
-          (colLists[i] as any).setItems(items);
+          colManagedLists[i]!.setItems(items);
           colBoxes[i]!.style.border = { fg: i === activeCol ? "cyan" : "gray" };
           colBoxes[i]!.setLabel(` ${COLUMNS[i]} (${data.columns[COLUMNS[i]].length}) `);
         }
@@ -125,21 +110,21 @@ export default function setup(host: MicroappHost) {
 
       function switchCol(dir: number) {
         activeCol = Math.max(0, Math.min(COLUMNS.length - 1, activeCol + dir));
-        colLists[activeCol]!.focus();
+        colManagedLists[activeCol]!.element.focus();
         refreshLists();
       }
 
       function getSelectedIdx(): number {
-        return (colLists[activeCol] as any).selected ?? 0;
+        return colManagedLists[activeCol]!.selected;
       }
 
-      // Bind keys on each list
-      for (let i = 0; i < colLists.length; i++) {
-        const list = colLists[i]!;
+      // Bind keys on each list element
+      for (let i = 0; i < colManagedLists.length; i++) {
+        const managed = colManagedLists[i]!;
 
-        list.key(["tab"], () => switchCol(activeCol < COLUMNS.length - 1 ? 1 : -2));
+        managed.element.key(["tab"], () => switchCol(activeCol < COLUMNS.length - 1 ? 1 : -2));
 
-        list.key(["a"], () => {
+        managed.element.key(["a"], () => {
           host.promptValue("New card text", "", (text) => {
             if (text.trim()) {
               data.columns[COLUMNS[activeCol]].push({ id: data.nextId++, text: text.trim() });
@@ -148,7 +133,7 @@ export default function setup(host: MicroappHost) {
           });
         });
 
-        list.key(["d"], () => {
+        managed.element.key(["d"], () => {
           const idx = getSelectedIdx();
           const cards = data.columns[COLUMNS[activeCol]];
           if (cards.length > 0 && idx < cards.length) {
@@ -157,7 +142,7 @@ export default function setup(host: MicroappHost) {
           }
         });
 
-        list.key(["right"], () => {
+        managed.element.key(["right"], () => {
           if (activeCol >= COLUMNS.length - 1) return;
           const idx = getSelectedIdx();
           const srcCards = data.columns[COLUMNS[activeCol]];
@@ -169,7 +154,7 @@ export default function setup(host: MicroappHost) {
           }
         });
 
-        list.key(["left"], () => {
+        managed.element.key(["left"], () => {
           if (activeCol <= 0) return;
           const idx = getSelectedIdx();
           const srcCards = data.columns[COLUMNS[activeCol]];
@@ -181,7 +166,7 @@ export default function setup(host: MicroappHost) {
           }
         });
 
-        list.key(["s"], () => {
+        managed.element.key(["s"], () => {
           saveData(host.repoRoot, data);
           host.flash("Kanban saved!");
         });
@@ -214,10 +199,7 @@ export default function setup(host: MicroappHost) {
             ...host.theme().body,
             border: { fg: i === activeCol ? "cyan" : "gray" },
           };
-          (colLists[i] as any).style = {
-            ...host.theme().body,
-            selected: { fg: "black", bg: "cyan" },
-          };
+          colManagedLists[i]!.update();
         }
         header.update({});
         status.update({});
@@ -227,11 +209,12 @@ export default function setup(host: MicroappHost) {
       win.onCleanup(() => {
         header.destroy();
         status.destroy();
+        for (const managed of colManagedLists) managed.destroy();
         for (const box of colBoxes) box.destroy();
       });
 
-      colLists[0]!.focus();
-      win.setFocusTarget(colLists[0]!);
+      colManagedLists[0]!.element.focus();
+      win.setFocusTarget(colManagedLists[0]!.element);
       refreshLists();
 
       return { ok: true, windowId: win.id };

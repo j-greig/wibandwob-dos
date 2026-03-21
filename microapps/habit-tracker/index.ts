@@ -5,6 +5,7 @@ import {
   createHeaderBar,
   createStatusBar,
   createTextViewer,
+  createManagedList,
   safeReadJSONOrDefault,
   safeWriteFile,
   registerMicroappHooks,
@@ -214,21 +215,9 @@ export default function setup(host: MicroappHost) {
         style: { ...host.theme().body, border: { fg: "cyan" } },
       });
 
-      const list = blessed.list({
-        parent: listBox,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        keys: true,
-        vi: true,
-        mouse: true,
-        items: [],
-        style: {
-          ...host.theme().body,
-          selected: { fg: "black", bg: "cyan" },
-        },
-      } as Record<string, unknown>);
+      const managedList = createManagedList(listBox, {
+        style: { selected: { fg: "black", bg: "cyan" } },
+      });
 
       // ── Right pane: detail / history ───────────────────────────────────────
       const detailViewer = createTextViewer(win.body, {
@@ -267,8 +256,8 @@ export default function setup(host: MicroappHost) {
 
       const refresh = () => {
         const items = buildListItems();
-        (list as any).setItems(items);
-        (list as any).select(selectedIdx);
+        managedList.setItems(items);
+        managedList.select(selectedIdx);
 
         if (showHistory) {
           detailViewer.update({ content: buildHistory(data) });
@@ -287,7 +276,7 @@ export default function setup(host: MicroappHost) {
 
       // ── Key bindings ───────────────────────────────────────────────────────
 
-      const focusTarget = list as unknown as blessed.Widgets.ListElement;
+      const focusTarget = managedList.element;
 
       focusTarget.key(["up", "k"], () => {
         selectedIdx = Math.max(0, selectedIdx - 1);
@@ -385,14 +374,12 @@ export default function setup(host: MicroappHost) {
           header.destroy();
           detailViewer.destroy();
           status.destroy();
+          managedList.destroy();
           listBox.destroy();
         },
         onRestyle: () => {
           listBox.style = { ...host.theme().body, border: { fg: "cyan" } };
-          (list as any).style = {
-            ...host.theme().body,
-            selected: { fg: "black", bg: "cyan" },
-          };
+          managedList.update();
           header.update({});
           detailViewer.update({});
           status.update({});
