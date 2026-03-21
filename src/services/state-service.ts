@@ -151,9 +151,9 @@ export class StateService {
 
     return {
       id: window.id,
-      kind: window.kind,
       appType: details.appType,
       title: window.title,
+      _deprecated_kind: window.kind,
       left: Number(window.frame.left) || 0,
       top: Number(window.frame.top) || 0,
       width: Number(window.frame.width) || null,

@@ -160,9 +160,11 @@ export interface WindowStateDetails {
 
 export interface DesktopWindowState {
   id: number;
-  kind: WindowKind;
+  /** Primary type discriminator — use this for filtering. */
   appType: AppType;
   title: string;
+  /** @deprecated Use appType instead. Will be removed in a future release. */
+  _deprecated_kind: WindowKind;
   left: number;
   top: number;
   width: number | null;

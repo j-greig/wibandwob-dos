@@ -54,7 +54,7 @@ export class ShellChromeController {
     const current = this.deps.getDesktopState();
     const focus = current.windows.find((window) => window.focused);
     const focusSummary = focus
-      ? ` Focus ${focus.id}:${focus.kind} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
+      ? ` Focus ${focus.id}:${focus.appType} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
       : " Focus none";
     const left = `Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary}`;
     const scrLabel = ` ${this.deps.getScrambleFace()}`;

@@ -373,7 +373,7 @@ sleep 0.2
 # Art window
 $W cmd art.open 2>&1 >/dev/null
 sleep 0.2
-ART_ID=$(curl -s "$API/state" | jq -r '.windows[] | select(.kind=="art") | .id')
+ART_ID=$(curl -s "$API/state" | jq -r '.windows[] | select(.appType=="art") | .id')
 [ -n "$ART_ID" ] && batch "{\"ops\":[{\"id\":$ART_ID,\"left\":90,\"top\":25,\"width\":65,\"height\":20}]}"
 
 # 5 words
