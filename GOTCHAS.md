@@ -51,6 +51,10 @@ They handle dir creation and swallow errors safely. Raw `fs.*` violates ARCHITEC
 **`registerSnapshot` is the right persistence primitive, not files.** Use it for workspace
 restore. Use `safeWriteFile` only for user-visible file exports or data that outlives sessions.
 
+**Scaffolded microapps don't appear until registered.** After `scaffold-microapp.sh`,
+you must add `"wibwob.<id>": "beta"` to `src/core/microapp-registry.ts` and restart.
+Without it the app loads silently but has no menu entry, no command, no API path. Nothing errors.
+
 **`reload-microapp.sh` doesn't cover host-side changes.** Editing `src/services/*` or
 `src/core/*` requires full restart. Mixed state causes "Unknown command" with no obvious cause.
 

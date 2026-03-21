@@ -78,6 +78,9 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.chat-sim":                    "beta",
   "wibwob.kanban":                      "beta",
   "wibwob.step-seq":                    "beta",
+  "wibwob.ascii-rain":                  "beta",
+  "wibwob.word-counter":                "beta",
+  "wibwob.habit-tracker":               "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */
