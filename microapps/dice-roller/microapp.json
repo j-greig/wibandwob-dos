@@ -1,0 +1,24 @@
+{
+  "name": "dice-roller",
+  "version": "0.1.0",
+  "description": "Dice Roller microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.dice-roller.open"
+  },
+  "microapp": {
+    "id": "wibwob.dice-roller",
+    "title": "Dice Roller",
+    "description": "Dice Roller microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 202, "label": "Dice Roller" }
+    ],
+    "palette": { "order": 202, "label": "Open Dice Roller" },
+    "agent": true,
+    "api": true
+  }
+}
