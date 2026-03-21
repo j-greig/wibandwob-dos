@@ -362,3 +362,63 @@ Reasoning:
 # Scaffold:         bash .pi/skills/microapp-creator/scripts/scaffold-microapp.sh microapps/<dir> <id> "<title>" <order>
 # Devlog:           scripts/devlog.sh "note"
 ```
+
+---
+
+## 12. Post-spike Hardening Session (2026-03-21)
+
+> Added after reviewing all docs (PHILOSOPHY.md, ARCHITECTURE.md, PATCHNOTES.md,
+> MICROAPP-DEV.md) with fresh eyes post-spike. These are gaps not covered by
+> the spike plan that only became visible when running actual tests.
+
+### What was discovered
+
+**ascii-studio uses raw `fs.writeFileSync`** — a direct ARCHITECTURE invariant 7
+violation. CCC built it because `safe-fs` wasn't exported from the SDK, so there
+was no safe path available. Pattern: agents reach for whatever works, so the SDK
+must make the right thing the easy thing.
+
+**`registerSnapshot` was invisible** — the persistence mechanism the host provides
+(workspace save/restore) wasn't documented anywhere in MICROAPP-DEV.md. Kanban used
+it correctly, but only because the agent already knew about it. Future agents have
+no way to discover it from docs.
+
+**COAT.md is a goldmine that nobody mentions** — 84 commands, 24 endpoints, all IDs
+listed. Agents guessing command IDs instead of grepping COAT.md is pure friction.
+`bun scripts/gen-coat.ts` should be step 4 of every session setup.
+
+**`microapp.json` fields were undocumented** — `multiInstance`, `persist`, `agent`,
+`api`, `menu.category` — none of these were in MICROAPP-DEV.md. Agents scaffolding
+from the script get these filled in, but agents editing or reading existing apps had
+no reference.
+
+### What was fixed
+
+- `safeWriteFile`, `safeReadJSON`, `safeReadFile`, `safeAppendFile`, `safeUnlink`,
+  `listDir`, `pathExists` exported `@public` from `microapp-sdk.ts`
+- MICROAPP-DEV.md: persistence decision tree, `microapp.json` field ref, COAT.md
+  discovery workflow, raw-`fs.*` DON'T entry
+- CCC task spec updated: `gen-coat.ts` in setup, `safeWriteFile` pattern for todo-list,
+  explicit "never raw `fs.*`" rule
+
+### validate-microapp.sh calibration
+
+Default threshold: 5 chars (catches truly blank apps — empty string, whitespace).
+Minimal apps like click-counter ("Count: 0" = 8 chars) PASS correctly.
+Content-rich apps: pass explicit 50: `bash scripts/validate-microapp.sh <id> 50`
+Tested against: click-counter (8, PASS), pomodoro (21, PASS), kanban (77, PASS @ 50).
+
+### Docker smoke result
+
+ubuntu:22.04 + tmux + bun — `ensure-running.sh --tmux` reaches `✓ ready` cleanly.
+The headless auto-detect (TERM=dumb → tmux mode) fires correctly.
+The Linux `script -qfc` path is NOT exercised (auto-detect picks tmux before reaching it)
+— which is correct behaviour. `--direct` on Linux will use the patched code path.
+
+### Remaining known issues (future work)
+
+- ascii-studio: fix raw `fs.writeFileSync` → `safeWriteFile` (currently a COAT violation)
+- validate-microapp.sh only checks captureText length, not content quality — a stub
+  returning `"x".repeat(10)` would pass. Good enough for now.
+- The `host.ui.*` accessor exposes LayoutPart components through a third path
+  (e.g. `host.ui.createStack`). Not documented, not removed — just undiscovered.
