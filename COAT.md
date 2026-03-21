@@ -8,7 +8,7 @@
 > Every endpoint and command flows through the same registry. This file is that claim made concrete.
 
 Generated: 2026-03-21
-Endpoints: 25 · Commands: 85
+Endpoints: 26 · Commands: 85
 
 ---
 
@@ -43,6 +43,10 @@ Default: `http://127.0.0.1:8099`. **Prefer `wibwob` CLI over `curl`.**
 ### /state
 
 - `GET /state` — Full live desktop + window state
+
+### /errors
+
+- `GET /errors/recent` — Last 20 runtime errors from microapp lifecycle hooks (setup, onRestyle, onResize) with microappId, hook, message, stack, timestamp
 
 ### /runtime
 
