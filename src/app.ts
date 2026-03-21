@@ -88,6 +88,15 @@ process.title = [
 fs.mkdirSync(runtimeNode.scratchBase, { recursive: true });
 safeWriteFile(runtimeNode.pidPath, String(process.pid));
 
+// Write boot-commit so reload-microapp.sh can detect host file changes since boot.
+{
+  try {
+    const result = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+    const commit = result.stdout?.trim() ?? "unknown";
+    safeWriteFile(path.join(runtimeNode.scratchBase, "boot-commit"), commit);
+  } catch { /* non-fatal — git may not be available */ }
+}
+
 // ─── Ghostty shader lifecycle ────────────────────────────────
 // Activate configured shader on start, deactivate on exit.
 // Set WIBWOB_GHOSTTY_SHADER env var to a shader name (e.g. "wibwob-crt")

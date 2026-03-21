@@ -34,6 +34,23 @@ done
 API="$(ww_api_base)"
 OPEN_CMD="microapp.${MICROAPP_ID}.open"
 
+# ── Check for host file changes since boot ─────────────────────────
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRATCH_DIR="${SCRATCH_DIR:-${ROOT}/scratch}"
+BOOT_COMMIT_FILE="${SCRATCH_DIR}/boot-commit"
+if [[ -f "$BOOT_COMMIT_FILE" ]]; then
+  BOOT_COMMIT=$(cat "$BOOT_COMMIT_FILE")
+  HEAD_COMMIT=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")
+  if [[ "$BOOT_COMMIT" != "$HEAD_COMMIT" && "$BOOT_COMMIT" != "unknown" && "$HEAD_COMMIT" != "unknown" ]]; then
+    CHANGED_HOST=$(git -C "$ROOT" diff --name-only "$BOOT_COMMIT" "$HEAD_COMMIT" -- src/ 2>/dev/null | head -5 || true)
+    if [[ -n "$CHANGED_HOST" ]]; then
+      echo "⚠️  Host files changed since boot — restart required for changes to take effect:"
+      echo "$CHANGED_HOST" | sed 's/^/    /'
+      echo "   (reload only refreshes microapp code, not host SDK changes)"
+    fi
+  fi
+fi
+
 # ── Check API is alive ──────────────────────────────────────────────
 if ! curl -sf --max-time 2 "${API}/health" >/dev/null 2>&1; then
   echo "✗ API not responding on ${API}" >&2
