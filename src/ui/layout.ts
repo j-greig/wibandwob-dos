@@ -26,7 +26,11 @@ export type Gap = number | {
 export type FlexChild = {
   key: string;
   basis: FlexBasis;
-  part: LayoutPart<any>;
+  // NOTE: LayoutPart<unknown> (not <any>) — prevents CompositionHelper handles
+  // from silently passing here. CompositionHelpers lack .node and .layout(rect)
+  // which LayoutPart requires. With <any>, TypeScript's structural check was loose
+  // enough to accept them, causing silent blank-window bugs at runtime.
+  part: LayoutPart<unknown>;
   visible?: () => boolean;
   align?: Alignment;
 };
