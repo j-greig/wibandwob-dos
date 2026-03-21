@@ -72,6 +72,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.pomodoro":                    "beta",
   "wibwob.dice-roller":                 "beta",
   "wibwob.md-preview":                  "beta",
+  "wibwob.sys-monitor":                 "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */
