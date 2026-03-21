@@ -1,8 +1,9 @@
 import blessed from "blessed";
 import { Agent } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+// eslint-disable-next-line no-restricted-imports -- skeleton-renderer is host-internal, coupled to webcam-renderer; cannot route via SDK
 import { renderSkeletonAt, landmarksFromPreset, type NormalisedLandmarks, type WebcamCell } from "../../src/core/skeleton-renderer.js";
-import { gridToBlessedContent } from "../../src/services/webcam-renderer.js";
+import { gridToBlessedContent } from "../../src/services/microapp-sdk.js";
 import {
   blankGrid,
   gridToText,

@@ -149,7 +149,7 @@ services must not leak through the `microapp-sdk.ts` boundary.
 - `EMPTY_PLACEHOLDER` (value)
 - `EMPTY_NO_MESSAGE` (value)
 
-## @internal (137 exports)
+## @internal (164 exports)
 
 - `clamp` (value)
 - `createStack` (value)
@@ -288,3 +288,30 @@ services must not leak through the `microapp-sdk.ts` boundary.
 - `TreeWidgetHandle` (type)
 - `createEmbeddedLivePlayer` (value) — host-only animation wiring; prefer createLazyMountedPlayer (@public)
 - `ContentService` (value) — host-side content discovery and primer loading; microapps receive content via the host object
+- `renderWebcamFrame` (value) — Webcam grid rendererused by monster-cam and demo-glitchbox
+- `gridToBlessedContent` (value) — Webcam grid rendererused by monster-cam and demo-glitchbox
+- `makeHill` (value) — Contour engineused by wibwobworld and demos
+- `heightmap` (value) — Contour engineused by wibwobworld and demos
+- `march` (value) — Contour engineused by wibwobworld and demos
+- `terrainNames` (value) — Contour engineused by wibwobworld and demos
+- `TerrainBiome` (type) — Terrain modelused by wibwobworld
+- `TerrainObject` (type) — Terrain modelused by wibwobworld
+- `TerrainCell` (type) — Terrain modelused by wibwobworld
+- `TerrainMap` (type) — Terrain modelused by wibwobworld
+- `TerrainPoint` (type) — Terrain modelused by wibwobworld
+- `findTerrainPeak` (value) — Terrain rendererused by wibwobworld
+- `renderTerrainMap` (value) — Terrain rendererused by wibwobworld
+- `BIOME_GLYPHS` (value) — Terrain rendererused by wibwobworld
+- `BIOME_COLORS` (value) — Terrain rendererused by wibwobworld
+- `layoutPanels` (value) — Zine panel layoutused by zine
+- `layoutColumns` (value) — Zine panel layoutused by zine
+- `measureViewport` (value) — Zine panel layoutused by zine
+- `pointerToContent` (value) — Zine panel layoutused by zine
+- `hitPanel` (value) — Zine panel layoutused by zine
+- `COL_GAP` (value) — Zine panel layoutused by zine
+- `PanelType` (type) — Canvas typesused by zine
+- `ZineItem` (type) — Canvas typesused by zine
+- `ZineItemType` (type) — Canvas typesused by zine
+- `ZineSourceType` (type) — Canvas typesused by zine
+- `BrowserEntry` (type) — Shared browser/gallery types
+- `GalleryTab` (type) — Shared browser/gallery types
