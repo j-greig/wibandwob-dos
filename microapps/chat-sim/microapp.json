@@ -1,0 +1,24 @@
+{
+  "name": "chat-sim",
+  "version": "0.1.0",
+  "description": "Chat Sim microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.chat-sim.open"
+  },
+  "microapp": {
+    "id": "wibwob.chat-sim",
+    "title": "Chat Sim",
+    "description": "Chat Sim microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 207, "label": "Chat Sim" }
+    ],
+    "palette": { "order": 207, "label": "Open Chat Sim" },
+    "agent": true,
+    "api": true
+  }
+}
