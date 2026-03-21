@@ -89,6 +89,12 @@ except: print('0x0')
     fi
     echo "Capture size: ${PANE_W}x${PANE_H}"
 
+    # Abort if screen is 1×1 or zero — no PTY attached, recording would be empty
+    if [[ "$PANE_W" -le 1 && "$PANE_H" -le 1 ]]; then
+      echo "✗ Screen is ${PANE_W}x${PANE_H} — no PTY attached. Start WibWob-DOS in a real terminal first." >&2
+      exit 1
+    fi
+
     # Write asciicast v2 header with actual dimensions
     echo "{\"version\":2,\"width\":$PANE_W,\"height\":$PANE_H,\"timestamp\":$(date +%s)}" > "$CAST"
 
