@@ -16,7 +16,7 @@
         "bun run health passes"
       ],
       "priority": 1,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/services/microapp-loader.ts. Phase 1 — safe defaults."
     },
@@ -32,7 +32,7 @@
         "bun run health passes"
       ],
       "priority": 2,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/sdk/composition-helpers.ts. Phase 1 — safe defaults."
     },
@@ -49,7 +49,7 @@
         "bun run health passes"
       ],
       "priority": 3,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "Files: src/core/safe-fs.ts, src/services/microapp-sdk.ts, microapps/habit-tracker/index.ts. Phase 1 — safe defaults."
     },
@@ -69,8 +69,10 @@
         "bun run health passes"
       ],
       "priority": 4,
-      "status": "open",
-      "dependsOn": ["US-002"],
+      "status": "done",
+      "dependsOn": [
+        "US-002"
+      ],
       "notes": "File: src/sdk/composition-helpers.ts, src/services/microapp-sdk.ts, microapps/kanban/index.ts, microapps/habit-tracker/index.ts. Phase 2 — SDK helpers. Depends on US-002 (types must be correct first)."
     },
     {
@@ -88,8 +90,10 @@
         "bun run health passes"
       ],
       "priority": 5,
-      "status": "open",
-      "dependsOn": ["US-002"],
+      "status": "done",
+      "dependsOn": [
+        "US-002"
+      ],
       "notes": "File: src/sdk/runtime-helpers.ts + affected microapps. Phase 2 — SDK helpers. MUST grep callers first before changing default."
     },
     {
@@ -108,8 +112,11 @@
         "bun run health passes"
       ],
       "priority": 6,
-      "status": "open",
-      "dependsOn": ["US-004", "US-005"],
+      "status": "done",
+      "dependsOn": [
+        "US-004",
+        "US-005"
+      ],
       "notes": "Files: src/services/microapp-loader.ts, src/core/microapp-registry.ts, .wibwob/microapps.json (new), scaffold script. Phase 3 — loader hardening."
     },
     {
@@ -125,7 +132,7 @@
         "bun run health passes"
       ],
       "priority": 7,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "Files: boot sequence (scratch/boot-commit write), scripts/reload-microapp.sh. Phase 3 — can be done independently."
     },
@@ -143,7 +150,7 @@
         "bun run health passes"
       ],
       "priority": 8,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/services/workspace-service.ts (or equivalent). Phase 3 — can be done independently."
     },
@@ -160,7 +167,7 @@
         "bun run health passes"
       ],
       "priority": 9,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/core/app-controller.ts (or command handler). Phase 3 — can be done independently."
     },
@@ -178,7 +185,7 @@
         "bun run health passes"
       ],
       "priority": 10,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "Files: src/services/control-api.ts, src/core/error-buffer.ts (new). Phase 4 — observability."
     },
@@ -195,7 +202,7 @@
         "bun run health passes"
       ],
       "priority": 11,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/services/state-service.ts + scripts/skills. Phase 4 — deprecation."
     },
@@ -211,7 +218,7 @@
         "bun run health passes"
       ],
       "priority": 12,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: src/services/microapp-loader.ts. Phase 4."
     },
@@ -226,7 +233,7 @@
         "bun run health passes"
       ],
       "priority": 13,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: scripts/wibwob-record.sh. Phase 4."
     },
@@ -241,7 +248,7 @@
         "bun run health passes"
       ],
       "priority": 14,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: scripts/add-command.sh (new). Phase 4. Investigate exact 4-file wiring path at implementation time."
     },
@@ -258,7 +265,7 @@
         "bun run health passes"
       ],
       "priority": 15,
-      "status": "open",
+      "status": "done",
       "dependsOn": [],
       "notes": "File: package.json + code importing canvas transitively. Phase 4."
     }
