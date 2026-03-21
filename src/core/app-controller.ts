@@ -1449,14 +1449,24 @@ export class TsTuiMvpApp {
 
   private restoreWorkspaceSnapshots(snapshots: WindowSnapshot[]): void {
     let focusedWindow: WindowRecord | undefined;
+    const failed: string[] = [];
     for (const snapshot of snapshots) {
-      const restored = restoreWindowSnapshot(
-        snapshot,
-        this.getRestoreActions(),
-      );
-      if (snapshot.focused) {
-        focusedWindow = restored;
+      try {
+        const restored = restoreWindowSnapshot(
+          snapshot,
+          this.getRestoreActions(),
+        );
+        if (snapshot.focused) {
+          focusedWindow = restored;
+        }
+      } catch (err) {
+        const label = snapshot.title ?? snapshot.kind ?? "unknown";
+        log.err(`[workspace] Failed to restore window "${label}": ${err}`);
+        failed.push(label);
       }
+    }
+    if (failed.length > 0) {
+      log.app(`[workspace] Boot completed — ${failed.length} window(s) skipped: ${failed.join(", ")}`);
     }
     focusedWindow?.focus();
   }
