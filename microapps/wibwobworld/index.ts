@@ -9,13 +9,13 @@ import {
   type SavedTerrainArtifact,
   type TerrainMap,
   type TerrainPoint,
-} from "../../src/services/terrain-model.js";
+} from "../../src/services/microapp-sdk.js";
 import {
   renderTerrainMap,
   findTerrainPeak,
   type TerrainRenderMode,
-} from "../../src/services/terrain-render.js";
-import { terrainNames } from "../../src/services/contour-engine.js";
+} from "../../src/services/microapp-sdk.js";
+import { terrainNames } from "../../src/services/microapp-sdk.js";
 import {
   clamp,
   createCanvas,

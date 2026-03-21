@@ -19,8 +19,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createBox, createList, type BoxElement, type ListElement, type IKeyEventArg } from "./zine-widgets.js";
-import { layoutPanels, layoutColumns, measureViewport, pointerToContent, hitPanel, type PanelNode } from "../../src/core/panel-layout.js";
-import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
+import { layoutPanels, layoutColumns, measureViewport, pointerToContent, hitPanel, type PanelNode } from "../../src/services/microapp-sdk.js";
+import type { ZineItem, ZineSourceType } from "../../src/services/microapp-sdk.js";
 import {
   createTimer,
   clearTimers,

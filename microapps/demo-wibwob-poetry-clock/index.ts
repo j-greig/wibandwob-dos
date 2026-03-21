@@ -22,7 +22,7 @@ import {
   readNodeViewport,
   terrainNames,
   type ContourMode,
-} from "../../src/services/contour-engine.js";
+} from "../../src/services/microapp-sdk.js";
 import {
   type AnimatedPanelPlayer,
   createLazyMountedPlayer,

@@ -6,15 +6,15 @@ import {
   createContourPlayer,
   readNodeViewport,
   terrainNames,
-} from "../../src/services/contour-engine.js";
+} from "../../src/services/microapp-sdk.js";
 import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
   type TerrainMap,
-} from "../../src/services/terrain-model.js";
-import { renderTerrainMap } from "../../src/services/terrain-render.js";
-import type { BrowserEntry, GalleryTab } from "../../src/core/types.js";
+} from "../../src/services/microapp-sdk.js";
+import { renderTerrainMap } from "../../src/services/microapp-sdk.js";
+import type { BrowserEntry, GalleryTab } from "../../src/services/microapp-sdk.js";
 import {
   clamp,
   ContentService,

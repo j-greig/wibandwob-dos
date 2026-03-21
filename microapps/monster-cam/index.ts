@@ -4,7 +4,7 @@
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { MonsterCamService } from "../../src/services/monster-cam-service.js";
-import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/webcam-renderer.js";
+import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/microapp-sdk.js";
 import { createCanvas, createStatusBar } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
 import {
