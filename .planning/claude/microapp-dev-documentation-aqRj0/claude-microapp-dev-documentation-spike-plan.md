@@ -50,8 +50,8 @@
 
 ## Workstream E — Docker smoke gate
 
-- [ ] **E1** Confirm Docker is running locally: `docker info`
-- [ ] **E2** Choose image: `ubuntu:22.04` + install `tmux` + `bun` (closest to CCC environment)
+- [x] **E1** Confirm Docker is running locally: `docker info`
+- [x] **E2** Choose image: `ubuntu:22.04` + install `tmux` + `bun` (closest to CCC environment)
 - [x] **E3** Write `scripts/docker-smoke.sh`:
   ```bash
   docker run --rm \
@@ -64,8 +64,8 @@
              bash scripts/ensure-running.sh --tmux && \
              curl -sf --max-time 5 http://127.0.0.1:8099/health"
   ```
-- [ ] **E4** Run `scripts/docker-smoke.sh` — must exit 0 with `✓ ready` and `{"ok":true}`.
-- [ ] **E5** If E4 fails, fix A1/A2/A3 before proceeding.
+- [x] **E4** Run `scripts/docker-smoke.sh` — must exit 0 with `✓ ready` and `{"ok":true}`.
+- [x] **E5** If E4 fails, fix A1/A2/A3 before proceeding.
 
 ---
 
@@ -73,7 +73,7 @@
 
 - [x] **F1** `bun run typecheck` — must pass with no errors after all C changes.
 - [x] **F2** Run `scripts/checks/check-cross-platform.sh` — must pass (exit 0).
-- [ ] **F3** Run `scripts/validate-microapp.sh microapp.wibwob.click-counter.open` against running local instance — must PASS (confirms the validator itself works).
+- [x] **F3** Run `scripts/validate-microapp.sh microapp.wibwob.click-counter.open` against running local instance — must PASS (confirms the validator itself works).
 - [x] **F4** Commit all changes:
   ```
   fix(scripts): cross-platform startup — headless auto-detect + Linux script syntax
@@ -87,19 +87,19 @@
 ## Workstream G — CCC task spec
 
 - [x] **G1** Write `.pi/tasks/microapp-run-2.md` — the exact prompt to paste into the next CCC session. Must include:
-  - [ ] "Read `MICROAPP-DEV.md` before writing any code"
-  - [ ] `bun install --ignore-scripts` as the install command
-  - [ ] `--tmux` mode only, never `--direct`
-  - [ ] `--max-time 5` on every curl
-  - [ ] Three specific apps to build:
+  - [x] "Read `MICROAPP-DEV.md` before writing any code"
+  - [x] `bun install --ignore-scripts` as the install command
+  - [x] `--tmux` mode only, never `--direct`
+  - [x] `--max-time 5` on every curl
+  - [x] Three specific apps to build:
     - `world-clock` — dual-timezone digital clock, proves `createAnimationClock` at ≤8fps
     - `todo-list` — add/complete/delete, proves `createInputLine` + `createScrollView` + `registerSnapshot`
     - `ascii-clock` — large ASCII art clock face via `createCanvas`, proves animation + non-blank text output
-  - [ ] After each app: run `scripts/validate-microapp.sh <id>` and include PASS output in the commit message — **no commit without PASS**
-  - [ ] Use `registerMicroappHooks()` for all four hooks
-  - [ ] No animation clock above 10fps; call `clock.pause()` immediately after creation
-  - [ ] "MICROAPP-DEV.md is canonical; the devlog is narrative — if they conflict, trust MICROAPP-DEV.md"
-  - [ ] Import only from `../../src/services/microapp-sdk.js` — never `src/core/*` or `src/ui/*`
+  - [x] After each app: run `scripts/validate-microapp.sh <id>` and include PASS output in the commit message — **no commit without PASS**
+  - [x] Use `registerMicroappHooks()` for all four hooks
+  - [x] No animation clock above 10fps; call `clock.pause()` immediately after creation
+  - [x] "MICROAPP-DEV.md is canonical; the devlog is narrative — if they conflict, trust MICROAPP-DEV.md"
+  - [x] Import only from `../../src/services/microapp-sdk.js` — never `src/core/*` or `src/ui/*`
 
 ---
 
