@@ -1807,6 +1807,9 @@ export class TsTuiMvpApp {
         const closeAll = args?.all === true;
         const overlayCancelled = this.overlays.cancelActiveOverlay();
         this.closeMenus();
+        // Snapshot windows before closing — closeWindow splices this.windows synchronously.
+        // All close operations complete before this function returns, so /state is
+        // immediately consistent after this command (no sleep needed).
         const windows = this.windowManager.getWindows();
         let closed = 0;
         let kept = 0;
@@ -1818,7 +1821,11 @@ export class TsTuiMvpApp {
             kept++;
           }
         }
+        // Force a synchronous screen render so the visual state matches the data state
+        // before the API response is returned.
+        this.screen.render();
         return {
+          ok: true,
           closed,
           kept,
           overlayCancelled,
