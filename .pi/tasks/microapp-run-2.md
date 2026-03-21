@@ -8,12 +8,12 @@
 ## Before you write any code
 
 Read in this order:
-1. **`MICROAPP-DEV.md`** — ops workflow: install, start, scaffold, verify, persistence, gotchas
-2. **`SDK.md`** — SDK contract: hooks, host API, component models, animation clocks
+1. **`MICROAPP-DEV-GUIDE.md`** — full tutorial: quick-start, host API, UI library, persistence, gotchas, worked examples
+2. **`MICROAPP-DEV.md`** — ops workflow: install, start, scaffold, verify (cloud/Linux specifics)
 3. **`GOTCHAS.md`** — non-obvious failure modes (especially the Microapps + Cloud sections)
 
 The devlog at `.pi/reflections/claude-code-cloud-agent-devlog.md` is narrative context.
-If any doc conflicts with `SDK.md`, trust `SDK.md`.
+If any doc conflicts with `MICROAPP-DEV-GUIDE.md`, trust the guide.
 
 ---
 
