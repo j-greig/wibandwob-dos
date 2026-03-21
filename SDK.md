@@ -122,7 +122,8 @@ Both exported from `microapp-sdk.ts`. Not interchangeable.
 
 **LayoutParts** (`@internal`): `createProgressBar`, `createKeyValuePanel`, `createDataTable`. Take no parent, return `{ node, layout(rect), restyle, destroy }`. Require `createStack`.
 
-**Never mix in `createStack`** — TypeScript allows it silently but `.layout()` fails → blank window. See `GOTCHAS.md`.
+**Never mix in `createStack`** — TypeScript allows it silently (via `LayoutPart<any>`) but
+`.layout()` fails → blank window. `host.ui.*` exposes both together — same trap. See `GOTCHAS.md`.
 
 **Persistence:** workspace restore → `host.registerSnapshot({ serialize, restore })`. File persistence → `safeWriteFile` / `safeReadJSON` from SDK (never raw `fs.*`). Full pattern in `MICROAPP-DEV.md`.
 

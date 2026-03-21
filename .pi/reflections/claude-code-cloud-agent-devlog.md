@@ -468,3 +468,42 @@ time. It only manifests as a blank window at runtime.
 **Prevention**: use `registerMicroappHooks` (forces correct hooks), avoid `createStack`
 unless all children are genuine LayoutParts from `createProgressBar`/`createKeyValuePanel`
 etc. If mixing, TypeScript won't save you — your only signal is a blank window.
+
+---
+
+## 14. Post-merge session (2026-03-21)
+
+### Stale entry corrections from §12
+
+- **ascii-studio raw fs.* violation** — FIXED. `safeWriteFile` now `@public` in SDK; ascii-studio migrated.
+- **dice-roller 12 chars** — was CCC run-1 version. Main's human-refined version (79 chars, cleaner ASCII art) took precedence at merge.
+- **host.ui.* third path** — documented below.
+
+### host.ui.* — the third component model path
+
+`host.ui` on `MicroappHost` exposes: `createStack`, `createRow`, `createHeaderBar`, `createStatusBar`, `createTextBlock`, `createRule`, `createButtonBar`, `applyRect`.
+
+This mixes LayoutPart infrastructure (`createStack`, `createRow`) with CompositionHelpers (`createHeaderBar`, `createStatusBar`) through a single accessor. An agent using `host.ui.*` for everything could unknowingly mix models — the exact bug pattern that blanked sys-monitor.
+
+**Rule:** ignore `host.ui.*`. Import everything directly from `microapp-sdk.js`. Top-level SDK imports are explicit about which model you're using. `host.ui.*` is a legacy convenience accessor, not a recommended path.
+
+### TypeScript gap: LayoutPart<any> allows CompositionHelper handles
+
+`FlexChild.part: LayoutPart<any>` — because the type parameter is `any`, TypeScript's structural type checking becomes loose enough to accept CompositionHelper handles. Strict mode doesn't save you here. This is a type-level bug that could be fixed by strengthening `FlexChild.part` to `LayoutPart<unknown>` or adding a discriminator property. Not fixed yet — it's a deeper refactor. Runtime symptom: blank window. TypeScript symptom: none.
+
+### SDK.md and GOTCHAS.md promoted
+
+All devlog §§10-13 learnings promoted to canonical CAPS docs:
+- `registerMicroappHooks()` → SDK.md
+- Component models + `host.ui.*` warning → SDK.md + GOTCHAS.md
+- `createAnimationClock` rules → SDK.md + GOTCHAS.md
+- Cloud/Linux gotchas → GOTCHAS.md
+- `captureText` non-empty rule → GOTCHAS.md
+- `safe-fs` / raw `fs.*` rule → GOTCHAS.md
+
+### Branch status
+
+10/10 microapps: ✓ PASS validate-microapp.sh
+15/15 doc-health axes
+Pre-commit hook installed
+spk-3p-microapp-dev-guide: 3/5 criteria met, MICROAPP-DEV-GUIDE.md synthesis not yet written
