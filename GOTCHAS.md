@@ -51,6 +51,12 @@ They handle dir creation and swallow errors safely. Raw `fs.*` violates ARCHITEC
 **`registerSnapshot` is the right persistence primitive, not files.** Use it for workspace
 restore. Use `safeWriteFile` only for user-visible file exports or data that outlives sessions.
 
+**`reload-microapp.sh` doesn't cover host-side changes.** Editing `src/services/*` or
+`src/core/*` requires full restart. Mixed state causes "Unknown command" with no obvious cause.
+
+**`createInputLine` has blessed modal focus.** Textbox enters edit mode on focus, Esc exits.
+Platform constraint — no workaround.
+
 ---
 
 ## Adding a command

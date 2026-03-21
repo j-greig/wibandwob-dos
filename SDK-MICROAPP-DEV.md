@@ -63,9 +63,13 @@ microapp.json discovered → setup(host) called → window live → onCleanup on
 
 **Dev loop:**
 ```bash
-bash scripts/reload-microapp.sh <id>   # close → reload → reopen
+bash scripts/reload-microapp.sh <id>   # close → reload → reopen (microapp code only)
 curl -sf --max-time 5 http://127.0.0.1:8099/state   # verify in state
 ```
+
+`reload-microapp.sh` only reloads microapp `index.ts` files. If you edited
+`src/services/*`, `src/core/*`, or `src/sdk/*` → full restart required:
+`bash scripts/restart.sh --tmux`
 
 ---
 
@@ -115,7 +119,7 @@ host.registerSnapshot({ serialize, restore })                // workspace persis
 host.theme()                    // ThemeTokens — call in onRestyle
 host.flash("message")           // toast notification
 host.promptValue(label, default, cb)   // inline text prompt
-host.pickFile(label, dir, cb)          // file browser
+host.pickFile(label, dir, cb, opts?)   // file browser (opts: { fileFilter?, directoriesOnly? })
 host.runCommand(localId)        // dispatch local command
 host.runGlobalCommand(id)       // dispatch any command
 host.repoRoot                   // absolute path to repo root
@@ -151,6 +155,21 @@ Common compositions:
 
 When in doubt: CompositionHelpers. They're `@public` and stable.
 
+**Layout rule:** CompositionHelpers own `top: 0` by default. When combining
+header + content + footer, pass offsets: `createTextViewer(win.body, { top: 1, bottom: 1 })`.
+`createSplitView` also defaults to `top: 0` — override with `{ top: 1 }` if you have a header.
+
+**Key bindings** go on `.element`, not the handle: `canvas.element.key(["space"], cb)`.
+
+**Restyle pattern:** `header.update({})` with empty opts re-applies theme. This is
+intentional — call it in `onRestyle` for every CompositionHelper.
+
+**Resize:** `win.onResize(() => { /* recalculate, re-render */ })` — not called on
+initial render, only on window resize.
+
+**`createInputLine`** uses blessed's modal textbox — enters edit mode on focus,
+Esc exits. This is a blessed constraint, not SDK.
+
 ### LayoutParts (`@internal` — advanced)
 
 `createProgressBar`, `createKeyValuePanel`, `createDataTable`. No parent arg.
@@ -174,6 +193,15 @@ to mix them unknowingly. Use top-level SDK imports instead.
 ---
 
 ## Timers and animation
+
+**Which timer?**
+
+| Need | Use |
+|------|-----|
+| Periodic refresh (≥1s) | `createTimer` + `Set` |
+| Frame-rate animation (≤8fps) | `createAnimationClock` |
+| One-shot delay | `createTimer` (NOT raw `setTimeout` — not lifecycle-managed) |
+| Multiple independent concerns | Separate `Set` per concern — `clearTimers` clears the whole Set |
 
 ### Simple interval
 
