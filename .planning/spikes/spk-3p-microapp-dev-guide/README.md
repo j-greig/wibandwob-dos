@@ -1,8 +1,8 @@
 ---
-status: not-started
+status: partial — foundation in place, full guide not yet written
 owner: unassigned
 branch: spike/spk-3p-microapp-dev-guide
-updated: 2026-03-20
+updated: 2026-03-21
 ---
 
 # spk-3p-microapp-dev-guide
@@ -55,9 +55,30 @@ TOC → quick start → concepts → full API ref → examples → gotchas.
 2–3 sessions. First session: outline + quick-start section. Second: full API ref.
 Third: polish + test with a fresh agent (can it build a microapp from the doc alone?).
 
+## What's been done (2026-03-21, branch claude/microapp-dev-documentation-aqRj0)
+
+The raw material for this guide now exists across three docs:
+
+- `SDK.md` — updated with `registerMicroappHooks()`, component models (CompositionHelper
+  vs LayoutPart), persistence decision tree, animation clock rules. 771 words.
+- `GOTCHAS.md` — now has 5+ blessed/lifecycle gotchas: createStack mixing, captureText
+  empty, clock.pause(), safe-fs, registerSnapshot. Cloud/Linux section added.
+- `MICROAPP-DEV.md` — agent ops workflow: install, start, scaffold, verify, persistence,
+  COAT.md discovery, microapp.json fields. 10 real microapps as worked examples.
+
+The spike said "no blessed/lifecycle gotchas exist yet" — that's now fixed.
+
+## What remains
+
+The actual `MICROAPP-DEV-GUIDE.md` document — a single linear tutorial synthesising
+SDK.md + MICROAPP-DEV.md + GOTCHAS.md into a cold-reader experience. Modelled on
+pi's `extensions.md`: TOC → quick-start (60s) → concepts → full API ref → worked
+examples (point to the 10 apps in `microapps/`) → gotchas.
+
 ## Success criteria
 
 - [ ] A fresh agent session with only the guide (no skills loaded) can scaffold and run a microapp
-- [ ] Guide covers every public SDK hook and host API method
-- [ ] Existing microapps in `src/microapps/` are referenced as worked examples
-- [ ] Gotchas section covers at least the top 5 known blessed/lifecycle footguns
+- [x] Guide covers every public SDK hook and host API method (via SDK.md, needs synthesis)
+- [ ] Single `MICROAPP-DEV-GUIDE.md` exists as the cold-reader entry point
+- [x] Existing microapps referenced as worked examples (MICROAPP-DEV.md §Persistence + 10 apps)
+- [x] Gotchas section covers at least the top 5 known blessed/lifecycle footguns (GOTCHAS.md)

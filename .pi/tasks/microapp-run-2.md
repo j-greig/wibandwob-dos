@@ -7,12 +7,13 @@
 
 ## Before you write any code
 
-**Read `MICROAPP-DEV.md` first.** It is the canonical reference for everything below.
-The devlog at `.pi/reflections/claude-code-cloud-agent-devlog.md` is narrative — if
-they conflict, trust `MICROAPP-DEV.md`.
+Read in this order:
+1. **`MICROAPP-DEV.md`** — ops workflow: install, start, scaffold, verify, persistence, gotchas
+2. **`SDK.md`** — SDK contract: hooks, host API, component models, animation clocks
+3. **`GOTCHAS.md`** — non-obvious failure modes (especially the Microapps + Cloud sections)
 
-Then read `ARCHITECTURE.md §The microapp contract` for hook rationale.
-Then read `PHILOSOPHY.md §The operational consequence` if you make any SDK boundary decision.
+The devlog at `.pi/reflections/claude-code-cloud-agent-devlog.md` is narrative context.
+If any doc conflicts with `SDK.md`, trust `SDK.md`.
 
 ---
 
