@@ -23,3 +23,6 @@
 [submodule "vendor/espennilsen-pi"]
 	path = vendor/espennilsen-pi
 	url = https://github.com/espennilsen/pi
+[submodule "vendor/defuddle"]
+	path = vendor/defuddle
+	url = https://github.com/kepano/defuddle
