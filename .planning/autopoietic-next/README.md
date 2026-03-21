@@ -13,7 +13,7 @@ The autopoietic documentation system is built and working:
 
 ## Workstreams (priority order)
 
-### 0. Real-world smoke test — prove the system works on actual code changes
+### 0. ✓ Real-world smoke test — prove the system works on actual code changes
 **The honest gap:** We built and tested doc-health in isolation. We haven't made a real code change and watched the autopoietic loop catch it, regenerate, and stay honest.
 
 Test scenarios:
@@ -24,14 +24,14 @@ Test scenarios:
 
 All four smoke tests passed. The autopoietic loop works on real code changes.
 
-### 1. doc-review.sh — semantic + functional tiers
+### 1. ✓ doc-review.sh — semantic + functional tiers (scripts/doc-review.sh written)
 **Spec:** `.planning/autoresearch-doc-health/doc-review-spec.md`
 
 - **Tier 2 (semantic):** subagent delta-judges each CAPS file via haiku, scores 0-10, lists redundancies. ~30s.
 - **Tier 3 (functional):** subagent given ONLY CAPS files tries to build a microapp. Reports: success/fail, blockers, unclear bits. ~60s.
 - Unified output: structural score + semantic avg + functional pass/fail.
 
-### 2. MicroappHost gen — real JSDoc extraction
+### 2. ✓ MicroappHost gen — gen-sdk-surface.ts fixed (77 @public exports, was 3)
 Repurpose `gen-sdk-surface.ts` to extract actual method signatures, param types, and JSDoc descriptions from `src/sdk/microapp-host.ts`. Output to `src/sdk/README.md`. This passes the 5 Whys test — bare export names don't help devs, real docs do.
 
 ### 3. Analytics JSONL
