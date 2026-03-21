@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-"""Parse a pi agent session JSONL file and extract pain signals."""
-import sys, json, re
+"""
+session-debrief-parser.py — Extract session data and prepare for LLM analysis.
+
+This script does TWO things:
+1. Extracts raw data from a pi session JSONL (tool calls, outputs, file reads)
+2. Outputs a condensed session summary that gets piped to a haiku agent for analysis
+
+The keyword matching / pattern detection is done by the LLM, NOT by this code.
+This code only extracts and formats.
+"""
+import sys, json
 from collections import Counter
 from pathlib import Path
 
 session_file = sys.argv[1]
-gotchas_path = Path("GOTCHAS.md")
+mode = sys.argv[2] if len(sys.argv) > 2 else "summary"
 
 messages = []
 with open(session_file) as f:
@@ -15,10 +24,12 @@ with open(session_file) as f:
         except:
             pass
 
+# ── Extract raw data ──────────────────────────────────────────────────────
+
 tool_calls = Counter()
-tool_errors = []
 file_reads = Counter()
-bash_failures = []
+bash_outputs = []  # (command_hint, output_snippet)
+tool_results = []  # all tool results for context
 
 for msg in messages:
     if msg.get("type") != "message":
@@ -38,76 +49,75 @@ for msg in messages:
                 if name in ("read", "Read") and isinstance(inp, dict) and "path" in inp:
                     file_reads[inp["path"]] += 1
 
-    # Tool results — extract errors
+    # Tool results — capture bash output snippets
     if role == "toolResult" and tool:
-        if tool in ("bash", "Bash"):
-            for b in content_blocks:
-                if isinstance(b, dict) and b.get("type") == "text":
-                    text = b["text"]
-                    lower = text.lower()
-                    # Only flag lines that look like actual errors, not content containing the word
-                    if any(kw in lower for kw in ["command not found", "exit code", "cannot find module", "permission denied", "enoent", "eacces"]):
-                        bash_failures.append(text[:200])
-                    elif lower.startswith("error") or "\nerror" in lower or "command exited with code" in lower:
-                        bash_failures.append(text[:200])
         for b in content_blocks:
-            if isinstance(b, dict) and b.get("is_error"):
-                tool_errors.append(f"{tool}: {str(b.get('text', ''))[:150]}")
+            if isinstance(b, dict) and b.get("type") == "text":
+                text = b["text"][:300]  # truncate for prompt budget
+                if tool in ("bash", "Bash"):
+                    bash_outputs.append(text)
+                tool_results.append({"tool": tool, "snippet": text[:150]})
 
-# Cross-reference with GOTCHAS.md
-gotcha_keywords = set()
-if gotchas_path.exists():
-    for line in gotchas_path.read_text().splitlines():
-        if line.startswith("**"):
-            gotcha_keywords.update(re.findall(r'\w+', line.lower()))
+# ── Mode: summary (for LLM consumption) ──────────────────────────────────
 
-uncovered = []
-for err in bash_failures:
-    err_words = set(re.findall(r'\w+', err.lower()))
-    if len(err_words & gotcha_keywords) < 3:
-        uncovered.append(err)
+if mode == "summary":
+    gotchas_content = ""
+    if Path("GOTCHAS.md").exists():
+        gotchas_content = Path("GOTCHAS.md").read_text()
 
-# Output
-total = sum(tool_calls.values())
-print(f"## Session summary ({total} tool calls)")
-print()
-for t, c in tool_calls.most_common(10):
-    print(f"  {c:4d}  {t}")
-print()
+    guide_headings = ""
+    if Path("SDK-MICROAPP-DEV.md").exists():
+        guide_headings = "\n".join(
+            line for line in Path("SDK-MICROAPP-DEV.md").read_text().splitlines()
+            if line.startswith("## ") or line.startswith("### ")
+        )
 
-if bash_failures:
-    print(f"## Bash failures ({len(bash_failures)})")
-    print()
-    for err in bash_failures[:8]:
-        print(f"  {err[:120]}")
-    print()
+    # Build condensed session summary for the LLM
+    summary = []
+    summary.append(f"SESSION: {Path(session_file).name}")
+    summary.append(f"TOTAL TOOL CALLS: {sum(tool_calls.values())}")
+    summary.append("")
+    summary.append("TOOL CALL COUNTS:")
+    for t, c in tool_calls.most_common(15):
+        summary.append(f"  {c:4d}  {t}")
 
-if tool_errors:
-    print(f"## Tool errors ({len(tool_errors)})")
-    print()
-    for err in tool_errors[:8]:
-        print(f"  {err[:120]}")
-    print()
+    summary.append("")
+    summary.append("MOST-READ FILES:")
+    for path, count in file_reads.most_common(15):
+        summary.append(f"  {count:4d}  {path}")
 
-if file_reads:
-    print(f"## Most-read files")
-    print()
-    for path, count in file_reads.most_common(10):
-        flag = " ⚠ re-read" if count > 3 else ""
-        print(f"  {count:4d}  {path}{flag}")
-    print()
+    summary.append("")
+    summary.append(f"BASH OUTPUTS ({len(bash_outputs)} total, showing last 15 snippets):")
+    for output in bash_outputs[-15:]:
+        # Show first 2 lines of each output
+        lines = output.strip().split("\n")[:2]
+        summary.append(f"  > {' | '.join(lines)[:150]}")
 
-if uncovered:
-    print(f"## Errors not covered by GOTCHAS.md ({len(uncovered)})")
-    print()
-    for err in uncovered[:5]:
-        print(f"  {err[:120]}")
-    print()
+    summary.append("")
+    summary.append("CURRENT GOTCHAS.MD (headings only):")
+    for line in gotchas_content.splitlines():
+        if line.startswith("**") or line.startswith("## "):
+            summary.append(f"  {line[:100]}")
 
-print("## Suggested actions")
-print()
-print("1. Review bash failures — new GOTCHAS.md entries needed?")
-print("2. Most-read files — if 5+ reads, the doc is unclear")
-print("3. Run: bash scripts/checks/check-scaffold-sync.sh")
-print()
-print("session-debrief complete.")
+    summary.append("")
+    summary.append("CURRENT GUIDE SECTIONS:")
+    summary.append(guide_headings)
+
+    print("\n".join(summary))
+
+# ── Mode: stats (quick non-LLM overview) ─────────────────────────────────
+
+elif mode == "stats":
+    total = sum(tool_calls.values())
+    print(f"## Session summary ({total} tool calls)")
+    print()
+    for t, c in tool_calls.most_common(10):
+        print(f"  {c:4d}  {t}")
+    print()
+    if file_reads:
+        print("## Most-read files")
+        print()
+        for path, count in file_reads.most_common(10):
+            flag = " ⚠ re-read" if count > 3 else ""
+            print(f"  {count:4d}  {path}{flag}")
+        print()
