@@ -34,7 +34,7 @@ echo ""
 echo "Checked $CHECKED script files."
 if [[ $ERRORS -gt 0 ]]; then
   echo "✗ $ERRORS unguarded platform-specific pattern(s) found."
-  echo "  See PATCHNOTES.md for the cross-platform fix pattern."
+  echo "  See SDK-MICROAPP-DEV.md §Cloud / headless ops for the cross-platform fix pattern."
   exit 1
 fi
 echo "✓ No unguarded platform-specific patterns found."

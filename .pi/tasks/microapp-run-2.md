@@ -8,12 +8,8 @@
 ## Before you write any code
 
 Read in this order:
-1. **`MICROAPP-DEV-GUIDE.md`** — full tutorial: quick-start, host API, UI library, persistence, gotchas, worked examples
-2. **`MICROAPP-DEV.md`** — ops workflow: install, start, scaffold, verify (cloud/Linux specifics)
-3. **`GOTCHAS.md`** — non-obvious failure modes (especially the Microapps + Cloud sections)
-
-The devlog at `.pi/reflections/claude-code-cloud-agent-devlog.md` is narrative context.
-If any doc conflicts with `MICROAPP-DEV-GUIDE.md`, trust the guide.
+1. **`SDK-MICROAPP-DEV.md`** — the one guide: quick-start, host API, UI, persistence, cloud ops
+2. **`GOTCHAS.md`** — non-obvious failure modes (especially the Microapps + Cloud sections)
 
 ---
 

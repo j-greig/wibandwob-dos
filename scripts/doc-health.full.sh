@@ -84,7 +84,7 @@ done
 # ── Axis 5: PD integrity ─────────────────────────────────────────────────────
 section "5. Progressive-disclosure integrity"
 missing=0
-for caps in AGENTS.md ARCHITECTURE.md SDK.md PHILOSOPHY.md GOTCHAS.md; do
+for caps in AGENTS.md ARCHITECTURE.md PHILOSOPHY.md GOTCHAS.md; do
   [[ -f "$caps" ]] || continue
   while IFS= read -r line; do
     path=$(echo "$line" | sed 's|.*<output>||;s|</output>.*||' | grep -oE '`[^`]+`' | head -1 | tr -d '`' | awk '{print $1}')

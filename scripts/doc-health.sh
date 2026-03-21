@@ -17,7 +17,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 SCORE=0
 VERBOSE="${VERBOSE:-}"
-CAPS=(AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md)
+CAPS=(AGENTS.md PHILOSOPHY.md ARCHITECTURE.md GOTCHAS.md)
 
 check() {
   if ( eval "$2" ) > /dev/null 2>&1; then

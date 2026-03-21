@@ -7,7 +7,7 @@
  * Import the type only:
  *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
  *
- * See SDK-FOR-MICROAPP-DEV.md for the full tutorial.
+ * See SDK-MICROAPP-DEV.md for the full tutorial.
  */
 import type blessed from "blessed";
 

@@ -103,7 +103,11 @@ win.onRestyle(() => { /* re-apply host.theme() */ })
 **Import rule:** only `import from "../../src/services/microapp-sdk.js"`.
 Importing from `src/core/` or `src/services/` directly is a COAT violation.
 
-
+<progressive-disclosure>
+  <output>`src/sdk/README.md` — SDK export surface by stability tier (@public/@beta/@internal)</output>
+  <generator>`bun scripts/gen-sdk-surface.ts` — regenerate if `src/services/microapp-sdk.ts` changed</generator>
+  <deeper>`SDK-MICROAPP-DEV.md` — full microapp development guide</deeper>
+</progressive-disclosure>
 
 ---
 

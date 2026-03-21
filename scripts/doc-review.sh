@@ -31,7 +31,7 @@ run_semantic() {
 
   # Build the prompt with current CAPS file contents
   CAPS_CONTENT=""
-  for f in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md; do
+  for f in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md GOTCHAS.md; do
     CAPS_CONTENT+="=== $f ===
 $(cat "$f")
 
@@ -112,7 +112,7 @@ run_functional() {
   echo ""
 
   CAPS_EXTRACT=""
-  for f in AGENTS.md SDK.md GOTCHAS.md; do
+  for f in AGENTS.md GOTCHAS.md; do
     CAPS_EXTRACT+="=== $f ===
 $(cat "$f")
 

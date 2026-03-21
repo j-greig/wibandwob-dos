@@ -14,7 +14,7 @@ for s in scripts/gen-*.py; do
 done
 
 # CAPS files must exist
-for f in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md; do
+for f in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md GOTCHAS.md; do
   [ -f "$f" ] || { echo "MISSING: $f"; exit 1; }
 done
 echo "checks passed"

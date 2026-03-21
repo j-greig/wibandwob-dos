@@ -15,11 +15,8 @@ CAPS MD files at repo root are the entire doc surface — hand-written stable pr
 | `AGENTS.md` | Conventions, workflow, posture (this file) |
 | `PHILOSOPHY.md` | Why this exists, design filters, SDK boundary |
 | `ARCHITECTURE.md` | COAT, subsystems, invariants |
-| `SDK.md` | Microapp SDK: contract, hooks, host API, lifecycle |
 | `GOTCHAS.md` | Non-obvious failure modes — add when something burns you |
-| `MICROAPP-DEV.md` | Agent dev workflow: install, start, scaffold, verify, gotchas |
-| `MICROAPP-DEV-GUIDE.md` | Full tutorial: quick-start, host API, UI library, persistence, worked examples |
-| `PATCHNOTES.md` | Script patches for cross-platform (cloud + local) compatibility |
+| `SDK-MICROAPP-DEV.md` | Building microapps: quick-start → host API → UI → persistence → cloud ops |
 
 ### Progressive disclosure
 

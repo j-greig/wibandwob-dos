@@ -11,7 +11,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 [[ -z "${ANTHROPIC_API_KEY:-}" ]] && echo "0" && exit 0
 
-CAPS=(AGENTS.md PHILOSOPHY.md ARCHITECTURE.md SDK.md GOTCHAS.md)
+CAPS=(AGENTS.md PHILOSOPHY.md ARCHITECTURE.md GOTCHAS.md)
 TOTAL=0
 COUNT=0
 
