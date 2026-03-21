@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-03-21T22:01:04Z",
+  "note": "Known failures at baseline time \u2014 only NEW failures beyond these will gate the build",
+  "knownFailures": {
+    "gaps": [
+      "G2",
+      "G3"
+    ],
+    "roundTrips": [
+      "markdown.toggle_figlet",
+      "editor.save_as",
+      "workspace.save_as",
+      "workspace.load",
+      "window.copy_text",
+      "theme.cycle",
+      "theme.choose",
+      "desktop.toggle_chrome",
+      "overlay.info",
+      "window.tile",
+      "window.cascade",
+      "window.toggle_maximize",
+      "primer-gallery.open",
+      "companion.smol",
+      "scramble.expand",
+      "scramble.pop-out",
+      "ghostty.shader.list",
+      "ghostty.shader.status",
+      "microapps.reload",
+      "microapp.wibwob.theattyr.play"
+    ],
+    "observability": []
+  }
+}
