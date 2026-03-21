@@ -122,6 +122,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 - Docs are wrong → fix in the same commit
 - A pattern confuses → write a devlog entry (`scripts/devlog.sh "note"`)
 - "It typechecks" is not done — run the thing
+- Use '5 whys' to explain why code was changed (adjuting why count to suit scope/complexity of changes)
 - Bun-first. No Node-only assumptions.
 
 ---
