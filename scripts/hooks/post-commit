@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# post-commit — validate changed microapps after commit (warn only, never blocks)
+# Install: bash scripts/install-hooks.sh
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Only run if WibWob-DOS is actually running
+if ! curl -sf --max-time 2 http://127.0.0.1:${CONTROL_API_PORT:-8099}/health >/dev/null 2>&1; then
+  exit 0  # silently skip — no instance, no validation
+fi
+
+# Find changed microapp index.ts files in this commit
+CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep '^microapps/.*/index\.ts$' || true)
+[[ -z "$CHANGED" ]] && exit 0
+
+echo "post-commit: validating changed microapps..."
+FAIL=0
+
+for file in $CHANGED; do
+  # Extract app dir name → command id
+  app_dir=$(echo "$file" | sed 's|microapps/\([^/]*\)/.*|\1|')
+  cmd_id="microapp.wibwob.${app_dir}.open"
+
+  # Check if the command is actually registered
+  if ! curl -sf --max-time 3 "http://127.0.0.1:${CONTROL_API_PORT:-8099}/commands/list" 2>/dev/null | grep -q "$cmd_id"; then
+    echo "  ⚠ $app_dir — command not registered (needs restart?)"
+    continue
+  fi
+
+  result=$(bash scripts/validate-microapp.sh "$cmd_id" 2>&1)
+  if echo "$result" | grep -q "✓ PASS"; then
+    echo "$result" | grep "✓ PASS"
+  else
+    echo "  ⚠ $app_dir — validation failed (captureText too short or open failed)"
+    FAIL=$((FAIL + 1))
+  fi
+  sleep 0.5
+done
+
+if [[ $FAIL -gt 0 ]]; then
+  echo ""
+  echo "⚠ $FAIL microapp(s) failed post-commit validation."
+  echo "  Run: bash scripts/validate-microapp.sh microapp.wibwob.<id>.open"
+  echo "  (This is a warning — the commit is not blocked.)"
+fi

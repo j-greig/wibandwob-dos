@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T17:28:24.070Z",
+  "generatedAt": "2026-03-21T17:43:32.809Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -73,7 +73,14 @@
         ]
       },
       "agentic-dev-reflection": {
-        "lastSeen": "2026-03-20T22:53:24.961Z",
+        "lastSeen": "2026-03-21T17:38:23.146Z",
+        "count": 2,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "browser-use": {
+        "lastSeen": "2026-03-21T17:43:32.809Z",
         "count": 1,
         "sources": [
           "read:SKILL.md"
@@ -98,8 +105,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-21T17:22:24.775Z",
-        "count": 53,
+        "lastSeen": "2026-03-21T17:38:16.760Z",
+        "count": 54,
         "sources": [
           "tool:execute_code"
         ]
