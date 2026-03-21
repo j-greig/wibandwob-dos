@@ -122,3 +122,153 @@ Expansion adds tokens, dilutes signal, fails the delta test.
 
 **Never trust API responses alone as proof.** Visual verification is mandatory —
 open the thing, screenshot it, read its state.
+
+---
+
+## Blessed widget ordering — Bun TDZ crashes `[HIGH]`
+
+**`const`/`let` declared after the function that references them → TDZ crash at runtime.**
+Bun's TS loader doesn't hoist like tsc would. No compile error — the app just crashes on open.
+Blessed widget declarations must be ordered BEFORE any render functions that reference them.
+
+---
+
+## Blessed list style crash on theme switch `[HIGH]`
+
+**`restyleAll` must include `item` and `scrollbar` keys in list style or blessed crashes.**
+`restyleAll` setting `listBox.style = { ...th.body, selected: {...} }` without `item`/`scrollbar`
+causes blessed to crash internally (`self.style.item[name]`, `this.style.scrollbar.fg`).
+Fix: always include `item: { fg, bg }` and `scrollbar: { fg }` in any list/scrollable box style,
+including inside `onRestyle` handlers. Applies to any scrollable `blessed.box`, not just lists.
+
+---
+
+## `desktop.clear-all` race — windows not in state for ~500ms `[HIGH]`
+
+**Open windows immediately after `desktop.clear-all` and their IDs are missing from `/state`.**
+`wibwob move/resize` silently no-ops on unknown IDs. Always `sleep 0.5` after `desktop.clear-all`
+before spawning or positioning new windows.
+
+---
+
+## Figlet window `.kind` is `"microapp"`, not `"figlet"` `[HIGH]`
+
+**Every choreography script gets this wrong.**
+`jq '.[] | select(.kind=="figlet")'` returns nothing — all microapp windows have `.kind="microapp"`.
+Must filter on `.appType`: `select(.appType=="wibwob.figlet")`. Batch move/resize silently no-ops
+when IDs are never captured. Same applies to any microapp window.
+
+---
+
+## Workspace restore crash → boot loop `[HIGH]`
+
+**If a microapp crashes during render and was open when workspace was saved, the restore
+re-triggers the crash on every startup.** Error appears in the tmux pane, not the API.
+Fix: `rm -f scratch/workspace.json` then restart before debugging the microapp.
+
+---
+
+## Direct/background mode → 1×1 screen, recording captures nothing `[HIGH]`
+
+**WibWob running backgrounded with no real PTY reports `screen.width/height` as 1×1.**
+`wibwob-record.sh` captures 1×1 frames with no warning. Must run in tmux with explicit dims:
+`tmux new-session -x 205 -y 55`. No auto-detect or error from the record script.
+
+---
+
+## `blessed.list.setItems()` / `.selected` need `(list as any)` cast `[MEDIUM]`
+
+**`blessed.Widgets.ListElement` is typed as `BoxElement` — `setItems` and `selected` exist
+at runtime but not in the type definitions.** Every list-touching microapp needs `(list as any).setItems()`
+and `(list as any).selected`. Not fixable without patching `@types/blessed`. If this cast appears
+in three microapps, it's correct — not a bug.
+
+---
+
+## `blessed.list.setItems` fires `select item` event → recursion `[MEDIUM]`
+
+**Calling `list.setItems([...])` to refresh triggers the `select item` handler.**
+If that handler refreshes, which calls `setItems`, infinite loop. Guard with a boolean:
+`let rendering = false; if (rendering) return; rendering = true; list.setItems(...); rendering = false`.
+
+---
+
+## `registerSnapshot` restore = re-run `open`, not state injection `[MEDIUM]`
+
+**The two-arg `restore: (_snap, payload)` signature implies diffing. It doesn't.**
+`payload` is passed to `host.runCommand("open", payload)`. Restore is just re-opening with saved args.
+State must be fully reconstructable from the open-command payload alone — don't rely on
+in-memory state surviving across restore.
+
+---
+
+## `blessed.textarea` is fully modal `[MEDIUM]`
+
+**`inputOnFocus: true` makes the textarea own all keys including Tab, Esc, and arrow keys.**
+No "textarea with normal focus" mode exists. Key bindings registered elsewhere work
+(`textarea.key(["tab"], ...)`) but focus UX is jarring. Platform constraint — no workaround.
+For multi-line input there is no SDK helper; you must use raw `blessed.textarea`.
+
+---
+
+## `multiInstance: true` required for re-openable microapps `[MEDIUM]`
+
+**Without `"multiInstance": true` in `microapp.json`, running `open` a second time silently
+no-ops — the existing window is not brought to focus, nothing happens.**
+Not in the quick-start section of `SDK-MICROAPP-DEV.md`. Discover it by running open twice
+and getting confused. Set it if the app should be openable while already open.
+
+---
+
+## `setImmediate(refresh)` required after textarea keypress `[MEDIUM]`
+
+**`textarea.on("keypress", refresh)` reads stale value** — blessed hasn't processed the keypress yet.
+Defer one tick: `textarea.on("keypress", () => setImmediate(refresh))`. Direct handler gives
+the state before the keystroke.
+
+---
+
+## Worktree / alt-instance may bind a different port `[MEDIUM]`
+
+**Cinema worktrees and second `ensure-running.sh` instances get a different port (e.g. 8101).**
+Scripts hardcoded to `8099` silently talk to the wrong instance or get ECONNREFUSED with no
+helpful error. Use `$WW_API` env var or read port from `/health`. Never hardcode `8099`.
+
+---
+
+## `safeReadJSON` returns `undefined`, not a typed default `[LOW]`
+
+**`safeReadJSON<T>()` returns `T | undefined`.** Every persistence-using microapp needs a
+`loadData()` wrapper with a fallback object. Verbose but expected — plan for it.
+
+---
+
+## `host.promptValue` focus not restored after dismiss `[LOW]`
+
+**After the modal closes, focus does NOT return to the triggering widget.** No `onDismiss`
+callback. User must Tab or click to re-focus. Platform constraint.
+
+---
+
+## Emoji appear as `?` in text screenshot API and `validate-microapp.sh` `[LOW]`
+
+**Not a real bug** — terminal encoding issue in text extraction. Emoji render correctly
+in a live terminal. During agentic validation, read `?` as "emoji was here", not corruption.
+Don't add fallback ASCII replacements to pass validation — the TUI is correct.
+
+---
+
+## `canvas.element` is the key-binding surface for `createTextViewer` `[LOW]`
+
+**`createTextViewer` returns `{ element, update, destroy, getContent }`.** Key bindings go on
+`element` (the raw blessed node), not on the textviewer object. Focus also requires:
+`win.setFocusTarget(canvas.element); win.focus()`. The SDK wrapper does not expose key-binding
+or focus methods directly.
+
+---
+
+## `createTextViewer` positional `%` strings cause TypeScript complaints `[LOW]`
+
+**Passing `top: "40%"` works at runtime but TypeScript flags it** — the `ViewerOpts` type
+declares some positional fields as `number` only, despite blessed accepting `number | string`.
+Use `as any` cast or pass integer pixel values. A future SDK fix should widen the type.
