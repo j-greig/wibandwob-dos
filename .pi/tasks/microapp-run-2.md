@@ -122,7 +122,8 @@ Do NOT open multiple apps in a loop. Test one at a time with `sleep 1` between c
 After building each app, run:
 
 ```bash
-bash scripts/validate-microapp.sh microapp.wibwob.<app-id>.open
+# default threshold is 10 chars; pass 50 for content-rich apps
+bash scripts/validate-microapp.sh microapp.wibwob.<app-id>.open 50
 ```
 
 Expected output:

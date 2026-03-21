@@ -29,6 +29,8 @@ docker run --rm \
     echo "  [docker] installing bun..."
     curl -fsSL https://bun.sh/install | bash 2>/dev/null
     export PATH="$HOME/.bun/bin:$PATH"
+    # Symlink so tmux child shells (which don'\''t inherit PATH) can find bun
+    ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun
 
     echo "  [docker] bun install --ignore-scripts..."
     bun install --ignore-scripts 2>&1 | tail -3

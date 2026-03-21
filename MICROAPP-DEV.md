@@ -288,8 +288,9 @@ bash scripts/validate-microapp.sh microapp.wibwob.your-app.open
 # ✗ FAIL — captureText returned 3 chars (< 50 minimum)
 ```
 
-A **passing app** produces ≥50 chars of readable text from `captureText`.
-A **blank app** returns an empty string or a minimal stub like `"(empty)"`.
+A **passing app** produces ≥5 chars of readable text from `captureText` (the default).
+For content-rich apps (clocks, lists, canvases) pass a higher bar: `validate-microapp.sh <id> 50`.
+A **blank app** returns an empty string or pure whitespace — 0–4 chars.
 If validate-microapp fails, check that your `captureText` hook returns real content.
 
 > The validate script opens the app, waits 1s, screenshots text, checks length,

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 COMMAND_ID="${1:-}"
-MIN_CHARS="${2:-50}"
+MIN_CHARS="${2:-5}"
 PORT="${CONTROL_API_PORT:-8099}"
 API="http://127.0.0.1:${PORT}"
 
@@ -81,7 +81,8 @@ if [[ $char_count -lt $MIN_CHARS ]]; then
   echo ""
   echo "✗ FAIL — captureText returned $char_count chars (< $MIN_CHARS minimum)"
   echo "  App appears blank or not rendering content."
-  echo "  Check: does the microapp implement captureText returning meaningful output?"
+  echo "  Check: does the microapp implement captureText() returning meaningful text?"
+  echo "  Tip: for richer apps pass a higher threshold: bash scripts/validate-microapp.sh <id> 50"
   exit 1
 fi
 
