@@ -1,0 +1,22 @@
+{
+  "name": "habit-tracker",
+  "version": "0.1.0",
+  "description": "Daily habit tracker with streaks and file persistence",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.habit-tracker.open"
+  },
+  "microapp": {
+    "id": "wibwob.habit-tracker",
+    "title": "Habit Tracker",
+    "description": "Daily habits with streaks. Space: toggle, a: add, d: delete, h: history view.",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [{ "category": "applications", "order": 220, "label": "Habit Tracker" }],
+    "palette": { "order": 220, "label": "Open Habit Tracker" },
+    "agent": true,
+    "api": true
+  }
+}
