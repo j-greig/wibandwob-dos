@@ -57,6 +57,10 @@ build-release/
 build-sprites/
 build-asan/
 wibwob_crash.log
+
+# .wibwob — config committed, runtime ignored
+.wibwob/instances/
+.wibwob/runtime/
 *.crash.log
 saves/
 assets/mediapipe-venv/
