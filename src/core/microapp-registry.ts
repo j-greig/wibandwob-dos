@@ -74,6 +74,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.md-preview":                  "beta",
   "wibwob.sys-monitor":                 "beta",
   "wibwob.color-palette":               "beta",
+  "wibwob.ascii-studio":                "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */

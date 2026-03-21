@@ -1,0 +1,24 @@
+{
+  "name": "ascii-studio",
+  "version": "0.1.0",
+  "description": "ASCII Studio microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.ascii-studio.open"
+  },
+  "microapp": {
+    "id": "wibwob.ascii-studio",
+    "title": "ASCII Studio",
+    "description": "ASCII Studio microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 206, "label": "ASCII Studio" }
+    ],
+    "palette": { "order": 206, "label": "Open ASCII Studio" },
+    "agent": true,
+    "api": true
+  }
+}
