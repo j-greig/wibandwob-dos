@@ -67,6 +67,10 @@ assets/mediapipe-venv/
 tests/tidepool-smoke/results/
 .ralph/
 
+# ralphi
+.ralphi/*
+!.ralphi/config.yaml
+
 # Large reference media (extracted frames tracked instead)
 asciicker-gameplay-animted.gif
 scripts/lib/find-ghostty-window

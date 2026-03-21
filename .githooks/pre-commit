@@ -6,3 +6,8 @@ if [[ "$BRANCH" == "main" ]]; then
   echo "✗ Direct commit to main is not allowed. Create a branch first." >&2
   exit 1
 fi
+
+# ralphi quality gate
+if command -v ralphi &> /dev/null; then
+  ralphi check
+fi

@@ -1,0 +1,34 @@
+# ralphi configuration
+# Auto-generated — edit as needed
+
+project:
+  name: "wibwob-dos"
+  language: "TypeScript"
+  framework: "blessed TUI"
+
+commands:
+  test: "bun test src/tests/unit/"
+  typecheck: "node_modules/.bin/tsc --noEmit"
+  lint: "npx eslint 'microapps/**/index.ts'"
+  health: "bun run health"
+
+rules:
+  - "Bun-first — use bun test, bun run, never assume Node-only APIs"
+  - "Strict TypeScript (strict: true in tsconfig)"
+  - "ES modules — type: module, NodeNext resolution"
+  - "Microapps import from microapp-sdk.js, never from src/core/* or src/services/*"
+  - "Never commit to main — use feature branches (epic/, spike/, fix/, feat/)"
+  - "Run health checks after every change (bun run health)"
+  - "No circular dependencies"
+  - "Follow existing AGENTS.md conventions"
+
+boundaries:
+  never_touch:
+    - "*.lock"
+    - "bun.lock"
+    - ".env*"
+    - "vendor/"
+    - "node_modules/"
+
+engine: "pi"
+max_retries: 3
