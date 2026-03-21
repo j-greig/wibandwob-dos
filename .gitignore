@@ -70,6 +70,8 @@ tests/tidepool-smoke/results/
 # ralphi
 .ralphi/*
 !.ralphi/config.yaml
+!.ralphi/prd.json
+!.ralphi/progress.txt
 
 # Large reference media (extracted frames tracked instead)
 asciicker-gameplay-animted.gif

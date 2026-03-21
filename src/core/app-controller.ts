@@ -536,7 +536,9 @@ export class TsTuiMvpApp {
       commands: this.commands,
       geometry: this.geometry.getGeometry(),
       focusOrCreate: (appType, createFn, multiInstance) => {
-        this.focusOrCreate(appType, createFn, multiInstance);
+        const wasFocused = !multiInstance && Boolean(this.findWindowByAppType(appType as AppType));
+        this.focusOrCreate(appType as AppType, createFn, multiInstance);
+        return { focused: wasFocused };
       },
       worldChat: worldChatService,
       overlays: this.overlays,

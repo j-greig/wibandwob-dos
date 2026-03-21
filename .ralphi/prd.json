@@ -1,0 +1,266 @@
+{
+  "project": "wibwob-dos",
+  "branchName": "ralph/gotcha-cures",
+  "description": "Eliminate silent failures from the microapp dev loop. Fix the platform (SDK, loader, scripts) so gotchas become impossible — correct defaults or loud errors. 4 phases: safe defaults → SDK helpers → loader hardening → observability.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "multiInstance: false → focus existing window",
+      "description": "When multiInstance: false and window already exists, focus the existing window instead of silently no-oping. Return {\"ok\":true, \"focused\":true} so callers know what happened.",
+      "acceptanceCriteria": [
+        "When multiInstance: false and window exists, open focuses the existing window",
+        "API returns {\"ok\": true, \"focused\": true} on re-open",
+        "curl POST open twice → second returns focused: true + window is visually focused",
+        "Verify with click-counter: open → open again → window comes to front",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 1,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/services/microapp-loader.ts. Phase 1 — safe defaults."
+    },
+    {
+      "id": "US-002",
+      "title": "createTextViewer types accept number | string",
+      "description": "Widen positional fields (top, bottom, left, right, width, height) on TextViewerOptions to accept string percentages so microapp devs don't need as-any casts for blessed-compatible values like '40%'.",
+      "acceptanceCriteria": [
+        "TextViewerOptions positional fields typed as number | string",
+        "Existing microapps using numeric values still typecheck",
+        "A microapp using top: '40%' typechecks without as any",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 2,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/sdk/composition-helpers.ts. Phase 1 — safe defaults."
+    },
+    {
+      "id": "US-003",
+      "title": "safeReadJSONOrDefault<T>(path, fallback): T",
+      "description": "Add a convenience function that reads JSON with a typed fallback default, eliminating the 3-line boilerplate wrapper every persistence-using microapp writes.",
+      "acceptanceCriteria": [
+        "safeReadJSONOrDefault<T>(path, fallback) exists in src/core/safe-fs.ts",
+        "Exported from src/services/microapp-sdk.ts as @public",
+        "Returns parsed data when file exists, fallback when missing or invalid",
+        "habit-tracker refactored to use it (manual fallback wrapper removed)",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 3,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "Files: src/core/safe-fs.ts, src/services/microapp-sdk.ts, microapps/habit-tracker/index.ts. Phase 1 — safe defaults."
+    },
+    {
+      "id": "US-004",
+      "title": "createManagedList — typed blessed.list wrapper",
+      "description": "New SDK composition helper providing a typed, recursion-guarded, theme-resilient list. Eliminates (list as any) casts, setItems recursion bugs, and theme-switch crashes.",
+      "acceptanceCriteria": [
+        "createManagedList exported from src/sdk/composition-helpers.ts and re-exported from microapp-sdk.ts",
+        "Returns ManagedListHandle with: element, setItems (recursion-guarded), selected (typed readonly), onSelect, update (safe restyle), destroy",
+        "setItems internally guards against re-entrant calls",
+        "update ensures style.item and style.scrollbar keys always present",
+        "Refactor kanban to use createManagedList — zero (list as any) casts",
+        "Refactor habit-tracker to use createManagedList — zero (list as any) casts",
+        "Theme switch 3 times without crash on refactored apps",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 4,
+      "status": "open",
+      "dependsOn": ["US-002"],
+      "notes": "File: src/sdk/composition-helpers.ts, src/services/microapp-sdk.ts, microapps/kanban/index.ts, microapps/habit-tracker/index.ts. Phase 2 — SDK helpers. Depends on US-002 (types must be correct first)."
+    },
+    {
+      "id": "US-005",
+      "title": "createAnimationClock starts paused by default",
+      "description": "Change animation clock default to paused. Add optional { autoplay?: boolean } param. Pre-work: grep all callers and add .play() where missing before changing the default.",
+      "acceptanceCriteria": [
+        "PRE-WORK: grep all createAnimationClock callers, add .play() to any that don't call it after setup",
+        "createAnimationClock default is running = false (paused)",
+        "Optional second param { autoplay?: boolean } for backward-compat",
+        "No microapp uses clock.pause() as the line immediately after creation",
+        "step-seq, ascii-rain, spore-clock all still animate correctly",
+        "All microapps using animation clocks verified working",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 5,
+      "status": "open",
+      "dependsOn": ["US-002"],
+      "notes": "File: src/sdk/runtime-helpers.ts + affected microapps. Phase 2 — SDK helpers. MUST grep callers first before changing default."
+    },
+    {
+      "id": "US-006",
+      "title": "Externalise microapp registration — auto-discover + config override",
+      "description": "Auto-discover microapps from microapps/*/microapp.json at beta tier. .wibwob/microapps.json overrides tiers. Core apps stay in source. Scaffold script no longer edits TypeScript.",
+      "acceptanceCriteria": [
+        "Any microapps/*/microapp.json not in hardcoded registry is auto-discovered at beta tier",
+        "Auto-discovery logged: [loader] auto-registered <id> at beta tier",
+        ".wibwob/microapps.json overrides tier for any app (auto-discovered or hardcoded)",
+        "Core apps remain in src/core/microapp-registry.ts (documented as shipped apps)",
+        "Scaffold script writes microapps/ dir + microapp.json — no source file edits",
+        "Scaffold → restart → app appears in /state without editing any src/ file",
+        "git diff src/ is clean after scaffolding a new microapp (beyond the feature's own loader changes)",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 6,
+      "status": "open",
+      "dependsOn": ["US-004", "US-005"],
+      "notes": "Files: src/services/microapp-loader.ts, src/core/microapp-registry.ts, .wibwob/microapps.json (new), scaffold script. Phase 3 — loader hardening."
+    },
+    {
+      "id": "US-007",
+      "title": "reload-microapp.sh warns on host file changes",
+      "description": "Write git commit hash to scratch/boot-commit at boot. reload-microapp.sh diffs HEAD against boot-commit for src/**. Warns if host files changed.",
+      "acceptanceCriteria": [
+        "Boot writes $(git rev-parse HEAD) to scratch/boot-commit",
+        "reload-microapp.sh diffs HEAD against boot-commit for src/**",
+        "If src/ changed, prints warning: Host files changed since boot — restart required",
+        "No behaviour change beyond the warning (reload still executes)",
+        "Edit microapp-sdk.ts → run reload → see warning",
+        "bun run health passes"
+      ],
+      "priority": 7,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "Files: boot sequence (scratch/boot-commit write), scripts/reload-microapp.sh. Phase 3 — can be done independently."
+    },
+    {
+      "id": "US-008",
+      "title": "Workspace restore crash protection",
+      "description": "Wrap each microapp restore in try/catch. On failure: log, skip, continue. One broken microapp must not brick the entire desktop.",
+      "acceptanceCriteria": [
+        "Each microapp restore wrapped in try/catch",
+        "On failure: log error with microapp ID, skip, continue restoring others",
+        "After boot: report which apps failed to restore",
+        "Break a microapp → save workspace → restart → other windows restore, broken one skipped",
+        "Boot completes successfully with broken app logged",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 8,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/services/workspace-service.ts (or equivalent). Phase 3 — can be done independently."
+    },
+    {
+      "id": "US-009",
+      "title": "desktop.clear-all waits for completion",
+      "description": "Make clear-all await all window close callbacks before returning the API response. 2-second timeout safety net.",
+      "acceptanceCriteria": [
+        "clear-all awaits all window close callbacks before returning API response",
+        "2-second timeout safety net (returns with warning if windows don't close in time)",
+        "curl POST clear-all && curl POST open → new window in /state immediately",
+        "No sleep needed between clear-all and next command",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 9,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/core/app-controller.ts (or command handler). Phase 3 — can be done independently."
+    },
+    {
+      "id": "US-010",
+      "title": "GET /errors/recent API endpoint",
+      "description": "Ring buffer of last 20 runtime errors. Capture errors from microapp setup(), onRestyle(), onResize() lifecycle hooks. Expose via GET /errors/recent.",
+      "acceptanceCriteria": [
+        "New src/core/error-buffer.ts — ring buffer of last 20 errors",
+        "Errors captured from microapp setup(), onRestyle(), onResize() lifecycle hooks",
+        "GET /errors/recent returns JSON array with: microappId, stack, timestamp, message",
+        "Bun TDZ errors and uncaught exceptions also captured",
+        "curl localhost:8099/errors/recent returns meaningful error data after triggering a crash",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 10,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "Files: src/services/control-api.ts, src/core/error-buffer.ts (new). Phase 4 — observability."
+    },
+    {
+      "id": "US-011",
+      "title": ".kind → .appType migration",
+      "description": "Move appType to prominent position in /state window objects. Deprecate .kind as _deprecated_kind. Update all internal code.",
+      "acceptanceCriteria": [
+        "appType moved to prominent position in /state window objects",
+        ".kind renamed to _deprecated_kind or removed (document decision)",
+        "All internal code using .kind updated to use .appType",
+        "Scripts/skills referencing .kind updated",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 11,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/services/state-service.ts + scripts/skills. Phase 4 — deprecation."
+    },
+    {
+      "id": "US-012",
+      "title": "host.promptValue restores focus on dismiss",
+      "description": "Save screen.focused before showing prompt modal. Restore in dismiss callback (both confirm and cancel paths).",
+      "acceptanceCriteria": [
+        "screen.focused saved before showing prompt modal",
+        "Focus restored to saved element in dismiss callback (confirm and cancel)",
+        "Open microapp → trigger prompt → dismiss → keyboard input goes to correct element",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 12,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: src/services/microapp-loader.ts. Phase 4."
+    },
+    {
+      "id": "US-013",
+      "title": "1×1 screen detection in recording",
+      "description": "Check /health screen dimensions before recording. Abort with clear error if screen ≤ 1×1.",
+      "acceptanceCriteria": [
+        "wibwob-record.sh checks /health for screen dimensions before recording",
+        "Aborts with clear error message if screen ≤ 1×1",
+        "Works correctly when PTY is present (recording proceeds normally)",
+        "bun run health passes"
+      ],
+      "priority": 13,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: scripts/wibwob-record.sh. Phase 4."
+    },
+    {
+      "id": "US-014",
+      "title": "add-command.sh scaffold",
+      "description": "New script: bash scripts/add-command.sh <group>.<verb> '<label>' generates all 4+ file edits needed to wire a command.",
+      "acceptanceCriteria": [
+        "bash scripts/add-command.sh <group>.<verb> '<label>' generates all required edits",
+        "Covers: command catalog entry, handler, API route, help text",
+        "Generated code is syntactically correct (bun run typecheck clean after running)",
+        "bun run health passes"
+      ],
+      "priority": 14,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: scripts/add-command.sh (new). Phase 4. Investigate exact 4-file wiring path at implementation time."
+    },
+    {
+      "id": "US-015",
+      "title": "canvas dependency audit",
+      "description": "Trace transitive dependency on canvas. Make optional or remove so bun install succeeds in headless containers.",
+      "acceptanceCriteria": [
+        "Transitive dependency path to canvas identified and documented",
+        "canvas made optional (optionalDependencies) or removed entirely",
+        "bun install succeeds in a container without native build tools",
+        "Functionality using canvas still works when available (graceful degradation)",
+        "bun run typecheck clean",
+        "bun run health passes"
+      ],
+      "priority": 15,
+      "status": "open",
+      "dependsOn": [],
+      "notes": "File: package.json + code importing canvas transitively. Phase 4."
+    }
+  ]
+}

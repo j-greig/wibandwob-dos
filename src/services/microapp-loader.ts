@@ -213,7 +213,11 @@ function createMicroappHost(
         id: fullId,
         label: def.label,
         description: def.description,
-        action: def.direct ? def.action : (args) => focusOrCreate(microappId, () => def.action(args), multiInstance),
+        action: def.direct ? def.action : (args) => {
+          const focusResult = focusOrCreate(microappId, () => def.action(args), multiInstance);
+          if (focusResult.focused) return { ok: true, focused: true };
+          return { ok: true };
+        },
         multiInstance,
         menuPlacements: (showMenu && Array.isArray(def.menu)) ? def.menu.map(m => ({
           category: resolveMenuCategory(m.category),

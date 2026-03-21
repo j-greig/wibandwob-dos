@@ -159,7 +159,7 @@ export interface MicroappHostDeps {
   windowManager: WindowManager;
   commands: CommandRegistry;
   geometry: { width: number; height: number; cellAspect: number };
-  focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
+  focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => { focused: boolean };
   worldChat: WorldChatHostAccess;
   overlays?: OverlayManager;
   repoRoot?: string;
