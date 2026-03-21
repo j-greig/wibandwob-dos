@@ -8,40 +8,40 @@
 
 ## Workstream A — Script patches (cross-platform)
 
-- [ ] **A1** `scripts/lib/process-manager.sh` — replace `WW_MODE="${WW_MODE:-direct}"` with headless auto-detect block (`[ ! -t 0 ]` or `$TERM == dumb` → tmux, else direct). Log "auto-detected headless" to stderr.
-- [ ] **A2** `scripts/lib/process-manager.sh` `ww_start_app()` — replace bare `nohup script -q /dev/null bash -c ...` with `uname` guard: Darwin uses macOS syntax, Linux uses `-qfc` syntax.
-- [ ] **A3** `scripts/start-alt-instance.sh` — same `uname` guard at its direct-mode block.
-- [ ] **A4** `.pi/skills/ww-ops/SKILL.md` — add `--max-time 5` to all bare `curl -sf` examples (lines 55, 56, 90, 160).
+- [x] **A1** `scripts/lib/process-manager.sh` — replace `WW_MODE="${WW_MODE:-direct}"` with headless auto-detect block (`[ ! -t 0 ]` or `$TERM == dumb` → tmux, else direct). Log "auto-detected headless" to stderr.
+- [x] **A2** `scripts/lib/process-manager.sh` `ww_start_app()` — replace bare `nohup script -q /dev/null bash -c ...` with `uname` guard: Darwin uses macOS syntax, Linux uses `-qfc` syntax.
+- [x] **A3** `scripts/start-alt-instance.sh` — same `uname` guard at its direct-mode block.
+- [x] **A4** `.pi/skills/ww-ops/SKILL.md` — add `--max-time 5` to all bare `curl -sf` examples (lines 55, 56, 90, 160).
 
 ---
 
 ## Workstream B — Doc surface
 
-- [ ] **B1** `AGENTS.md` "How these docs work" — change "Four CAPS MD files" → "Six CAPS MD files", add:
+- [x] **B1** `AGENTS.md` "How these docs work" — change "Four CAPS MD files" → "Six CAPS MD files", add:
   - `MICROAPP-DEV.md` — agent dev workflow: install, start, scaffold, verify, gotchas
   - `PATCHNOTES.md` — script patches for cross-platform (cloud + local) compatibility
-- [ ] **B2** `MICROAPP-DEV.md` "Visual verification pattern" section — add a **blank-app check** note: `captureText` output must be >50 chars to count as passing. Show what a blank vs passing screenshot looks like.
+- [x] **B2** `MICROAPP-DEV.md` "Visual verification pattern" section — add a **blank-app check** note: `captureText` output must be >50 chars to count as passing. Show what a blank vs passing screenshot looks like.
 
 ---
 
 ## Workstream C — SDK prevention-not-cure
 
-- [ ] **C1** `src/services/microapp-sdk.ts` — add `@group` JSDoc tags distinguishing the two component models at the export site:
+- [x] **C1** `src/services/microapp-sdk.ts` — add `@group` JSDoc tags distinguishing the two component models at the export site:
   - `CompositionHelper` group: `createStatusBar`, `createTextViewer`, `createListPanel`, `createSplitView`, `createTabs`, `createCanvas`, `createInputLine`, `createHeaderBar`, `createScrollView`
   - `LayoutPart` group: `createProgressBar`, `createKeyValuePanel`, `createDataTable`, `createSpinner`
-- [ ] **C2** `src/services/microapp-sdk.ts` `createAnimationClock` — add fps guard: `if (fps > 10) console.warn('[microapp-sdk] createAnimationClock: fps=${fps} risks saturating blessed render (recommend ≤10)')`. Add JSDoc `@warn` noting clock starts running immediately — call `clock.pause()` if you want manual control.
-- [ ] **C3** `src/services/microapp-sdk.ts` — add exported `registerMicroappHooks(win, { captureText, describeState, onCleanup, onRestyle })` typed helper that enforces all four required hooks at once. Document as preferred pattern.
-- [ ] **C4** `MICROAPP-DEV.md` "The four required hooks" section — update to mention `registerMicroappHooks()` as the preferred approach, individual hooks as the fallback.
+- [x] **C2** `src/services/microapp-sdk.ts` `createAnimationClock` — add fps guard: `if (fps > 10) console.warn('[microapp-sdk] createAnimationClock: fps=${fps} risks saturating blessed render (recommend ≤10)')`. Add JSDoc `@warn` noting clock starts running immediately — call `clock.pause()` if you want manual control.
+- [x] **C3** `src/services/microapp-sdk.ts` — add exported `registerMicroappHooks(win, { captureText, describeState, onCleanup, onRestyle })` typed helper that enforces all four required hooks at once. Document as preferred pattern.
+- [x] **C4** `MICROAPP-DEV.md` "The four required hooks" section — update to mention `registerMicroappHooks()` as the preferred approach, individual hooks as the fallback.
 
 ---
 
 ## Workstream D — Verification infrastructure
 
-- [ ] **D1** `scripts/validate-microapp.sh` — new script:
+- [x] **D1** `scripts/validate-microapp.sh` — new script:
   - Args: `<command-id>` (e.g. `microapp.wibwob.click-counter.open`)
   - Flow: open app → sleep 1 → list windows → text screenshot → check output length > 50 chars → close window → print `PASS` or `FAIL` with screenshot excerpt
   - Exit 0 on PASS, exit 1 on FAIL
-- [ ] **D2** `scripts/checks/check-cross-platform.sh` — new script:
+- [x] **D2** `scripts/checks/check-cross-platform.sh` — new script:
   - Greps `scripts/` for `script -q /dev/null` without `uname`/`Darwin`/`Linux` guard on the same line or adjacent line
   - Exits 1 with file:line if found, exits 0 with `✓ No platform-specific patterns found`
   - Run this before the Docker gate to self-check
@@ -52,7 +52,7 @@
 
 - [ ] **E1** Confirm Docker is running locally: `docker info`
 - [ ] **E2** Choose image: `ubuntu:22.04` + install `tmux` + `bun` (closest to CCC environment)
-- [ ] **E3** Write `scripts/docker-smoke.sh`:
+- [x] **E3** Write `scripts/docker-smoke.sh`:
   ```bash
   docker run --rm \
     -v "$(pwd):/app" -w /app \
@@ -71,10 +71,10 @@
 
 ## Workstream F — Typecheck + commit
 
-- [ ] **F1** `bun run typecheck` — must pass with no errors after all C changes.
-- [ ] **F2** Run `scripts/checks/check-cross-platform.sh` — must pass (exit 0).
+- [x] **F1** `bun run typecheck` — must pass with no errors after all C changes.
+- [x] **F2** Run `scripts/checks/check-cross-platform.sh` — must pass (exit 0).
 - [ ] **F3** Run `scripts/validate-microapp.sh microapp.wibwob.click-counter.open` against running local instance — must PASS (confirms the validator itself works).
-- [ ] **F4** Commit all changes:
+- [x] **F4** Commit all changes:
   ```
   fix(scripts): cross-platform startup — headless auto-detect + Linux script syntax
   feat(sdk): registerMicroappHooks typed helper, fps guard, @group JSDoc tags
@@ -86,7 +86,7 @@
 
 ## Workstream G — CCC task spec
 
-- [ ] **G1** Write `.pi/tasks/microapp-run-2.md` — the exact prompt to paste into the next CCC session. Must include:
+- [x] **G1** Write `.pi/tasks/microapp-run-2.md` — the exact prompt to paste into the next CCC session. Must include:
   - [ ] "Read `MICROAPP-DEV.md` before writing any code"
   - [ ] `bun install --ignore-scripts` as the install command
   - [ ] `--tmux` mode only, never `--direct`
