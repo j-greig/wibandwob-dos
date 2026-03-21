@@ -1,0 +1,28 @@
+{
+  "name": "pi-defuddle",
+  "version": "0.1.0",
+  "description": "Convert any URL to clean Markdown using Defuddle — no headless browser needed.",
+  "type": "module",
+  "bin": {
+    "pi-defuddle": "./defuddle.ts"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-skill",
+    "agent-skill",
+    "web-scraping",
+    "readability",
+    "markdown",
+    "defuddle"
+  ],
+  "pi": {
+    "skills": ["../../.pi/skills/pi-defuddle/SKILL.md"]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/j-greig/wibandwob-dos.git"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

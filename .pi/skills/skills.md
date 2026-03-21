@@ -229,7 +229,7 @@ Triggers on: "Cache and refresh remote git repositories under ~/", "librarian".
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
-Last used: yesterday (2026-03-20) · See: `.pi/skills/librarian/SKILL.md`
+Last used: today (2026-03-21) · See: `.pi/skills/librarian/SKILL.md`
 
 ---
 
@@ -252,6 +252,17 @@ Triggers on: "create a microapp", "new microapp", "scaffold a microapp", "add a 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
 Last used: yesterday (2026-03-20) · See: `.pi/skills/microapp-creator/SKILL.md`
+
+---
+
+## pi-defuddle
+**Your Specialist** — Convert any URL to clean Markdown instantly — no headless browser needed. Uses Defuddle for content extraction. Faster than pi-web-browse for static/SSR pages.…
+
+Triggers on: "defuddle".
+
+Does not: Does not create or modify content — searches and presents existing data only.
+
+Last used: never · See: `.pi/skills/pi-defuddle/SKILL.md`
 
 ---
 
@@ -358,7 +369,7 @@ Does not: Does not simplify other domains in this family — pick the right vari
 
 > **Family:** simplify (see also: simplify-docs, simplify-planning)
 
-Last used: yesterday (2026-03-20) · See: `.pi/skills/simplify-docs/SKILL.md`
+Last used: today (2026-03-21) · See: `.pi/skills/simplify-docs/SKILL.md`
 
 ---
 
@@ -481,6 +492,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | librarian | Repo Cacher | Cache and refresh remote git repositories under ~/ |
 | michel-gondry-music-video-director | Director Lens | A director-lens inspired by Michel Gondry’s public body of work and process: - h |
 | microapp-creator | Specialist | Scaffold, register, and dev-loop a new WibWob-DOS microapp end-to-end |
+| pi-defuddle | Specialist | Convert any URL to clean Markdown instantly — no headless browser needed |
 | pi-session-log-explorer | Session Archaeologist | Search and extract content from pi agent session logs (~/ |
 | pi-usage-audit | Stale-Skill Auditor | Audit local Pi skill, extension, and agent usage from session logs for the curre |
 | planning-update | Planning Closer | - Update  |
