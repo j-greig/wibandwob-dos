@@ -383,3 +383,32 @@ export {
   listDir,
   pathExists,
 } from "../core/safe-fs.js";
+
+// ── Host renderer engines — re-exported for microapps that need them ──────────
+// These are host-side modules used by specialised microapps (world, zine, etc.)
+// They live here so microapps never import from src/ directly.
+
+/** @internal Webcam grid renderer — used by monster-cam and demo-glitchbox */
+export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
+export type { WebcamRenderOptions } from "./webcam-renderer.js";
+
+/** @internal Contour engine — used by wibwobworld and demos */
+export { makeHill, heightmap, march, terrainNames } from "./contour-engine.js";
+export type { Hill, ContourMode } from "./contour-engine.js";
+
+/** @internal Terrain model — used by wibwobworld */
+export type { TerrainBiome, TerrainObject, TerrainCell, TerrainMap, TerrainPoint } from "./terrain-model.js";
+
+/** @internal Terrain renderer — used by wibwobworld */
+export { findTerrainPeak, renderTerrainMap, BIOME_GLYPHS, BIOME_COLORS } from "./terrain-render.js";
+export type { TerrainRenderMode, TerrainRenderOptions } from "./terrain-render.js";
+
+/** @internal Zine panel layout — used by zine */
+export { layoutPanels, layoutColumns, measureViewport, pointerToContent, hitPanel, COL_GAP } from "../core/panel-layout.js";
+export type { PanelDef, PanelNode, LayoutResult } from "../core/panel-layout.js";
+
+/** @internal Canvas types — used by zine */
+export type { PanelType, ZineItem, ZineItemType, ZineSourceType } from "../core/canvas-types.js";
+
+/** @internal Shared browser/gallery types */
+export type { BrowserEntry, GalleryTab } from "../core/types.js";
