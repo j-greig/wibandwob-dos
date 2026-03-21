@@ -507,3 +507,34 @@ All devlog §§10-13 learnings promoted to canonical CAPS docs:
 15/15 doc-health axes
 Pre-commit hook installed
 spk-3p-microapp-dev-guide: 3/5 criteria met, MICROAPP-DEV-GUIDE.md synthesis not yet written
+
+---
+
+## 15. gen-sdk-surface fix + remaining raw fs.* inventory (2026-03-21)
+
+### gen-sdk-surface.ts was broken since inception
+
+The export parser used a single-line regex `/^export\s+(type\s+)?\{([^}]+)\}/` that
+only matched exports like `export { foo, bar } from "..."` on one line. All multiline
+export blocks (which is most of them) were invisible.
+
+Result: `src/sdk/README.md` showed `@public (3 exports)` for months, when the real
+count is 77. The SDK surface was essentially undocumented.
+
+Fix: two-pass parser using character-position scanning. Pass 1 finds all tier annotations
+by string index. Pass 2 slices from each annotation, finds the next `export` keyword, then
+accumulates brace-matched content for multiline blocks. Inline comments stripped before
+name extraction.
+
+New counts: @public 77, @beta 44, @internal 137 — total 258.
+
+### Remaining raw fs.* violations in pre-existing microapps
+
+The `safeWriteFile` fix applied to ascii-studio (CCC-built). Pre-existing microapps
+still using raw `fs.*`:
+
+- `microapps/plasma/index.ts` lines 78, 243 — readFileSync + writeFileSync
+- `microapps/llm-orch-studio/index.ts` lines 891-897 — 6x writeFileSync
+
+These are core/beta apps maintained by humans, not CCC. Not fixing now — flagged for
+future cleanup. The pattern is established: `safeWriteFile` from SDK is the right path.
