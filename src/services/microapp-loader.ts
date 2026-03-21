@@ -25,6 +25,7 @@ import { theme } from "../core/theme/resolver.js";
 import { log } from "./app-logger.js";
 import { clearDynamicSnapshots, registerDynamicSnapshot } from "../core/snapshot-registry.js";
 import { getMicroappTier, isMicroappEnabled, isMicroappInRegistry, isTierVisibleOn, loadExternalMicroappConfig } from "../core/microapp-registry.js";
+import { captureError } from "../core/error-buffer.js";
 import type { SnapshotHandler } from "../core/snapshot-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
 import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "../core/types.js";
@@ -443,9 +444,15 @@ async function loadMicroappModule(mod: DiscoveredMicroapp, deps: MicroappHostDep
       return;
     }
 
+    const microappId = config.id;
     const host = createMicroappHost(config, deps, path.basename(mod.dir));
-    setup(host);
-    log.app(`[microapp-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
+    try {
+      setup(host);
+    } catch (err) {
+      captureError(err, microappId, "setup");
+      throw err; // re-throw so the outer catch can still log
+    }
+    log.app(`[microapp-loader] Loaded microapp: ${microappId} (from ${mod.manifest.name})`);
   } catch (err) {
     log.err(`[microapp-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
   }

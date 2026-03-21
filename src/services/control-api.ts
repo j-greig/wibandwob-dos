@@ -33,6 +33,7 @@ import path from "node:path";
 import type { BackroomsChannel } from "../core/types.js";
 import type { CommandListItem, CommandSurface } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
+import { getRecentErrors } from "../core/error-buffer.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
@@ -100,6 +101,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/errors/recent",                  description: "Last 20 runtime errors from microapp lifecycle hooks (setup, onRestyle, onResize) with microappId, hook, message, stack, timestamp" },
   { method: "GET",  path: "/runtime/inspection",            description: "Structured runtime snapshot: desktop state, menu/overlay UI state, runtime stats, and Scramble inspection." },
   { method: "GET",  path: "/runtime/stats",                 description: "Shell-level runtime stats: render FPS, frame time, RAM, and agent activity" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
@@ -576,6 +578,10 @@ export class ControlApiService {
       // Always rebuild state fresh — internal window state may have changed
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.deps.inspection.syncState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/errors/recent") {
+      return Response.json({ ok: true, errors: getRecentErrors() });
     }
 
     if (request.method === "GET" && url.pathname === "/runtime/inspection") {
