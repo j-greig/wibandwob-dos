@@ -13,7 +13,7 @@
 **What main did:** deleted the file entirely.
 **Resolution:** Accept main's deletion. Our `--max-time` guidance now lives in
 `MICROAPP-DEV.md` (better location). The skill was removed upstream deliberately.
-- [ ] After merge: confirm `MICROAPP-DEV.md` has `--max-time` docs ✓ (already there)
+- [x] After merge: confirm `MICROAPP-DEV.md` has `--max-time` docs ✓ (already there)
 
 ### 2. `scripts/start-alt-instance.sh` — DELETED on main, modified on branch
 **What we did:** added uname guard for cross-platform `script(1)` syntax.
@@ -21,7 +21,7 @@
 **Resolution:** Accept main's deletion. Check if functionality was absorbed elsewhere.
 If start-alt-instance is genuinely gone, our cross-platform fix lives in
 `process-manager.sh` (the core library) which IS kept.
-- [ ] After merge: verify `scripts/ensure-running.sh` and `scripts/restart.sh` cover all use cases
+- [x] After merge: verify `scripts/ensure-running.sh` and `scripts/restart.sh` cover all use cases
 
 ### 3. `AGENTS.md` — content conflict
 **What we did:** Changed "Four CAPS MD files" → "Six CAPS MD files", added MICROAPP-DEV.md + PATCHNOTES.md as list items.
@@ -31,7 +31,7 @@ If start-alt-instance is genuinely gone, our cross-platform fix lives in
 | `MICROAPP-DEV.md` | Agent dev workflow: install, start, scaffold, verify, gotchas |
 | `PATCHNOTES.md`   | Script patches for cross-platform (cloud + local) compatibility |
 ```
-- [ ] After merge: add these two rows to the CAPS table in AGENTS.md
+- [x] After merge: add these two rows to the CAPS table in AGENTS.md
 
 ### 4. `COAT.md` — add/add conflict
 **What we did:** Generated via `bun scripts/gen-coat.ts` (old generator).
@@ -40,25 +40,25 @@ If start-alt-instance is genuinely gone, our cross-platform fix lives in
 ```bash
 bun scripts/gen-integration-surface.ts
 ```
-- [ ] After merge: regenerate COAT.md with correct script
+- [x] After merge: regenerate COAT.md with correct script
 
 ### 5. `microapps/dice-roller/` — add/add conflict
 **What we did (CCC run 1):** Basic dice roller with createCanvas, createHeaderBar, createStatusBar.
 **What main did:** Better version — cleaner 7×5 ASCII dice art, more compact.
 **Resolution:** Take main's version (it's superior). Our dice-roller was CCC-generated; main's is human-refined.
-- [ ] After merge: run `validate-microapp.sh microapp.wibwob.dice-roller.open` to confirm main's version passes
+- [x] After merge: run `validate-microapp.sh microapp.wibwob.dice-roller.open` to confirm main's version passes
 
 ### 6. `.pi/reflections/2026-W12.md` — content conflict
 **What we did:** Added cloud agent devlog sections (10 entries on CCC run, detailed mapp notes).
 **What main did:** Added doc-health + chrome browser enhancement entries.
 **Resolution:** Keep all entries from both branches. Chronological order.
-- [ ] After merge: verify both sets of entries are present
+- [x] After merge: verify both sets of entries are present
 
 ### 7. `.pi/metrics/usage-last-seen.json` — content conflict
 **What we did:** updated timestamps via normal usage.
 **What main did:** same.
 **Resolution:** Take main's version (most recent from main's last commit is fine).
-- [ ] After merge: accept theirs, no action needed
+- [x] After merge: accept theirs, no action needed
 
 ### 8. `microapps/dice-roller/microapp.json` — add/add conflict
 Same as #5 — take main's version.
@@ -69,13 +69,13 @@ Same as #5 — take main's version.
 
 These didn't conflict but need a post-merge check:
 
-- [ ] `src/services/microapp-sdk.ts` — our safe-fs exports + registerMicroappHooks must survive (git auto-merged)
-- [ ] `src/sdk/runtime-helpers.ts` — our fps guard + registerMicroappHooks implementation must survive
-- [ ] `scripts/lib/process-manager.sh` — our A1+A2 patches must survive (git auto-merged)
-- [ ] `src/core/microapp-registry.ts` — our 10 new apps + any main additions must both be present
-- [ ] `bun run typecheck` — must pass after merge
-- [ ] `bash scripts/checks/check-cross-platform.sh` — must pass
-- [ ] `bash scripts/validate-microapp.sh microapp.wibwob.dice-roller.open` — main's version must pass
+- [x] `src/services/microapp-sdk.ts` — our safe-fs exports + registerMicroappHooks must survive (git auto-merged)
+- [x] `src/sdk/runtime-helpers.ts` — our fps guard + registerMicroappHooks implementation must survive
+- [x] `scripts/lib/process-manager.sh` — our A1+A2 patches must survive (git auto-merged)
+- [x] `src/core/microapp-registry.ts` — our 10 new apps + any main additions must both be present
+- [x] `bun run typecheck` — must pass after merge
+- [x] `bash scripts/checks/check-cross-platform.sh` — must pass
+- [x] `bash scripts/validate-microapp.sh microapp.wibwob.dice-roller.open` — main's version must pass
 
 ---
 
