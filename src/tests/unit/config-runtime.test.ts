@@ -69,6 +69,9 @@ describe("config runtime", () => {
   });
 
   test("resolveDataRoot: dev/local guard falls back when ~/.wibwob is a file", () => {
+    // Run in a temp dir without .wibwob to isolate from project-local mode detection
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "ww-dev-guard-fallback-"));
+    process.chdir(temp);
     process.env.NODE_ENV = "development";
     const globalDir = path.join(os.homedir(), ".wibwob");
     const fallbackDir = path.join(os.homedir(), ".wibwob-data");

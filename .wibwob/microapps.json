@@ -1,0 +1,3 @@
+{
+  "_readme": "Tier overrides for dev/third-party microapps. Format: { microapp-id: core|beta|internal|disabled }. Core apps live in src/core/microapp-registry.ts."
+}

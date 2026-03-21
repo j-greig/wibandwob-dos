@@ -24,7 +24,7 @@ import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
 import { log } from "./app-logger.js";
 import { clearDynamicSnapshots, registerDynamicSnapshot } from "../core/snapshot-registry.js";
-import { getMicroappTier, isMicroappEnabled, isTierVisibleOn } from "../core/microapp-registry.js";
+import { getMicroappTier, isMicroappEnabled, isMicroappInRegistry, isTierVisibleOn, loadExternalMicroappConfig } from "../core/microapp-registry.js";
 import type { SnapshotHandler } from "../core/snapshot-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
 import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "../core/types.js";
@@ -418,6 +418,11 @@ async function loadMicroappModule(mod: DiscoveredMicroapp, deps: MicroappHostDep
     return;
   }
 
+  // Log auto-registered microapps (not in hardcoded registry or external config)
+  if (!isMicroappInRegistry(config.id)) {
+    log.app(`[loader] auto-registered ${config.id} at beta tier`);
+  }
+
   const entry = mod.manifest.entry ?? "index.ts";
   const entryPath = path.join(mod.dir, entry);
 
@@ -468,6 +473,10 @@ export async function loadThemes(): Promise<void> {
  * CommandRegistry, etc.) but before workspace restore.
  */
 export async function loadRuntimeMicroapps(deps: MicroappHostDeps): Promise<void> {
+  // Load external tier config (.wibwob/microapps.json) before any microapps are evaluated
+  const externalConfigPath = path.join(APP_ROOT, ".wibwob", "microapps.json");
+  loadExternalMicroappConfig(externalConfigPath);
+
   const microapps = discoverMicroapps();
   const seenIds = new Set<string>();
 
