@@ -62,6 +62,7 @@ EOF
 cat > "$MICROAPP_DIR/index.ts" <<EOF
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { registerMicroappHooks } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "${ESC_TITLE}";
 const APP_SUMMARY = "Microapp scaffold loaded.";
@@ -98,18 +99,11 @@ export default function setup(host: MicroappHost) {
         style: host.theme().body,
       });
 
-      win.describeState(() => ({
-        summary: \`${ESC_TITLE} scaffold\`,
-        contentPreview: APP_SUMMARY,
-      }));
-
-      win.captureText(() => content.getContent());
-      win.onRestyle(() => {
-        content.style = host.theme().body;
-        host.screen.render();
-      });
-      win.onCleanup(() => {
-        // Clear timers, destroy resources, close connections here.
+      registerMicroappHooks(win, {
+        captureText:   () => content.getContent() || \`${ESC_TITLE} — scaffold\`,
+        describeState: () => ({ summary: \`${ESC_TITLE} scaffold\`, contentPreview: APP_SUMMARY }),
+        onCleanup:     () => { /* destroy handles, clear timers */ },
+        onRestyle:     () => { content.style = host.theme().body; host.screen.render(); },
       });
       win.focus();
     },
