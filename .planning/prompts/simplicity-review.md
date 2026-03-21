@@ -10,9 +10,17 @@ Read before anything else:
   PHILOSOPHY.md (five filters) · ARCHITECTURE.md (fourteen invariants) · GOTCHAS.md
   git diff HEAD~<N>..HEAD
 
+If PHILOSOPHY.md or ARCHITECTURE.md have changed since you last read them, re-read
+before proceeding. If GOTCHAS.md is over its word budget (800w), flag it — that's a
+simplicity failure in the documentation itself.
+
 Single goal: find every place in this session's work where something can be
 removed, merged, or replaced with a simpler composition — without reducing what
 the system can do or what agents can observe.
+
+If you encounter a pattern, problem, or opportunity not covered by the lenses
+below that you judge to be higher leverage than anything listed — state it first,
+before the structured output.
 
 ---
 
@@ -47,7 +55,8 @@ Run each applicable lens against changed files. Skip lenses with no purchase.
 
 ### CONTRACTUAL
 - Does the public interface expose more than its current callers use?
-  Cut the unused surface. YAGNI is not a tradeoff here — it's a COAT invariant.
+  Prefer cutting unused surface. If you suspect a future caller within the
+  current sprint, note it rather than cutting blindly.
 - Does a parameter exist to handle a case that never occurs in this codebase?
   Remove it.
 
@@ -71,41 +80,39 @@ These fire only when triggered. Check each trigger; apply the heuristic if it fi
   → Apply deletion test line by line: what breaks if this line is removed?
     Lines that break nothing are candidates for deletion.
     Lines that break something reveal the function's true contract.
-    The true contract is probably 5–10 lines. Find it.
 
 **IF a new type or interface was added:**
-  → Apply the interface budget: can a caller understand it in under 30 seconds
-    without reading the implementation? If not, split or rename until yes.
+  → Can a caller understand it in under 30 seconds without reading the
+    implementation? If not, split or rename until yes.
 
 **IF a new abstraction was added that has a single implementation:**
-  → Apply Chesterton's Fence: state in one sentence why the abstraction exists
-    rather than inlining the implementation. If you cannot, the abstraction
-    should not exist yet.
+  → State in one sentence why the abstraction exists rather than inlining
+    the implementation. If you cannot, the abstraction should not exist yet.
 
 **IF the same pattern appears in 2+ places:**
-  → Apply the compression test: can both instances be expressed as one
-    parameterised call? If yes, extract. If the parameterisation is more complex
-    than the duplication, leave it duplicated — three similar lines beat a
-    premature abstraction.
+  → Can both instances be expressed as one parameterised call? If yes, extract.
+    If the parameterisation is more complex than the duplication, leave it
+    duplicated — three similar lines beat a premature abstraction.
 
 **IF a comment explains what the code does:**
-  → Apply the inversion test: can the code be rewritten so the comment is
-    unnecessary? Rename the function or variable until the comment disappears.
-    If the comment explains *why*, keep it. If it explains *what*, delete it.
+  → Can the code be rewritten so the comment is unnecessary? Rename the
+    function or variable until the comment disappears. If the comment
+    explains *why*, keep it. If it explains *what*, delete it.
 
 **IF a new describeState() was added:**
-  → Apply the agent-sufficiency test: give only the describeState() output to a
-    hypothetical agent. Can it answer:
+  → Give only the describeState() output to a hypothetical agent. Can it answer:
     - what is this window doing right now?
     - what operations are available?
     - is it in an error state?
-    If no: add the missing fields. If yes and output is >200 bytes of JSON,
-    look for redundancy.
+    If no: add the missing fields. If the output exceeds 200 bytes of JSON
+    and contains redundancy, cut it.
 
 **IF a CAPS doc was updated:**
-  → Apply the delta principle: does every sentence state something that diverges
-    from a standard pattern? Delete any sentence that restates what any competent
-    Bun/TypeScript developer would assume.
+  → Does every sentence state something that diverges from a standard pattern?
+    Delete any sentence that restates what a competent Bun/TypeScript developer
+    would assume. If GOTCHAS.md exceeds 800 words, triage: promote stable
+    entries to their parent CAPS file or to SDK-MICROAPP-DEV.md, delete
+    entries that are now absorbed into code (JSDoc, runtime warnings).
 
 ---
 
@@ -125,4 +132,5 @@ Then, only if you found it:
   **DISCOVERY:** one pattern this prompt didn't ask about but which is the
   highest-leverage simplification available.
 
+Omit any group (CUT/MERGE/RENAME) where you have nothing substantive to say.
 Nothing else.
