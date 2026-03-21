@@ -1,3 +1,28 @@
+---
+# Machine-readable generator manifest — read by .pi/extensions/doc-sync-reminder.ts
+# Format: each entry declares an output file, the command that regenerates it,
+# and the source files it watches. Kept here so the architectural doc owns its
+# own maintenance contract.
+generators:
+  - output: COAT.md
+    run: bun scripts/gen-integration-surface.ts
+    watches:
+      - src/services/control-api.ts
+      - src/core/command-catalog.ts
+  - output: src/core/primitives.ts
+    run: bun scripts/gen-primitives.ts
+    watches:
+      - src/core/*/index.ts
+  - output: src/sdk/README.md
+    run: bun scripts/gen-sdk-surface.ts
+    watches:
+      - src/services/microapp-sdk.ts
+  - output: .pi/skills/skills.md
+    run: python3 scripts/gen-skills.py
+    watches:
+      - .pi/skills/*/SKILL.md
+---
+
 # WibWob-DOS — Architecture
 
 ## COAT — Command Once, Adapt Thin

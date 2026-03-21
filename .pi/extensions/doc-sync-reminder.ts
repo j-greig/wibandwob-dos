@@ -13,7 +13,7 @@
  *  2. mtime check: skips reminder if output is already fresher than modified sources
  *  3. Missing vs. stale urgency: ❌ MISSING vs ⚠️ possibly stale
  *  4. Session-level deduplication: only re-fires if output was regenerated since last reminder
- *  5. Parses <progressive-disclosure> from ARCHITECTURE.md as supplementary config
+ *  5. Reads YAML frontmatter in ARCHITECTURE.md as primary config source
  *  6. Multi-line @watches support: multiple @watches lines per script
  *  7. Auto-run mode: set COAT_AUTOSYNC=1 to run gens instead of just reminding
  *
@@ -25,6 +25,7 @@ import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import { parse as parseYaml } from "yaml";
 
 interface GenScript {
   file: string;
@@ -35,6 +36,54 @@ interface GenScript {
 
 // ─── Config parsing ───────────────────────────────────────────────────────────
 
+/**
+ * Primary source: YAML frontmatter in ARCHITECTURE.md.
+ * The architectural doc owns its own maintenance contract — each generator entry
+ * declares its output, run command, and watched source files. This is the
+ * canonical config; gen script @watches annotations are the fallback.
+ *
+ * Frontmatter shape:
+ *   generators:
+ *     - output: COAT.md
+ *       run: bun scripts/gen-integration-surface.ts
+ *       watches:
+ *         - src/services/control-api.ts
+ *         - src/core/command-catalog.ts
+ */
+function parseArchFrontmatter(repoRoot: string): GenScript[] {
+  const archPath = path.join(repoRoot, "ARCHITECTURE.md");
+  if (!fs.existsSync(archPath)) return [];
+
+  const content = fs.readFileSync(archPath, "utf8");
+  if (!content.startsWith("---")) return [];
+
+  const end = content.indexOf("\n---", 3);
+  if (end === -1) return [];
+
+  try {
+    const fm = parseYaml(content.slice(3, end)) as Record<string, unknown>;
+    const gens = fm["generators"];
+    if (!Array.isArray(gens)) return [];
+
+    return gens
+      .filter((g): g is Record<string, unknown> => g && typeof g === "object")
+      .map(g => ({
+        file:    "ARCHITECTURE.md (frontmatter)",
+        output:  String(g["output"]  ?? ""),
+        run:     String(g["run"]     ?? ""),
+        watches: Array.isArray(g["watches"]) ? g["watches"].map(String) : [],
+      }))
+      .filter(g => g.output && g.run);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fallback source: @watches/@output/@run annotations in scripts/gen-* files.
+ * Used for any generator not declared in ARCHITECTURE.md frontmatter.
+ * Supports multiple @watches lines per script (multi-line patterns).
+ */
 function parseGenScripts(repoRoot: string): GenScript[] {
   const scriptsDir = path.join(repoRoot, "scripts");
   if (!fs.existsSync(scriptsDir)) return [];
@@ -42,16 +91,14 @@ function parseGenScripts(repoRoot: string): GenScript[] {
   const results: GenScript[] = [];
   for (const f of fs.readdirSync(scriptsDir)) {
     if (!f.startsWith("gen-")) continue;
-    const fullPath = path.join(scriptsDir, f);
     try {
-      const content = fs.readFileSync(fullPath, "utf8");
-      // Improvement 6: collect all @watches lines (multi-line support)
+      const content = fs.readFileSync(path.join(scriptsDir, f), "utf8");
       const watchesLines = [...content.matchAll(/@watches\s+(.+)/g)].map(m => m[1]!.trim());
       const outputMatch  = content.match(/@output\s+(.+)/);
       const runMatch     = content.match(/@run\s+(.+)/);
       if (watchesLines.length > 0 && outputMatch && runMatch) {
         results.push({
-          file: f,
+          file:    f,
           watches: watchesLines.flatMap(line => line.split(/\s+/)),
           output:  outputMatch[1]!.trim(),
           run:     runMatch[1]!.trim(),
@@ -63,63 +110,15 @@ function parseGenScripts(repoRoot: string): GenScript[] {
 }
 
 /**
- * Improvement 5: parse <progressive-disclosure> blocks from ARCHITECTURE.md.
- * Extracts {output, run} pairs. For watches, parses the "regenerate if X changed"
- * hint from the <generator> tag. Supplements (does not replace) @watches from scripts.
- */
-function parseProgressiveDisclosure(repoRoot: string): GenScript[] {
-  const archPath = path.join(repoRoot, "ARCHITECTURE.md");
-  if (!fs.existsSync(archPath)) return [];
-
-  const content = fs.readFileSync(archPath, "utf8");
-  const results: GenScript[] = [];
-
-  const blockRe = /<progressive-disclosure>([\s\S]*?)<\/progressive-disclosure>/g;
-  let match: RegExpExecArray | null;
-  while ((match = blockRe.exec(content)) !== null) {
-    const block = match[1]!;
-    const outputLine    = block.match(/<output>([\s\S]*?)<\/output>/)?.[1]?.trim() ?? "";
-    const generatorLine = block.match(/<generator>([\s\S]*?)<\/generator>/)?.[1]?.trim() ?? "";
-    if (!outputLine || !generatorLine) continue;
-
-    // Extract output path from first backtick-quoted token
-    const outputFile = outputLine.match(/`([^`]+)`/)?.[1] ?? "";
-    // Extract run command from first backtick-quoted token in generator line
-    const runCmd = generatorLine.match(/`([^`]+)`/)?.[1] ?? "";
-    if (!outputFile || !runCmd) continue;
-
-    // Parse watch patterns from "regenerate if X or Y changed"
-    const watchHint = generatorLine.match(/regenerate if (.+?) changed/i);
-    const watches: string[] = [];
-    if (watchHint) {
-      const parts = watchHint[1]!.split(/\s*(?:,\s*|\s+or\s+|\s+and\s+)\s*/i);
-      for (const part of parts) {
-        const fname = part.replace(/`/g, "").trim();
-        if (fname) watches.push(`**/${fname}`);
-      }
-    }
-
-    results.push({
-      file: "ARCHITECTURE.md (progressive-disclosure)",
-      watches,
-      output: outputFile,
-      run:    runCmd,
-    });
-  }
-  return results;
-}
-
-/**
- * Merge gen scripts from scripts/gen-* and progressive-disclosure blocks.
- * Scripts from gen-* files take precedence (their @watches are more precise).
- * PD entries only added if no gen script already covers the same output file.
+ * Frontmatter is authoritative. Gen script annotations fill in anything
+ * not declared there.
  */
 function loadGenScripts(repoRoot: string): GenScript[] {
-  const fromScripts = parseGenScripts(repoRoot);
-  const fromArch    = parseProgressiveDisclosure(repoRoot);
-  const coveredOutputs = new Set(fromScripts.map(g => g.output));
-  const extras = fromArch.filter(g => !coveredOutputs.has(g.output));
-  return [...fromScripts, ...extras];
+  const fromFrontmatter = parseArchFrontmatter(repoRoot);
+  const fromScripts     = parseGenScripts(repoRoot);
+  const coveredOutputs  = new Set(fromFrontmatter.map(g => g.output));
+  const extras          = fromScripts.filter(g => !coveredOutputs.has(g.output));
+  return [...fromFrontmatter, ...extras];
 }
 
 // ─── Glob matching ────────────────────────────────────────────────────────────
