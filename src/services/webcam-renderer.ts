@@ -65,9 +65,13 @@ function padCenter(s: string, width: number): string {
   return " ".repeat(left) + s + " ".repeat(right);
 }
 
-/** @primitive */
-// WebcamCell canonical source is now skeleton-renderer.ts (broke circular dep)
-export type { WebcamCell } from "../core/skeleton-renderer.js";
+// ── Re-export everything consumers need so they only import from webcam-renderer ──
+// webcam-renderer is the single facade for all webcam/skeleton/monster-cam rendering.
+// microapps should import from microapp-sdk.js which re-exports from here.
+export type { WebcamCell, NormalisedLandmarks } from "../core/skeleton-renderer.js";
+export { renderSkeletonAt, landmarksFromPreset } from "../core/skeleton-renderer.js";
+export { MonsterCamService } from "./monster-cam-service.js";
+export type { MonsterCamFrame } from "./monster-cam-service.js";
 
 /** @primitive */
 export interface WebcamRenderOptions {

@@ -1,6 +1,5 @@
 import { renderFiglet } from "../../src/services/microapp-sdk.js";
-// eslint-disable-next-line no-restricted-imports -- MonsterCamFrame type lives host-side, coupled to webcam-renderer
-import type { MonsterCamFrame } from "../../src/services/monster-cam-service.js";
+import type { MonsterCamFrame } from "../../src/services/microapp-sdk.js";
 
 export type MonsterCamPhase = "starting" | "ready" | "error";
 

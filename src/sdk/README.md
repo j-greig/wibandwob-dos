@@ -149,7 +149,7 @@ services must not leak through the `microapp-sdk.ts` boundary.
 - `EMPTY_PLACEHOLDER` (value)
 - `EMPTY_NO_MESSAGE` (value)
 
-## @internal (164 exports)
+## @internal (167 exports)
 
 - `clamp` (value)
 - `createStack` (value)
@@ -288,8 +288,11 @@ services must not leak through the `microapp-sdk.ts` boundary.
 - `TreeWidgetHandle` (type)
 - `createEmbeddedLivePlayer` (value) — host-only animation wiring; prefer createLazyMountedPlayer (@public)
 - `ContentService` (value) — host-side content discovery and primer loading; microapps receive content via the host object
-- `renderWebcamFrame` (value) — Webcam grid rendererused by monster-cam and demo-glitchbox
-- `gridToBlessedContent` (value) — Webcam grid rendererused by monster-cam and demo-glitchbox
+- `renderWebcamFrame` (value) — Webcam/skeleton/monster-cam facadesingle entry point for all webcam rendering
+- `gridToBlessedContent` (value) — Webcam/skeleton/monster-cam facadesingle entry point for all webcam rendering
+- `renderSkeletonAt` (value) — Webcam/skeleton/monster-cam facadesingle entry point for all webcam rendering
+- `landmarksFromPreset` (value) — Webcam/skeleton/monster-cam facadesingle entry point for all webcam rendering
+- `MonsterCamService` (value) — Webcam/skeleton/monster-cam facadesingle entry point for all webcam rendering
 - `makeHill` (value) — Contour engineused by wibwobworld and demos
 - `heightmap` (value) — Contour engineused by wibwobworld and demos
 - `march` (value) — Contour engineused by wibwobworld and demos

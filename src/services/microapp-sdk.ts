@@ -388,9 +388,15 @@ export {
 // These are host-side modules used by specialised microapps (world, zine, etc.)
 // They live here so microapps never import from src/ directly.
 
-/** @internal Webcam grid renderer — used by monster-cam and demo-glitchbox */
-export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
-export type { WebcamRenderOptions } from "./webcam-renderer.js";
+/** @internal Webcam/skeleton/monster-cam facade — single entry point for all webcam rendering */
+export {
+  renderWebcamFrame, gridToBlessedContent,
+  renderSkeletonAt, landmarksFromPreset,
+  MonsterCamService,
+} from "./webcam-renderer.js";
+export type {
+  WebcamRenderOptions, WebcamCell, NormalisedLandmarks, MonsterCamFrame,
+} from "./webcam-renderer.js";
 
 /** @internal Contour engine — used by wibwobworld and demos */
 export { makeHill, heightmap, march, terrainNames } from "./contour-engine.js";

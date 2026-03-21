@@ -3,8 +3,7 @@
  * b = toggle background, m = toggle monster sprites, q = close.
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-// eslint-disable-next-line no-restricted-imports -- monster-cam-service is host-internal, MonsterCamFrame coupled to webcam-renderer; cannot route via SDK
-import { MonsterCamService } from "../../src/services/monster-cam-service.js";
+import { MonsterCamService } from "../../src/services/microapp-sdk.js";
 import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/microapp-sdk.js";
 import { createCanvas, createStatusBar } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
