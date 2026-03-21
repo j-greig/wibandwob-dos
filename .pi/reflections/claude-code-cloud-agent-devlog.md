@@ -304,6 +304,47 @@ scripts/devlog.sh "your note here"
 
 ---
 
+## 11. Follow-up Assessment (2026-03-21)
+
+> Added after review of the full branch. These are conclusions from the Cladue Code agent
+> reading the devlog end-to-end and assessing what should happen next to make their
+> next run easier and smoother.
+
+### Can the scripts be modified to work for both humans and agents?
+
+**Yes, and mostly they already do.** Two specific issues:
+
+- **`--direct` mode** (default in `ensure-running.sh`, `restart.sh`, `start-alt-instance.sh`) uses macOS `script` flags that don't exist on cloud Linux.
+- **The gen-\* scripts all work headlessly already** — they're pure file-I/O, no running instance needed.
+
+**The fix is small:** add a no-TTY guard to startup scripts:
+```bash
+if [ ! -t 0 ]; then MODE=tmux; fi
+```
+This makes them auto-select `--tmux` when there's no interactive terminal — agents get `--tmux` automatically, humans keep `--direct` as default. No interface change needed.
+
+### Should the devlog become a proper reference doc?
+
+**Yes.** The devlog content is already excellent and was the primary reference for the whole session. The issue isn't content — it's **discoverability**. It's buried at `.pi/reflections/`.
+
+### Best location for future Claude Code agents to find it
+
+**Proposed: `MICROAPP-DEV.md` at the repo root.**
+
+Reasoning:
+- Root-level CAPS `.md` files are the established convention (`AGENTS.md`, `ARCHITECTURE.md`, `PHILOSOPHY.md`, `LEXICON.md`)
+- Claude Code reads `CLAUDE.md` first — one pointer line there gives instant discoverability
+- Name matches what agents need: microapp development procedures
+- Content should be **proven procedures** distilled from this devlog, not the raw trial-and-error narrative
+
+### Proposed next actions (in priority order)
+
+1. **Create `MICROAPP-DEV.md`** at repo root — curated procedures from this devlog
+2. **Patch startup scripts** — add the `! -t 0` headless guard to `ensure-running.sh`, `restart.sh`, `start-alt-instance.sh`
+3. **Add pointer in `CLAUDE.md`** — single line pointing to `MICROAPP-DEV.md`
+
+---
+
 ## 10. Quick Reference Commands
 
 ```bash
