@@ -1,0 +1,22 @@
+{
+  "name": "ascii-rain",
+  "version": "0.1.0",
+  "description": "Matrix-style ASCII rain animation",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.ascii-rain.open"
+  },
+  "microapp": {
+    "id": "wibwob.ascii-rain",
+    "title": "ASCII Rain",
+    "description": "Matrix-style falling character rain animation. Space: pause/resume, r: reroll charset, +/-: speed.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [{ "category": "demos", "order": 250, "label": "ASCII Rain" }],
+    "palette": { "order": 250, "label": "Open ASCII Rain" },
+    "agent": true,
+    "api": true
+  }
+}
