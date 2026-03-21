@@ -1,3 +1,9 @@
+---
+title: WibWob-DOS — Lexicon
+description: Vocabulary for humans. Project terms, architecture terms, process and dev lifecycle.
+audience: humans
+---
+
 # LEXICON
 
 > Human-facing only. Not agent orientation — a glossary to sharpen software engineering vocabulary for humans working on this codebase.

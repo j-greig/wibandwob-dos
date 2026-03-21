@@ -1,3 +1,9 @@
+---
+title: WibWob-DOS — Philosophy
+description: Why this exists. Symbiency, five decision filters, SDK contract, north star.
+audience: humans + agents questioning a decision
+---
+
 # WibWob-DOS — Philosophy
 
 ---

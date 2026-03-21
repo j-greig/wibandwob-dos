@@ -1,3 +1,9 @@
+---
+title: WibWob-DOS — Gotchas
+description: Non-obvious failure modes. Add when something burns you, not preemptively.
+audience: agents
+---
+
 # GOTCHAS.md — Non-Obvious Failure Modes
 
 > Things LLMs get wrong here that they wouldn't get wrong in a standard repo.
@@ -13,8 +19,7 @@
 **Never edit generated files directly.** They carry `<!-- AUTO-GENERATED -->` headers.
 Fix via the generator script, then regenerate. Direct edits are silently overwritten.
 
-**Never list watched file mappings outside gen scripts.** The `@watches` header in each
-`scripts/gen-*` file is the single source of truth. A duplicate list anywhere else will drift.
+**Never list watched file mappings in prose.** Canonical sources: `ARCHITECTURE.md` frontmatter (primary) and gen script `@watches` headers (fallback). A prose list anywhere else will drift.
 
 **Never restate standard patterns.** Delta principle: if a competent LLM already knows it,
 cut it. The test: "would this sentence appear in any TypeScript project's docs?" If yes — cut.

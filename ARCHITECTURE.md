@@ -1,8 +1,9 @@
 ---
-# Machine-readable generator manifest — read by .pi/extensions/doc-sync-reminder.ts
-# Format: each entry declares an output file, the command that regenerates it,
-# and the source files it watches. Kept here so the architectural doc owns its
-# own maintenance contract.
+title: WibWob-DOS — Architecture
+description: COAT pattern, four seams, state flow, SDK boundary, shell invariants.
+audience: agents
+# Generator manifest — read by .pi/extensions/doc-sync-reminder.ts
+# The architectural doc owns its own maintenance contract.
 generators:
   - output: COAT.md
     run: bun scripts/gen-integration-surface.ts
@@ -45,10 +46,7 @@ Four seams connect every adapter to the core:
 | **Window** | `window-facade.ts` + `window-manager.ts` | 11-method interface; all consumers identical |
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
-<progressive-disclosure>
-  <output>`COAT.md` — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)</output>
-  <generator>`bun scripts/gen-integration-surface.ts` — regenerate if `control-api.ts` or `command-catalog.ts` changed</generator>
-</progressive-disclosure>
+**→ [COAT.md](COAT.md)** — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)
 
 
 > Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).
@@ -128,11 +126,8 @@ win.onRestyle(() => { /* re-apply host.theme() */ })
 **Import rule:** only `import from "../../src/services/microapp-sdk.js"`.
 Importing from `src/core/` or `src/services/` directly is a COAT violation.
 
-<progressive-disclosure>
-  <output>`src/sdk/README.md` — SDK export surface by stability tier (@public/@beta/@internal)</output>
-  <generator>`bun scripts/gen-sdk-surface.ts` — regenerate if `src/services/microapp-sdk.ts` changed</generator>
-  <deeper>`SDK-MICROAPP-DEV.md` — full microapp development guide</deeper>
-</progressive-disclosure>
+**→ [src/sdk/README.md](src/sdk/README.md)** — SDK export surface by stability tier (@public/@beta/@internal)
+**→ [SDK-MICROAPP-DEV.md](SDK-MICROAPP-DEV.md)** — full microapp development guide
 
 ---
 
@@ -159,10 +154,7 @@ from outside `src/core/`.
 **8. Command catalog is the single source of truth.** Add to `command-catalog.ts`
 first; `command-registry.ts` is execution only.
 
-<progressive-disclosure>
-  <output>`src/core/primitives.ts` — generated barrel of all shared core exports</output>
-  <generator>`bun scripts/gen-primitives.ts` — regenerate if any `src/core/*/index.ts` changed</generator>
-</progressive-disclosure>
+**→ [src/core/primitives.ts](src/core/primitives.ts)** — generated barrel of all shared core exports
 
 **9–14.** Microapps import only from `microapp-sdk.ts` · `describeState()` is not
 optional · host owns complexity · component contract: return `{node, destroy()}` ·

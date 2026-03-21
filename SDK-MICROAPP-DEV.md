@@ -1,3 +1,9 @@
+---
+title: WibWob-DOS — Microapp Developer Guide
+description: Build, verify, ship, and survive in cloud. Setup, hooks, SDK surface, patterns.
+audience: agents building microapps
+---
+
 # SDK-MICROAPP-DEV — Building WibWob-DOS Microapps
 
 > The one guide. Build → verify → ship → survive in cloud.

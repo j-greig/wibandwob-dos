@@ -2,8 +2,7 @@
  * doc-sync-reminder — Remind the agent to run gen scripts when watched files change.
  *
  * Reads @watches/@run/@output headers from scripts/gen-* at session start.
- * Also parses <progressive-disclosure> blocks from ARCHITECTURE.md as a
- * supplementary source of gen script config (canonical reference).
+ * Reads YAML frontmatter from ARCHITECTURE.md as the primary config source.
  * Watches edit/write/multi_edit/bash tool calls during each agent turn.
  * At agent_end, if any modified path matches a @watches pattern, injects a
  * reminder message listing the stale generators and their run commands.
