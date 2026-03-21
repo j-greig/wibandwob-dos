@@ -1,0 +1,18 @@
+{
+  "phaseRuns": [
+    {
+      "id": "run-1efa3597",
+      "phase": "ralphi-init",
+      "status": "running",
+      "sessionKey": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-21T20-49-35-305Z_193503a6-5348-4f52-a1c3-552101a61453.jsonl",
+      "sessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-21T20-49-35-305Z_193503a6-5348-4f52-a1c3-552101a61453.jsonl",
+      "checkpointLeafId": "32d1bb86",
+      "checkpointSessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-21T20-49-35-305Z_193503a6-5348-4f52-a1c3-552101a61453.jsonl",
+      "cwd": "/Users/james/Repos/wibandwob-dos",
+      "createdAt": "2026-03-21T20:49:36.815Z",
+      "autoConfirm": false
+    }
+  ],
+  "loops": [],
+  "savedAt": "2026-03-21T20:49:36.815Z"
+}
