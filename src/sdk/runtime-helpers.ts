@@ -14,24 +14,33 @@ export interface AnimationClock {
   destroy(): void;
 }
 
+export interface AnimationClockOptions {
+  /** Start the clock immediately. Default: false (starts paused). */
+  autoplay?: boolean;
+}
+
 /**
  * Create an interval-based animation clock.
  *
- * @warn The clock starts running immediately — call `clock.pause()` if you want
- *   manual control over when it starts.
+ * **Starts paused by default.** Call `clock.play()` after setup to begin animation.
+ * This prevents CPU saturation during window construction before rendering is ready.
+ *
+ * @param fps - Frames per second. Recommended ≤ 10fps.
+ * @param opts - Options. Use `{ autoplay: true }` to start immediately (legacy behaviour).
+ *
  * @warn fps > 10 risks saturating the blessed render loop and making the HTTP API
  *   unresponsive. Recommended maximum: 8–10fps. At 30fps with grid-canvas output
  *   the event loop saturates and the control API stops responding.
  * @warn Always call `clock.destroy()` in your `onCleanup` hook to prevent zombie
  *   intervals after the window is closed.
  */
-export function createAnimationClock(fps: number): AnimationClock {
+export function createAnimationClock(fps: number, opts: AnimationClockOptions = {}): AnimationClock {
   if (fps > 10) {
     // eslint-disable-next-line no-console
     console.warn(`[microapp-sdk] createAnimationClock: fps=${fps} risks saturating blessed render (recommended ≤10fps). High fps + grid-canvas = CPU cliff.`);
   }
   let tick = 0;
-  let running = true;
+  let running = opts.autoplay ?? false; // default: paused
   const handlers = new Set<(tick: number) => void>();
   const interval = setInterval(() => {
     if (!running) return;

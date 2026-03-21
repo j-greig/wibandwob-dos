@@ -48,10 +48,9 @@ export default function setup(host: MicroappHost) {
         right: "",
       });
 
-      // Animation clock — starts paused, only runs during playback
+      // Animation clock — starts paused by default, only runs during playback
       const CLOCK_FPS = 8;
       const clock = createAnimationClock(CLOCK_FPS);
-      clock.pause(); // start paused
       let tickAccum = 0;
       const ticksPerStep = () => Math.max(1, Math.round(CLOCK_FPS / (bpm / 60) / 4));
 
