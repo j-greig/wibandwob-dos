@@ -48,10 +48,12 @@ export default function setup(host: MicroappHost) {
         right: "",
       });
 
-      // Animation clock — ticks at sub-beat rate, we count ticks to advance steps
-      const clock = createAnimationClock(30); // 30fps visual, step advance on beat
+      // Animation clock — starts paused, only runs during playback
+      const CLOCK_FPS = 8;
+      const clock = createAnimationClock(CLOCK_FPS);
+      clock.pause(); // start paused
       let tickAccum = 0;
-      const ticksPerStep = () => Math.round(30 / (bpm / 60) / 4); // 16th note ticks
+      const ticksPerStep = () => Math.max(1, Math.round(CLOCK_FPS / (bpm / 60) / 4));
 
       const render = () => {
         const size = canvas.getSize();
@@ -77,10 +79,10 @@ export default function setup(host: MicroappHost) {
 
           // Track label
           const label = TRACKS[t]!.padEnd(labelW - 1);
-          const isCursorRow = t === cursorTrack;
-          paintText(grid, 0, y, isCursorRow ? `\x1b[1m${label}\x1b[0m` : `\x1b[90m${label}\x1b[0m`);
+          const prefix = t === cursorTrack ? ">" : " ";
+          paintText(grid, 0, y, `${prefix}${label}`);
 
-          // Steps
+          // Steps — plain characters for performance
           for (let s = 0; s < STEPS; s++) {
             const active = pattern[t]![s];
             const isCursor = t === cursorTrack && s === cursorStep;
@@ -88,21 +90,9 @@ export default function setup(host: MicroappHost) {
 
             let cell: string;
             if (active) {
-              if (isPlayhead) {
-                cell = `\x1b[97;42m ${TRACK_SYMBOLS[t]} \x1b[0m`; // white on green
-              } else if (isCursor) {
-                cell = `\x1b[7m ${TRACK_SYMBOLS[t]} \x1b[0m`; // inverted
-              } else {
-                cell = `\x1b[96m ${TRACK_SYMBOLS[t]} \x1b[0m`; // cyan
-              }
+              cell = isPlayhead ? `[${TRACK_SYMBOLS[t]}]` : isCursor ? `<${TRACK_SYMBOLS[t]}>` : ` ${TRACK_SYMBOLS[t]} `;
             } else {
-              if (isCursor) {
-                cell = `\x1b[7m · \x1b[0m`; // inverted dot
-              } else if (isPlayhead) {
-                cell = `\x1b[42m · \x1b[0m`; // green bg
-              } else {
-                cell = (s % 4 === 0) ? " · " : " · ";
-              }
+              cell = isCursor ? "<·>" : isPlayhead ? "[·]" : " · ";
             }
             paintText(grid, labelW + s * 3, y, cell);
           }
@@ -145,7 +135,7 @@ export default function setup(host: MicroappHost) {
       });
       canvas.element.key(["p"], () => {
         playing = !playing;
-        if (playing) { playhead = 0; tickAccum = 0; clock.play(); }
+        if (playing) { playhead = 0; tickAccum = 0; clock.play(); } else { clock.pause(); }
         render();
       });
       canvas.element.key(["c"], () => {
