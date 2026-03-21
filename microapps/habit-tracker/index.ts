@@ -5,7 +5,7 @@ import {
   createHeaderBar,
   createStatusBar,
   createTextViewer,
-  safeReadJSON,
+  safeReadJSONOrDefault,
   safeWriteFile,
   registerMicroappHooks,
 } from "../../src/services/microapp-sdk.js";
@@ -52,9 +52,10 @@ function dataPath(repoRoot: string): string {
 }
 
 function loadData(repoRoot: string): HabitData {
-  const saved = safeReadJSON<HabitData>(dataPath(repoRoot));
-  if (saved && saved.version === 1) return saved;
-  return { version: 1, habits: DEFAULT_HABITS, completions: {} };
+  const DEFAULT_DATA: HabitData = { version: 1, habits: DEFAULT_HABITS, completions: {} };
+  const saved = safeReadJSONOrDefault<HabitData>(dataPath(repoRoot), DEFAULT_DATA);
+  if (saved.version === 1) return saved;
+  return DEFAULT_DATA;
 }
 
 function saveData(repoRoot: string, data: HabitData): void {

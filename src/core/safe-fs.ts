@@ -30,6 +30,17 @@ export function safeReadJSON<T = unknown>(filePath: string): T | undefined {
   }
 }
 
+/**
+ * Read and parse a JSON file. Returns fallback if file is missing or invalid.
+ * Eliminates the common pattern of `safeReadJSON<T>() ?? defaultValue`.
+ *
+ * @public
+ */
+export function safeReadJSONOrDefault<T>(filePath: string, fallback: T): T {
+  const data = safeReadJSON<T>(filePath);
+  return data ?? fallback;
+}
+
 /** Read a file as a Buffer. Returns undefined on any error. */
 export function safeReadBuffer(filePath: string): Buffer | undefined {
   try {

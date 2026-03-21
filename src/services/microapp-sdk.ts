@@ -375,6 +375,7 @@ export type {
 export {
   safeReadFile,
   safeReadJSON,
+  safeReadJSONOrDefault,
   safeWriteFile,
   safeAppendFile,
   safeUnlink,
