@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T22:36:33.961Z",
+  "generatedAt": "2026-03-21T22:39:31.735Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -24,8 +24,8 @@
         ]
       },
       "simplify-docs": {
-        "lastSeen": "2026-03-20T18:02:13.818Z",
-        "count": 2,
+        "lastSeen": "2026-03-21T22:39:12.044Z",
+        "count": 3,
         "sources": [
           "read:SKILL.md"
         ]
@@ -119,8 +119,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-21T22:31:59.037Z",
-        "count": 58,
+        "lastSeen": "2026-03-21T22:39:31.735Z",
+        "count": 60,
         "sources": [
           "tool:execute_code"
         ]

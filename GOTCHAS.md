@@ -16,7 +16,7 @@ audience: agents
 
 ## Documentation
 
-**Never edit generated files directly.** They carry `<!-- AUTO-GENERATED -->` headers.
+**Never edit generated files directly.** They carry `do-not-edit: true` in their YAML frontmatter.
 Fix via the generator script, then regenerate. Direct edits are silently overwritten.
 
 **Never list watched file mappings in prose.** Canonical sources: `ARCHITECTURE.md` frontmatter (primary) and gen script `@watches` headers (fallback). A prose list anywhere else will drift.
@@ -119,8 +119,7 @@ always-current. Standard pattern (webpack, tsc --watch, tailwind). Not built yet
 
 ## CAPS files
 
-**If a CAPS file needs >3 `<progressive-disclosure>` tags, split it.** More than 3 means
-the file covers multiple concerns — create a new CAPS file at root for the second concern.
+**If a CAPS file needs >3 generated-output links, split it.** More than 3 bold `→` links means the file covers multiple concerns — create a new CAPS file at root for the second concern.
 
 ---
 

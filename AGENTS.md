@@ -61,8 +61,8 @@ Every `scripts/gen-*` file declares its own metadata via comment headers:
 
 - You deleted a skill → `doc-sync.sh` detects `.pi/skills/` changed → reruns `gen-skills.py` → `skills.md` stays honest
 - You added an API endpoint → `doc-sync.sh` detects `control-api.ts` changed → reruns `gen-integration-surface.ts` → `COAT.md` reflects it
-- You added a new gen script → add `@watches`/`@output`/`@run` headers → done. Nothing else.
-- You open a generated file and consider editing it → the `<!-- AUTO-GENERATED -->` header stops you → you run the generator instead
+- You added a new gen script → add `@watches`/`@output`/`@run` headers **and** add an entry to `ARCHITECTURE.md` frontmatter `generators:` block → done.
+- You open a generated file and consider editing it → the `do-not-edit: true` frontmatter field stops you → you run the generator instead
 
 #### What NOT to do
 

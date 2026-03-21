@@ -26,7 +26,7 @@ For each section in each doc, ask:
 
 1. Does a **skill** already cover this? → cut, point to skill
 2. Does the **CLI help** tell you this? → cut, mention `--help`
-3. Does the **running system** expose this? → cut, add `<progressive-disclosure>` tag
+3. Does the **running system** expose this? → cut, add a **`→ [filename](path)`** bold link
 4. Does `ls` show you this? → cut file/key-file listings
 5. Does **source JSDoc** document this? → cut, reference the source file
 
@@ -37,7 +37,7 @@ If yes to any: the section does not belong in the doc.
 Cross-reference every doc against:
 - Other docs (same concept in two places → one dies)
 - Skills (doc restates what a skill's SKILL.md says → doc section dies)
-- `scripts/gen-*` generators (doc restates generated output → replace with `<progressive-disclosure>` tag)
+- `scripts/gen-*` generators (doc restates generated output → replace with a bold `→ [output-file](path)` link)
 
 ### Pass 3 — DRY / single-source ownership
 
@@ -61,19 +61,20 @@ Cross-reference every doc against:
 
 ---
 
-## Progressive disclosure convention
+## Generated output links
 
-`<progressive-disclosure>` tags in docs contain a one-liner describing what
-a `scripts/gen-*` script provides, plus the command to run it.
+When a section's detail lives in a generated file, replace the prose with a bold inline link:
 
 ```markdown
-<progressive-disclosure>
-Full SDK export directory with stability tiers: run `bun scripts/gen-sdk-surface.ts`
-</progressive-disclosure>
+**→ [COAT.md](COAT.md)** — committed snapshot of all endpoints + commands
 ```
 
-Human maintains the doc. Agent maintains the generator script.
-The tag bridges the two.
+The generator manifest (what produces what, watching which sources) lives in
+`ARCHITECTURE.md` frontmatter `generators:` block — that's the machine-readable config.
+Generated markdown files carry `do-not-edit: true` in their own YAML frontmatter as a back-link.
+
+When adding a new gen script: add `@watches`/`@output`/`@run` headers to the script
+**and** add an entry to `ARCHITECTURE.md` `generators:` frontmatter.
 
 ---
 
@@ -88,7 +89,7 @@ status, it either belongs in a skill, a script, or the running system.
 ## Fix policy
 
 - **Delete over summarise.** If the system knows it, remove the section entirely.
-- **Point don't restate.** Replace with a skill name or `<progressive-disclosure>` tag.
+- **Point don't restate.** Replace with a skill name or a bold `→ [file](path)` link.
 - **Preserve decisions.** Human rationale, design constraints, and invariants stay.
 
 ---
@@ -98,5 +99,5 @@ status, it either belongs in a skill, a script, or the running system.
 For each edited doc:
 - What was deleted (system already knew it)
 - What was replaced with a skill pointer
-- What got a `<progressive-disclosure>` tag
+- What got a bold `→` link
 - What remains as human-only knowledge
