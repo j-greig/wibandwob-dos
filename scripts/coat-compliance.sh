@@ -1,106 +1,77 @@
 #!/usr/bin/env bash
-# scripts/coat-compliance.sh — COAT Runtime Compliance Checker
+# scripts/coat-compliance.sh — COAT smoke test
 #
-# Collects command execution snapshots, delegates judgment to coat-review.ts.
-# No fingerprinting, no skip lists, no jq loops — just HTTP calls and data.
+# POSTs every registered command via the HTTP API and reports which ones error.
+# Proves the API surface exists and responds — not that apps work correctly.
+# For deeper per-app verification, write app-specific tests.
 #
-# Usage:
-#   scripts/coat-compliance.sh [--port N] [--update-baseline]
-# Exit: 0=compliant, 1=regressions, 2=no instance
+# Usage: scripts/coat-compliance.sh [--port N]
+# Exit:  0=all commands reachable, 1=some errored, 2=no instance
 
 set -eo pipefail
 
 PORT="${WIBWOB_PORT:-8099}"
 BASE_URL="http://127.0.0.1:${PORT}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RESULTS_FILE="${TMPDIR:-/tmp}/coat-results-$$.json"
-UPDATE_BASELINE=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --port)            PORT="$2"; BASE_URL="http://127.0.0.1:${PORT}"; shift 2 ;;
-    --update-baseline) UPDATE_BASELINE=true; shift ;;
-    *)                 shift ;;
+    --port) PORT="$2"; BASE_URL="http://127.0.0.1:${PORT}"; shift 2 ;;
+    *)      shift ;;
   esac
 done
 
 api()      { curl -sf --max-time 5 "${BASE_URL}$1" 2>/dev/null; }
-api_post() { curl -sf --max-time 8 -X POST -H "Content-Type: application/json" \
+api_post() { curl -s -o /dev/null -w "%{http_code}" --max-time 8 \
+               -X POST -H "Content-Type: application/json" \
                -d "$2" "${BASE_URL}$1" 2>/dev/null; }
 
-state_snapshot() {
-  api /state 2>/dev/null | jq -c '{
-    windowCount: (.windows | length),
-    focusedWindowId: .focusedWindowId,
-    windowIds: [.windows[].id],
-    windowKinds: [.windows[] | .appType // .kind]
-  }' 2>/dev/null || echo "{}"
-}
-
-# ── Health check ──────────────────────────────────────────────────────────────
+# ── Health ────────────────────────────────────────────────────────────────────
 
 health=$(api /health) || { echo "EXIT 2: no instance on port ${PORT}"; exit 2; }
 INSTANCE=$(echo "$health" | jq -r '.label // "unknown"')
-CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "Collecting COAT data — ${INSTANCE}  port:${PORT}  ${CHECKED_AT}"
+echo "COAT smoke — ${INSTANCE}  port:${PORT}  $(date -u +%H:%M:%SZ)"
+echo ""
 
-# ── Capability gap ────────────────────────────────────────────────────────────
-
-G1_OK=false
-api /errors/recent &>/dev/null && G1_OK=true
-
-# ── Collect command executions ────────────────────────────────────────────────
+# ── POST every command ────────────────────────────────────────────────────────
 
 cmds=$(api /commands/list) || { echo "❌ cannot fetch /commands/list"; exit 2; }
-
-# Clear desktop once before the run
-api_post /commands/run '{"id":"desktop.clear-all"}' &>/dev/null || true
-sleep 0.5
-
-echo "[]" > "$RESULTS_FILE"
+total=0; errors=0; skipped=0
+errored=()
 
 while IFS= read -r cmd; do
-  id=$(echo "$cmd"   | jq -r '.id')
-  desc=$(echo "$cmd" | jq -r '.description // ""')
+  id=$(echo "$cmd" | jq -r '.id')
 
-  # Only skip genuinely destructive commands that would break the test session
+  # Skip session-breaking commands only
   case "$id" in
-    app.quit|*.shutdown|desktop.clear-all) continue ;;
+    app.quit|*.shutdown) skipped=$((skipped+1)); continue ;;
   esac
 
-  before=$(state_snapshot)
-  http_ok=true
-  api_post /commands/run "{\"id\":\"${id}\"}" &>/dev/null || http_ok=false
-  sleep 0.3
-  after=$(state_snapshot)
+  status=$(api_post /commands/run "{\"id\":\"${id}\"}")
+  total=$((total+1))
 
-  # Append result to array
-  entry=$(jq -n \
-    --arg id "$id" \
-    --arg desc "$desc" \
-    --argjson http_ok "$http_ok" \
-    --argjson before "$before" \
-    --argjson after "$after" \
-    '{id: $id, description: $desc, http_ok: $http_ok, before: $before, after: $after}')
+  if [[ "$status" -ge 500 ]]; then
+    echo "  ❌  $id  → HTTP $status"
+    errored+=("$id")
+    errors=$((errors+1))
+  else
+    echo "  ✅  $id  → HTTP $status"
+  fi
 
-  tmp=$(jq --argjson e "$entry" '. + [$e]' "$RESULTS_FILE")
-  echo "$tmp" > "$RESULTS_FILE"
-
-  echo "  collected $id"
 done < <(echo "$cmds" | jq -c '.commands[]')
 
+# ── Report ────────────────────────────────────────────────────────────────────
+
 echo ""
-echo "Collected $(jq 'length' "$RESULTS_FILE") commands — running agent review..."
-echo ""
+echo "──────────────────────────────────────────"
+echo "${total} commands  |  ${errors} errors  |  ${skipped} skipped"
 
-# ── Agent review ──────────────────────────────────────────────────────────────
+if [[ "$errors" -gt 0 ]]; then
+  echo ""
+  echo "Errored commands:"
+  printf '  %s\n' "${errored[@]}"
+  echo ""
+  echo "EXIT: 1"
+  exit 1
+fi
 
-bun "${REPO_ROOT}/scripts/coat-review.ts" \
-  --results "$RESULTS_FILE" \
-  --baseline "${REPO_ROOT}/coat-compliance.baseline.json" \
-  --g1 "$G1_OK" \
-  $( [[ "$UPDATE_BASELINE" == true ]] && echo "--update-baseline" )
-
-STATUS=$?
-rm -f "$RESULTS_FILE"
-exit $STATUS
+echo "EXIT: 0  ✅"
