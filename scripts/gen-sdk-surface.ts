@@ -28,53 +28,65 @@ const exports: Export[] = [];
 let currentTier = "";
 let currentComment = "";
 
-for (let i = 0; i < lines.length; i++) {
-  const line = lines[i];
+// Join entire file back to handle multiline export blocks cleanly
+// Strategy: find @public/@beta/@internal markers, then extract the
+// complete export block that follows (handles multiline { ... } blocks).
+const fullSrc = src;
 
-  // Capture tier from JSDoc comment
-  const tierMatch = line.match(/\/\*\*\s*(@public|@beta|@internal)(.*)?\*\//);
-  if (tierMatch) {
-    currentTier = tierMatch[1].replace("@", "");
-    currentComment = (tierMatch[2] || "").replace(/\s*—\s*/, "").trim();
+// Pass 1: find all tier annotations and their positions
+const tierPositions: Array<{ pos: number; tier: string; comment: string }> = [];
+const tierRe = /\/\*\*\s*(@public|@beta|@internal)(.*?)\*\//g;
+let tm: RegExpExecArray | null;
+while ((tm = tierRe.exec(fullSrc)) !== null) {
+  tierPositions.push({
+    pos: tm.index + tm[0].length,
+    tier: tm[1].replace("@", ""),
+    comment: (tm[2] || "").replace(/\s*—\s*/, "").trim(),
+  });
+}
+
+// Pass 2: for each tier annotation, grab the export that immediately follows
+for (const { pos, tier, comment } of tierPositions) {
+  const rest = fullSrc.slice(pos);
+
+  // Skip whitespace and pure comment lines to find the first 'export'
+  const exportStart = rest.search(/^export\s/m);
+  if (exportStart < 0) continue;
+  // Make sure nothing significant intervenes (no non-comment, non-whitespace before export)
+  const gap = rest.slice(0, exportStart);
+  if (/^[^/\s]/.test(gap.replace(/\s+/g, "").replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, ""))) continue;
+
+  const exportSlice = rest.slice(exportStart);
+
+  // export function/const/class name
+  const directMatch = exportSlice.match(/^export\s+(function|const|class)\s+(\w+)/);
+  if (directMatch) {
+    exports.push({ tier, names: [directMatch[2]], kind: "value", comment: comment || undefined });
     continue;
   }
 
-  if (!currentTier) continue;
-
-  // export { name1, name2 } from "..."
-  const namedExport = line.match(/^export\s+(type\s+)?\{([^}]+)\}/);
-  if (namedExport) {
-    const isType = !!namedExport[1];
-    const names = namedExport[2].split(",").map((n) => n.trim()).filter(Boolean);
-    exports.push({
-      tier: currentTier,
-      names,
-      kind: isType ? "type" : "value",
-      comment: currentComment || undefined,
-    });
-    currentTier = "";
-    currentComment = "";
-    continue;
-  }
-
-  // export function / export const / export class
-  const directExport = line.match(/^export\s+(function|const|class)\s+(\w+)/);
-  if (directExport) {
-    exports.push({
-      tier: currentTier,
-      names: [directExport[2]],
-      kind: "value",
-      comment: currentComment || undefined,
-    });
-    currentTier = "";
-    currentComment = "";
-    continue;
-  }
-
-  // If we hit a non-blank, non-comment line without an export, reset
-  if (line.trim() && !line.trim().startsWith("//") && !line.trim().startsWith("*")) {
-    currentTier = "";
-    currentComment = "";
+  // export { ... } or export type { ... } — possibly multiline
+  const braceMatch = exportSlice.match(/^export\s+(type\s+)?\{/);
+  if (braceMatch) {
+    const isType = !!braceMatch[1];
+    // Find matching closing brace (handles nested content)
+    let depth = 0;
+    let end = -1;
+    for (let ci = braceMatch[0].length - 1; ci < exportSlice.length; ci++) {
+      if (exportSlice[ci] === "{") depth++;
+      else if (exportSlice[ci] === "}") { depth--; if (depth === 0) { end = ci; break; } }
+    }
+    if (end < 0) continue;
+    const body = exportSlice.slice(braceMatch[0].length - 1 + 1, end);
+    // Strip inline comments, extract identifiers
+    const cleaned = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+    // Each entry is like: name or name as alias
+    const names = cleaned.split(",")
+      .map(n => n.trim().replace(/\s+as\s+\w+/, "").trim())
+      .filter(n => /^\w+$/.test(n));
+    if (names.length > 0) {
+      exports.push({ tier, names, kind: isType ? "type" : "value", comment: comment || undefined });
+    }
   }
 }
 
