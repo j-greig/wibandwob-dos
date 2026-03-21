@@ -71,6 +71,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.click-counter":               "beta",
   "wibwob.pomodoro":                    "beta",
   "wibwob.dice-roller":                 "beta",
+  "wibwob.md-preview":                  "beta",
 };
 
 /** Default tier for microapps not listed in the registry. */

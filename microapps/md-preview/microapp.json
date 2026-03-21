@@ -1,0 +1,24 @@
+{
+  "name": "md-preview",
+  "version": "0.1.0",
+  "description": "Markdown Preview microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.md-preview.open"
+  },
+  "microapp": {
+    "id": "wibwob.md-preview",
+    "title": "Markdown Preview",
+    "description": "Markdown Preview microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 203, "label": "Markdown Preview" }
+    ],
+    "palette": { "order": 203, "label": "Open Markdown Preview" },
+    "agent": true,
+    "api": true
+  }
+}
