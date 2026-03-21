@@ -140,7 +140,13 @@ Expected output:
 ✓ PASS — microapp.wibwob.world-clock.open (143 chars)
 ```
 
-**Do not commit an app without a PASS from validate-microapp.sh.**
+**After each app, run both checks before committing:**
+```bash
+bun run typecheck                                            # must be clean
+bash scripts/validate-microapp.sh microapp.wibwob.<id>.open 50  # must PASS
+```
+
+**Do not commit an app without both passing.**
 Include the PASS line in your commit message, e.g.:
 
 ```
