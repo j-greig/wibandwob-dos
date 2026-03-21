@@ -8,57 +8,73 @@ description: >
 
 # Microapp Creator
 
-Full workflow: scaffold → register → implement required hooks → hot-reload verify.
+Workflow: scaffold → implement → register tier → reload → verify.
+
+**Read `SDK.md` first** — it has the full host API, required hooks, and manifest reference.
+
+---
 
 ## 1. Scaffold
 
+No scaffold script. Copy the canonical minimal example:
+
 ```bash
-bash scripts/scaffold-microapp.sh microapps/<name> wibwob.<id> "<Title>" <menuOrder>
+cp -r microapps/demo-hello-world microapps/<your-name>
 ```
 
-Creates `microapps/<name>/index.ts` + `microapp.json`. Default `menuOrder` is 120.
+Then update `microapp.json`:
+- `name` — directory name
+- `microapp.id` — `wibwob.<your-id>` (must be unique)
+- `microapp.title` / `microapp.description`
 
-## 2. Register
+---
 
-Add to `src/core/microapp-registry.ts` → `REGISTRY`. **The microapp won't appear until you do this.**
+## 2. Implement
+
+Entry point is `index.ts`, default export is `setup(host)`:
 
 ```typescript
-import { MyMicroapp } from "../../microapps/my-microapp/index.js";
-// in REGISTRY array:
-{ tier: "core", factory: () => new MyMicroapp() }
-// tiers: core = menu + API visible · beta = API only
+import type { MicroappHost } from "../../src/services/microapp-sdk.js"
+
+export default function setup(host: MicroappHost) {
+  host.registerCommand({
+    id: "open",
+    label: "My App",
+    description: "Open My App",
+    palette: { order: 100 },
+    action: () => {
+      const win = host.createWindow({ title: "My App" })
+      // ... your logic
+    }
+  })
+}
 ```
 
-## 3. Implement required hooks
+See `SDK.md` for the four required hooks, full host API, and manifest field reference.
 
-Every window needs all four — missing any is the most common failure mode:
+---
+
+## 3. Register tier
+
+Microapps default to `beta` (palette + API visible, hidden from menu). To promote:
 
 ```typescript
-win.describeState(() => ({ summary: "..." }))  // agents read this
-win.captureText(() => "content text")           // wibwob read <id>
-win.onCleanup(() => { /* stop timers */ })
-win.onRestyle(() => { /* re-apply host.theme() */ })
+// src/core/microapp-registry.ts → REGISTRY
+"wibwob.<your-id>": "core",   // menu + palette + API + agent
+"wibwob.<your-id>": "beta",   // palette + API (default — no entry needed)
+"wibwob.<your-id>": "internal", // API only, dev/test
 ```
 
-Import only from `../../src/services/microapp-sdk.js` — never from `src/core/` directly.
+Only add an entry if you need something other than `beta`.
 
-## 4. Verify
+---
+
+## 4. Reload and verify
 
 ```bash
-bash scripts/reload-microapp.sh <id>
-wibwob -i <label> cmd wibwob.<id>.open
-wibwob -i <label> read <windowId>
+bash scripts/reload-microapp.sh <id>         # close → reload → reopen
+curl -s localhost:8099/state | jq            # window in state?
+wibwob read <windowId>                       # captureText working?
 ```
 
-## 5. Dev loop (optional)
-
-```bash
-bun run scripts/watch-microapp.ts microapps/<name>
-```
-
-Auto-reloads and reopens the microapp on file change.
-
-## Reference
-
-Full SDK, layout, pitfalls: `ARCHITECTURE.md §The microapp model`
-Examples by complexity: `microapps/demo-hello-world` → `microapps/runtime-inspector`
+Visual verification is mandatory — API response alone is not proof.

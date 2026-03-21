@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T12:24:01.124Z",
+  "generatedAt": "2026-03-20T22:54:44.306Z",
   "surfaces": {
     "skills": {
       "joan-stark-ascii-art": {
@@ -10,15 +10,15 @@
         ]
       },
       "ww-ops": {
-        "lastSeen": "2026-03-21T11:59:42.592Z",
+        "lastSeen": "2026-03-20T19:01:13.499Z",
         "count": 2,
         "sources": [
           "read:SKILL.md"
         ]
       },
       "commit": {
-        "lastSeen": "2026-03-20T15:50:52.187Z",
-        "count": 4,
+        "lastSeen": "2026-03-20T19:31:02.947Z",
+        "count": 5,
         "sources": [
           "read:SKILL.md"
         ]
@@ -57,12 +57,33 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "microapp-creator": {
+        "lastSeen": "2026-03-20T22:25:56.008Z",
+        "count": 2,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "doc-agent": {
+        "lastSeen": "2026-03-20T20:33:33.615Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "agentic-dev-reflection": {
+        "lastSeen": "2026-03-20T22:53:24.961Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "multi-edit": {
-        "lastSeen": "2026-03-21T12:16:27.522Z",
-        "count": 57,
+        "lastSeen": "2026-03-20T21:46:03.346Z",
+        "count": 62,
         "sources": [
           "tool:edit",
           "tool:multi_edit"
@@ -77,8 +98,8 @@
         ]
       },
       "ptc": {
-        "lastSeen": "2026-03-21T12:24:01.124Z",
-        "count": 42,
+        "lastSeen": "2026-03-20T20:38:12.849Z",
+        "count": 48,
         "sources": [
           "tool:execute_code"
         ]
@@ -91,8 +112,8 @@
         ]
       },
       "todos": {
-        "lastSeen": "2026-03-20T18:03:02.615Z",
-        "count": 2,
+        "lastSeen": "2026-03-20T19:42:04.138Z",
+        "count": 3,
         "sources": [
           "command:/todos",
           "tool:todo"
@@ -106,10 +127,17 @@
         ]
       },
       "checklist": {
-        "lastSeen": "2026-03-20T18:00:35.862Z",
-        "count": 4,
+        "lastSeen": "2026-03-20T21:44:06.320Z",
+        "count": 6,
         "sources": [
           "tool:checklist"
+        ]
+      },
+      "quizme": {
+        "lastSeen": "2026-03-20T22:54:44.306Z",
+        "count": 6,
+        "sources": [
+          "tool:quizme"
         ]
       }
     },

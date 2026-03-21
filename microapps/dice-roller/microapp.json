@@ -1,7 +1,7 @@
 {
   "name": "dice-roller",
   "version": "0.1.0",
-  "description": "Dice Roller microapp",
+  "description": "Roll 1-6 dice and display ASCII faces.",
   "type": "microapp",
   "entry": "index.ts",
   "dev": {
@@ -11,13 +11,13 @@
   "microapp": {
     "id": "wibwob.dice-roller",
     "title": "Dice Roller",
-    "description": "Dice Roller microapp scaffold.",
-    "multiInstance": false,
+    "description": "Roll 1-6 dice and display them as ASCII faces. Args: count (1-6).",
+    "multiInstance": true,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 202, "label": "Dice Roller" }
+      { "category": "applications", "order": 75, "label": "Dice Roller" }
     ],
-    "palette": { "order": 202, "label": "Open Dice Roller" },
+    "palette": { "order": 75, "label": "Dice Roller" },
     "agent": true,
     "api": true
   }

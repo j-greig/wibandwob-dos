@@ -63,6 +63,16 @@ One concept, one owner. Small tools. Explicit contracts. Predictable interfaces.
 
 ---
 
+## The documentation principle
+
+This codebase uses **autopoietic homoiconicity**: a system whose documentation is its infrastructure — reading itself to maintain itself, maintaining itself by being read.
+
+Gen scripts produce docs. Docs link back to their generators. The system self-discovers and self-updates. The documentation actively constitutes the system — it is not a passive reflection of it.
+
+All documentation is written as **compressed delta**: it states only what diverges from patterns the reading agent already knows from training data or experience. Everything standard is omitted. Everything specific is stated once, precisely, where it's needed. This compression is made safe by the autopoietic loop — guaranteeing the delta never drifts from reality.
+
+---
+
 ## The SDK stability contract
 
 The SDK (`src/services/microapp-sdk.ts`) is the **only import surface** for
