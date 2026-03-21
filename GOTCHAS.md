@@ -32,6 +32,25 @@ to a single change or the loop can't learn.
 **Never change a microapp's `id` field carelessly.** It's the key into the command registry.
 Changing it silently breaks all commands, workspace saves, and API paths for that microapp.
 
+**Never mix CompositionHelpers and LayoutParts in `createStack`.** TypeScript's `LayoutPart<any>`
+silently accepts CompositionHelper handles (they lack `.layout()`) — no type error, but the
+window renders blank. Use only LayoutParts in `createStack`, or use only CompositionHelpers
+and skip `createStack` entirely. When in doubt: CompositionHelpers only.
+
+**`captureText` must return non-empty text.** Returning `gridToText(emptyGrid)` = spaces/newlines
+= 0 meaningful chars. Add a fallback: `return content.trim() || "AppName — blank state description"`.
+Agents read this. A blank return breaks `wibwob read <id>` and `validate-microapp.sh`.
+
+**`createAnimationClock` starts immediately.** Call `clock.pause()` on the next line after creation.
+At >10fps with grid-canvas rendering, the blessed render loop saturates and the HTTP API stops
+responding (87% CPU observed). Max safe rate: 8fps. Always `clock.destroy()` in `onCleanup`.
+
+**Never use raw `fs.*` in microapps.** Use `safeWriteFile` / `safeReadJSON` from `microapp-sdk.js`.
+They handle dir creation and swallow errors safely. Raw `fs.*` violates ARCHITECTURE invariant 7.
+
+**`registerSnapshot` is the right persistence primitive, not files.** Use it for workspace
+restore. Use `safeWriteFile` only for user-visible file exports or data that outlives sessions.
+
 ---
 
 ## Adding a command
@@ -51,6 +70,20 @@ A scaffold script is planned — see `.planning/autopoietic-next/README.md §5`.
 **`grep -c` returns multiline output.** Always pipe through `| tail -1 | tr -d " \n"` or
 use `|| echo 0`. Raw `grep -c` breaks bash arithmetic (`[[ $count -gt 0 ]]`) silently.
 This has bitten us three times.
+
+---
+
+## Cloud / Linux agents
+
+**`bun install` fails in cloud containers.** The `canvas` native module fails to compile.
+Always use `bun install --ignore-scripts`. Nothing in the critical path needs canvas.
+
+**`--direct` mode fails on Linux.** Default startup uses macOS `script -q /dev/null` syntax.
+Linux `script` uses `-qfc`. The startup scripts now auto-detect headless (`TERM=dumb` or no TTY)
+and fall back to `--tmux`. Explicit: always use `bash scripts/ensure-running.sh --tmux` in agents.
+
+**`curl` without `--max-time` hangs forever against an unresponsive API.** Always:
+`curl -sf --max-time 5 http://127.0.0.1:8099/health`. A hung API + no timeout = silent zombie.
 
 ---
 

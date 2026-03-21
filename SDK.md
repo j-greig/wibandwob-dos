@@ -38,14 +38,28 @@ export default function setup(host: MicroappHost) {
 
 ## The four required hooks
 
-Missing any one fails silently — this is the most common microapp bug:
+Missing any one fails silently — this is the most common microapp bug.
+**Preferred pattern** — use the typed helper that enforces all four at once:
+
+```typescript
+import { registerMicroappHooks } from "../../src/services/microapp-sdk.js";
+
+registerMicroappHooks(win, {
+  captureText:   () => myContent,                        // plain text, must be non-empty
+  describeState: () => ({ summary: "My App — ready" }), // agents read this
+  onCleanup:     () => { clock?.destroy(); },            // stop ALL timers here
+  onRestyle:     () => { label.style.fg = host.theme().text.fg; },
+});
+```
+
+TypeScript will error if you omit any of the four. Individual methods still work for conditional wiring.
 
 | Hook | Purpose |
 |------|---------|
-| `win.describeState()` | Agents read this to understand what the window contains |
-| `win.captureText()` | Powers `wibwob read <id>` — must return plain text |
-| `win.onCleanup()` | Called on close — stop all timers and listeners here |
-| `win.onRestyle()` | Called on theme switch — re-apply every themed colour |
+| `captureText` | Powers `wibwob read <id>` — must return >0 non-whitespace chars |
+| `describeState` | Agents read this via `/state` API — include a meaningful `summary` |
+| `onCleanup` | Called on close — stop every timer, destroy every handle |
+| `onRestyle` | Called on theme switch — re-apply every `host.theme()` colour |
 
 ---
 
@@ -55,13 +69,13 @@ Missing any one fails silently — this is the most common microapp bug:
 |-|-------------|
 | `host.createWindow(init)` | Create the blessed frame — returns `win` handle |
 | `host.registerCommand(def)` | Register palette / menu / API / agent command |
+| `host.registerSnapshot({serialize,restore})` | Workspace persistence — save/restore window state |
 | `host.theme()` | Current theme tokens — use in `onRestyle` |
 | `host.runCommand(id)` | Dispatch a local command by id |
 | `host.runGlobalCommand(id)` | Dispatch any global command |
 | `host.flash(msg)` | Show a toast notification |
 | `host.promptValue(label, default, cb)` | Open an inline value prompt |
 | `host.pickFile(label, dir, cb)` | Open the file browser prompt |
-| `host.ui.*` | Layout primitives — `createStack`, `createRow`, `createHeaderBar`, etc. |
 | `host.screen` | Raw blessed screen (avoid unless necessary) |
 | `host.geometry` | Desktop geometry — width, height, usable area |
 | `host.repoRoot` | Absolute path to repo root |
@@ -97,6 +111,22 @@ Missing any one fails silently — this is the most common microapp bug:
 | `menu` | Appear in app menu (core tier only) |
 | `palette` | Appear in command palette |
 | `agent` / `api` | Expose commands to agents and HTTP API |
+
+---
+
+## Component models — two families, one import path
+
+Both exported from `microapp-sdk.ts`. Not interchangeable.
+
+**CompositionHelpers** (`@public` — prefer): `createHeaderBar`, `createStatusBar`, `createTextViewer`, `createListPanel`, `createSplitView`, `createTabs`, `createInputLine`, `createCanvas`, `createScrollView`. Take `parent` as first arg, self-position, return `{ element, update, destroy }`.
+
+**LayoutParts** (`@internal`): `createProgressBar`, `createKeyValuePanel`, `createDataTable`. Take no parent, return `{ node, layout(rect), restyle, destroy }`. Require `createStack`.
+
+**Never mix in `createStack`** — TypeScript allows it silently but `.layout()` fails → blank window. See `GOTCHAS.md`.
+
+**Persistence:** workspace restore → `host.registerSnapshot({ serialize, restore })`. File persistence → `safeWriteFile` / `safeReadJSON` from SDK (never raw `fs.*`). Full pattern in `MICROAPP-DEV.md`.
+
+**Animation clocks:** `createAnimationClock(fps)` starts immediately — call `clock.pause()` next line. Max 8–10fps or blessed render saturates. `clock.destroy()` in `onCleanup`.
 
 ---
 
