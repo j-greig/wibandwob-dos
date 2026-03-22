@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # @desc  Click a menu bar item, optionally click a menu item within it.
 # Uses /menu/list API for positions — no screenshot parsing needed.
-# Auto-detects running wibwob instance.
 #
 # Usage:
 #   bash menu-click.sh "File"                  # just open the menu
@@ -14,28 +13,20 @@ ITEM_LABEL="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Auto-detect port
-PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
-if [[ -z "$PORT" ]]; then
-  echo "ERROR: no running wibwob instance found" >&2
-  exit 1
-fi
+# Calibrate once, export for child click-cell.sh calls
+eval "$("${SCRIPT_DIR}/calibrate.sh")"
+export CELL_W CELL_H GHOSTTY_WIN_INDEX
 
 # Get menu positions from API
 MENU_DATA=$(curl -sf "http://127.0.0.1:${PORT}/menu/list")
 
-# Find menu col (middle of the label text)
-MENU_COL=$(echo "$MENU_DATA" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)['result']
-label = '$MENU_LABEL'
-for menu in data:
-    if menu['label'] == label:
-        print(menu['col'] + len(label) // 2)
-        sys.exit(0)
-print(f'menu not found: {label}', file=sys.stderr)
-sys.exit(1)
-")
+# Find menu col
+MENU_COL=$(echo "$MENU_DATA" | jq -r --arg label "$MENU_LABEL" '
+  .result[] | select(.label == $label) | .col + (.label | length / 2 | floor)
+')
+if [[ -z "$MENU_COL" || "$MENU_COL" == "null" ]]; then
+  echo "menu not found: $MENU_LABEL" >&2; exit 1
+fi
 
 # Click the menu bar label (single click opens the menu)
 bash "${SCRIPT_DIR}/click-cell.sh" "$MENU_COL" 0 --single
@@ -47,22 +38,17 @@ fi
 sleep 0.5
 
 # Find item row and col from API data
-read -r ITEM_COL ITEM_ROW < <(echo "$MENU_DATA" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)['result']
-menu_label = '$MENU_LABEL'
-item_label = '$ITEM_LABEL'
-for menu in data:
-    if menu['label'] == menu_label:
-        for item in menu['items']:
-            if item['label'] == item_label:
-                print(menu['col'] + 5, item['row'])
-                sys.exit(0)
-        print(f'item not found: {item_label} in {menu_label}', file=sys.stderr)
-        sys.exit(1)
-print(f'menu not found: {menu_label}', file=sys.stderr)
-sys.exit(1)
-")
+ITEM_INFO=$(echo "$MENU_DATA" | jq -r --arg menu "$MENU_LABEL" --arg item "$ITEM_LABEL" '
+  .result[] | select(.label == $menu) |
+  .col as $col |
+  .items[] | select(.label == $item) |
+  "\($col + 5) \(.row)"
+')
+if [[ -z "$ITEM_INFO" || "$ITEM_INFO" == "null" ]]; then
+  echo "item not found: $ITEM_LABEL in $MENU_LABEL" >&2; exit 1
+fi
+
+read -r ITEM_COL ITEM_ROW <<< "$ITEM_INFO"
 
 # Double-click the menu item
 bash "${SCRIPT_DIR}/click-cell.sh" "$ITEM_COL" "$ITEM_ROW"

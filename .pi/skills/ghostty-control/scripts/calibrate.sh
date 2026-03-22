@@ -14,24 +14,20 @@ if [[ -z "$PORT" ]]; then
 fi
 
 # Find which Ghostty window contains a terminal with wibandwob-dos cwd
-# Returns the window index (1-based for AppleScript)
-GHOSTTY_WIN_INDEX=$(osascript <<'APPLESCRIPT'
+GHOSTTY_WIN_INDEX=$(osascript <<'AS'
 tell application "Ghostty"
   set winCount to count of windows
   repeat with i from 1 to winCount
-    set w to window i
-    repeat with t in terminals of w
-      if working directory of t contains "wibandwob-dos" then
-        return i
-      end if
+    repeat with t in terminals of window i
+      if working directory of t contains "wibandwob-dos" then return i
     end repeat
   end repeat
   return 1
 end tell
-APPLESCRIPT
+AS
 )
 
-# Window geometry from that specific window
+# Window size from that specific window
 read -r WIN_W WIN_H < <(
   osascript -e "tell application \"System Events\" to tell process \"Ghostty\" to size of window ${GHOSTTY_WIN_INDEX}" \
   | tr -d ',' | awk '{print $1, $2}'
@@ -40,12 +36,13 @@ read -r WIN_W WIN_H < <(
 # Screen dimensions from wibwob API
 read -r COLS ROWS < <(
   curl -sf "http://127.0.0.1:${PORT}/health" \
-  | python3 -c "import json,sys; s=json.load(sys.stdin)['screen']; print(s['width'], s['height'])"
+  | jq -r '.screen | "\(.width) \(.height)"'
 )
 
 TITLE_BAR=28
-CELL_W=$(python3 -c "print(${WIN_W} / ${COLS})")
-CELL_H=$(python3 -c "print((${WIN_H} - ${TITLE_BAR}) / ${ROWS})")
+read -r CELL_W CELL_H < <(
+  awk "BEGIN { printf \"%.6f %.6f\n\", ${WIN_W}/${COLS}, (${WIN_H}-${TITLE_BAR})/${ROWS} }"
+)
 
 echo "PORT=${PORT}"
 echo "GHOSTTY_WIN_INDEX=${GHOSTTY_WIN_INDEX}"
