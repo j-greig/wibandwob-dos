@@ -117,9 +117,11 @@ export interface AppMenuActions {
   // ── Menu ──────────────────────────────────────────────
   closeMenus: () => void;
   // ── Overlay ───────────────────────────────────────────
+  menuList: () => unknown;
   overlayConfirm: () => unknown;
   overlayCancel: () => unknown;
   overlaySelect: (args?: Record<string, unknown>) => unknown;
+  overlaySetText: (args?: Record<string, unknown>) => unknown;
   overlayInfo: () => unknown;
   // ── Ghostty ────────────────────────────────────────────
   ghosttyShaderSet: (args?: Record<string, unknown>) => unknown;
@@ -835,6 +837,26 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     description: "Select an item index in the active overlay when supported (browser/list/file-browser). Args: index (number).",
     group: "focus",
     actionKey: "overlaySelect",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "menu.list",
+    label: "List Menu Items",
+    description: "List all menu bar menus with their items, positions, and indices. Returns menus with label, col, and numbered items for click targeting.",
+    group: "inspect",
+    actionKey: "menuList",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.set-text",
+    label: "Set Overlay Text",
+    description: "Set the text value in the active value/path overlay input. Args: text (string). Use text=\"\" to clear.",
+    group: "focus",
+    actionKey: "overlaySetText",
     api: true,
     agent: true,
   },

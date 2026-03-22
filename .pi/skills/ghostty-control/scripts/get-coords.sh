@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# get-coords.sh — print Ghostty window geometry + TUI cell size for click calibration
+# @desc  Print Ghostty window geometry + TUI cell size for click calibration (legacy, see calibrate.sh).
 #
 # Usage: bash .pi/skills/ghostty-control/scripts/get-coords.sh
 #

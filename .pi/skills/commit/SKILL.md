@@ -41,3 +41,5 @@ chore(planning): move E042 to .done/
 docs: radically simplify .planning/README.md
 spike(targeting): add precedent comparison table
 ```
+
+NEVER USE EMOJI IN COMMITS

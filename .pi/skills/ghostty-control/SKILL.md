@@ -16,238 +16,127 @@ description: >
 
 # Ghostty AppleScript Control
 
-Ghostty ships a full AppleScript dictionary (merged in 1.3.0, PRs #11208 #11251).
 Drive WibWob-DOS TUI as a human would — click menus, send keys, move the mouse.
-Read results via the wibwob API or screencapture.
+macOS only. Requires Ghostty >= 1.3.0 with AppleScript enabled.
 
-macOS only. Disable with `macos-applescript = false` in Ghostty config.
-TCC permission required — macOS prompts once per calling app.
-
----
-
-## Objects
-
-| Object | Key Properties | Key Elements |
-|---|---|---|
-| `application` | `name`, `frontmost`, `version` | `windows`, `terminals` |
-| `window` | `id`, `name`, `selected tab` | `tabs`, `terminals` |
-| `tab` | `id`, `name`, `index`, `selected`, `focused terminal` | `terminals` |
-| `terminal` | `id`, `name`, `working directory` | — |
-
----
-
-## Commands
-
-| Category | Command | Purpose |
-|---|---|---|
-| Application | `perform action` | Execute a Ghostty action string on a terminal |
-| Configuration | `new surface configuration` | Create/copy a reusable surface config record |
-| Creation | `new window` | Open a new Ghostty window (optional config) |
-| Creation | `new tab` | Open a new tab (optional target window/config) |
-| Layout | `split` | Split a terminal, return the new terminal |
-| Focus | `focus` | Focus a terminal |
-| Focus | `activate window` | Bring a window to front |
-| Focus | `select tab` | Select and foreground a tab |
-| Lifecycle | `close` | Close a terminal |
-| Lifecycle | `close tab` | Close a tab |
-| Lifecycle | `close window` | Close a window |
-| Input | `input text` | Paste-style text input |
-| Input | `send key` | Key press/release with optional modifiers |
-| Input | `send mouse button` | Mouse button press/release |
-| Input | `send mouse position` | Mouse position update (pixel coords) |
-| Input | `send mouse scroll` | Scroll event with precision/momentum options |
-| Standard | `count`, `exists`, `quit` | Standard Cocoa scripting |
-
----
-
-## Quick reference
-
-```applescript
-tell application "Ghostty"
-  set t to focused terminal of selected tab of front window
-
-  input text "curl -sf localhost:8099/health\n" to t   -- send text
-  send key "escape" to t                                -- named key
-  send key "q" modifiers "control" to t                 -- with modifier
-
-  -- Click at pixel coords (relative to terminal content area — see calibration)
-  send mouse position x 294.0 y 8.0 to t
-  send mouse button left button action press to t
-  send mouse button left button action release to t
-
-  send mouse scroll x 0.0 y 3.0 to t                   -- scroll down
-  perform action "new_window" on t                      -- Ghostty action string
-end tell
-```
-
----
-
-## Coord calibration (click anywhere in TUI)
-
-Pixel coords are relative to the terminal content area, not the screen.
+## Scripts — use these first
 
 ```bash
-# Get window geometry
-osascript -e 'tell application "System Events" to tell process "Ghostty" to {position of window 1, size of window 1}'
-# → win_x, win_y, win_w, win_h   e.g. 1111, 156, 1384, 1167
-
-# Terminal dimensions from wibwob
-wibwob ls | python3 -c "import json,sys; s=json.load(sys.stdin)[0]['screen']; print(s['width'], s['height'])"
-# → 173 66
-
-# Formula
-# cell_w = win_w / cols          e.g. 1384 / 173 = 8.0 px
-# cell_h = (win_h - 28) / rows   e.g. (1167 - 28) / 66 = 17.3 px  (28px title bar)
-# pixel_x = col * cell_w
-# pixel_y = row * cell_h
+bash .pi/skills/ghostty-control/scripts/index.sh   # list all scripts
 ```
 
-Click "Core Apps" (col 31, row 0):
+All scripts auto-detect the running wibwob instance. No port or instance args needed.
+
 ```bash
-osascript << 'EOF'
-tell application "Ghostty"
-  set t to focused terminal of selected tab of front window
-  set cw to 1384.0 / 173.0
-  set ch to (1167.0 - 28.0) / 66.0
-  send mouse position x (31.0 * cw + cw/2.0) y (0.5 * ch) to t
-  send mouse button left button action press to t
-  send mouse button left button action release to t
-end tell
-EOF
-sleep 0.3
-wibwob screenshot
+# Click a menu item by name
+bash .pi/skills/ghostty-control/scripts/menu-click.sh "File" "Quit"
+bash .pi/skills/ghostty-control/scripts/menu-click.sh "Core Apps" "Figlet Banner"
+
+# Click any TUI cell (double-click default, --single for one click)
+bash .pi/skills/ghostty-control/scripts/click-cell.sh 35 3
+bash .pi/skills/ghostty-control/scripts/click-cell.sh 75 36 --single
+
+# Send a command to a Ghostty terminal matched by cwd
+bash .pi/skills/ghostty-control/scripts/send-to-terminal.sh wibandwob-dos "bun run dev"
+
+# List Ghostty windows with sizes and terminal cwds
+bash .pi/skills/ghostty-control/scripts/ghostty-windows.sh
+
+# Get cell dimensions (for manual coord work)
+eval "$(bash .pi/skills/ghostty-control/scripts/calibrate.sh)"
 ```
 
----
+## When to use what
+
+| Task | Tool | Why |
+|---|---|---|
+| Open a microapp | `wibwob cmd <id>` or API | Bypasses menu, most reliable |
+| Set overlay text | `POST /overlay/set-text` | Direct, no mouse needed |
+| Confirm/cancel overlay | `POST /overlay/confirm` | Direct, no mouse needed |
+| Click a menu item | `menu-click.sh` | Uses `/menu/list` API for positions |
+| Click a button visible on screen | `click-cell.sh` | Find row/col from screenshot |
+| Type into a shell terminal | `send-to-terminal.sh` | Clears line, types, presses enter |
+| Navigate TUI with keyboard | Raw `send key` AppleScript | For escape, tab, letters |
+| Visual verification | `screencapture -x -D 1 /tmp/snap.png` | Only way to see colors |
+| Semantic verification | `wibwob state` / `wibwob windows` | Structured, parseable |
+| Find text position on screen | `wibwob screenshot` + Python `.find()` | For dynamic click targets |
+
+## Finding click targets
+
+For buttons, labels, or other text visible on screen:
+
+```bash
+# Find row and col of text
+wibwob screenshot | python3 -c "
+import sys
+for i, line in enumerate(sys.stdin.readlines()):
+    if 'OK' in line:
+        print(f'row={i} col={line.find(\"OK\")}')
+        break
+"
+# Then click it
+bash .pi/skills/ghostty-control/scripts/click-cell.sh <col> <row>
+```
+
+For menu items, use the API — no screenshot parsing needed:
+
+```bash
+curl -sf http://127.0.0.1:$(wibwob health 2>&1 | awk '/^port:/{print $2}')/menu/list
+```
 
 ## Read results
 
 ```bash
-wibwob screenshot          # text screenshot — clean, strips ANSI/chrome
+wibwob screenshot          # text screenshot (strips ANSI)
 wibwob state               # full semantic state as JSON
 wibwob windows             # list open windows
-curl -sf localhost:8099/errors/recent   # any microapp errors
-
-# Visual proof
-screencapture -x -D 1 /tmp/tui-snap.png
+screencapture -x -D 1 /tmp/snap.png   # visual proof (PNG)
 ```
 
----
+## Raw AppleScript (when scripts don't cover it)
 
-## Worked examples
-
-### Layout — 4-pane dev environment
 ```applescript
-set projectDir to POSIX path of (path to home folder) & "src/myproject"
 tell application "Ghostty"
-  activate
-  set cfg to new surface configuration
-  set initial working directory of cfg to projectDir
-  set win to new window with configuration cfg
-  set paneEditor to terminal 1 of selected tab of win
-  set paneBuild to split paneEditor direction right with configuration cfg
-  set paneGit   to split paneEditor direction down  with configuration cfg
-  set paneLogs  to split paneBuild  direction down  with configuration cfg
-  input text "nvim ." to paneEditor
-  send key "enter" to paneEditor
-  input text "git status -sb" to paneGit
-  send key "enter" to paneGit
-  input text "tail -f /tmp/dev.log" to paneLogs
-  send key "enter" to paneLogs
-  focus paneEditor
+  set t to focused terminal of selected tab of front window
+  input text "some text" to t              -- paste-style input
+  send key "enter" to t                    -- press enter
+  send key "c" modifiers "control" to t    -- Ctrl+C
+  send key "escape" to t                   -- escape key
 end tell
 ```
 
-### Broadcast — run one command across all terminals
-```applescript
-set cmd to "echo sync && date"
-tell application "Ghostty"
-  repeat with t in terminals
-    input text cmd to t
-    send key "enter" to t
-  end repeat
-end tell
-```
-
-### Jump — focus terminal by working directory
-```applescript
-set needle to "wibandwob-dos"
-tell application "Ghostty"
-  set matches to every terminal whose working directory contains needle
-  if (count of matches) = 0 then
-    set matches to every terminal whose name contains needle
-  end if
-  if (count of matches) > 0 then
-    focus terminal (item 1 of matches)
-  end if
-end tell
-```
-
-### Send Input to Focused Terminal (PR #11251)
-```applescript
-tell application "Ghostty"
-  set term to focused terminal of selected tab of front window
-  input text "pwd\n" to term
-end tell
-```
-
-### Split the Focused Terminal (PR #11251)
-```applescript
-tell application "Ghostty"
-  set currentTerm to focused terminal of selected tab of front window
-  set newTerm to split currentTerm direction right
-  input text "echo split-ready\n" to newTerm
-end tell
-```
-
----
-
-## WibWob smoke test pattern
-
-```bash
-# 1. Confirm running
-wibwob health
-
-# 2. Click a menu (auto-calc coords from wibwob ls)
-bash .pi/skills/ghostty-control/scripts/click-menu.sh "Core Apps"
-sleep 0.3
-
-# 3. Read result
-wibwob screenshot
-
-# 4. Close menu
-osascript -e 'tell application "Ghostty" to send key "escape" to focused terminal of selected tab of front window'
-
-# 5. Visual proof if needed
-screencapture -x -D 1 /tmp/snap-$(date +%s).png
-```
-
----
+Read [references/applescript-api.md](references/applescript-api.md) for the full
+object model, command table, and worked examples (splits, broadcasts, layouts).
 
 ## Gotchas
 
-**Coords off — click lands wrong**
-Recalibrate: `osascript -e 'tell application "System Events" to tell process "Ghostty" to {position of window 1, size of window 1}'` — window may have moved.
+**Blessed menu items need double-click.**
+Single click dismisses without selecting. `menu-click.sh` and `click-cell.sh`
+handle this automatically (double-click by default).
 
-**`send mouse position` has no effect**
-Ghostty window not focused. Fix: `tell application "Ghostty" to activate window front window` before sending mouse events.
+**`input text` does not interpret `\n` as enter.**
+Use `send key "enter"` after `input text`. `send-to-terminal.sh` does this for you.
 
-**`input text` goes to WibWob blessed, not a shell**
-WibWob-DOS owns the terminal — blessed swallows unknown keystrokes. Use `send key` for TUI navigation or `wibwob commands/run` for actions. `input text` only works in a shell pane (split or separate tab).
+**Always clear the line before sending commands.**
+Stray human input concatenates with yours. `send-to-terminal.sh` sends Ctrl+C +
+Ctrl+U automatically. For raw AppleScript, do it manually.
 
-**`focused terminal` error**
-Another app is frontmost. Use `first terminal of first tab of first window` as a stable fallback.
+**`focus t` not `focus terminal t`.**
+Terminal references from `whose` filters are already typed — `focus terminal t`
+throws a coercion error.
 
-**TCC permission denied**
-System Settings → Privacy & Security → Automation → allow your terminal/app to control Ghostty.
+**Valid key names: `enter`, `escape`, `space`, single letters.**
+`return` and `down` do NOT work. Arrow keys may not be supported.
 
-**`wibwob screenshot` blank**
-App not fully rendered yet. Add `sleep 0.5` before reading.
+**`wibwob screenshot` strips ANSI — no highlight visibility.**
+Can't see which menu item is hovered. Use `screencapture` for visual proof.
 
----
+**Wrong Ghostty window targeted.**
+With multiple windows, `front window` may not be the WibWob TUI. `calibrate.sh`
+finds the right window by matching terminal `working directory` to "wibandwob-dos".
 
 ## References
 
-- PR #11208 (main AppleScript implementation): https://github.com/ghostty-org/ghostty/pull/11208
-- PR #11251 (front window + focused terminal): https://github.com/ghostty-org/ghostty/pull/11251
+- [references/applescript-api.md](references/applescript-api.md) — objects, commands, key names, worked examples
+- [references/coord-calibration.md](references/coord-calibration.md) — manual pixel math (when scripts break)
 - Full scripting dictionary: `/Applications/Ghostty.app/Contents/Resources/Ghostty.sdef`
