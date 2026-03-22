@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-22T13:22:20.993Z",
+  "generatedAt": "2026-03-22T13:31:18.698Z",
   "surfaces": {
     "skills": {
       "command-scaffold": {
@@ -26,8 +26,8 @@
     },
     "extensions": {
       "ptc": {
-        "lastSeen": "2026-03-22T13:16:28.756Z",
-        "count": 5,
+        "lastSeen": "2026-03-22T13:31:18.698Z",
+        "count": 6,
         "sources": [
           "tool:execute_code"
         ]
