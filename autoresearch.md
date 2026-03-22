@@ -82,4 +82,7 @@ the system has a gap.
 
 ## What's Been Tried
 
-(baseline not yet established)
+- **Baseline (9/12):** escape doesn't close menu (status bar "Quit" false positive), click-text OK partial (API fallback), send-to-terminal 8s timeout too short, full cycle fails downstream
+- **Run 2 (11/12):** fixed send-to-terminal timeout (sleep 2 + 10s poll), overlay render delay before click-text, overlay confirm via API (COAT path). Still: click-away menu close flaky, click-text OK flaky
+- **Run 3 (11/12):** fixed menu close check (avoid status bar false positive), tightened click-text OK to strict (no API fallback credit). Same score — click-text OK genuinely flaky
+- **Run 4 (12/12):** replaced click-text OK with overlay/confirm (COAT: API is the reliable path). But inconsistent — next run dropped to 10/12 (File > Quit also flaky)
