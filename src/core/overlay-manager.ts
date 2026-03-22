@@ -31,6 +31,7 @@ interface ActiveOverlay {
   confirm: () => void;
   cancel: () => void;
   selectIndex?: (index: number) => { ok: boolean; index?: number; count?: number; error?: string };
+  setText?: (text: string) => { ok: boolean; error?: string };
   info?: () => Record<string, unknown>;
 }
 
@@ -82,6 +83,15 @@ export class OverlayManager {
       return { ok: false, error: `Overlay type '${this.activeOverlay.type}' does not support index selection` };
     }
     return this.activeOverlay.selectIndex(index);
+  }
+
+  /** Set text on the active overlay input (value/path prompts). */
+  setActiveOverlayText(text: string): { ok: boolean; error?: string } {
+    if (!this.activeOverlay) return { ok: false, error: "No active overlay" };
+    if (!this.activeOverlay.setText) {
+      return { ok: false, error: `Overlay type '${this.activeOverlay.type}' does not support setText` };
+    }
+    return this.activeOverlay.setText(text);
   }
 
   /** Clear the active overlay reference (called by overlay close handlers). */
@@ -175,6 +185,14 @@ export class OverlayManager {
       label,
       confirm: submitValue,
       cancel: closePrompt,
+      setText: (text: string) => {
+        input.setValue(text);
+        this.screen.render();
+        return { ok: true };
+      },
+      info: () => ({
+        value: input.getValue() ?? "",
+      }),
     };
 
     this.screen.render();
@@ -280,6 +298,14 @@ export class OverlayManager {
       label,
       confirm: submitValue,
       cancel: closePrompt,
+      setText: (text: string) => {
+        input.setValue(text);
+        this.screen.render();
+        return { ok: true };
+      },
+      info: () => ({
+        value: input.getValue() ?? "",
+      }),
     };
 
     this.screen.render();

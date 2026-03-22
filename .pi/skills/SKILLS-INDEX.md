@@ -184,6 +184,17 @@ Last used: never · See: `.pi/skills/figlet-videographer/SKILL.md`
 
 ---
 
+## ghostty-control
+**Your Specialist** — Control Ghostty terminal via AppleScript to simulate human interaction with the WibWob-DOS TUI — click menu items, send keystrokes, move the mouse, read screen…
+
+Triggers on: "smoke-testing the TUI", "verifying a microapp opened correctly", "clicking a menu to check its contents", "simulating user input in an automated test", "or any task that requires acting on the TUI like a human would", "click the menu", "smoke test the TUI".
+
+Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+
+Last used: never · See: `.pi/skills/ghostty-control/SKILL.md`
+
+---
+
 ## git-branch-oneliners
 **Your Git Reporter** — - Export recent git commits grouped by branch into a plain text report. Use when the user asks for "git oneliners", "last 24h commits by branch", "repo summary"…
 
@@ -305,7 +316,7 @@ Triggers on: "users ask to search notes", "find documents", "or look up informat
 
 Does not: Does not make changes — reads and reports only.
 
-Last used: never · See: `.pi/skills/qmd/SKILL.md`
+Last used: today (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
 
 ---
 
@@ -388,7 +399,7 @@ Triggers on: "building a new skill", "restructuring an existing one", "writing a
 
 Does not: Does not make broad changes — stays within its narrow defined scope.
 
-Last used: never · See: `.pi/skills/skill-creator/SKILL.md`
+Last used: today (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
 
 ---
 
@@ -481,6 +492,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | doc-agent | Specialist | Autopoietic documentation agent |
 | figlet-videographer | Typography VJ | Create typographic video sequences using figlet text animations in WibWob-DOS |
+| ghostty-control | Specialist | Control Ghostty terminal via AppleScript to simulate human interaction with the  |
 | git-branch-oneliners | Git Reporter | - Export recent git commits grouped by branch into a plain text report |
 | img-to-ascii | ASCII Converter | Convert images to plain-text ASCII art primers for the TUI |
 | joan-stark-ascii-art | Art Librarian | Library of 500+ ASCII art pieces by Joan G |

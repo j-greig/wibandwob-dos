@@ -1852,6 +1852,36 @@ export class TsTuiMvpApp {
           ? { selected: true, index: result.index, count: result.count }
           : { selected: false, error: result.error ?? "Selection failed", count: result.count };
       },
+      menuList: () => {
+        const focusedAppType = this.windowManager.getFocusedWindow()?.describeState?.()?.appType as string | undefined;
+        return this.menus.map((menu) => {
+          // Filter to only currently visible items (same logic as menu renderer)
+          const visible = menu.items.filter(
+            (item) => !item.appTypes || (!!focusedAppType && item.appTypes.includes(focusedAppType)),
+          );
+          let row = 2; // row 0 = menu bar, row 1 = top border, items start at row 2
+          let index = 0;
+          const items: { label: string; index: number; row: number }[] = [];
+          for (const item of visible) {
+            if (item.separator) {
+              row++; // separators take a row but aren't clickable
+            } else {
+              items.push({ label: item.label, index, row });
+              index++;
+              row++;
+            }
+          }
+          return { label: menu.label, category: menu.category, col: menu.left, items };
+        });
+      },
+      overlaySetText: (args) => {
+        const text = typeof args?.text === "string" ? args.text : undefined;
+        if (text === undefined) {
+          return { ok: false, error: "text (string) is required" };
+        }
+        const result = this.overlays.setActiveOverlayText(text);
+        return result.ok ? { ok: true, text } : { ok: false, error: result.error };
+      },
       overlayInfo: () => {
         const info = this.overlays.getActiveOverlayInfo();
         return info ? { active: true, ...info } : { active: false };

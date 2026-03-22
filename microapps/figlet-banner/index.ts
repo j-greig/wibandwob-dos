@@ -357,6 +357,7 @@ export default function setup(host: MicroappHost) {
     let currentText = text;
     let currentFont = initialFont;
     let lastMeasurement = measureFiglet(currentText, currentFont, 0);
+    let pickerPreviewBox: blessed.Widgets.BoxElement | null = null;
 
     function syncTitle() {
       win.setTitle(`Banner: ${currentText.slice(0, 18) || "Banner"}`);
@@ -365,8 +366,10 @@ export default function setup(host: MicroappHost) {
     function autoSizeWindow() {
       const measured = measureFiglet(currentText, currentFont, 0);
       const contentSize = getFigletWindowContentSize(measured);
+      // Toolbar: Text input + 4 buttons (48 chars) + label (6 chars) + borders (2)
+      const toolbarMinWidth = 56;
       const targetW = Math.min(
-        Math.max(contentSize.width + 4, 24),
+        Math.max(contentSize.width + 4, toolbarMinWidth, 24),
         Math.max(24, (host.geometry?.width ?? 120) - 10),
       );
       const targetH = Math.min(
@@ -479,6 +482,7 @@ export default function setup(host: MicroappHost) {
       });
 
       fontList.select(idx);
+      pickerPreviewBox = preview;
 
       // Show initial preview
       const initialChoice = filtered[idx];
@@ -526,6 +530,7 @@ export default function setup(host: MicroappHost) {
       });
 
       function closePicker() {
+        pickerPreviewBox = null;
         pickerContainer.detach();
         textInput.show();
         viewer.show();
@@ -628,7 +633,13 @@ export default function setup(host: MicroappHost) {
         .join("\n"),
     }));
 
-    win.captureText(() => viewer.getContent());
+    win.captureText(() => {
+      if (pickerPreviewBox) {
+        const label = pickerPreviewBox.getLabel?.() ?? "";
+        return `Font picker · ${label}\n\n${pickerPreviewBox.getContent()}`;
+      }
+      return viewer.getContent();
+    });
 
     win.onResize(() => rerenderFiglet());
 

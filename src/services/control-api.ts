@@ -164,10 +164,14 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional)" }, description: "Export window text content to scratch/captures/" },
   { method: "POST", path: "/windows/editor/write",          body: { id: "number", content: "string" }, description: "Write content to an editor window buffer" },
   // ── Overlay control ──
+  // ── Menu inspection ──
+  { method: "GET",  path: "/menu/list",                     description: "List all menus with items, col positions, and row indices for click targeting." },
+  // ── Overlay control ──
   { method: "GET",  path: "/overlay/info",                  description: "Check if a modal overlay is active. Returns { active, type?, selectedIndex?, count? }." },
   { method: "POST", path: "/overlay/confirm",               body: {}, description: "Confirm the active modal overlay (OK/Enter). Returns ok:false if no overlay." },
   { method: "POST", path: "/overlay/cancel",                body: {}, description: "Cancel the active modal overlay (Cancel/Escape). Returns ok:false if no overlay." },
   { method: "POST", path: "/overlay/select",                body: { index: "number (required)" }, description: "Select item index in active overlay when supported (browser/list/file-browser)." },
+  { method: "POST", path: "/overlay/set-text",              body: { text: "string (required)" }, description: "Set the text value in the active value/path overlay input. Use text=\"\" to clear." },
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
@@ -1054,6 +1058,11 @@ export class ControlApiService {
       );
       return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
     }
+    // ── Menu inspection ──
+    if (request.method === "GET" && url.pathname === "/menu/list") {
+      const result = this.runApiCommand("menu.list");
+      return Response.json(result);
+    }
     // ── Overlay control ──
     if (request.method === "GET" && url.pathname === "/overlay/info") {
       const result = this.runApiCommand("overlay.info");
@@ -1085,6 +1094,14 @@ export class ControlApiService {
       if (inner && !inner.selected) {
         return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
       }
+      return Response.json(result);
+    }
+    if (request.method === "POST" && url.pathname === "/overlay/set-text") {
+      const text = body.text;
+      if (typeof text !== "string") {
+        return Response.json({ ok: false, error: "text (string) is required" }, { status: 400 });
+      }
+      const result = this.runApiCommand("overlay.set-text", { text });
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
