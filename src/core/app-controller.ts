@@ -470,7 +470,7 @@ export class TsTuiMvpApp {
     );
 
     // Wire StateService into ControlApi for SSE events (S06)
-    (this.controlApi as unknown as { deps: { stateService: unknown } }).deps.stateService = this.state;
+    this.controlApi.setStateService(this.state);
 
     // Set scramble session log path
     const scrambleLogDir = path.join(this.runtimeNode.scratchBase, "scramble-sessions");
@@ -1904,14 +1904,8 @@ export class TsTuiMvpApp {
             this.windowManager.closeWindowById(win.id);
           }
         }
-        // 2. Reload from disk
-        this.reloadMicroappsFromDisk().then((reload) => {
-          if (!reload.requiresRestart) {
-            // 3. Reopen
-            const openId = `microapp.${microappId}.open`;
-            try { this.commands.run(openId); } catch { /* command may not exist */ }
-          }
-        });
+        // 2. Reload from disk (no auto-reopen — caller decides when/how to reopen)
+        this.reloadMicroappsFromDisk();
         return { ok: true, closed, reloading: true };
       },
       menuList: () => {

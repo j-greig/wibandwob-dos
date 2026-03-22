@@ -214,6 +214,10 @@ function buildOpenApiSpec(port: number) {
 // ---------------------------------------------------------------------------
 
 export class ControlApiService {
+  /** Wire StateService after construction to avoid circular dep. */
+  setStateService(s: import("../services/state-service.js").StateService): void {
+    (this.deps as { stateService: unknown }).stateService = s;
+  }
   private server?: { stop: (closeActiveConnections?: boolean) => void };
   private socketServer?: { stop: (closeActiveConnections?: boolean) => void };
   private actualPort?: number;

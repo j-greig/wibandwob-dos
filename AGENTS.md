@@ -93,4 +93,10 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 ## Parking lot
 
 BPM-synced animation · ASCII music video · Ambient-presence v3 ·
-Unicode/cell-aware rendering · Terminal subsystem (swap term.js for @xterm/headless)
+Unicode/cell-aware rendering · Terminal subsystem (swap term.js for @xterm/headless) ·
+`wibwob watch` CLI subcommand for `/events` SSE (S06 spec written, not wired in CLI) ·
+`desktop.arrange` TS port (arrange-presets-plan.md written, only shell skill exists) ·
+Gallery TVision layout import (e055 stretch goal, `~/Repos/wibandwob-dos-tvision/app/ascii_gallery_view.h`) ·
+Figlet font picker preview exports rendered text (TODO-f08f13fc) ·
+Figlet autosize chrome width bug (TODO-f0909921) ·
+S04 missingHooks check logic too eager (flags describeState as missing when default summary matches manifest title)
