@@ -276,6 +276,8 @@ export interface WindowRecord {
   openContextMenu?: (x?: number, y?: number) => void;
   /** Registered clickable regions. Populated by registerClickable(). */
   clickables?: Array<{ label: string; node: Box }>;
+  /** Missing SDK hooks detected after setup(). Empty = healthy. */
+  missingHooks?: string[];
 }
 
 // ---------------------------------------------------------------------------

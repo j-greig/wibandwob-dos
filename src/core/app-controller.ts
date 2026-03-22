@@ -323,6 +323,7 @@ export class TsTuiMvpApp {
       persist: () => this.persistState(),
       render: () => this.screen.render(),
     });
+    let _prevWindowIds = new Set<number>();
     this.windowManager = new WindowManager(
       this.screen,
       this.desktop,
@@ -330,6 +331,20 @@ export class TsTuiMvpApp {
       () => {
         this.shellChrome.repaintDesktop();
         this.invalidation.requestSync();
+        // S06: emit window-opened / window-closed events
+        const current = this.windowManager.getWindows();
+        const currentIds = new Set(current.map(w => w.id));
+        for (const w of current) {
+          if (!_prevWindowIds.has(w.id)) {
+            this.state?.emitEvent({ type: "window-opened", windowId: w.id, appType: w.describeState?.()?.appType as string ?? w.kind, title: w.title });
+          }
+        }
+        for (const id of _prevWindowIds) {
+          if (!currentIds.has(id)) {
+            this.state?.emitEvent({ type: "window-closed", windowId: id, appType: "unknown" });
+          }
+        }
+        _prevWindowIds = currentIds;
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y),
     );
@@ -432,6 +447,7 @@ export class TsTuiMvpApp {
         inspection: this.runtimeInspection,
         windows: this.runtimeWindows,
         workspace: this.runtimeWorkspace,
+        stateService: undefined, // wired after StateService is constructed below
       },
       this.runtimeNode,
       this.rateLimiter,
@@ -452,6 +468,9 @@ export class TsTuiMvpApp {
         getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel(),
       },
     );
+
+    // Wire StateService into ControlApi for SSE events (S06)
+    (this.controlApi as unknown as { deps: { stateService: unknown } }).deps.stateService = this.state;
 
     // Set scramble session log path
     const scrambleLogDir = path.join(this.runtimeNode.scratchBase, "scramble-sessions");
@@ -1873,6 +1892,27 @@ export class TsTuiMvpApp {
         return result.ok
           ? { selected: true, index: result.index, count: result.count }
           : { selected: false, error: result.error ?? "Selection failed", count: result.count };
+      },
+      reloadMicroapp: (args) => {
+        const microappId = typeof args?.microappId === "string" ? args.microappId : undefined;
+        if (!microappId) return { ok: false, error: "microappId (string) is required" };
+        // 1. Close matching windows
+        const closed: number[] = [];
+        for (const win of this.windowManager.getWindows()) {
+          if (win.microappId === microappId) {
+            closed.push(win.id);
+            this.windowManager.closeWindowById(win.id);
+          }
+        }
+        // 2. Reload from disk
+        this.reloadMicroappsFromDisk().then((reload) => {
+          if (!reload.requiresRestart) {
+            // 3. Reopen
+            const openId = `microapp.${microappId}.open`;
+            try { this.commands.run(openId); } catch { /* command may not exist */ }
+          }
+        });
+        return { ok: true, closed, reloading: true };
       },
       menuList: () => {
         const focusedAppType = this.windowManager.getFocusedWindow()?.describeState?.()?.appType as string | undefined;

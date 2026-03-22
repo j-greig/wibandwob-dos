@@ -140,6 +140,18 @@ function createMicroappHost(
         frame.focus();
       };
       queueMicrotask(ensureRegistered);
+      // S04: check for missing hooks after setup() has run
+      queueMicrotask(() => {
+        const missing: string[] = [];
+        if (!frame.describeState || frame.describeState()?.summary === manifest.title) missing.push("describeState");
+        if (!frame.captureText)  missing.push("captureText");
+        if (!frame.cleanup)      missing.push("onCleanup");
+        if (!frame.onRestyle)    missing.push("onRestyle");
+        if (missing.length > 0) {
+          log.app(`[wibwob] ${microappId} — missing hooks: ${missing.join(", ")}`);
+          frame.missingHooks = missing;
+        }
+      });
 
       const handle: MicroappWindowHandle = {
         get id() { return frame.id; },

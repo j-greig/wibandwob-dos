@@ -71,6 +71,7 @@ interface ControlApiDeps {
   inspection: RuntimeInspectionService;
   windows: RuntimeWindowService;
   workspace: RuntimeWorkspaceService;
+  stateService?: import("../services/state-service.js").StateService;
 }
 
 type RuntimeControlApiIdentity = Pick<
@@ -169,6 +170,7 @@ const ENDPOINT_CATALOGUE = [
   // ── Menu inspection ──
   { method: "GET",  path: "/menu/list",                     description: "List all menus with items, col positions, and row indices for click targeting." },
   // ── Overlay control ──
+  { method: "GET",  path: "/events",                        description: "SSE stream of runtime events (window-opened, window-closed, command-completed, command-failed). ?type= filter. ?window=N filter." },
   { method: "GET",  path: "/overlay/info",                  description: "Check if a modal overlay is active. Returns { active, type?, selectedIndex?, count? }." },
   { method: "POST", path: "/overlay/confirm",               body: {}, description: "Confirm the active modal overlay (OK/Enter). Returns ok:false if no overlay." },
   { method: "POST", path: "/overlay/cancel",                body: {}, description: "Cancel the active modal overlay (Cancel/Escape). Returns ok:false if no overlay." },
@@ -811,9 +813,21 @@ export class ControlApiService {
         args = result.data as Record<string, unknown>;
       }
       try {
+        const errorsBefore = getRecentErrors().length;
         const result = this.runApiCommand(id, args);
-        return Response.json(result, { status: result.ok ? 200 : 404 });
+        // S01: surface synchronous setup errors in the response
+        const microappId = id.startsWith("microapp.") ? id.split(".").slice(1, -1).join(".") : undefined;
+        const newErrors = getRecentErrors()
+          .slice(errorsBefore)
+          .filter(e => !microappId || !e.microappId || e.microappId === microappId);
+        const response = newErrors.length > 0 ? { ...result, errors: newErrors } : result;
+        // S06: emit command-completed event
+        const windowId = typeof (result as Record<string, unknown>)?.windowId === "number"
+          ? (result as Record<string, unknown>).windowId as number : undefined;
+        this.deps.stateService?.emitEvent({ type: "command-completed", commandId: id, windowId });
+        return Response.json(response, { status: result.ok ? 200 : 404 });
       } catch (err: unknown) {
+        this.deps.stateService?.emitEvent({ type: "command-failed", commandId: id, error: err instanceof Error ? err.message : String(err) });
         return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined }, { status: 500 });
       }
     }
@@ -1077,6 +1091,27 @@ export class ControlApiService {
       );
       return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
     }
+    // ── SSE event stream (S06) ──
+    if (request.method === "GET" && url.pathname === "/events") {
+      const typeFilter = url.searchParams.get("type");
+      const windowFilter = url.searchParams.get("window") ? Number(url.searchParams.get("window")) : undefined;
+      const stateService = this.deps.stateService;
+      if (!stateService) return Response.json({ ok: false, error: "SSE not available" }, { status: 503 });
+      let unsub: (() => void) | undefined;
+      const stream = new ReadableStream({
+        start(controller) {
+          const enc = new TextEncoder();
+          unsub = stateService.subscribeEvents((event) => {
+            if (typeFilter && event.type !== typeFilter) return;
+            if (windowFilter && !("windowId" in event && event.windowId === windowFilter)) return;
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ ...event, timestamp: new Date().toISOString() })}\n\n`));
+          });
+        },
+        cancel() { unsub?.(); },
+      });
+      return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" } });
+    }
+
     // ── Menu inspection ──
     if (request.method === "GET" && url.pathname === "/menu/list") {
       const result = this.runApiCommand("menu.list");

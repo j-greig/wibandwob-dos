@@ -119,6 +119,7 @@ export interface AppMenuActions {
   closeMenus: () => void;
   // ── Overlay ───────────────────────────────────────────
   menuList: () => unknown;
+  reloadMicroapp: (args?: Record<string, unknown>) => unknown;
   overlayConfirm: () => unknown;
   overlayCancel: () => unknown;
   overlaySelect: (args?: Record<string, unknown>) => unknown;
@@ -635,6 +636,16 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     menuPlacements: [{ category: "file", order: 190, appTypes: ["wibwob-agent"] }],
     api: true,
     agent: true
+  },
+  {
+    id: "microapps.reload-app",
+    label: "Reload Microapp",
+    description: "Close all windows for a microapp, reload its code, reopen. Args: { microappId: string }. Returns { ok, closed, windowId }.",
+    group: "system",
+    actionKey: "reloadMicroapp",
+    api: true,
+    agent: true,
+    returns: "json",
   },
   {
     id: "microapps.reload",

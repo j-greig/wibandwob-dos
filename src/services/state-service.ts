@@ -46,9 +46,27 @@ interface StateDependencies {
  * `onStateChanged` callback and call it after mutations. The controller
  * wires this to `syncState()` which calls `sync()`.
  */
+export type RuntimeEvent =
+  | { type: "window-opened";    windowId: number; appType: string; title: string }
+  | { type: "window-closed";    windowId: number; appType: string }
+  | { type: "state-changed";    windowCount: number }
+  | { type: "command-completed"; commandId: string; windowId?: number }
+  | { type: "command-failed";   commandId: string; error: string }
+  | { type: "microapp-reloaded"; microappId: string };
+
 export class StateService {
   private latestState: DesktopState;
   private readonly listeners = new Set<(state: DesktopState) => void>();
+  private readonly eventListeners = new Set<(event: RuntimeEvent) => void>();
+
+  emitEvent(event: RuntimeEvent): void {
+    for (const l of this.eventListeners) { try { l(event); } catch { /* ignore */ } }
+  }
+
+  subscribeEvents(listener: (event: RuntimeEvent) => void): () => void {
+    this.eventListeners.add(listener);
+    return () => { this.eventListeners.delete(listener); };
+  }
 
   constructor(
     private readonly options: StateServiceOptions,
@@ -148,6 +166,11 @@ export class StateService {
       appType: window.kind as AppType,
       summary: window.filePath ? `File-backed ${window.kind} window.` : `${window.kind} window.`
     };
+
+    // S04: surface missing hooks for broken microapps
+    if (window.missingHooks?.length) {
+      details.missingHooks = window.missingHooks;
+    }
 
     // Inject clickable positions lazily (blessed node coords valid after render)
     if (window.clickables?.length) {

@@ -1,6 +1,6 @@
 ---
 title: "E054 — Agent API DX: close the temporal and semantic gaps"
-status: not-started
+status: done
 branch: epic/e054-agent-api-dx
 issue: ~
 ---
@@ -95,7 +95,7 @@ Six stories. In implementation order — each one is independently mergeable.
 ## Stories
 
 ### S01 — Inline errors in command response
-`[ ]`
+`[x]`
 
 **The gap.**
 `POST /commands/run` returns `{ok:true}` even when the microapp crashes during `setup()`.
@@ -280,7 +280,7 @@ Mitigate in validate-microapp.sh by replacing `sleep 1` with a short retry loop
 ---
 
 ### S04 — Surface missing hooks in /state
-`[ ]`
+`[x]`
 
 **The gap.**
 When a microapp doesn't register `captureText`, `describeState`, `onCleanup`, or
@@ -337,7 +337,7 @@ the frame record.
 ---
 
 ### S05 — microapps.reload-app command
-`[ ]`
+`[x]`
 
 **The gap.**
 `reload-microapp.sh` does: find windows by appType → close each → sleep 0.3 →
@@ -418,7 +418,7 @@ action to be synchronous (close + reload + schedule reopen) and return a polling
 ---
 
 ### S06 — GET /events — SSE stream
-`[ ]`
+`[x]`
 
 **The gap.**
 "Whatever the human can do, the agent must be able to do." That breaks on time.
