@@ -10,6 +10,7 @@
  * native addon event callbacks.
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import fs from "node:fs";
 import { spawn, type ChildProcess } from "child_process";

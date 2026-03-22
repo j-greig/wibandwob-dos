@@ -8,6 +8,7 @@
  * @see https://github.com/j-greig/wibandwob-dos/issues/129
  */
 
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost, MicroappWindowHandle } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";

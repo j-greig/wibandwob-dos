@@ -13,7 +13,9 @@
  * content exceeds the viewport height.
  */
 
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
+// eslint-disable-next-line no-restricted-imports
 import contrib from "blessed-contrib";
 import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
 import {

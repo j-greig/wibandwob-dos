@@ -66,8 +66,7 @@ if (request.method === "POST" && url.pathname === "/my/endpoint") {
 ```bash
 bun run typecheck              # must pass
 bash scripts/restart.sh        # core files need restart, not reload
-bash scripts/doc-sync.sh       # regenerates COAT.md with new command/endpoint
-bash scripts/doc-health.sh     # verify loop stays green
+bash scripts/doc-sync.sh       # regenerate stale outputs
 ```
 
 ## See also

@@ -4,6 +4,7 @@
  * Inspired by https://github.com/mualat/wiretext
  * Unicode box-drawing wireframes directly in the terminal.
  */
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";

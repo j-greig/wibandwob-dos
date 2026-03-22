@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import type blessed from "blessed";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
 import fs from "node:fs";

@@ -60,7 +60,7 @@ Every window must expose `describeState()` and `captureText()` so agents can rea
 | `@beta` | Functional, may change |
 | `@internal` | Host-only — do not use in microapps |
 
-Run `bun scripts/gen-sdk-surface.ts` → `src/sdk/README.md` for the full directory.
+Full export directory: `grep -E '@(public|beta|internal)' src/services/microapp-sdk.ts`
 
 **Lifecycle:**
 ```
@@ -411,8 +411,8 @@ Command IDs: `microapp.{appId}.{commandId}` (e.g. `microapp.wibwob.click-counter
 ### Discovering command IDs
 
 ```bash
-bun scripts/gen-integration-surface.ts    # → COAT.md (80+ commands, all IDs)
-grep "your-app" COAT.md
+curl -sf localhost:8099/commands/list | grep "your-app"   # live command IDs
+wibwob commands | grep "your-app"                         # or via CLI
 ```
 
 ### Parsing state
@@ -427,10 +427,9 @@ for w in d.get('windows',[]): print(f'id={w[\"id\"]} title={w.get(\"title\",\"?\
 
 | Script | Output |
 |--------|--------|
-| `bun scripts/gen-integration-surface.ts` | `COAT.md` — endpoints + commands |
-| `bun scripts/gen-sdk-surface.ts` | `src/sdk/README.md` — SDK export directory |
 | `bun scripts/gen-primitives.ts` | `src/core/primitives.ts` — barrel export |
 | `python3 scripts/gen-skills.py` | `.pi/skills/skills.md` — skill index |
+| `bash scripts/doc-sync.sh --list` | show all watched paths |
 
 ### File reference
 

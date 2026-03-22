@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import type blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";

@@ -6,6 +6,7 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { MonsterCamService } from "../../src/services/microapp-sdk.js";
 import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/microapp-sdk.js";
 import { createCanvas, createStatusBar } from "../../src/services/microapp-sdk.js";
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import {
   createMonsterCamModel,

@@ -15,6 +15,7 @@
  * - ? help overlay, API text input (onInput), centered 80-col content
  * - Includes dvd.vt — WibWob-DOS DVD screensaver as VT100 animation
  */
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {

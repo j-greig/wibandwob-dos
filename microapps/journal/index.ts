@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";

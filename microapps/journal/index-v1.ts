@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { renderFiglet } from "../../src/services/microapp-sdk.js";

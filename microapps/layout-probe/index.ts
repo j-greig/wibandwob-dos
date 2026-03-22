@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import type blessed from "blessed"; // blessed required: LayoutPart widget creation
 import type { LayoutReport, MicroappHost } from "../../src/services/microapp-sdk.js";
 import {

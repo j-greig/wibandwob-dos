@@ -139,5 +139,4 @@ echo "── Next steps ──────────────────�
 echo "   1. Apply the stubs above to the 4 files"
 echo "   2. bun run typecheck"
 echo "   3. bash scripts/restart.sh"
-echo "   4. bash scripts/doc-sync.sh   (regenerates COAT.md)"
-echo "   5. bash scripts/doc-health.sh (verify health loop)"
+echo "   4. bash scripts/doc-sync.sh   (regenerate stale outputs)"

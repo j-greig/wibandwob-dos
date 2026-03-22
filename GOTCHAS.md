@@ -19,7 +19,7 @@ audience: agents
 **Never edit generated files directly.** They carry `do-not-edit: true` in their YAML frontmatter.
 Fix via the generator script, then regenerate. Direct edits are silently overwritten.
 
-**Never list watched file mappings in prose.** Canonical sources: `ARCHITECTURE.md` frontmatter (primary) and gen script `@watches` headers (fallback). A prose list anywhere else will drift.
+**Never list watched file mappings in prose.** The canonical source is the `@watches` header in each gen script. `bash scripts/doc-sync.sh --list` prints the manifest. A prose list will drift.
 
 **Never restate standard patterns.** Delta principle: if a competent LLM already knows it,
 cut it. The test: "would this sentence appear in any TypeScript project's docs?" If yes — cut.
@@ -111,9 +111,7 @@ release mouse tracking escape codes. Use `SIGTERM` (`kill $PID`). If terminal ma
 
 ## Gen scripts
 
-**Gen scripts don't auto-run on save.** They run at commit time via the pre-commit hook.
-A `doc-sync.sh --watch` mode (fswatch/fs.watch on `@watches` paths) would make docs
-always-current. Standard pattern (webpack, tsc --watch, tailwind). Not built yet.
+**Gen scripts don't auto-run on save.** Run `bash scripts/doc-sync.sh` to regen stale outputs, or the pre-commit hook catches it via `--check`.
 
 ---
 

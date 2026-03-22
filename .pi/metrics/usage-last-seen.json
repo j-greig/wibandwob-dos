@@ -1,100 +1,9 @@
 {
-  "generatedAt": "2026-03-21T23:05:02.652Z",
+  "generatedAt": "2026-03-22T12:32:10.524Z",
   "surfaces": {
     "skills": {
-      "joan-stark-ascii-art": {
-        "lastSeen": "2026-03-19T18:39:38.389Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "ww-ops": {
-        "lastSeen": "2026-03-20T19:01:13.499Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "commit": {
-        "lastSeen": "2026-03-21T22:20:17.784Z",
-        "count": 6,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "simplify-docs": {
-        "lastSeen": "2026-03-21T22:39:12.044Z",
-        "count": 3,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "librarian": {
-        "lastSeen": "2026-03-21T22:47:51.925Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "codex": {
-        "lastSeen": "2026-03-20T12:22:34.068Z",
-        "count": 1,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "skill-creator": {
-        "lastSeen": "2026-03-20T14:05:42.909Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "changelog": {
-        "lastSeen": "2026-03-20T14:03:15.628Z",
-        "count": 1,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "microapp-creator": {
-        "lastSeen": "2026-03-20T22:25:56.008Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "doc-agent": {
-        "lastSeen": "2026-03-20T20:33:33.615Z",
-        "count": 1,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "agentic-dev-reflection": {
-        "lastSeen": "2026-03-21T17:38:23.146Z",
-        "count": 2,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "browser-use": {
-        "lastSeen": "2026-03-21T17:43:32.809Z",
-        "count": 1,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
       "command-scaffold": {
-        "lastSeen": "2026-03-21T21:31:17.230Z",
-        "count": 1,
-        "sources": [
-          "read:SKILL.md"
-        ]
-      },
-      "wibwobdos": {
-        "lastSeen": "2026-03-21T22:14:43.511Z",
+        "lastSeen": "2026-03-22T12:20:27.775Z",
         "count": 1,
         "sources": [
           "read:SKILL.md"
@@ -102,116 +11,21 @@
       }
     },
     "extensions": {
-      "multi-edit": {
-        "lastSeen": "2026-03-21T22:52:31.435Z",
-        "count": 71,
-        "sources": [
-          "tool:edit",
-          "tool:multi_edit"
-        ]
-      },
-      "microloop": {
-        "lastSeen": "2026-03-19T12:59:31.874Z",
-        "count": 4,
-        "sources": [
-          "tool:signal_microloop_success",
-          "command:/microloop"
-        ]
-      },
       "ptc": {
-        "lastSeen": "2026-03-21T23:05:02.652Z",
-        "count": 63,
+        "lastSeen": "2026-03-22T12:25:49.142Z",
+        "count": 2,
         "sources": [
           "tool:execute_code"
         ]
       },
-      "review": {
-        "lastSeen": "2026-03-20T10:12:28.834Z",
-        "count": 1,
+      "multi-edit": {
+        "lastSeen": "2026-03-22T12:32:10.524Z",
+        "count": 3,
         "sources": [
-          "command:/review"
-        ]
-      },
-      "todos": {
-        "lastSeen": "2026-03-21T12:47:51.674Z",
-        "count": 4,
-        "sources": [
-          "command:/todos",
-          "tool:todo"
-        ]
-      },
-      "session-breakdown": {
-        "lastSeen": "2026-03-20T14:10:47.164Z",
-        "count": 1,
-        "sources": [
-          "command:/session-breakdown"
-        ]
-      },
-      "checklist": {
-        "lastSeen": "2026-03-20T21:44:06.320Z",
-        "count": 6,
-        "sources": [
-          "tool:checklist"
-        ]
-      },
-      "quizme": {
-        "lastSeen": "2026-03-21T23:04:47.858Z",
-        "count": 9,
-        "sources": [
-          "tool:quizme"
+          "tool:multi_edit"
         ]
       }
     },
-    "agents": {
-      "microapp-product-owner": {
-        "lastSeen": "2026-03-19T19:14:41.879Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "microapp-developer": {
-        "lastSeen": "2026-03-20T12:37:50.997Z",
-        "count": 2,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "MODELS": {
-        "lastSeen": "2026-03-20T12:22:34.055Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "haiku": {
-        "lastSeen": "2026-03-20T12:37:14.916Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "microapp-doc-refiner": {
-        "lastSeen": "2026-03-20T12:38:02.305Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "ops": {
-        "lastSeen": "2026-03-20T12:38:02.315Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      },
-      "opus": {
-        "lastSeen": "2026-03-20T12:38:02.323Z",
-        "count": 1,
-        "sources": [
-          "read:agent.md"
-        ]
-      }
-    }
+    "agents": {}
   }
 }

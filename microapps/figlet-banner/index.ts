@@ -8,6 +8,7 @@ import {
   getFigletWindowContentSize,
   toggleFigletFavourite,
 } from "../../src/services/microapp-sdk.js";
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 
 export default function setup(host: MicroappHost) {

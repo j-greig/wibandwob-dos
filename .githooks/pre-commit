@@ -2,12 +2,8 @@
 set -euo pipefail
 
 BRANCH="$(git branch --show-current)"
-if [[ "$BRANCH" == "main" ]]; then
-  echo "✗ Direct commit to main is not allowed. Create a branch first." >&2
-  exit 1
-fi
+[[ "$BRANCH" == "main" ]] && echo "✗ No direct commits to main." >&2 && exit 1
 
-# ralphi quality gate (disabled — re-enable if running a ralphi loop)
-# if command -v ralphi &> /dev/null; then
-#   ralphi check
-# fi
+node_modules/.bin/tsc --noEmit              || { echo "✗ Typecheck failed." >&2; exit 1; }
+npx eslint 'microapps/**/*.ts' --ignore-pattern 'microapps/.disabled/**' || { echo "✗ SDK boundary violated." >&2; exit 1; }
+bash scripts/doc-sync.sh --check            || { echo "✗ Stale gen outputs — run: bash scripts/doc-sync.sh" >&2; exit 1; }

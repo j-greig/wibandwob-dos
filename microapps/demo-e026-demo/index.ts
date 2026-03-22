@@ -20,6 +20,7 @@
  * Tab / ①②③④ buttons switch focus.
  */
 
+// eslint-disable-next-line no-restricted-imports
 import type blessed from "blessed";
 // All SDK imports from one place — dogfooding TODO-5f986603 fix
 import {

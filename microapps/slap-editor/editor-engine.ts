@@ -5,6 +5,7 @@
  * Features: line-numbered gutter, cursor movement, selection, insert/delete,
  * undo/redo, find, clipboard, scroll, tab handling.
  */
+// eslint-disable-next-line no-restricted-imports
 import type blessed from "blessed";
 
 export interface EditorTheme {

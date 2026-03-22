@@ -4,6 +4,7 @@
  *
  * What if Twitter was designed by Wib & Wob inside a terminal?
  */
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";

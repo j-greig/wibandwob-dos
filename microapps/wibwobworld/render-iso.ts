@@ -2,7 +2,9 @@
  * ISO terrain renderer — SimCity 2000-inspired isometric view.
  * Renders terrain with objects (trees, houses, rocks, etc).
  */
+// eslint-disable-next-line no-restricted-imports
 import { BIOME_COLORS, BIOME_GLYPHS } from "../../src/services/terrain-render.js";
+// eslint-disable-next-line no-restricted-imports
 import type {
   SavedTerrainArtifact,
   TerrainBiome,

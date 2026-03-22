@@ -1,4 +1,5 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import { execFileSync } from "child_process";
 import { existsSync } from "fs";

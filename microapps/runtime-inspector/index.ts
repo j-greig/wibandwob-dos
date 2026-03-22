@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type {
   CommandListItem,

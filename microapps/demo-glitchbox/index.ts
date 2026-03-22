@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import { Agent } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";

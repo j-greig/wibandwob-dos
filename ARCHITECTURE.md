@@ -2,26 +2,6 @@
 title: WibWob-DOS — Architecture
 description: COAT pattern, four seams, state flow, SDK boundary, shell invariants.
 audience: agents
-# Generator manifest — read by .pi/extensions/doc-sync-reminder.ts
-# The architectural doc owns its own maintenance contract.
-generators:
-  - output: COAT.md
-    run: bun scripts/gen-integration-surface.ts
-    watches:
-      - src/services/control-api.ts
-      - src/core/command-catalog.ts
-  - output: src/core/primitives.ts
-    run: bun scripts/gen-primitives.ts
-    watches:
-      - src/core/*/index.ts
-  - output: src/sdk/README.md
-    run: bun scripts/gen-sdk-surface.ts
-    watches:
-      - src/services/microapp-sdk.ts
-  - output: .pi/skills/skills.md
-    run: python3 scripts/gen-skills.py
-    watches:
-      - .pi/skills/*/SKILL.md
 ---
 
 # WibWob-DOS — Architecture
@@ -46,7 +26,7 @@ Four seams connect every adapter to the core:
 | **Window** | `window-facade.ts` + `window-manager.ts` | 11-method interface; all consumers identical |
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
-**→ [COAT.md](COAT.md)** — committed snapshot of all endpoints + commands (or live: `curl localhost:8099/` · `wibwob -i <label> commands`)
+Live surface: `curl localhost:8099/` · `wibwob -i <label> commands`
 
 
 > Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).
@@ -126,7 +106,7 @@ win.onRestyle(() => { /* re-apply host.theme() */ })
 **Import rule:** only `import from "../../src/services/microapp-sdk.js"`.
 Importing from `src/core/` or `src/services/` directly is a COAT violation.
 
-**→ [src/sdk/README.md](src/sdk/README.md)** — SDK export surface by stability tier (@public/@beta/@internal)
+SDK export surface: `grep -E '@(public|beta|internal)' src/services/microapp-sdk.ts`
 **→ [SDK-MICROAPP-DEV.md](SDK-MICROAPP-DEV.md)** — full microapp development guide
 
 ---

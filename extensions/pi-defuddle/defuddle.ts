@@ -3,12 +3,14 @@
  * pi-defuddle — URL → clean Markdown (no headless browser needed)
  *
  * Uses Defuddle (kepano/defuddle, vendor/defuddle) for content extraction.
- * Works on static/SSR pages. For JS-gated or bot-protected sites, use pi-web-browse instead.
+ * Works on static/SSR pages. On 403/bot-block, automatically falls back to
+ * pi-web-browse (headless Chromium) if available.
  *
  * Usage:
  *   bun extensions/pi-defuddle/defuddle.ts <url>
  *   bun extensions/pi-defuddle/defuddle.ts <url> --json
  *   bun extensions/pi-defuddle/defuddle.ts <url> --debug
+ *   bun extensions/pi-defuddle/defuddle.ts <url> --no-fallback
  */
 
 import { fetchPage, getInitialUA } from "../../vendor/defuddle/src/fetch.ts";
@@ -24,6 +26,19 @@ function hasFlag(...flags: string[]): boolean {
 const url = args.find((a) => !a.startsWith("-"));
 const jsonMode = hasFlag("--json", "-j");
 const debugMode = hasFlag("--debug");
+const noFallback = hasFlag("--no-fallback");
+
+// Fallback browser: try common global npm paths, then PATH
+const WEB_BROWSE = (() => {
+  const { spawnSync: which } = require("child_process");
+  const candidates = [
+    "/opt/homebrew/lib/node_modules/@ogulcancelik/pi-web-browse/web-browse.js", // macOS Homebrew
+    "/usr/local/lib/node_modules/@ogulcancelik/pi-web-browse/web-browse.js",    // Linux global
+    `${process.env.HOME}/.npm-global/lib/node_modules/@ogulcancelik/pi-web-browse/web-browse.js`,
+  ];
+  const { existsSync } = require("fs");
+  return candidates.find(existsSync) ?? null;
+})();
 
 if (!url || hasFlag("--help", "-h")) {
   console.log(`pi-defuddle — URL → Markdown (no headless browser)
@@ -87,12 +102,28 @@ try {
     msg.includes("Timed out") ||
     msg.includes("Failed to fetch");
 
-  if (isBotBlocked) {
-    console.error(
-      `❌ Fetch failed: ${msg}\n\n` +
-        `💡 This page may require a real browser. Try:\n` +
-        `   web-browse.js --url "${url}"\n`
-    );
+  if (isBotBlocked && !noFallback) {
+    const fs = await import("fs");
+    if (fs.existsSync(WEB_BROWSE)) {
+      console.error(`⚠️  Fetch failed (${msg}) — falling back to pi-web-browse…`);
+      const { spawnSync } = await import("child_process");
+      const result = spawnSync(
+        "node",
+        [WEB_BROWSE, "--url", url, "--no-daemon", ...(hasFlag("--full") ? ["--full"] : [])],
+        { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"] }
+      );
+      if (result.status === 0) {
+        process.stdout.write(result.stdout);
+        process.exit(0);
+      }
+      console.error(`❌ pi-web-browse also failed: ${result.stderr || result.error?.message}`);
+    } else {
+      console.error(
+        `❌ Fetch failed: ${msg}\n\n` +
+          `💡 pi-web-browse not found at expected path:\n` +
+          `   ${WEB_BROWSE}\n`
+      );
+    }
   } else {
     console.error(`❌ Error: ${msg}`);
   }

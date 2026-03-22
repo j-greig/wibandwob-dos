@@ -1,30 +1,51 @@
 #!/usr/bin/env bash
-# doc-sync.sh — diff-aware doc regeneration
+# doc-sync.sh — staleness gate for generated files
 #
-# Reads @watches and @output headers from every scripts/gen-* file.
-# Checks if any watched path changed. Reruns only affected scripts.
-# Self-registering: add a gen-* script with @watches/@output/@run headers
-# and it participates automatically — no other files to update.
+# Some files in this repo are produced by scripts, not written by hand.
+# Each gen script declares what source files it reads (@watches), what it
+# produces (@output), and how to run it (@run) — all in comment headers.
 #
-# Usage:
-#   bash scripts/doc-sync.sh          # regenerate stale outputs
-#   bash scripts/doc-sync.sh --all    # force-run all gen scripts
-#   bash scripts/doc-sync.sh --check  # report stale, exit 1 if any
+# This script reads those headers, diffs against git, and either re-runs
+# stale generators or blocks a commit that would land with outdated output.
+# New gen scripts self-register — add the three headers and they're picked up.
+#
+# bash scripts/doc-sync.sh          # regen stale outputs
+# bash scripts/doc-sync.sh --all    # force-run everything
+# bash scripts/doc-sync.sh --check  # exit 1 if anything stale (pre-commit)
+# bash scripts/doc-sync.sh --list   # print the watch manifest
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 MODE="${1:-}"
-CHANGED=$({ git diff --name-only HEAD; git diff --name-only --cached; } 2>/dev/null | sort -u)
+
+# ── --list: print the watch manifest and exit ──
+if [[ "$MODE" == "--list" ]]; then
+  for script in scripts/gen-*.ts scripts/gen-*.py; do
+    [[ -f "$script" ]] || continue
+    name=$(basename "$script")
+    watches=$(grep -E '^(//|#) @watches' "$script" | sed 's|.*@watches ||')
+    output=$(grep -E '^(//|#) @output'  "$script" | sed 's|.*@output ||')
+    [[ -z "$watches" || -z "$output" ]] && continue
+    printf "  %-28s %s → %s\n" "$name" "$watches" "$output"
+  done
+  exit 0
+fi
+
+if [[ "$MODE" == "--check" ]]; then
+  CHANGED=$(git diff --name-only --cached 2>/dev/null | sort -u)
+else
+  CHANGED=$({ git diff --name-only --cached; git diff --name-only; } 2>/dev/null | sort -u)
+fi
 RAN=0
 STALE=()
 
 for script in scripts/gen-*.ts scripts/gen-*.py; do
   [[ -f "$script" ]] || continue
 
-  watches=$(grep -E '^(//|#) @watches' "$script" | sed 's|.*@watches ||')
-  output=$(grep -E '^(//|#) @output'  "$script" | sed 's|.*@output ||')
-  run=$(grep -E '^(//|#) @run'        "$script" | sed 's|.*@run ||')
+  watches=$(grep -E '^(//|#) @watches' "$script" | sed 's|.*@watches[[:space:]]*||' | xargs)
+  output=$(grep -E '^(//|#) @output'  "$script" | sed 's|.*@output[[:space:]]*||'  | xargs)
+  run=$(grep -E '^(//|#) @run'        "$script" | sed 's|.*@run[[:space:]]*||'     | xargs)
 
   [[ -z "$watches" || -z "$output" || -z "$run" ]] && continue
 
@@ -34,12 +55,26 @@ for script in scripts/gen-*.ts scripts/gen-*.py; do
   else
     while IFS= read -r watch; do
       [[ -z "$watch" ]] && continue
-      # Convert glob pattern to regex: * → [^/]*, ** → .*
       watch_re=$(echo "${watch%/}" | sed 's|\.|\\.|g; s|\*\*|.*|g; s|\*|[^/]*|g')
       if echo "$CHANGED" | grep -qE "^${watch_re}"; then
         needs_run=true; break
       fi
     done <<< "$(echo "$watches" | tr ' ' '\n')"
+  fi
+
+  # In --check mode, skip if output is already newer than all watched sources
+  if [[ "$needs_run" == true && "$MODE" == "--check" && -f "$output" ]]; then
+    out_mtime=$(stat -f %m "$output" 2>/dev/null || stat -c %Y "$output" 2>/dev/null)
+    newer=false
+    while IFS= read -r watch_glob; do
+      [[ -z "$watch_glob" ]] && continue
+      for f in $watch_glob; do
+        [[ -f "$f" ]] || continue
+        src_mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
+        [[ "$src_mtime" -gt "$out_mtime" ]] && newer=true && break 2
+      done
+    done <<< "$(echo "$watches" | tr ' ' '\n')"
+    [[ "$newer" == false ]] && needs_run=false
   fi
 
   if [[ "$needs_run" == true ]]; then

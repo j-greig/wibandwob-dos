@@ -5,6 +5,7 @@
  * Features: gutter, cursor, selection, undo/redo, find, save, clipboard,
  * ANSI syntax highlighting, current-line highlight, vim keybindings.
  */
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";

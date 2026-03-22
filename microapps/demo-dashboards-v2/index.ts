@@ -17,7 +17,9 @@
  *                 createScrollbar, scrollableStyle
  */
 
+// eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
+// eslint-disable-next-line no-restricted-imports
 import contrib from "blessed-contrib";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
