@@ -22,7 +22,7 @@ export class ContentService {
 
   collectPrimerGroups(): PrimerGroup[] {
     const groups: PrimerGroup[] = [];
-    for (const root of ["modules", "modules-private"] as const) {
+    for (const root of PRIMER_ROOTS) {
       const rootPath = path.join(REPO_ROOT, root);
       if (!fs.existsSync(rootPath)) {
         continue;
@@ -42,7 +42,7 @@ export class ContentService {
           .sort((left, right) => left.label.localeCompare(right.label));
         if (entries.length > 0) {
           groups.push({
-            label: root === "modules" ? moduleEntry.name : `private:${moduleEntry.name}`,
+            label: root.includes("private") ? `private:${moduleEntry.name}` : moduleEntry.name,
             entries
           });
         }
@@ -53,7 +53,7 @@ export class ContentService {
 
   collectGalleryEntries(): BrowserEntry[] {
     const entries: BrowserEntry[] = [];
-    for (const root of ["modules", "modules-private"] as const) {
+    for (const root of PRIMER_ROOTS) {
       const rootPath = path.join(REPO_ROOT, root);
       if (!fs.existsSync(rootPath)) {
         continue;
