@@ -2,19 +2,33 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# Ensure doc-sync still works (no broken scripts)
-bash scripts/doc-sync.sh --check 2>&1 | tail -5
+# Typecheck — scripts can't break the TS codebase
+bunx tsc --noEmit
 
-# Ensure no syntax errors in gen scripts
-for s in scripts/gen-*.ts; do
-  bun "$s" --help > /dev/null 2>&1 || bun "$s" < /dev/null > /dev/null 2>&1 || true
-done
-for s in scripts/gen-*.py; do
-  python3 -c "import ast; ast.parse(open('$s').read())" 2>&1 | tail -3
+# All scripts must have @desc
+for f in .pi/skills/ghostty-control/scripts/*.sh; do
+  name=$(basename "$f")
+  [[ "$name" == "index.sh" ]] && continue
+  if ! grep -q '@desc' "$f"; then
+    echo "FAIL: $name missing @desc" >&2
+    exit 1
+  fi
 done
 
-# CAPS files must exist
-for f in AGENTS.md PHILOSOPHY.md ARCHITECTURE.md GOTCHAS.md; do
-  [ -f "$f" ] || { echo "MISSING: $f"; exit 1; }
+# No python in scripts (jq + awk + bash only)
+for f in .pi/skills/ghostty-control/scripts/*.sh; do
+  if grep -q 'python3\|python ' "$f"; then
+    echo "FAIL: $(basename "$f") uses python" >&2
+    exit 1
+  fi
 done
+
+# No hardcoded ports
+for f in .pi/skills/ghostty-control/scripts/*.sh; do
+  if grep -qE '(8099|8100|8101)' "$f"; then
+    echo "FAIL: $(basename "$f") has hardcoded port" >&2
+    exit 1
+  fi
+done
+
 echo "checks passed"
