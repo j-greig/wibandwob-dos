@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-22T13:09:37.176Z",
+  "generatedAt": "2026-03-22T13:16:36.205Z",
   "surfaces": {
     "skills": {
       "command-scaffold": {
@@ -8,12 +8,19 @@
         "sources": [
           "read:SKILL.md"
         ]
+      },
+      "qmd": {
+        "lastSeen": "2026-03-22T13:16:36.205Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
       }
     },
     "extensions": {
       "ptc": {
-        "lastSeen": "2026-03-22T13:09:37.176Z",
-        "count": 4,
+        "lastSeen": "2026-03-22T13:16:28.756Z",
+        "count": 5,
         "sources": [
           "tool:execute_code"
         ]

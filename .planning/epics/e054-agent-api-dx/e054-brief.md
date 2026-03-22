@@ -7,6 +7,81 @@ issue: ~
 
 # E054 — Agent API DX
 
+---
+
+## TUI monitoring toolkit (use this when verifying every story)
+
+Before testing any story, confirm the app is running and pick a verification method.
+
+### 1. Text dump — fast, works headless (primary)
+```bash
+tmux capture-pane -t wibwob -p                        # raw dump
+tmux capture-pane -t wibwob -p | grep -v '^.\{20,\}$\|^a\+$'  # strip fill-char lines
+```
+
+### 2. Ghostty AppleScript — click menus, send keys, move mouse
+Ghostty ships a full scripting dictionary (merged in 1.3.0). Works on macOS only.
+
+```applescript
+-- Get the terminal surface
+tell application "Ghostty"
+  set t to first terminal of front window
+
+  -- Send text / keystrokes
+  input text "curl -sf localhost:8099/health" & return to t
+
+  -- Click at pixel coords (relative to terminal content area)
+  -- Calibrate: cell_w = window_px_width / cols, cell_h = (window_px_height - 28) / rows
+  send mouse position x 294.0 y 8.0 to t   -- e.g. col 42, row 0 = "Core Apps" menu
+  send mouse button left button action press to t
+  send mouse button left button action release to t
+
+  -- Send a key with modifiers
+  send key "q" modifiers "control" to t
+end tell
+```
+
+```bash
+# One-liner to click "Core Apps" menu (col 42, row 0, 173x66 terminal, window at 1111,156 1384x1167)
+osascript -e '
+  tell application "Ghostty"
+    set t to first terminal of front window
+    send mouse position x (42.0 * (1384/173)) y (0.5 * ((1167-28)/66)) to t
+    send mouse button left button action press to t
+    send mouse button left button action release to t
+  end tell'
+sleep 0.3
+tmux capture-pane -t wibwob -p | head -10   # verify menu opened
+```
+
+Get window geometry for coord calibration:
+```bash
+osascript -e 'tell application "System Events" to tell process "Ghostty" to {position of window 1, size of window 1}'
+# → 1111, 156, 1384, 1167  (x, y, w, h)
+```
+
+### 3. PNG screenshot — visual proof
+```bash
+screencapture -x -D 1 /tmp/tui-snap.png   # full display
+# Then: read the file in pi to attach as evidence
+```
+
+### 4. API semantic state — preferred for assertions
+```bash
+curl -sf localhost:8099/state | python3 -m json.tool
+curl -sf localhost:8099/health
+curl -sf "localhost:8099/windows/text?id=N"
+curl -sf localhost:8099/errors/recent
+```
+
+### Ensure running
+```bash
+bash scripts/ensure-running.sh --tmux
+curl -sf --max-time 2 localhost:8099/health || echo "not running"
+```
+
+---
+
 PHILOSOPHY.md says: "Whatever the human can do, the agent must be able to do."
 Right now this breaks on time and semantics:
 - A human watches state evolve in real time. An agent polls and guesses.

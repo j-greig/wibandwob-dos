@@ -78,7 +78,8 @@ export class ShellChromeController {
   repaintDesktop(): void {
     const width = Math.max(1, Number(this.deps.screen.width));
     const height = Math.max(1, Number(this.deps.screen.height) - 2);
-    const pattern = theme().desktopPattern;
+    const headless = process.env.TERM_PROGRAM === "tmux" || !process.stdout.isTTY;
+    const pattern = !headless ? theme().desktopPattern : undefined;
     if (pattern && pattern.length > 0) {
       const rows: string[] = [];
       for (let y = 0; y < height; y++) {
@@ -90,7 +91,10 @@ export class ShellChromeController {
       this.deps.desktop.setContent(rows.join("\n"));
       return;
     }
-    const fill = theme().desktopFillChar || " ";
+    // Always use space in tmux/headless — fill chars are visual noise in text dumps.
+    const fill = process.env.TERM_PROGRAM === "tmux" || !process.stdout.isTTY
+      ? " "
+      : (theme().desktopFillChar || " ");
     const line = fill.repeat(width);
     this.deps.desktop.setContent(
       Array.from({ length: height }, () => line).join("\n"),
