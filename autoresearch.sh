@@ -54,7 +54,7 @@ fi
 
 # 4. Escape closes menu
 osascript -e 'tell application "Ghostty" to send key "escape" to focused terminal of selected tab of front window' 2>/dev/null
-sleep 0.3
+sleep 0.5
 SHOT2=$(wibwob screenshot 2>/dev/null)
 if echo "$SHOT2" | grep -q "Open Primer\|Quit"; then
   fail "escape: menu still open"
@@ -87,6 +87,7 @@ else
 fi
 
 # 8. click-text OK confirms overlay → window appears
+sleep 0.5  # let overlay render fully before searching for OK text
 bash "${SCRIPTS}/click-text.sh" "OK" --single 2>/dev/null
 sleep 1
 OV3=$(curl -sf "http://127.0.0.1:${PORT}/overlay/info")
@@ -142,9 +143,10 @@ else
 fi
 
 # 11. send-to-terminal restarts app
+sleep 2  # let shell return to prompt after app exits
 bash "${SCRIPTS}/send-to-terminal.sh" wibandwob-dos "bun run dev" 2>/dev/null
 STARTED=false
-for i in 1 2 3 4 5 6 7 8; do
+for i in 1 2 3 4 5 6 7 8 9 10; do
   sleep 1
   if wibwob health 2>&1 | grep -q "^port:"; then
     STARTED=true

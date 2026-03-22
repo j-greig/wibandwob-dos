@@ -1,1 +1,2 @@
 {"type":"config","name":"Ghostty TUI Control — agent-as-human reliability","metricName":"tui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"3b853b3","metric":9,"metrics":{},"status":"keep","description":"Baseline: 9/12. Fails: escape doesn't close menu (blessed focus), click-text OK partial (API fallback), send-to-terminal timeout after quit (8s not enough), full cycle fails downstream.","timestamp":1774190378883,"segment":0,"confidence":null}
