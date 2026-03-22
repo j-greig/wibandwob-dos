@@ -8,11 +8,48 @@ Context: Three consecutive prompts exploring what WibWob-DOS could be, beyond th
 
 ## Prompt 1
 
-> *(not available — prior context was compressed before this session window)*
+> what's the single smartest and most radically innovative and accretive and useful and compelling addition you could make to the project at this point? think it over
 
 ### Response 1
 
-*(not available)*
+*(Researched PHILOSOPHY.md, ARCHITECTURE.md, COAT.md, and related files before answering.)*
+
+Here's the answer.
+
+**`GET /events` — a Server-Sent Events stream**
+
+**The gap.** `PHILOSOPHY.md` says: "Whatever the human can do, the agent must be able to do." But right now the symmetry breaks on one dimension: time. A human watches the screen evolve in real time. An agent polls `/state` and asks "has anything changed yet?" on a loop. That's not equal control — it's a degraded approximation of it.
+
+The agent interaction model today is:
+```
+command → wait → poll /state → did it work? → wait → poll again
+```
+It should be:
+```
+subscribe to /events → command → event confirms completion → next command
+```
+
+**The addition.** A single new endpoint in `control-api.ts`:
+```
+GET /events                         # SSE stream: one event per state transition
+GET /events?window=N                # filtered: only events from window N
+GET /events?type=command-completed  # filtered: only command confirmations
+```
+
+Events carry: timestamp, type (`window-opened`, `window-closed`, `state-changed`, `command-completed`, `command-failed`), `windowId`, and the new `describeState()` payload for the affected window. No polling. No race conditions. No guessing whether a command settled.
+
+CLI complement: `wibwob watch` — subscribe and stream events to stdout in JSON-lines format. Agents pipe it. Humans `| grep`. It completes the Unix surface.
+
+**Why this is the single smartest choice right now:**
+
+1. ~80 lines of implementation. Bun's HTTP server has native SSE support. The state-service already emits internal events — this just exposes them. Zero architectural change.
+2. It makes everything else better without touching it. All 85 commands, all 63 microapps, all 25 existing endpoints become more powerful. The value multiplies across everything already built.
+3. It directly closes the known concrete bugs — the 500ms race after `desktop.clear-all`, workspace restore timing, the batch-operation "returns false with no explanation" problem. These all collapse when agents can subscribe to the outcome instead of polling for it.
+4. It passes all five filters. Composition (new consumption mode over existing state pipeline). No SDK growth. Explicit (each event is typed, the stream is self-describing). Host owns the emission. Unix-idiomatic (pipe it, grep it, tail it).
+5. It's the prerequisite for three parked epics. Ambient-presence v3 (a background agent that watches and maintains context) requires a live event stream. Session capture (E049) needs a timestamped event log. The `wibwob watch` verb makes those futures buildable without new infrastructure.
+6. It makes the philosophy demonstrably true. Right now "equal human/agent control" is an aspiration with a structural asterisk. After this, it's literal: agents subscribe to state changes the same way the TUI refreshes on events. Same mechanism, same latency, same information.
+
+The addition is small enough to land in one session and consequential enough to change how every future session works.
 
 ---
 
