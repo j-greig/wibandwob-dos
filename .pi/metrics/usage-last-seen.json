@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-22T13:16:36.205Z",
+  "generatedAt": "2026-03-22T13:22:20.993Z",
   "surfaces": {
     "skills": {
       "command-scaffold": {
@@ -11,6 +11,13 @@
       },
       "qmd": {
         "lastSeen": "2026-03-22T13:16:36.205Z",
+        "count": 1,
+        "sources": [
+          "read:SKILL.md"
+        ]
+      },
+      "skill-creator": {
+        "lastSeen": "2026-03-22T13:22:20.993Z",
         "count": 1,
         "sources": [
           "read:SKILL.md"
