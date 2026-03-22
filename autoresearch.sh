@@ -5,7 +5,7 @@ set -uo pipefail
 
 SCRIPTS=".pi/skills/ghostty-control/scripts"
 SCORE=0
-TOTAL=12
+TOTAL=15
 
 pass() { SCORE=$((SCORE + 1)); echo "  ✓ $1"; }
 fail() { echo "  ✗ $1"; }
@@ -156,6 +156,45 @@ if [[ -n "$NEW_PORT" ]] && curl -sf "http://127.0.0.1:${NEW_PORT}/health" | jq -
   pass "full cycle: health OK after restart"
 else
   fail "full cycle: health check failed"
+fi
+
+# ── Multi-app interaction (real agent workflow) ──
+echo ""
+echo "Multi-app interaction:"
+
+# 13. Open a second app via menu while first is still open
+bash "${SCRIPTS}/menu-click.sh" "Demos" "Hello World" 2>/dev/null
+sleep 1
+WIN_COUNT=$(wibwob windows 2>/dev/null | jq 'length')
+if [[ "${WIN_COUNT:-0}" -ge 2 ]]; then
+  pass "open second app while first exists (${WIN_COUNT} windows)"
+else
+  fail "second app: only ${WIN_COUNT} windows"
+fi
+
+# 14. click-text finds text and clicks it (on-screen button/label)
+# Use the figlet banner's [F] Font button
+bash "${SCRIPTS}/click-text.sh" "[F] Font" --single 2>/dev/null
+sleep 0.5
+SHOT_FONT=$(wibwob screenshot 2>/dev/null)
+if echo "$SHOT_FONT" | grep -q "Fonts\|Preview\|Bloody\|bolger"; then
+  pass "click-text finds and clicks [F] Font"
+else
+  fail "click-text [F] Font: picker not visible"
+fi
+
+# 15. Close all windows via API, verify clean desktop
+CLOSE_IDS=$(wibwob windows 2>/dev/null | jq -r '.[].id')
+for wid in $CLOSE_IDS; do
+  curl -sf -X POST "http://127.0.0.1:${NEW_PORT:-${PORT}}/windows/close" \
+    -H 'Content-Type: application/json' -d "{\"id\": ${wid}}" >/dev/null 2>&1
+done
+sleep 0.3
+REMAINING=$(wibwob windows 2>/dev/null | jq 'length')
+if [[ "${REMAINING:-1}" -eq 0 ]]; then
+  pass "close all windows: clean desktop"
+else
+  fail "close all windows: ${REMAINING} remain"
 fi
 
 echo ""

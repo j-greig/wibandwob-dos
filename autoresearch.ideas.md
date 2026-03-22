@@ -25,3 +25,12 @@
 - click-text for OK/Cancel buttons — position-dependent, timing-sensitive. Use API overlay/confirm instead (COAT principle)
 - `\n` in `input text` — Ghostty doesn't interpret it as enter
 - `send key "return"` / `"down"` — invalid key names in Ghostty
+
+## The big one: clickable element positions in describeState()
+- Every SDK composition helper (createButtonBar, createTabs, createHeaderBar) auto-registers clickable regions
+- `describeState()` includes `clickables: [{ label, row, col, width }]`
+- host.registerClickable(node, label) SDK method — reads blessed node position
+- Recalculates on resize
+- Eliminates click-text.sh for SDK widgets — agent reads position from state, clicks directly
+- COAT: if a human can click it, the API must know where it is
+- Would also enable: `wibwob click <window-id> <label>` CLI command
