@@ -20,8 +20,28 @@
       "complete": false,
       "reviewPasses": 1,
       "completedAt": "2026-03-21T20:51:31.305Z"
+    },
+    {
+      "id": "run-88dfb95a",
+      "phase": "ralphi-prd",
+      "status": "completed",
+      "sessionKey": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "sessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "checkpointLeafId": "15008a68",
+      "checkpointSessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "cwd": "/Users/james/Repos/wibandwob-dos",
+      "createdAt": "2026-03-22T15:06:15.089Z",
+      "autoConfirm": true,
+      "summary": "Generated a full PRD for E055 — TUI AppleScript Control. 14 user stories across 3 layers: runtime (registerClickable → coords in describeState, SDK helpers auto-register, overlay button positions), API/CLI (menu.close, menu/list open state, menu.activate), and scripts (wait-for.sh fix, sleep elimination, test isolation fix, scoped click-text, error hints). Key design decisions captured via ralphi_ask_user_question: F01 before F02, SDK helpers auto-register, menu.activate thin+visual, Test 13 fix via test isolation. Success metric: 15/15 autoresearch benchmark stable.",
+      "outputs": [
+        "tasks/prd-e055-tui-applescript-control.md",
+        ".planning/epics/e055-tui-applescript-control/e055-brief.md"
+      ],
+      "complete": false,
+      "reviewPasses": 1,
+      "completedAt": "2026-03-22T15:11:39.097Z"
     }
   ],
   "loops": [],
-  "savedAt": "2026-03-21T20:51:31.305Z"
+  "savedAt": "2026-03-22T15:11:39.097Z"
 }

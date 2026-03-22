@@ -274,6 +274,8 @@ export interface WindowRecord {
   captureText?: () => string;
   describeState?: () => WindowStateDetails;
   openContextMenu?: (x?: number, y?: number) => void;
+  /** Registered clickable regions. Populated by registerClickable(). */
+  clickables?: Array<{ label: string; node: Box }>;
 }
 
 // ---------------------------------------------------------------------------

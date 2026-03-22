@@ -611,6 +611,12 @@ export default function setup(host: MicroappHost) {
     viewAllBtn.on("click", viewAllFonts);
     favsBtn.on("click", viewFavouriteFonts);
 
+    // Register toolbar buttons as named clickables for agent/API access
+    win.registerClickable(viewAllBtn, "[V] All");
+    win.registerClickable(favsBtn, "[S] Favs");
+    win.registerClickable(fontBtn, "[F] Font");
+    win.registerClickable(editBtn, "[E] Edit");
+
     // Keyboard shortcuts on the viewer
     viewer.key(["e"], editText);
     viewer.key(["f"], pickFont);

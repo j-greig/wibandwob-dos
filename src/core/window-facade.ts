@@ -29,4 +29,8 @@ export interface WindowFacade {
   sendInput(id: number, input: string, sender?: string): boolean;
   writeEditorText(id: number, text: string): boolean;
   captureText(id: number): string | undefined;
+
+  // Clickable registration
+  registerClickable(id: number, node: import("./types.js").Box, label: string): void;
+  getClickables(id: number): Array<{ label: string; row: number; col: number; width: number }>;
 }

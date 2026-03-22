@@ -13,49 +13,55 @@
 #
 # Options:
 #   --timeout N   max seconds to wait (default: 10)
+#
+# Flags may appear anywhere: wait-for.sh overlay --timeout 2
 set -euo pipefail
 
-CONDITION="${1:?usage: wait-for.sh <condition> [arg] [--timeout N]}"
-ARG="${2:-}"
-shift; [[ -n "$ARG" ]] && shift
-
+# Parse all args: flags first, then positionals
 TIMEOUT=10
+POSITIONALS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --timeout) TIMEOUT="$2"; shift 2 ;;
-    *)         ARG="$1"; shift ;;
+    --*)       echo "unknown flag: $1" >&2; exit 1 ;;
+    *)         POSITIONALS+=("$1"); shift ;;
   esac
 done
+
+CONDITION="${POSITIONALS[0]:?usage: wait-for.sh <condition> [arg] [--timeout N]}"
+ARG="${POSITIONALS[1]:-}"
+
+_port() { wibwob health 2>&1 | awk '/^port:/{print $2}'; }
 
 check() {
   case "$CONDITION" in
     window)
-      wibwob windows 2>/dev/null | jq -e --arg t "$ARG" '[.[] | select(.title | test($t; "i"))] | length > 0' >/dev/null 2>&1
+      wibwob windows 2>/dev/null \
+        | jq -e --arg t "$ARG" '[.[] | select(.title | test($t; "i"))] | length > 0' >/dev/null 2>&1
       ;;
     no-window)
-      ! wibwob windows 2>/dev/null | jq -e --arg t "$ARG" '[.[] | select(.title | test($t; "i"))] | length > 0' >/dev/null 2>&1
+      ! wibwob windows 2>/dev/null \
+        | jq -e --arg t "$ARG" '[.[] | select(.title | test($t; "i"))] | length > 0' >/dev/null 2>&1
       ;;
     overlay)
-      curl -sf "http://127.0.0.1:$(wibwob health 2>&1 | awk '/^port:/{print $2}')/overlay/info" 2>/dev/null \
+      curl -sf "http://127.0.0.1:$(_port)/overlay/info" 2>/dev/null \
         | jq -e '.result.active == true' >/dev/null 2>&1
       ;;
     no-overlay)
-      curl -sf "http://127.0.0.1:$(wibwob health 2>&1 | awk '/^port:/{print $2}')/overlay/info" 2>/dev/null \
+      curl -sf "http://127.0.0.1:$(_port)/overlay/info" 2>/dev/null \
         | jq -e '.result.active == false' >/dev/null 2>&1
       ;;
     health)
-      wibwob health 2>&1 | grep -q "^port:" 2>/dev/null
+      wibwob health 2>&1 | grep -q "^port:"
       ;;
     no-health)
-      ! wibwob health 2>&1 | grep -q "^port:" 2>/dev/null
+      ! wibwob health 2>&1 | grep -q "^port:"
       ;;
     text)
-      wibwob screenshot 2>/dev/null | grep -q "$ARG"
+      wibwob screenshot 2>/dev/null | grep -qF "$ARG"
       ;;
     windows-count)
-      local count
-      count=$(wibwob windows 2>/dev/null | jq 'length' 2>/dev/null)
-      [[ "${count:-0}" -eq "$ARG" ]]
+      [[ "$(wibwob windows 2>/dev/null | jq 'length' 2>/dev/null)" -eq "$ARG" ]]
       ;;
     *)
       echo "unknown condition: $CONDITION" >&2; exit 1
@@ -63,12 +69,10 @@ check() {
   esac
 }
 
-for i in $(seq 1 "$((TIMEOUT * 4))"); do
-  if check; then
-    exit 0
-  fi
+for _ in $(seq 1 "$((TIMEOUT * 4))"); do
+  if check; then exit 0; fi
   sleep 0.25
 done
 
-echo "wait-for: timeout after ${TIMEOUT}s waiting for ${CONDITION} ${ARG}" >&2
+echo "wait-for: timeout after ${TIMEOUT}s waiting for: ${CONDITION}${ARG:+ ${ARG}}" >&2
 exit 1

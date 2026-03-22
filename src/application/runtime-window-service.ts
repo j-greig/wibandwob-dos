@@ -26,6 +26,7 @@ export interface RuntimeWindowService {
   sendInput(id: number, input: string, sender?: string): boolean;
   writeEditorText(id: number, text: string): boolean;
   captureText(id: number): string | undefined;
+  getClickables(id: number): Array<{ label: string; row: number; col: number; width: number }>;
 }
 
 interface RuntimeWindowServiceDeps {
@@ -136,5 +137,6 @@ export function createRuntimeWindowService(
     sendInput: (id, input, sender) => deps.windows.sendInput(id, input, sender),
     writeEditorText: (id, text) => deps.windows.writeEditorText(id, text),
     captureText: (id) => deps.windows.captureText(id),
+    getClickables: (id) => deps.windows.getClickables(id),
   };
 }

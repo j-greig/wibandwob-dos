@@ -149,6 +149,18 @@ export class StateService {
       summary: window.filePath ? `File-backed ${window.kind} window.` : `${window.kind} window.`
     };
 
+    // Inject clickable positions lazily (blessed node coords valid after render)
+    if (window.clickables?.length) {
+      const bodyTop = Number(window.body.atop) || 0;
+      const bodyLeft = Number(window.body.aleft) || 0;
+      details.clickables = window.clickables.map(({ label, node }) => ({
+        label,
+        row: (Number(node.atop) || 0) - bodyTop,
+        col: (Number(node.aleft) || 0) - bodyLeft,
+        width: Number(node.width) || 0,
+      }));
+    }
+
     return {
       id: window.id,
       appType: details.appType,

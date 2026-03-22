@@ -135,6 +135,15 @@ export interface MicroappWindowHandle {
   close(): void;
   setFocusTarget(widget: blessed.Widgets.BlessedElement): void;
   setTitle(title: string): void;
+
+  /**
+   * Register a blessed node as a named clickable region on this window.
+   * Positions appear in `wibwob state` under `details.clickables`.
+   * Call this for any button, tab, or control an agent might want to click by label.
+   * Composition helpers (createButtonBar, createTabs) call this automatically.
+   * @public
+   */
+  registerClickable(node: blessed.Widgets.BlessedElement, label: string): void;
 }
 
 export interface MicroappStateDetails {

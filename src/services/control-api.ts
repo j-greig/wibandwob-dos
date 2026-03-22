@@ -154,6 +154,8 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/browser/state",                 description: "Chrome browser state: currentUrl, currentTitle, historyLength, loading." },
   // ── Window operations ──
   { method: "POST", path: "/windows/focus",                 body: { id: "number" }, description: "Focus a window by id" },
+  { method: "POST", path: "/windows/click",                 body: { id: "number", label: "string" }, description: "Click a named element in a window. Returns { ok, label, row, col } or { ok: false, error, available }." },
+  { method: "GET",  path: "/windows/clickables",            description: "List clickable elements for a window. ?id=N" },
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" }, description: "Move a window to absolute coordinates" },
   { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" }, description: "Resize a window" },
   { method: "POST", path: "/windows/close",                 body: { id: "number" }, description: "Close a window by id" },
@@ -910,6 +912,16 @@ export class ControlApiService {
       return Response.json({
         ok: this.deps.windows.focus(Number(body.id)),
       });
+    }
+    if (request.method === "POST" && url.pathname === "/windows/click") {
+      const result = this.runApiCommand("window.click", { id: Number(body.id), label: body.label });
+      return Response.json(result);
+    }
+    if (request.method === "GET" && url.pathname === "/windows/clickables") {
+      const id = Number(url.searchParams.get("id"));
+      if (!Number.isFinite(id)) return Response.json({ ok: false, error: "id is required" }, { status: 400 });
+      const clickables = this.deps.windows.getClickables(id);
+      return Response.json({ ok: true, id, clickables });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       const b = body as Record<string, unknown>;

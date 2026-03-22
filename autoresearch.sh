@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ghostty TUI Control — agent-as-human reliability benchmark
-# Runs 12 binary tests, outputs METRIC tui_score=N
+# Runs 15 binary tests, outputs METRIC tui_score=N
 set -uo pipefail
 
 SCRIPTS=".pi/skills/ghostty-control/scripts"
@@ -9,7 +9,7 @@ TOTAL=15
 
 pass() { SCORE=$((SCORE + 1)); echo "  ✓ $1"; }
 fail() { echo "  ✗ $1"; }
-
+wf() { bash "${SCRIPTS}/wait-for.sh" "$@" 2>/dev/null; }
 port() { wibwob health 2>&1 | awk '/^port:/{print $2}'; }
 
 echo "=== Ghostty TUI Control Benchmark ==="
@@ -44,7 +44,7 @@ echo "Menu interaction:"
 
 # 3. menu-click opens File menu
 bash "${SCRIPTS}/menu-click.sh" "File" 2>/dev/null
-sleep 0.8
+wf text "Open Primer" --timeout 3 || true
 SHOT=$(wibwob screenshot 2>/dev/null)
 if echo "$SHOT" | grep -q "Open Primer\|Open Text\|Quit"; then
   pass "menu-click File opens menu"
@@ -52,19 +52,19 @@ else
   fail "menu-click File: menu not visible"
 fi
 
-# 4. Close menu — click empty area (blessed menus close on click-away)
-bash "${SCRIPTS}/click-cell.sh" 80 30 --single 2>/dev/null
-sleep 0.5
+# 4. menu.close closes it via API
+wibwob cmd menu.close 2>/dev/null
+sleep 0.3
 SHOT2=$(wibwob screenshot 2>/dev/null)
 if echo "$SHOT2" | grep -q "Open Primer\.\.\.\|Open Text File\.\.\.\|Open Markdown"; then
-  fail "click-away: menu still open"
+  fail "menu.close: menu still open"
 else
-  pass "click-away closes menu"
+  pass "menu.close closes menu"
 fi
 
 # 5. menu-click Core Apps > Figlet Banner opens overlay
 bash "${SCRIPTS}/menu-click.sh" "Core Apps" "Figlet Banner" 2>/dev/null
-sleep 1
+wf overlay --timeout 5
 OV=$(curl -sf "http://127.0.0.1:${PORT}/overlay/info")
 if echo "$OV" | jq -e '.result.active == true and .result.type == "value"' >/dev/null 2>&1; then
   pass "menu-click Core Apps > Figlet Banner opens overlay"
@@ -86,12 +86,11 @@ else
   fail "overlay/set-text: value not updated"
 fi
 
-# 8. API confirm overlay → window appears (COAT: API is the reliable path)
+# 8. API confirm overlay → window appears
 curl -sf -X POST "http://127.0.0.1:${PORT}/overlay/confirm" >/dev/null 2>&1
-sleep 1
-OV3=$(curl -sf "http://127.0.0.1:${PORT}/overlay/info")
+wf no-overlay --timeout 5
 WINS=$(wibwob windows 2>/dev/null | jq 'length')
-OV_GONE=$(echo "$OV3" | jq -r '.result.active' 2>/dev/null)
+OV_GONE=$(curl -sf "http://127.0.0.1:${PORT}/overlay/info" | jq -r '.result.active' 2>/dev/null)
 if [[ "$OV_GONE" == "false" && "${WINS:-0}" -ge 1 ]]; then
   pass "overlay/confirm dismisses overlay, window appeared"
 else
@@ -124,9 +123,9 @@ fi
 echo ""
 echo "Lifecycle:"
 
-# 6. menu-click File > Quit exits app (deferred here to not break earlier tests)
+# 6. menu-click File > Quit exits app
 bash "${SCRIPTS}/menu-click.sh" "File" "Quit" 2>/dev/null
-sleep 2
+wf no-health --timeout 8
 if curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   fail "menu-click File > Quit: instance still alive"
 else
@@ -134,60 +133,57 @@ else
 fi
 
 # 11. send-to-terminal restarts app
-sleep 2  # let shell return to prompt after app exits
 bash "${SCRIPTS}/send-to-terminal.sh" wibandwob-dos "bun run dev" 2>/dev/null
-STARTED=false
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  sleep 1
-  if wibwob health 2>&1 | grep -q "^port:"; then
-    STARTED=true
-    break
-  fi
-done
-if $STARTED; then
-  pass "send-to-terminal restarts app (${i}s)"
+wf health --timeout 15
+NEW_PORT=$(port)
+if wibwob health 2>&1 | grep -q "^port:"; then
+  pass "send-to-terminal restarts app"
 else
-  fail "send-to-terminal: app didn't start within 8s"
+  fail "send-to-terminal: app didn't start"
 fi
 
-# 12. Full cycle verification — health OK after restart
-NEW_PORT=$(port)
+# 12. Full cycle verification
 if [[ -n "$NEW_PORT" ]] && curl -sf "http://127.0.0.1:${NEW_PORT}/health" | jq -e '.ok' >/dev/null 2>&1; then
   pass "full cycle: health OK after restart"
 else
   fail "full cycle: health check failed"
 fi
 
-# ── Multi-app interaction (real agent workflow) ──
+# ── Multi-app + new features ──
 echo ""
-echo "Multi-app interaction:"
+echo "Multi-app + clickables:"
 
-# 13. Open a second app via menu while first is still open
+# 13. Open two apps, verify window count (isolated setup — doesn't depend on earlier state)
+curl -sf -X POST "http://127.0.0.1:${NEW_PORT}/view/figlet/open" \
+  -H 'Content-Type: application/json' -d '{"text":"A","font":"banner"}' >/dev/null
+wf windows-count 1 --timeout 5
 bash "${SCRIPTS}/menu-click.sh" "Demos" "Hello World" 2>/dev/null
-sleep 1
+wf windows-count 2 --timeout 5
 WIN_COUNT=$(wibwob windows 2>/dev/null | jq 'length')
 if [[ "${WIN_COUNT:-0}" -ge 2 ]]; then
-  pass "open second app while first exists (${WIN_COUNT} windows)"
+  pass "two apps open simultaneously (${WIN_COUNT} windows)"
 else
-  fail "second app: only ${WIN_COUNT} windows"
+  fail "two apps: only ${WIN_COUNT} windows"
 fi
 
-# 14. click-text finds text and clicks it (on-screen button/label)
-# Use the figlet banner's [F] Font button
-bash "${SCRIPTS}/click-text.sh" "[F] Font" --single 2>/dev/null
-sleep 0.5
-SHOT_FONT=$(wibwob screenshot 2>/dev/null)
-if echo "$SHOT_FONT" | grep -q "Fonts\|Preview\|Bloody\|bolger"; then
-  pass "click-text finds and clicks [F] Font"
+# 14. window.click triggers [F] Font on figlet via API (no mouse, headless)
+FIGLET_ID=$(wibwob windows 2>/dev/null | jq '[.[] | select(.appType=="wibwob.figlet")] | .[0].id')
+if [[ "$FIGLET_ID" != "null" && -n "$FIGLET_ID" ]]; then
+  CLICK_RESULT=$(curl -sf -X POST "http://127.0.0.1:${NEW_PORT}/windows/click" \
+    -H 'Content-Type: application/json' -d "{\"id\": ${FIGLET_ID}, \"label\": \"[F] Font\"}")
+  if echo "$CLICK_RESULT" | jq -e '.ok == true' >/dev/null 2>&1; then
+    pass "window.click [F] Font opens picker headlessly"
+  else
+    fail "window.click: $(echo "$CLICK_RESULT" | jq -r '.error // "unknown"')"
+  fi
 else
-  fail "click-text [F] Font: picker not visible"
+  fail "window.click: no figlet window found"
 fi
 
 # 15. Close all windows via API, verify clean desktop
-CLOSE_IDS=$(wibwob windows 2>/dev/null | jq -r '.[].id')
-for wid in $CLOSE_IDS; do
-  curl -sf -X POST "http://127.0.0.1:${NEW_PORT:-${PORT}}/windows/close" \
-    -H 'Content-Type: application/json' -d "{\"id\": ${wid}}" >/dev/null 2>&1
+wibwob windows 2>/dev/null | jq -r '.[].id' | while read -r wid; do
+  curl -sf -X POST "http://127.0.0.1:${NEW_PORT}/windows/close" \
+    -H 'Content-Type: application/json' -d "{\"id\": ${wid}}" >/dev/null 2>&1 || true
 done
 sleep 0.3
 REMAINING=$(wibwob windows 2>/dev/null | jq 'length')

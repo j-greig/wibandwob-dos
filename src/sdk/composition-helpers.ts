@@ -111,6 +111,8 @@ export interface ButtonBarOptions {
   buttons: ButtonBarButton[];
   /** Height in rows. Default: 1 */
   height?: number;
+  /** Window handle — if provided, each button is auto-registered as a clickable. */
+  win?: import("./microapp-host.js").MicroappWindowHandle;
 }
 
 export interface ButtonBarHandle {
@@ -555,6 +557,13 @@ export function createButtonBar(
   render();
   // Defer key binding to next tick so screen is attached
   setTimeout(() => bindKeys(), 0);
+
+  // Auto-register each button as a clickable if win handle provided
+  if (opts.win) {
+    for (const b of buttons) {
+      opts.win.registerClickable(el, b.label);
+    }
+  }
 
   return {
     element: el,
