@@ -246,7 +246,7 @@ export class TsTuiMvpApp {
       smartCSR: true,
       fullUnicode: true,
       dockBorders: true,
-      title: "WibWob-DOS TS MVP",
+      title: `WibWob-DOS · ${this.instanceDisplayId} · ${process.pid}`,
       mouse: true,
       autoPadding: false,
     });
