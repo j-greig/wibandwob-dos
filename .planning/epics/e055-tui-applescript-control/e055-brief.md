@@ -171,3 +171,15 @@ Replace sleep-and-hope with observe-and-proceed everywhere.
 - [x] `wibwob state` shows clickable positions for figlet banner buttons
 - [x] `wibwob window 1 click --label "[F] Font"` works end-to-end
 - [x] All scripts pass `autoresearch.checks.sh` (no python, no hardcoded ports, @desc present)
+
+---
+
+## Stretch Goals
+
+- [ ] **Import gallery layout from wibandwob-dos-tvision** (`~/Repos/wibandwob-dos-tvision/app/ascii_gallery_view.h` + `.cpp`)
+  - TVision version has a different tab grouping scheme: `#-C`, `D-L`, `M`, `N-S`, `T-Z`, `Find` (6 tabs, letter-range based)
+  - Current blessed version uses A-E, F-J, K-O, P-T, U-Z, Search
+  - TVision version has a `TGalleryTabBar`, `TGalleryFileList` (left pane), preview pane (right, scrollable) — same split-pane shape, different tab grouping logic
+  - Worth reviewing: does the `#-C` grouping (catches numerics + early alpha) work better than pure `A-E`?
+  - Also check `gallery.py` in `tools/api_server/` for any backend logic worth porting
+  - Ref: `~/Repos/wibandwob-dos-tvision/app/ascii_gallery_view.{h,cpp}`
