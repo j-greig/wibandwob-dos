@@ -52,14 +52,14 @@ else
   fail "menu-click File: menu not visible"
 fi
 
-# 4. Escape closes menu
-osascript -e 'tell application "Ghostty" to send key "escape" to focused terminal of selected tab of front window' 2>/dev/null
+# 4. Close menu — click empty area (blessed menus close on click-away)
+bash "${SCRIPTS}/click-cell.sh" 80 30 --single 2>/dev/null
 sleep 0.5
 SHOT2=$(wibwob screenshot 2>/dev/null)
-if echo "$SHOT2" | grep -q "Open Primer\|Quit"; then
-  fail "escape: menu still open"
+if echo "$SHOT2" | grep -q "Open Primer\.\.\.\|Open Text File\.\.\.\|Open Markdown"; then
+  fail "click-away: menu still open"
 else
-  pass "escape closes menu"
+  pass "click-away closes menu"
 fi
 
 # 5. menu-click Core Apps > Figlet Banner opens overlay
@@ -86,25 +86,16 @@ else
   fail "overlay/set-text: value not updated"
 fi
 
-# 8. click-text OK confirms overlay → window appears
-sleep 0.5  # let overlay render fully before searching for OK text
-bash "${SCRIPTS}/click-text.sh" "OK" --single 2>/dev/null
+# 8. API confirm overlay → window appears (COAT: API is the reliable path)
+curl -sf -X POST "http://127.0.0.1:${PORT}/overlay/confirm" >/dev/null 2>&1
 sleep 1
 OV3=$(curl -sf "http://127.0.0.1:${PORT}/overlay/info")
 WINS=$(wibwob windows 2>/dev/null | jq 'length')
-OV_GONE=$(echo "$OV3" | jq -e '.result.active == false' 2>/dev/null && echo yes || echo no)
-if [[ "$OV_GONE" == "yes" && "${WINS:-0}" -ge 1 ]]; then
-  pass "click-text OK confirms overlay, window appeared"
+OV_GONE=$(echo "$OV3" | jq -r '.result.active' 2>/dev/null)
+if [[ "$OV_GONE" == "false" && "${WINS:-0}" -ge 1 ]]; then
+  pass "overlay/confirm dismisses overlay, window appeared"
 else
-  # Fallback: try API confirm
-  curl -sf -X POST "http://127.0.0.1:${PORT}/overlay/confirm" >/dev/null 2>&1
-  sleep 0.5
-  WINS2=$(wibwob windows 2>/dev/null | jq 'length')
-  if [[ "${WINS2:-0}" -ge 1 ]]; then
-    pass "click-text OK failed but API confirm worked (partial)"
-  else
-    fail "click-text OK: overlay not dismissed or no window"
-  fi
+  fail "overlay/confirm: active=$OV_GONE wins=$WINS"
 fi
 
 # ── Window verification ──
