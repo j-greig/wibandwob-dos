@@ -773,8 +773,14 @@ export class ControlApiService {
       let id = Number(url.searchParams.get("id"));
       const appType = url.searchParams.get("appType");
       if (!id && appType) {
-        const wins = this.deps.windows.getWindows().filter(w => (w.describeState?.()?.appType ?? w.kind) === appType);
-        const win = wins.find(w => w === this.deps.windows.getWindowById(w.id) && w.id === wins.at(-1)?.id) ?? wins.at(-1);
+        // Use cached state snapshot rather than calling describeState() live
+        const stateWins = this.deps.stateService?.getState()?.windows ?? [];
+        const wins = stateWins.filter(w => w.appType === appType)
+          .map(sw => this.deps.windows.getWindowById(sw.id))
+          .filter((w): w is NonNullable<typeof w> => w !== undefined);
+        // prefer focused window, else last opened (highest id)
+        const focusedId = this.deps.stateService?.getState()?.focus?.windowId;
+        const win = wins.find(w => w.id === focusedId) ?? wins.at(-1);
         if (!win) return Response.json({ ok: false, error: `No window with appType: ${appType}` }, { status: 404 });
         id = win.id;
       }
@@ -820,7 +826,10 @@ export class ControlApiService {
         const errorsBefore = getRecentErrors().length;
         const result = this.runApiCommand(id, args);
         // S01: surface synchronous setup errors in the response
-        const microappId = id.startsWith("microapp.") ? id.split(".").slice(1, -1).join(".") : undefined;
+        // microapp.wibwob.figlet.open → "wibwob.figlet" (strip microapp. prefix and .verb suffix)
+        const microappId = id.startsWith("microapp.") && id.split(".").length >= 4
+          ? id.split(".").slice(1, -1).join(".")
+          : undefined;
         const newErrors = getRecentErrors()
           .slice(errorsBefore)
           .filter(e => !microappId || !e.microappId || e.microappId === microappId);

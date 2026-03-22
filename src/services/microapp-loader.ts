@@ -140,10 +140,13 @@ function createMicroappHost(
         frame.focus();
       };
       queueMicrotask(ensureRegistered);
-      // S04: check for missing hooks after setup() has run
+      // S04: use a sentinel on the frame — describeState() starts as the default,
+      // and is replaced when the microapp calls handle.describeState(fn).
+      // We check after setup() by comparing to the default fn reference.
+      const _defaultDescribeState = frame.describeState;
       queueMicrotask(() => {
         const missing: string[] = [];
-        if (!frame.describeState || frame.describeState()?.summary === manifest.title) missing.push("describeState");
+        if (frame.describeState === _defaultDescribeState) missing.push("describeState");
         if (!frame.captureText)  missing.push("captureText");
         if (!frame.cleanup)      missing.push("onCleanup");
         if (!frame.onRestyle)    missing.push("onRestyle");

@@ -323,7 +323,9 @@ export class TsTuiMvpApp {
       persist: () => this.persistState(),
       render: () => this.screen.render(),
     });
-    let _prevWindowIds = new Set<number>();
+    // S06: snapshot of prev window IDs and appTypes for open/close event diffing
+    let _prevWindowIds: Set<number> | null = null;
+    let _prevWindowSnapshot = new Map<number, string>();
     this.windowManager = new WindowManager(
       this.screen,
       this.desktop,
@@ -334,17 +336,20 @@ export class TsTuiMvpApp {
         // S06: emit window-opened / window-closed events
         const current = this.windowManager.getWindows();
         const currentIds = new Set(current.map(w => w.id));
+        // First call — seed from current state, emit nothing (avoids spurious events at startup/restore)
+        if (_prevWindowIds === null) { _prevWindowIds = currentIds; return; }
         for (const w of current) {
           if (!_prevWindowIds.has(w.id)) {
-            this.state?.emitEvent({ type: "window-opened", windowId: w.id, appType: w.describeState?.()?.appType as string ?? w.kind, title: w.title });
+            this.state?.emitEvent({ type: "window-opened", windowId: w.id, appType: String(w.describeState?.()?.appType ?? w.kind), title: w.title });
           }
         }
-        for (const id of _prevWindowIds) {
+        for (const [id, appType] of _prevWindowSnapshot) {
           if (!currentIds.has(id)) {
-            this.state?.emitEvent({ type: "window-closed", windowId: id, appType: "unknown" });
+            this.state?.emitEvent({ type: "window-closed", windowId: id, appType });
           }
         }
         _prevWindowIds = currentIds;
+        _prevWindowSnapshot = new Map(current.map(w => [w.id, String(w.describeState?.()?.appType ?? w.kind)]));
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y),
     );

@@ -31,7 +31,8 @@ done
 CONDITION="${POSITIONALS[0]:?usage: wait-for.sh <condition> [arg] [--timeout N]}"
 ARG="${POSITIONALS[1]:-}"
 
-_port() { wibwob health 2>&1 | awk '/^port:/{print $2}'; }
+# Cache port once — avoid calling wibwob health on every 250ms poll tick
+_PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
 
 check() {
   case "$CONDITION" in
@@ -44,11 +45,11 @@ check() {
         | jq -e --arg t "$ARG" '[.[] | select(.title | test($t; "i"))] | length > 0' >/dev/null 2>&1
       ;;
     overlay)
-      curl -sf "http://127.0.0.1:$(_port)/overlay/info" 2>/dev/null \
+      curl -sf "http://127.0.0.1:${_PORT}/overlay/info" 2>/dev/null \
         | jq -e '.result.active == true' >/dev/null 2>&1
       ;;
     no-overlay)
-      curl -sf "http://127.0.0.1:$(_port)/overlay/info" 2>/dev/null \
+      curl -sf "http://127.0.0.1:${_PORT}/overlay/info" 2>/dev/null \
         | jq -e '.result.active == false' >/dev/null 2>&1
       ;;
     health)
