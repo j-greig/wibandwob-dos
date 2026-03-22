@@ -12,6 +12,7 @@ export interface RuntimeWindowBatchOp {
 }
 
 export interface RuntimeWindowService {
+  getWindows(): WindowRecord[];
   getWindowById(id: number): WindowRecord | undefined;
   open(
     type: string,
@@ -82,6 +83,7 @@ export function createRuntimeWindowService(
   deps: RuntimeWindowServiceDeps,
 ): RuntimeWindowService {
   return {
+    getWindows: () => deps.windows.getWindows(),
     getWindowById: (id) => deps.windows.getWindowById(id),
     open: (type, args) => {
       const resolved = resolveOpenCommand(type, args);

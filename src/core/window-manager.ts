@@ -39,6 +39,7 @@ export class WindowManager implements WindowFacade {
   private readonly windows: WindowRecord[] = [];
   private focusedWindow?: WindowRecord;
   private nextWindowId = 1;
+  private _lastCreatedId: number | undefined;
   private dragState?: DragState;
   private resizeState?: ResizeState;
   private suppressClickWindowId?: number;
@@ -70,6 +71,13 @@ export class WindowManager implements WindowFacade {
 
   restoreWindowFocus(): void {
     this.focusedWindow?.focus();
+  }
+
+  /** Consume and return the ID assigned by the most recent createFrame() call. One-shot. */
+  getLastCreatedId(): number | undefined {
+    const id = this._lastCreatedId;
+    this._lastCreatedId = undefined;
+    return id;
   }
 
   getWindowById(id: number): WindowRecord | undefined {
@@ -167,6 +175,7 @@ export class WindowManager implements WindowFacade {
       style: theme().resizeGrip
     });
 
+    this._lastCreatedId = this.nextWindowId;
     const record: WindowRecord = {
       id: this.nextWindowId++,
       kind,

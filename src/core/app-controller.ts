@@ -538,7 +538,10 @@ export class TsTuiMvpApp {
       focusOrCreate: (appType, createFn, multiInstance) => {
         const wasFocused = !multiInstance && Boolean(this.findWindowByAppType(appType as AppType));
         this.focusOrCreate(appType as AppType, createFn, multiInstance);
-        return { focused: wasFocused };
+        const windowId = wasFocused
+          ? this.findWindowByAppType(appType as AppType)?.id
+          : this.windowManager.getLastCreatedId();
+        return { focused: wasFocused, windowId };
       },
       worldChat: worldChatService,
       overlays: this.overlays,

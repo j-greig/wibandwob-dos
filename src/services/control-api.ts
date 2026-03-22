@@ -110,7 +110,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/world-chat/channels",           description: "List world chat channels outside the TUI" },
   { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
-  { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
+  { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N or ?appType=wibwob.figlet (focused or last opened)." },
   { method: "GET",  path: "/screenshot",                    description: "Friendly screenshot alias. Defaults to clean text output." },
   { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
   { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
@@ -764,7 +764,14 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/windows/text") {
-      const id = Number(url.searchParams.get("id"));
+      let id = Number(url.searchParams.get("id"));
+      const appType = url.searchParams.get("appType");
+      if (!id && appType) {
+        const wins = this.deps.windows.getWindows().filter(w => (w.describeState?.()?.appType ?? w.kind) === appType);
+        const win = wins.find(w => w === this.deps.windows.getWindowById(w.id) && w.id === wins.at(-1)?.id) ?? wins.at(-1);
+        if (!win) return Response.json({ ok: false, error: `No window with appType: ${appType}` }, { status: 404 });
+        id = win.id;
+      }
       const text = this.deps.windows.captureText(id);
       return Response.json({ ok: text !== undefined, text: text ?? null });
     }

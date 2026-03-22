@@ -221,11 +221,20 @@ function createMicroappHost(
         id: fullId,
         label: def.label,
         description: def.description,
-        action: def.direct ? def.action : (args) => {
-          const focusResult = focusOrCreate(microappId, () => def.action(args), multiInstance);
-          if (focusResult.focused) return { ok: true, focused: true };
-          return { ok: true };
-        },
+        action: def.direct
+          ? (args) => {
+              const result: unknown = def.action(args);
+              const windowId = windowManager.getLastCreatedId();
+              if (result !== null && result !== undefined && typeof result === "object") {
+                return windowId ? { ...(result as Record<string, unknown>), windowId } : result;
+              }
+              return windowId ? { ok: true, windowId } : { ok: true };
+            }
+          : (args) => {
+              const focusResult = focusOrCreate(microappId, () => def.action(args), multiInstance);
+              if (focusResult.focused) return { ok: true, focused: true, windowId: focusResult.windowId };
+              return { ok: true, windowId: focusResult.windowId };
+            },
         multiInstance,
         menuPlacements: (showMenu && Array.isArray(def.menu)) ? def.menu.map(m => ({
           category: resolveMenuCategory(m.category),

@@ -148,7 +148,7 @@ Async errors remain available at `GET /errors/recent`. Document this boundary.
 ---
 
 ### S02 — Address windows by appType not numeric id
-`[ ]`
+`[x]`
 
 **The gap.**
 `GET /windows/text?id=N` requires a numeric window id. Agents always know the appType
@@ -194,7 +194,7 @@ Document the tie-break rule in the endpoint description.
 ---
 
 ### S03 — Return windowId from open commands
-`[ ]`
+`[x]`
 
 **The gap.**
 Opening a microapp returns `{ok:true}` with no indication of which window was created.
