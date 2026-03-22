@@ -20,8 +20,20 @@
       "complete": false,
       "reviewPasses": 1,
       "completedAt": "2026-03-21T20:51:31.305Z"
+    },
+    {
+      "id": "run-88dfb95a",
+      "phase": "ralphi-prd",
+      "status": "running",
+      "sessionKey": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "sessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "checkpointLeafId": "15008a68",
+      "checkpointSessionFile": "/Users/james/.pi/agent/sessions/--Users-james-Repos-wibandwob-dos--/2026-03-22T13-42-26-175Z_e1eb9f13-3e7d-43c8-a005-fe74bae64e86.jsonl",
+      "cwd": "/Users/james/Repos/wibandwob-dos",
+      "createdAt": "2026-03-22T15:06:15.089Z",
+      "autoConfirm": false
     }
   ],
   "loops": [],
-  "savedAt": "2026-03-21T20:51:31.305Z"
+  "savedAt": "2026-03-22T15:06:15.089Z"
 }
