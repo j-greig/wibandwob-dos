@@ -5,6 +5,8 @@ branch: epic/e055-tui-applescript-control
 issue: ~
 ---
 
+> MOVED TO /Users/james/Repos/wibandwob-dos/tasks/prd-e055-tui-applescript-control.md TO BE RUN AS A `.ralphi` LOOP
+
 # E055 — TUI AppleScript Control
 
 Make agents reliable operators of the WibWob-DOS TUI via AppleScript mouse/keyboard

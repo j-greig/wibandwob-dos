@@ -466,6 +466,31 @@ export class WindowManager implements WindowFacade {
     return record?.captureText?.();
   }
 
+  /** Register a blessed node as a named clickable region on a window. */
+  registerClickable(id: number, node: Box, label: string): void {
+    const record = this.getWindowById(id);
+    if (!record) return;
+    if (!record.clickables) record.clickables = [];
+    // Remove any existing entry with the same label (re-registration on restyle)
+    record.clickables = record.clickables.filter((c) => c.label !== label);
+    record.clickables.push({ label, node });
+  }
+
+  /** Read current clickable positions for a window (lazy — reads blessed node coords at call time). */
+  getClickables(id: number): Array<{ label: string; row: number; col: number; width: number }> {
+    const record = this.getWindowById(id);
+    if (!record?.clickables?.length) return [];
+    // node positions are relative to the screen — subtract window body origin
+    const bodyTop = Number(record.body.atop) || 0;
+    const bodyLeft = Number(record.body.aleft) || 0;
+    return record.clickables.map(({ label, node }) => ({
+      label,
+      row: (Number(node.atop) || 0) - bodyTop,
+      col: (Number(node.aleft) || 0) - bodyLeft,
+      width: Number(node.width) || 0,
+    }));
+  }
+
   /** Restyle all open windows to match the current theme tokens. */
   restyleAll(): void {
     for (const window of this.windows) {

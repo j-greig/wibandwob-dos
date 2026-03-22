@@ -169,6 +169,13 @@ function createMicroappHost(
           frame.title = title;
           if (frame.titleBar) frame.titleBar.setContent(` ${title} `);
         },
+        registerClickable(node, label) {
+          // Store directly on the frame record — window may not be registered in window-manager yet
+          if (!frame.clickables) frame.clickables = [];
+          frame.clickables = frame.clickables.filter((c) => c.label !== label);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK widget may be any blessed element subtype
+          frame.clickables.push({ label, node: node as any });
+        },
       };
 
       return handle;

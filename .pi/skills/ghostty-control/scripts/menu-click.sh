@@ -13,6 +13,9 @@ ITEM_LABEL="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Close any stale open menu first
+wibwob cmd menu.close 2>/dev/null || true
+
 # Calibrate once, export for child click-cell.sh calls
 eval "$("${SCRIPT_DIR}/calibrate.sh")"
 export CELL_W CELL_H GHOSTTY_WIN_INDEX
@@ -22,10 +25,11 @@ MENU_DATA=$(curl -sf "http://127.0.0.1:${PORT}/menu/list")
 
 # Find menu col
 MENU_COL=$(echo "$MENU_DATA" | jq -r --arg label "$MENU_LABEL" '
-  .result[] | select(.label == $label) | .col + (.label | length / 2 | floor)
+  (.result.menus // .result) | .[] | select(.label == $label) | .col + (.label | length / 2 | floor)
 ')
 if [[ -z "$MENU_COL" || "$MENU_COL" == "null" ]]; then
-  echo "menu not found: $MENU_LABEL" >&2; exit 1
+  AVAILABLE=$(echo "$MENU_DATA" | jq -r '(.result.menus // .result) | .[].label' | tr '\n' ', ')
+  echo "menu not found: $MENU_LABEL (available: $AVAILABLE)" >&2; exit 1
 fi
 
 # Click the menu bar label (single click opens the menu)
@@ -35,17 +39,19 @@ if [[ -z "$ITEM_LABEL" ]]; then
   exit 0
 fi
 
-sleep 0.5
+# Wait for menu to appear in screenshot rather than sleep
+bash "${SCRIPT_DIR}/wait-for.sh" text "$MENU_LABEL" --timeout 3 2>/dev/null || true
 
 # Find item row and col from API data
 ITEM_INFO=$(echo "$MENU_DATA" | jq -r --arg menu "$MENU_LABEL" --arg item "$ITEM_LABEL" '
-  .result[] | select(.label == $menu) |
-  .col as $col |
-  .items[] | select(.label == $item) |
+  ((.result.menus // .result) | .[] | select(.label == $menu)) as $m |
+  $m.col as $col |
+  $m.items[] | select(.label == $item) |
   "\($col + 5) \(.row)"
 ')
 if [[ -z "$ITEM_INFO" || "$ITEM_INFO" == "null" ]]; then
-  echo "item not found: $ITEM_LABEL in $MENU_LABEL" >&2; exit 1
+  AVAILABLE=$(echo "$MENU_DATA" | jq -r --arg menu "$MENU_LABEL" '(.result.menus // .result) | .[] | select(.label==$menu) | .items[].label' | tr '\n' ', ')
+  echo "item not found: $ITEM_LABEL in $MENU_LABEL (available: $AVAILABLE)" >&2; exit 1
 fi
 
 read -r ITEM_COL ITEM_ROW <<< "$ITEM_INFO"

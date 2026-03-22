@@ -1789,6 +1789,25 @@ export class TsTuiMvpApp {
         }
       },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
+      clickWindowElement: (args) => {
+        const id = Number(args?.id);
+        const label = typeof args?.label === "string" ? args.label : undefined;
+        if (!label) return { ok: false, error: "label (string) is required" };
+        const record = this.windowManager.getWindowById(id);
+        if (!record) return { ok: false, error: `no window with id ${id}` };
+        const clickables = this.windowManager.getClickables(id);
+        const target = clickables.find((c) => c.label === label);
+        if (!target) {
+          return { ok: false, error: `label not found: "${label}"`, available: clickables.map((c) => c.label) };
+        }
+        // Find the actual node and emit a click event (headless — no AppleScript needed)
+        const entry = record.clickables?.find((c) => c.label === label);
+        if (entry?.node) {
+          entry.node.emit("click");
+          return { ok: true, label, row: target.row, col: target.col };
+        }
+        return { ok: false, error: "node reference lost" };
+      },
       moveWindowById: (args) => {
         this.windowManager.moveWindow(
           Number(args?.id),
@@ -1854,7 +1873,8 @@ export class TsTuiMvpApp {
       },
       menuList: () => {
         const focusedAppType = this.windowManager.getFocusedWindow()?.describeState?.()?.appType as string | undefined;
-        return this.menus.map((menu) => {
+        const openMenuLabel = this.menuUi.getOpenMenuLabel();
+        const menus = this.menus.map((menu) => {
           // Filter to only currently visible items (same logic as menu renderer)
           const visible = menu.items.filter(
             (item) => !item.appTypes || (!!focusedAppType && item.appTypes.includes(focusedAppType)),
@@ -1873,6 +1893,7 @@ export class TsTuiMvpApp {
           }
           return { label: menu.label, category: menu.category, col: menu.left, items };
         });
+        return { openMenu: openMenuLabel ?? null, menus };
       },
       overlaySetText: (args) => {
         const text = typeof args?.text === "string" ? args.text : undefined;

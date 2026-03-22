@@ -109,6 +109,7 @@ export interface AppMenuActions {
   closeWindowById: (args?: Record<string, unknown>) => void;
   setWindowChrome: (args?: Record<string, unknown>) => void;
   focusWindowById: (args?: Record<string, unknown>) => void;
+  clickWindowElement: (args?: Record<string, unknown>) => unknown;
   moveWindowById: (args?: Record<string, unknown>) => void;
   resizeWindowById: (args?: Record<string, unknown>) => void;
   // ── Canvas documents ───────────────────────────────────
@@ -775,6 +776,16 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
       height: z.number().describe("New height in rows"),
     })
   },
+  {
+    id: "window.click",
+    label: "Click Window Element",
+    description: "Click a named clickable element in a window by label. Args: { id: number, label: string }. Returns { ok, label, row, col } or { ok: false, error, available: [...] }.",
+    group: "focus",
+    actionKey: "clickWindowElement",
+    api: true,
+    agent: true,
+  },
+
   {
     id: "desktop.clear-all",
     label: "Clear Desktop",
