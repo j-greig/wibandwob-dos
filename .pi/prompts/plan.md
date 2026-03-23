@@ -35,7 +35,7 @@ Flag any pre-existing bugs found along the way.
 
 ## Phase 3 · Review
 
-Pretend you're encountering this plan cold.
+Pretend you're encountering this plan cold. Read it again with fresh eyes.
 
 Apply each lens. Skip any with no purchase — but name it so the skip is visible.
 
