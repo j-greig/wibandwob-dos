@@ -23,31 +23,48 @@ description: Reflect on implementation friction after sessions. Write for yourse
 ```markdown
 ## YYYY-MM-DD — Session name
 
-### What happened
+### Friction name — one line summary
 
-**Pain:** The problem.
+**Pain:** What went wrong. Specific. One sentence preferred.
 
-**Why:** Root cause (5 whys).
+**Why:** Root cause. Scale the whys to the problem — 1 for obvious causes, 5+ for knotty ones where each layer reveals a deeper cause. Ask 'but why did that happen?' until you hit bedrock. Unknown? Write "unknown — symptoms: X". Blank is fine.
 
-**Fix:** Skill, script, or doc change to prevent recurrence.
+**Fix:** What was done or what would prevent recurrence. Blank / "TBD" / "to be explored" all valid — especially for unknowns or mid-session discoveries.
+
+#### → Ideas
+- One atomic actionable idea per line `[id:WNN-001][status:open]`
+- Another `[id:WNN-002][status:open]`
 ```
 
-Example (real entry):
+Example:
 
 ```markdown
 ## 2026-03-18 — Adding theattyr microapp
 
-### Couldn't launch theattyr via CLI
+### `wibwob cmd microapp.wibwob.theattyr.open` returned "unknown command"
 
-**Pain:** `wibwob cmd microapp.wibwob.theattyr.open` returned "unknown command" after adding microapp to registry.
+**Pain:** Microapp scaffolded, typecheck passed, app started — command not found.
 
-**Why:** The microapp-registry.ts needs an entry for new microapps. Without it, commands don't register. But AGENTS.md listed the file path without explaining WHAT it does or WHEN to touch it.
+**Why:** `microapp-registry.ts` gates loading. Without an entry, the microapp silently skips. AGENTS.md listed the file path but not what it does or when to touch it.
 
-**Fix:** Added theattyr to REGISTRY. Better: AGENTS.md should explain the registry+tier system, or auto-register unknown microapps at beta tier with a log hint.
+**Fix:** Added `"wibwob.theattyr": "beta"` to REGISTRY.
+
+#### → Ideas
+- Log hint on skip: `[microapp-loader] Skipped unregistered: wibwob.theattyr — add to REGISTRY` `[id:W13-005][status:open]`
+- Or: auto-register unknown microapps at beta tier on first load `[id:W13-006][status:open]`
 ```
 
 ## Tips
 
-- One entry per session
-- Fixes must be actionable (skill, script, doc)
-- The value is pain → why (5 whys, more if complex) → fix analysis, not chronological log
+- `**Why**` and `**Fix**` can be blank, "TBD", or "to be explored" — don't invent a root cause you don't have
+- `#### → Ideas` is the ONLY place tags live — haiku and `devlog-triage.sh` scan only these sections
+- When prompting haiku to tag a devlog file: "tag ONLY lines starting with `- ` inside `#### → Ideas` sections — not prose, not continuation lines, not `###` headings"
+- One idea per bullet, one tag per idea — no tagging continuation lines or narrative prose
+- If a Fix is itself buildable, copy it to `→ Ideas`
+- One-liners (`devlog.sh "note"`) auto-get IDs — they land under the day's `#### → Ideas` section
+- If there's no friction (pure positive observation or shipped item), skip the `###` block entirely — just add to `#### → Ideas` directly under the session `##` heading
+- Tag the `###` heading with a top-level ID+status: `### Pain name \`[id:WNN-001][status:open]\``
+- Sub-ideas use lettered suffixes: `[id:WNN-001a]`, `[id:WNN-001b]`
+- Statuses: `open` → `in-progress` → `partial` → `done:hash` | `wontfix`
+- `partial` = some sub-ideas shipped, pain not fully gone yet
+- When a commit resolves an idea: update to `[status:done:abc1234]` + add `Addresses WNN-001a` to commit body

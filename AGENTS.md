@@ -64,6 +64,8 @@ produces binary evidence (pass/fail + artefact path). 3 small slices > 1 large o
 `bash scripts/ensure-running.sh` · `bash scripts/restart.sh` · `bash scripts/reload-microapp.sh <id>`
 `curl localhost:8099/health` · `curl localhost:8099/state` · `wibwob --help` for full CLI.
 
+TUI control: `ghostty-control` skill (terminal emulator — keystrokes, clicks) · `wibwobdos-control` skill (HTTP API — windows, state, commands).
+
 ---
 
 ## Planning
@@ -85,8 +87,9 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 - Docs are wrong → fix in the same commit
 - A pattern confuses → write a devlog entry (`scripts/devlog.sh "note"`)
 - "It typechecks" is not done — run the thing
-- Use '5 whys' to explain why code was changed (adjuting why count to suit scope/complexity of changes)
+- Use '5 whys' approach ("5W") to explain why code was changed - adjusting why count to suit scope/complexity of the change or problem in question
 - Bun-first. No Node-only assumptions.
+- Subagents doing analysis, tagging, or parallel work must write results to `scratch/` paths — return values are ephemeral. Give each agent an explicit output path; merge after all complete. Template: `scratch/.template/worker-pattern.md`.
 
 ---
 

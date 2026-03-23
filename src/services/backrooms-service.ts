@@ -72,21 +72,22 @@ export class BackroomsService {
   }
 
   collectPlaybackFiles(): BrowserEntry[] {
-    const backroomsPath = this.resolveBackroomsPath();
+    // Only use locally-recorded session logs — not external repo art/outputs
+    // which contained unrelated files (e.g. maze-3d, maze-cheese) that leaked
+    // into the fallback playlist.
+    const logsDir = path.join(REPO_ROOT, "logs", "backrooms-tv");
     const entries: BrowserEntry[] = [];
-    for (const dirPath of [path.join(backroomsPath, "art", "outputs"), path.join(backroomsPath, "outputs"), path.join(backroomsPath, "primers")]) {
-      if (!fs.existsSync(dirPath)) {
+    if (!fs.existsSync(logsDir)) {
+      return entries;
+    }
+    for (const name of fs.readdirSync(logsDir).sort((a, b) => b.localeCompare(a))) {
+      if (!name.endsWith(".txt")) {
         continue;
       }
-      for (const name of fs.readdirSync(dirPath).sort((a, b) => a.localeCompare(b))) {
-        if (!name.endsWith(".txt")) {
-          continue;
-        }
-        entries.push({
-          label: name.replace(/\.txt$/, ""),
-          filePath: path.join(dirPath, name)
-        });
-      }
+      entries.push({
+        label: name.replace(/\.txt$/, ""),
+        filePath: path.join(logsDir, name)
+      });
     }
     return entries;
   }
@@ -154,7 +155,7 @@ export class BackroomsService {
     // Guard against broken symlinks and missing sources before attempting anything.
     // fs.existsSync follows symlinks, so it returns false for a broken symlink.
     if (!fs.existsSync(sourcePath)) {
-      console.warn(`[backrooms] skipping missing/broken source: ${sourcePath}`);
+      // silently skip — external source repos may not be present locally
       return;
     }
     if (overwrite && fs.existsSync(targetPath)) {

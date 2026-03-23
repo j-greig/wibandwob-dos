@@ -1,20 +1,23 @@
 ---
 name: ghostty-control
 description: >
-  Control Ghostty terminal via AppleScript to simulate human interaction with
-  the WibWob-DOS TUI — click menu items, send keystrokes, move the mouse,
-  read screen state, and take screenshots for visual verification. Use when
-  smoke-testing the TUI, verifying a microapp opened correctly, clicking a
-  menu to check its contents, simulating user input in an automated test, or
-  any task that requires acting on the TUI like a human would. Triggers on:
-  "click the menu", "smoke test the TUI", "simulate a click", "send a keystroke
-  to the terminal", "verify the TUI visually", "ghostty applescript",
-  "ghostty control", "act like a human in the TUI", "test by clicking",
-  "screenshot the TUI", "broadcast a command", "jump to terminal by directory".
+  TERMINAL EMULATOR LAYER — control Ghostty itself, below WibWob-DOS.
+  Uses AppleScript to act as a human at the keyboard/mouse: click blessed
+  menu items, send keystrokes, inject shell commands, take PNG screenshots,
+  ghost-click TUI cells. Use when: clicking a menu, sending a keystroke,
+  restarting the TUI, smoke-testing the UI, simulating user input.
+  NOT for: opening microapps, reading window content, or anything the HTTP
+  API can do — use wibwobdos-control for that.
+  Typical sequence: ghostty-control to act → wibwobdos-control to verify.
   macOS only. Requires Ghostty >= 1.3.0.
+  Scripts: calibrate.sh, click-cell.sh, click-text.sh, menu-click.sh,
+  send-to-terminal.sh, wait-for.sh, restart-wibwob.sh, ghostty-windows.sh.
 ---
 
 # Ghostty AppleScript Control
+
+> **Layer:** terminal emulator (below WibWob-DOS) · **Sibling:** `wibwobdos-control` (application layer above)
+> If the HTTP API can do it — use `wibwobdos-control`. If it needs a human at the keyboard — use this.
 
 Drive WibWob-DOS TUI as a human would — click menus, send keys, move the mouse.
 macOS only. Requires Ghostty >= 1.3.0 with AppleScript enabled.

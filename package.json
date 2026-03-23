@@ -28,7 +28,7 @@
     "health": "bun run test && bun run typecheck && bun run check-coat && bash -c 'cycles=$(npx madge --circular --extensions ts src/ 2>&1 | grep -c \"^[0-9])\" || true); [ \"$cycles\" = \"0\" ] && echo \"✅ No circular deps\" || (echo \"❌ $cycles circular deps\"; exit 1)' && echo '✅ All health checks passed'",
     "health-full": "bash scripts/health-full.sh",
     "handover": "bash scripts/handover.sh",
-    "check-coat": "bun run .pi/skills/tui-smoke-test/scripts/check-coat.ts",
+    "check-coat": "bun run scripts/checks/check-coat.ts",
     "cli:install": "bun build --compile src/cli/wibwob.ts --outfile /tmp/wibwob-next && sudo mv /tmp/wibwob-next /usr/local/bin/wibwob && echo '✅ wibwob installed'",
     "check-themes": "bun run .pi/skills/tui-smoke-test/scripts/check-themes.ts",
     "watch:microapp": "bun run scripts/watch-microapp.ts",
@@ -38,7 +38,8 @@
     "planning:inbox": "echo 'planning-inbox.ts removed — use wibwob CLI or .planning/ directly'",
     "prepare": "git config core.hooksPath .githooks",
     "lint": "npx eslint 'microapps/**/index.ts'",
-    "wibwob": "bun run src/cli/wibwob.ts"
+    "wibwob": "bun run src/cli/wibwob.ts",
+    "cli:install-dev": "printf '#!/usr/bin/env bash\\nexec bun run --cwd /Users/james/Repos/wibandwob-dos src/cli/wibwob.ts \"$@\"\\n' | sudo tee /usr/local/bin/wibwob > /dev/null && sudo chmod +x /usr/local/bin/wibwob && echo '✅ wibwob dev wrapper installed (runs from source)'"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",
@@ -50,7 +51,6 @@
     "@skitee3000/bun-pty": "^0.3.3",
     "@xterm/headless": "^6.0.0",
     "ascii-data-image": "^1.0.7852",
-
     "blessed": "^0.1.81",
     "blessed-contrib": "^4.11.0",
     "blessed-xterm": "^1.5.1",

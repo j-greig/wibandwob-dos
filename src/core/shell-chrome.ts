@@ -1,5 +1,6 @@
 import blessed from "blessed";
 import stringWidth from "string-width";
+import { copyToClipboard } from "./clipboard.js";
 
 import { appFlags } from "./cli.js";
 import { theme, themeName } from "./theme/resolver.js";
@@ -13,6 +14,8 @@ interface ShellChromeDeps {
   getInstanceDisplayLabel: () => string;
   getDesktopState: () => DesktopState;
   getScrambleFace: () => string;
+  getSessionClipboardText: () => string;
+  onFlash: (msg: string) => void;
   onResize: () => void;
   onReloadMicroapps: () => void;
   onRestart: () => void;
@@ -233,6 +236,14 @@ export class ShellChromeController {
         tags: true,
         content: text,
         style: theme().menuBar,
+        mouse: true,
+        clickable: true,
+      });
+      this.statusIdentity.on("click", () => {
+        const text = this.deps.getSessionClipboardText();
+        if (copyToClipboard(text)) {
+          this.deps.onFlash("Session info copied to clipboard ✓");
+        }
       });
       return;
     }

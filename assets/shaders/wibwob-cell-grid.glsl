@@ -5,8 +5,8 @@
 const float COLS           = 142.0;
 const float ROWS           = 81.0;
 // ── Grid ─────────────────────────────────────────
-const float GRID_OPACITY = 0.20;          // grid line darkness (0 = off)
-const vec3  GRID_COLOR   = vec3(1.0);     // grid line colour (default white)
+const float GRID_OPACITY = 0.17;          // grid line darkness (0 = off)
+const vec3  GRID_COLOR   = vec3(1.0);     // grid line colour (defaults to white)
 
 // ── Gradient ─────────────────────────────────────
 const bool  GRAD_ON      = true;   // toggle gradient on/off

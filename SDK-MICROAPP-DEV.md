@@ -77,6 +77,10 @@ curl -sf --max-time 5 http://127.0.0.1:8099/state   # verify in state
 `src/services/*`, `src/core/*`, or `src/sdk/*` → full restart required:
 `bash scripts/restart.sh --tmux`
 
+**`wibwob` CLI is a compiled binary.** Changes to `src/cli/wibwob.ts` don't
+take effect on restart — rebuild and reinstall: `bun run cli:install`.
+Server-side changes (commands, control-api) take effect on TUI restart only.
+
 ---
 
 ## The four required hooks
@@ -107,12 +111,28 @@ export default function setup(host: MicroappHost) {
 }
 ```
 
-| Hook | Purpose |
-|------|---------|
-| `captureText` | `wibwob read <id>` — semantic text. Falls back to screen crop if unregistered; prefer explicit. |
-| `describeState` | `/state` API — include a meaningful `summary` |
-| `onCleanup` | Stop every timer, destroy every handle |
-| `onRestyle` | Re-apply `host.theme()` colours on theme switch |
+| Hook | Signature | Purpose |
+|------|-----------|---------|
+| `captureText` | `(fn: () => string): void` | `wibwob read <id>` — semantic text. Never return empty. Falls back to screen crop if missing; prefer explicit. |
+| `describeState` | `(fn: () => { summary: string; [k: string]: unknown }): void` | `/state` API — `summary` is required in practice; agents use it for orientation. |
+| `onCleanup` | `(fn: () => void): void` | Stop every timer, destroy every handle. Fires on window close. |
+| `onRestyle` | `(fn: () => void): void` | Re-apply `host.theme()` colours on theme switch. Must reach every styled node. |
+
+**onRestyle minimum pattern:**
+```typescript
+onRestyle: () => {
+  header.update({});      // CompositionHelpers re-apply theme when called with {}
+  host.screen.render();   // always call render() at the end
+},
+```
+
+**describeState minimum pattern:**
+```typescript
+describeState: () => ({
+  summary: "My App — showing X",   // one sentence, present tense, agent-readable
+  itemCount: items.length,          // any extra state an agent might need
+}),
+```
 
 ---
 
@@ -120,7 +140,7 @@ export default function setup(host: MicroappHost) {
 
 ```typescript
 host.createWindow({ title, width?, height?, left?, top? })  // → MicroappWindowHandle
-host.registerCommand({ id, label, action, menu?, palette? }) // prefixed: microapp.<appId>.<id>
+host.registerCommand({ id, label, description?, action, menu?, palette?, multiInstance?, direct? })
 host.registerSnapshot({ serialize, restore })                // workspace persistence
 host.theme()                    // ThemeTokens — call in onRestyle
 host.flash("message")           // toast notification
@@ -130,7 +150,17 @@ host.runCommand(localId)        // dispatch local command
 host.runGlobalCommand(id)       // dispatch any command
 host.repoRoot                   // absolute path to repo root
 host.screen                     // raw blessed Screen (avoid)
-host.geometry                   // { width, height }
+host.geometry                   // { width, height, cellAspect }
+```
+
+**Window handle extras** (on the handle returned by `createWindow`):
+```typescript
+win.setTitle(title)             // update window chrome title
+win.focus()                     // bring window to front
+win.close()                     // programmatic close (triggers onCleanup)
+win.registerClickable(node, label)  // expose a button/tab to agents
+                                    // appears in wibwob state under details.clickables
+                                    // called automatically by createButtonBar + createTabs
 ```
 
 ---
@@ -343,6 +373,151 @@ curl -sf --max-time 5 -X POST http://127.0.0.1:8099/commands/run \
 7. **Batch-verify loop** → rapid curl overwhelms single-threaded bun, one at a time
 
 Full list: `GOTCHAS.md`
+
+---
+
+## COAT compliance — every keybind needs a command
+
+**Rule:** Any key binding that mutates state (playback, selection, mode, data) must have a `host.registerCommand` equivalent so agents and the API can trigger it without a human at the keyboard.
+
+**Paired pattern — the only acceptable form:**
+
+```typescript
+// ✅ COAT-compliant: key binding paired with registered command
+const doRefresh = () => { /* mutates state */ refreshList(); };
+
+host.registerCommand({
+  id: "refresh",
+  label: "Refresh",
+  description: "Re-scan and refresh the list.",
+  action: () => { doRefresh(); },
+});
+
+canvas.element.key(["r"], doRefresh); // same handler — zero duplication
+```
+
+Navigation-only keys (scroll, focus) don't need commands. Cosmetic keys (toggle viz mode) are optional. When in doubt: if an agent needs to drive it, register it.
+
+---
+
+## Patterns & Gotchas
+
+Hard-won patterns from the MAPP 1-10 audit. Each has burned at least one session.
+
+### 1. Two component models — know which you're using
+
+**CompositionHelpers** (`createStatusBar`, `createTextViewer`, `createListPanel`, `createSplitView`, `createTabs`, `createCanvas`) return `{ element, update, destroy }` and self-parent into a blessed box. **Use these for new microapps.**
+
+**LayoutParts** (`createProgressBar`, `createKeyValuePanel`) return `{ node, layout(rect), restyle(), destroy() }`. They do NOT self-parent — you must position them via `createStack` or `createRow`, which are `@internal`.
+
+They are structurally incompatible. You cannot put a CompositionHelper handle into `createStack`. No runtime error — the window just renders blank.
+
+```typescript
+// WRONG — createTextViewer is a CompositionHelper, not a LayoutPart
+const stack = createStack(win.body, [{ key: "text", basis: 1, part: createTextViewer(...) }]);
+
+// RIGHT — CompositionHelpers self-parent, just pass the parent box
+const viewer = createTextViewer(win.body, { ... });
+```
+
+### 2. Three timer mechanisms — pick the right one
+
+| Mechanism | Lifecycle | Use when |
+|-----------|-----------|----------|
+| `setInterval` | Manual `clearInterval` | Never — leaks on close |
+| `createTimer(fn, ms, timers)` | `clearTimers(timers)` clears ALL | Periodic updates with cleanup |
+| `createAnimationClock(fps)` | `subscribe` + `clock.destroy()` | Animation loops |
+
+`createAnimationClock` **starts immediately** — call `clock.pause()` right after creation if you need deferred start. Multiple timers via `createTimer` share one `Set` — if you need independent pause/resume, use separate Sets.
+
+```typescript
+const timers = new Set<ReturnType<typeof setInterval>>();
+createTimer(() => refresh(), 1000, timers);
+onCleanup(() => clearTimers(timers));
+
+// Animation:
+const clock = createAnimationClock(8); // 8fps max — see performance note below
+const unsub = clock.subscribe(() => render());
+onCleanup(() => { unsub(); clock.destroy(); });
+clock.pause(); // pause until ready
+```
+
+### 3. `createCanvas` — call `getSize()` after attach, not during construction
+
+The internal drawille canvas allocates at attach time using whatever blessed dimensions exist then. If you call `getSize()` during construction, you get 0×0.
+
+```typescript
+// WRONG
+const canvas = createCanvas(win.body, {});
+const { width, height } = canvas.getSize(); // 0×0 at construction
+
+// RIGHT — use onResize which fires after layout settles
+canvas.onResize(() => {
+  const { width, height } = canvas.getSize(); // real dimensions
+  initGrid(width, height);
+});
+```
+
+For `blessed-contrib` widgets outside a grid, emit `resize` after layout:
+
+```typescript
+function applyContribRect(widget: any, rect: Rect) {
+  applyRect(widget, rect);
+  widget.emit?.("resize"); // re-allocates internal drawille canvas
+}
+```
+
+### 4. ANSI in grid cells = performance cliff
+
+`paintText` accepts ANSI escape codes in cell content. At 30fps with ANSI-per-cell, bun hits 87% CPU and the HTTP API becomes unresponsive.
+
+```typescript
+// WRONG — ANSI codes in every cell at high fps
+clock = createAnimationClock(30);
+clock.subscribe(() => paintText(grid, row, col, `\x1b[31m${char}\x1b[0m`));
+
+// RIGHT — plain chars, colour via theme or post-process
+clock = createAnimationClock(8); // 8fps ceiling for grid renders
+clock.subscribe(() => paintText(grid, row, col, char));
+```
+
+**Rule:** max 8fps for grid renders. Apply colour globally, not per-cell.
+
+### 5. `createButton` steals focus — use as indicator only
+
+`createButton` sets `focusable: true` + `keys: true` by default. Used as a status indicator, it eats all keyboard shortcuts from the parent widget.
+
+**Workaround:** Don't use `createButton` for non-interactive indicators. Use a plain `blessed.box` with styled content, or `createTextViewer` in read-only mode.
+
+### 6. Focus and input — three separate paths
+
+| Path | What it handles |
+|------|----------------|
+| `win.onInput(text)` | Plumb/write API — text piped from another window or `wibwob write` |
+| `canvas.key(["enter"], fn)` | Keyboard shortcuts on a blessed element |
+| `screen.on("keypress", fn)` | Raw keypress with `(ch, key)` including modifiers |
+
+`win.onInput` is NOT keyboard input. `createInputLine` is modal (`inputOnFocus`) — pressing a key enters edit mode, Escape exits. Tab/Shift-Tab are reliable for focus switching; 1-5 number keys may be captured by the shell.
+
+### 7. Destroy order matters
+
+Destroy children before parents. Destroying a parent while children are still live causes orphan errors in blessed.
+
+```typescript
+onCleanup(() => {
+  childWidget.destroy();  // first
+  parentStack.destroy();  // then
+});
+```
+
+### 8. `host.promptValue()` — undocumented but excellent
+
+Modal text input. Takes focus, returns a promise that resolves to the entered string or `null` on cancel. No docs — found it by reading `microapp-host.ts` types.
+
+```typescript
+const value = await host.promptValue("Enter a name:");
+if (value === null) return; // cancelled
+```
 
 ---
 

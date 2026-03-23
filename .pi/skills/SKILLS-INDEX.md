@@ -14,7 +14,7 @@ do-not-edit: true
 ## agentic-dev-reflection
 **Your Friction Journalist** — Reflect on implementation friction after sessions. Write for yourself and future agents. Focus on pain → why → fix. Skip git-log style entries.
 
-Triggers on: "Reflect on implementation friction after sessions", "agentic dev reflection", "agentic reflection".
+Triggers on: "Reflect on implementation friction after sessions", "to be explored", "agentic dev reflection".
 
 Does not: Does not make changes — reads and reports only.
 
@@ -125,7 +125,7 @@ Triggers on: "add a command", "new command", "wire a command", "scaffold command
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
-Last used: today (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
 
 ---
 
@@ -196,11 +196,11 @@ Last used: never · See: `.pi/skills/figlet-videographer/SKILL.md`
 ---
 
 ## ghostty-control
-**Your Specialist** — Control Ghostty terminal via AppleScript to simulate human interaction with the WibWob-DOS TUI — click menu items, send keystrokes, move the mouse, read screen…
+**Your Specialist** — TERMINAL EMULATOR LAYER — control Ghostty itself, below WibWob-DOS. Uses AppleScript to act as a human at the keyboard/mouse: click blessed menu items, send key…
 
-Triggers on: "smoke-testing the TUI", "verifying a microapp opened correctly", "clicking a menu to check its contents", "simulating user input in an automated test", "or any task that requires acting on the TUI like a human would", "click the menu", "smoke test the TUI".
+Triggers on: "clicking a menu", "sending a keystroke", "restarting the TUI", "smoke-testing the UI", "simulating user input".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: NOT for: opening microapps, reading window content, or anything the HTTP API can do — use wibwobdos-control for that
 
 Last used: never · See: `.pi/skills/ghostty-control/SKILL.md`
 
@@ -327,7 +327,7 @@ Triggers on: "users ask to search notes", "find documents", "or look up informat
 
 Does not: Does not make changes — reads and reports only.
 
-Last used: today (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
 
 ---
 
@@ -421,7 +421,7 @@ Triggers on: "building a new skill", "restructuring an existing one", "writing a
 
 Does not: Does not make broad changes — stays within its narrow defined scope.
 
-Last used: today (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
 
 ---
 
@@ -458,19 +458,6 @@ Last used: never · See: `.pi/skills/wibwob-hosting-smoke/SKILL.md`
 
 ---
 
-## wibwobdos
-**Your Desktop Operator** — Operate WibWob-DOS: open/move/read windows, check desktop state, send messages to the agent, take screenshots, share to Discord, and manage Ghostty shader overl…
-
-Triggers on: "opening apps on the desktop", "reading window content", "controlling the TUI", "enabling a shader or visual effect", "sharing the desktop state".
-
-Does not: Does not overlap with the other wibwob-ops member — see family note.
-
-> **Family:** wibwob-ops (see also: wibwobdos, wibwobdos-cinema)
-
-Last used: never · See: `.pi/skills/wibwobdos/SKILL.md`
-
----
-
 ## wibwobdos-cinema
 **Your Reel Director** — Record choreographed WibWob-DOS TUI sessions as retina GIF/MP4 with synced chiptune SFX audio. Use when recording a demo, making a show reel, capturing a choreo…
 
@@ -481,6 +468,17 @@ Does not: Does not overlap with the other wibwob-ops member — see family note.
 > **Family:** wibwob-ops (see also: wibwobdos, wibwobdos-cinema)
 
 Last used: never · See: `.pi/skills/wibwobdos-cinema/SKILL.md`
+
+---
+
+## wibwobdos-control
+**Your Specialist** — APPLICATION LAYER — control what runs inside Ghostty, not Ghostty itself. Talks to the WibWob-DOS HTTP API (port 8099) to open/move/read windows, check desktop…
+
+Triggers on: "opening a microapp", "reading a window's content", "checking desktop layout", "sending a command", "managing shaders".
+
+Does not: NOT for: clicking menus, sending keystrokes, or interacting with the terminal emulator itself — use ghostty-control for that
+
+Last used: never · See: `.pi/skills/wibwobdos-control/SKILL.md`
 
 ---
 
@@ -515,7 +513,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | doc-agent | Specialist | Autopoietic documentation agent |
 | figlet-videographer | Typography VJ | Create typographic video sequences using figlet text animations in WibWob-DOS |
-| ghostty-control | Specialist | Control Ghostty terminal via AppleScript to simulate human interaction with the  |
+| ghostty-control | Specialist | TERMINAL EMULATOR LAYER — control Ghostty itself, below WibWob-DOS |
 | git-branch-oneliners | Git Reporter | - Export recent git commits grouped by branch into a plain text report |
 | img-to-ascii | ASCII Converter | Convert images to plain-text ASCII art primers for the TUI |
 | joan-stark-ascii-art | Art Librarian | Library of 500+ ASCII art pieces by Joan G |
@@ -538,6 +536,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | timeline-smoke | Timeline Tester | - Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs at ever |
 | vj-timeline | Show Director | Compose and execute timed music video shows inside WibWob-DOS TUI |
 | wibwob-hosting-smoke | Deployment Validator | Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VP |
-| wibwobdos | Desktop Operator | Operate WibWob-DOS: open/move/read windows, check desktop state, send messages t |
 | wibwobdos-cinema | Reel Director | Record choreographed WibWob-DOS TUI sessions as retina GIF/MP4 with synced chipt |
+| wibwobdos-control | Specialist | APPLICATION LAYER — control what runs inside Ghostty, not Ghostty itself |
 | youtube-transcript | Transcript Fetcher | Fetch the transcript of any YouTube video as plain text |

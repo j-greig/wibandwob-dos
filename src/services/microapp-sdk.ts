@@ -403,7 +403,8 @@ export { makeHill, heightmap, march, terrainNames } from "./contour-engine.js";
 export type { Hill, ContourMode } from "./contour-engine.js";
 
 /** @internal Terrain model — used by wibwobworld */
-export type { TerrainBiome, TerrainObject, TerrainCell, TerrainMap, TerrainPoint } from "./terrain-model.js";
+export { createTerrainMap, getTerrainFocusPoint, createSavedTerrainArtifact } from "./terrain-model.js";
+export type { TerrainBiome, TerrainObject, TerrainCell, TerrainMap, TerrainPoint, SavedTerrainArtifact } from "./terrain-model.js";
 
 /** @internal Terrain renderer — used by wibwobworld */
 export { findTerrainPeak, renderTerrainMap, BIOME_GLYPHS, BIOME_COLORS } from "./terrain-render.js";

@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 // child_process no longer needed here — FX pipeline extracted to fx-pipeline.ts
 import { log } from "../services/app-logger.js";
+import { shaderSet, shaderList, shaderStatus, shaderLabel } from "../services/ghostty-shader-service.js";
 import {
   resolveSmearSource as fxResolveSmearSource,
   runFxScript as fxRunFxScript,
@@ -296,6 +297,25 @@ export class TsTuiMvpApp {
       desktop: this.desktop,
       statusLine: this.statusLine,
       getInstanceDisplayLabel: () => this.getInstanceDisplayLabel(),
+      onFlash: (msg) => this.overlays.flash(msg),
+      getSessionClipboardText: () => {
+        const state = this.state.getState();
+        const w = this.screen.width as number;
+        const h = this.screen.height as number;
+        const port = this.controlApi.getStatus().port
+          ?? parseInt(process.env.WIBWOB_PORT ?? String(CONTROL_API_PORT), 10);
+        return [
+          `[WibWob-DOS session]`,
+          `id: ${this.instanceId}`,
+          `label: ${this.instanceLabel ?? this.instanceDisplayId}`,
+          `pid: ${process.pid}`,
+          `port: ${port}`,
+          `screen: ${w}×${h}`,
+          `theme: ${themeName()}`,
+          `windows: ${state.windows.length}`,
+          `api: http://127.0.0.1:${port}/`,
+        ].join("\n");
+      },
       getDesktopState: () => this.state.sync(),
       getScrambleFace: () =>
         this.scrambleBrain.sleeping ? "(-.-)"
@@ -496,7 +516,8 @@ export class TsTuiMvpApp {
     this.microappDeps = this.buildMicroappDeps();
     await loadMicroapps(this.microappDeps);
 
-    // Rebuild menus after microapps may have registered dynamic commands
+    // Register dynamic commands, then rebuild menus so they're included
+    this.registerShaderMenu();
     this.rebuildMenusFromCommands();
     registerAllHostWindows();
 
@@ -576,6 +597,35 @@ export class TsTuiMvpApp {
   private rebuildMenusFromCommands(): void {
     this.menus.length = 0;
     this.menus.push(...this.commands.buildMenus());
+  }
+
+  /** Register "Shaders ▸" in the View menu — opens a popup with live shader list. */
+  private registerShaderMenu(): void {
+    this.commands.addDynamic({
+      id: "ghostty.shaders",
+      label: "Shaders ▸",
+      group: "system",
+      description: "Toggle Ghostty GPU shaders",
+      menuPlacements: [{ category: "view" as any, order: 96 }],
+      action: () => {
+        const shaders = shaderList();
+        const { active } = shaderStatus();
+        const items = shaders.map((name) => ({
+          label: `${active === name ? "✓ " : "  "}${shaderLabel(name)}`,
+          action: () => shaderSet(name),
+        }));
+        items.push({
+          label: `${active === null ? "✓ " : "  "}Off`,
+          action: () => shaderSet("off"),
+        });
+        // Position submenu to the right of the View dropdown
+        const viewMenu = this.menus.find((m) => m.category === "view");
+        const viewLeft = viewMenu?.left ?? 15;
+        const dropdownWidth = Math.max(...(viewMenu?.items ?? []).map((i) => i.label.length), 10) + 4;
+        const shaderRow = (viewMenu?.items ?? []).length + 2;
+        this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow);
+      },
+    });
   }
 
   private collectReloadInvalidationFiles(limit = 6): string[] {
@@ -1135,6 +1185,9 @@ export class TsTuiMvpApp {
   private getBackroomsPickerApi(): {
     info?: () => unknown;
     select?: (index: number) => unknown;
+    toggle?: (index?: number) => unknown;
+    toggleByLabel?: (label: string) => unknown;
+    search?: (query: string) => unknown;
     confirm?: () => unknown;
     cancel?: () => unknown;
   } | null {
@@ -1144,6 +1197,9 @@ export class TsTuiMvpApp {
     return {
       info: typeof dyn._backroomsPickerInfo === "function" ? (dyn._backroomsPickerInfo as () => unknown) : undefined,
       select: typeof dyn._backroomsPickerSelect === "function" ? (dyn._backroomsPickerSelect as (index: number) => unknown) : undefined,
+      toggle: typeof dyn._backroomsPickerToggle === "function" ? (dyn._backroomsPickerToggle as (index?: number) => unknown) : undefined,
+      toggleByLabel: typeof dyn._backroomsPickerToggleByLabel === "function" ? (dyn._backroomsPickerToggleByLabel as (label: string) => unknown) : undefined,
+      search: typeof dyn._backroomsPickerSearch === "function" ? (dyn._backroomsPickerSearch as (query: string) => unknown) : undefined,
       confirm: typeof dyn._backroomsPickerConfirm === "function" ? (dyn._backroomsPickerConfirm as () => unknown) : undefined,
       cancel: typeof dyn._backroomsPickerCancel === "function" ? (dyn._backroomsPickerCancel as () => unknown) : undefined,
     };
@@ -1984,6 +2040,25 @@ export class TsTuiMvpApp {
         if (!Number.isFinite(index)) return { selected: false, error: "index must be a number" };
         return api.select(index);
       },
+      backroomsPickerToggle: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.toggle) return { ok: false, error: "Backrooms picker not active" };
+        const index = args?.index !== undefined ? Number(args.index) : undefined;
+        return api.toggle(Number.isFinite(index) ? index : undefined);
+      },
+      backroomsPickerToggleByLabel: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.toggleByLabel) return { ok: false, error: "Backrooms picker not active" };
+        const label = typeof args?.label === "string" ? args.label.trim() : "";
+        if (!label) return { ok: false, error: "label is required" };
+        return api.toggleByLabel(label);
+      },
+      backroomsPickerSearch: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.search) return { ok: false, error: "Backrooms picker not active" };
+        const query = typeof args?.query === "string" ? args.query : "";
+        return api.search(query);
+      },
       backroomsPickerConfirm: () => {
         const api = this.getBackroomsPickerApi();
         if (!api?.confirm) return { confirmed: false, error: "Backrooms picker not active" };
@@ -2263,47 +2338,18 @@ export class TsTuiMvpApp {
         }
       },
 
-      // ── Ghostty shader control ──────────────────────────
+      // ── Ghostty shader control (logic in ghostty-shader-service.ts) ──
       ghosttyShaderSet: (args) => {
         const name = typeof args?.name === "string" ? args.name : "";
-        if (!name) return { ok: false, error: "Missing shader name" };
-        const action = name === "off" ? "off" : "on";
-        const shaderArgs = action === "on" ? [action, name] : [action];
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" ${shaderArgs.join(" ")}`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          return { ok: true, shader: name, action, output };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        return shaderSet(name);
       },
       ghosttyShaderList: () => {
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" list`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          const shaders = output.split("\n").filter(Boolean);
-          return { ok: true, shaders };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        const shaders = shaderList();
+        return { ok: true, shaders };
       },
       ghosttyShaderStatus: () => {
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" status`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          return { ok: true, status: output };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        const { active, output } = shaderStatus();
+        return { ok: true, active, status: output };
       },
     };
   }

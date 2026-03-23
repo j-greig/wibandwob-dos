@@ -18,6 +18,16 @@ Create a git commit using the project's conventional commit format.
 Optional. Blank line after subject. Explain *why*, not just *what*.
 Chase the 5 whys — scaled to the problem.
 
+**Devlog link — two ways to close the loop:**
+- Add `Addresses W13-001a` to the commit body → `devlog-triage.sh` auto-upgrades `open` → `done:<hash>`
+- Or update the tag manually: `[status:done:abc1234]`
+
+Status lifecycle: `open` → `in-progress` → `partial` → `done:hash` | `wontfix`
+- `partial` = some sub-ideas shipped, pain not fully gone — update the `###` heading tag manually
+- `wontfix` = explicitly not doing — add reason inline after the tag
+
+Both paths work. Commit reference is lazier and preferred.
+
 ## Rules
 
 - Only commit, do NOT push.
@@ -31,6 +41,8 @@ Chase the 5 whys — scaled to the problem.
 2. Optionally `git log -n 10 --pretty=format:%s` to see recent style.
 3. Stage intended files.
 4. `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+5. If this commit ships a devlog idea, add `Addresses WXX-NNN` to the body — or update `[status:open]` → `[status:shipped:<hash>]` in the reflection file directly.
+6. Optionally: `bash scripts/devlog-triage.sh W<NN>` to confirm the link resolved.
 
 ## Examples
 

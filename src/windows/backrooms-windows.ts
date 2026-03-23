@@ -279,8 +279,41 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
     list.select(index);
     updatePreview(index);
+    context.syncState();
     context.screen.render();
     return { ok: true, index, count, label: filteredEntries[index]?.label };
+  };
+  (frame as unknown as Record<string, unknown>)._backroomsPickerToggle = (requestedIndex?: number) => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
+    const count = filteredEntries.length;
+    if (count <= 0) return { ok: false, error: "No selectable entries" };
+    if (requestedIndex !== undefined) {
+      const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+      list.select(index);
+    }
+    const index = (list as List & { selected: number }).selected ?? 0;
+    const label = filteredEntries[index]?.label;
+    toggleSelected();
+    context.syncState();
+    return { ok: true, index, label, selected: selectedLabels.has(label ?? "") };
+  };
+  (frame as unknown as Record<string, unknown>)._backroomsPickerToggleByLabel = (label: string) => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
+    const index = filteredEntries.findIndex((e) => e.label === label);
+    if (index < 0) return { ok: false, error: `Primer not found in filtered list: ${label}` };
+    list.select(index);
+    toggleSelected();
+    updatePreview(index);
+    context.syncState();
+    context.screen.render();
+    return { ok: true, index, label, selected: selectedLabels.has(label) };
+  };
+  (frame as unknown as Record<string, unknown>)._backroomsPickerSearch = (query: string) => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
+    searchValue = query ?? "";
+    applyFilter();
+    context.syncState();
+    return { ok: true, searchValue, count: filteredEntries.length };
   };
   (frame as unknown as Record<string, unknown>)._backroomsPickerConfirm = () => {
     if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
@@ -324,19 +357,25 @@ export function promptForBackroomsRunOptions(
   primers: string,
   defaults: BackroomsChannel
 ): void {
-  context.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
-    context.overlays.openValuePrompt("Backrooms Model", defaults.model, (modelValue) => {
+  const promptTurns = () => {
+    context.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
       const turns = Math.max(1, Math.min(20, Number.parseInt(turnsValue, 10) || defaults.turns));
-      const trimmedModel = modelValue.trim();
-      const model = ["haiku", "sonnet", "opus"].includes(trimmedModel) ? (trimmedModel as BackroomsChannel["model"]) : defaults.model;
-      context.openBackroomsTv({
-        theme,
-        primers,
-        turns,
-        model
-      });
+      context.overlays.openRadioPrompt(
+        "Backrooms Model",
+        [
+          { label: "Haiku  (fast)", value: "haiku" as const },
+          { label: "Sonnet (balanced)", value: "sonnet" as const },
+          { label: "Opus   (deep)", value: "opus" as const }
+        ],
+        defaults.model,
+        (model) => {
+          context.openBackroomsTv({ theme, primers, turns, model });
+        },
+        promptTurns
+      );
     });
-  });
+  };
+  promptTurns();
 }
 
 export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: BackroomsChannel): void {

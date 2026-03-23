@@ -14,6 +14,7 @@ import { theme } from "./theme/resolver.js";
 import { createScrollbar, scrollableStyle } from "./ui-primitives.js";
 import { EMPTY_FILE_SELECTED } from "./empty-states.js";
 import { createModal, createButtonBar, showToast, type ModalPosition } from "./modal.js";
+import { createRadioGroup } from "../ui/forms.js";
 import type { Box, List, Textbox } from "./types.js";
 
 interface BrowserPromptItem {
@@ -685,6 +686,85 @@ export class OverlayManager {
   }
 
   /** File browser with directory navigation, filtering, preview, and directoriesOnly/fileFilter options. */
+  /**
+   * Show a modal with a radio button group and OK / Back buttons.
+   * `onBack` is optional — if omitted the Back button is not rendered.
+   */
+  openRadioPrompt<T extends string>(
+    label: string,
+    options: { label: string; value: T }[],
+    selected: T,
+    onSubmit: (value: T) => void,
+    onBack?: () => void
+  ): void {
+    const t = theme();
+    const modalHeight = options.length + 6;
+    const modal = createModal({
+      screen: this.screen,
+      width: 40,
+      height: modalHeight,
+      position: "c",
+      label,
+      style: { ...t.body, border: t.windowBorderFocused }
+    });
+
+    let currentValue = selected;
+
+    const radio = createRadioGroup({
+      options,
+      selected,
+      onChange: (e) => { currentValue = e.value as T; }
+    });
+    radio.node.top = 1;
+    radio.node.left = 2;
+    radio.node.width = 36;
+    radio.node.parent = modal.box;
+    modal.box.append(radio.node);
+
+    const closePrompt = () => {
+      this.clearActiveOverlay();
+      buttonBar.destroy();
+      modal.destroy();
+      this.restoreWindowFocus();
+      this.screen.render();
+    };
+
+    const submitValue = () => {
+      closePrompt();
+      onSubmit(currentValue);
+    };
+
+    const buttons = onBack
+      ? [
+          { label: "OK", variant: "primary" as const, action: submitValue },
+          { label: "Back", action: () => { closePrompt(); onBack(); } }
+        ]
+      : [{ label: "OK", variant: "primary" as const, action: submitValue }];
+
+    const buttonBar = createButtonBar({
+      parent: modal.box,
+      bottom: 1,
+      screen: this.screen,
+      align: "right",
+      buttons
+    });
+
+    radio.node.key(["tab"], () => buttonBar.focus(0));
+    radio.node.key(["enter"], submitValue);
+    radio.node.key(["escape"], closePrompt);
+
+    this.activeOverlay = {
+      type: "value",
+      label,
+      confirm: submitValue,
+      cancel: closePrompt,
+      info: () => ({ value: currentValue })
+    };
+
+    this.screen.render();
+    radio.node.focus();
+  }
+
   openFileBrowserPrompt(
     label: string,
     initialDirectory: string,

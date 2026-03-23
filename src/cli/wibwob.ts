@@ -19,7 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync as _spawnSync } from "node:child_process";
 import { safeWriteFile } from "../core/safe-fs.js";
 import { APP_ROOT, DATA_ROOT, SCRATCH_BASE } from "../core/config.js";
 
@@ -320,6 +320,19 @@ function tryResolveBase(): string | null {
     return `unix://${alive[0].socketPath}`;
   }
   if (alive.length > 1) {
+    // Prefer instances with a real screen over headless ones (screen 1×1 = zombie)
+    const realScreen = alive.filter((inst) => {
+      try {
+        const res = _spawnSync("curl", [
+          "-sf", "--unix-socket", inst.socketPath, "http://localhost/health",
+        ], { timeout: 800, encoding: "utf-8" });
+        const health = JSON.parse(res.stdout ?? "{}") as { screen?: { width: number; height: number } };
+        return (health.screen?.width ?? 0) > 1;
+      } catch { return true; /* unknown — don't exclude */ }
+    });
+    const candidates = realScreen.length > 0 ? realScreen : alive;
+    if (candidates.length === 1) return `unix://${candidates[0].socketPath}`;
+
     process.stderr.write("Multiple instances running — specify which one:\n");
     for (const inst of alive) {
       const aliases = [inst.instanceId, inst.instanceDisplayId].filter(Boolean).join(", ");
@@ -339,9 +352,33 @@ function tryResolveBase(): string | null {
 /** Resolve base URL, exiting with error if no instance found. */
 function resolveBase(): string {
   const base = tryResolveBase();
-  if (base) return base;
-  process.stderr.write(`No WibWob-DOS instances running.\nStart one with: bun run dev\n`);
-  process.exit(1);
+  if (!base) {
+    process.stderr.write(`No WibWob-DOS instances running.\nStart one with: bun run dev\n`);
+    process.exit(1);
+  }
+  // Health gate: warn if target instance appears headless (screen 1×1)
+  // Only check socket-based instances (remote/env-URL instances skip the gate)
+  const strict = process.argv.includes("--strict");
+  if (base.startsWith("unix://") && !findFlag("--instance", "-i")) {
+    try {
+      const sock = base.slice("unix://".length);
+      const res = _spawnSync("curl", [
+        "-sf", "--unix-socket", sock, "http://localhost/health",
+      ], { timeout: 800, encoding: "utf-8" });
+      const health = JSON.parse(res.stdout ?? "{}") as { screen?: { width: number; height: number } };
+      const w = health.screen?.width ?? 99;
+      const h = health.screen?.height ?? 99;
+      if (w <= 1 || h <= 1) {
+        process.stderr.write(`⚠  Target instance screen is ${w}×${h} — may be headless (commands may silently no-op).\n`);
+        process.stderr.write(`   Use -i <label> to target a specific instance, or check: wibwob ls\n`);
+        if (strict) {
+          process.stderr.write(`   --strict: refusing to dispatch to headless instance.\n`);
+          process.exit(1);
+        }
+      }
+    } catch { /* health check failed — proceed */ }
+  }
+  return base;
 }
 
 // Lazy resolution — only resolved when a command actually needs the API connection.
@@ -469,11 +506,36 @@ async function cmdCommands() {
     params.set("includeUnavailable", "true");
   }
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  const data = (await api(`/commands/list${suffix}`)) as { commands: Array<{ id: string }> };
+  const data = (await api(`/commands/list${suffix}`)) as {
+    commands: Array<{
+      id: string;
+      label?: string;
+      description?: string;
+      params?: { properties?: Record<string, { type?: string; description?: string }>; required?: string[] };
+    }>
+  };
   if (QUIET) {
     for (const c of data.commands) console.log(c.id);
-  } else {
+  } else if (flags.json) {
     out(data.commands);
+  } else {
+    for (const c of data.commands) {
+      const label = c.label ? `  ${c.label}` : "";
+      process.stdout.write(`${c.id}${label}\n`);
+      if (c.description) {
+        process.stdout.write(`    ${c.description}\n`);
+      }
+      if (c.params?.properties && Object.keys(c.params.properties).length > 0) {
+        const required = new Set(c.params.required ?? []);
+        for (const [name, prop] of Object.entries(c.params.properties)) {
+          const req = required.has(name) ? "" : "?";
+          const type = prop.type ?? "any";
+          const desc = prop.description ? `  — ${prop.description}` : "";
+          process.stdout.write(`    --${name}${req} (${type})${desc}\n`);
+        }
+      }
+      process.stdout.write("\n");
+    }
   }
 }
 

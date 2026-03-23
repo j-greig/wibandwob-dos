@@ -226,7 +226,9 @@ function createMicroappHost(
         if (requested === "demos" || (requested === "applications" && isDemoMicroapp)) {
           return "demos";
         }
-        if (requested === "applications") {
+        // Microapps that opt into the Applications menu rather than Core Apps
+        const APPLICATIONS_MENU = new Set(["wibwob.world"]);
+        if (requested === "applications" && !APPLICATIONS_MENU.has(microappId)) {
           return "core";
         }
         return requested as MenuPlacement["category"];

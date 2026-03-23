@@ -342,6 +342,51 @@ if (coverageClean) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// Check 7: Microapp keyboard/command gap (warn-only — prevention check)
+// Flags microapps with significantly more key bindings than registerCommand
+// calls. Navigation keys are excluded from heuristic. Host windows (src/)
+// are excluded — those violations are tracked in coat-audit-2026-03-23.md.
+// ═══════════════════════════════════════════════════════════════════════
+
+checks++;
+console.log("\n── Check 7: Microapp keyboard/command gap ──────────────────");
+
+// MICROAPPS_DIR already declared at top of file
+const KEY_PATTERN = /\.(key|on)\(\s*\[?["'][^"']*["']/g;
+const NAV_KEYS = new Set(["up","down","left","right","pageup","pagedown","home","end","tab","escape","enter","space"]);
+const COMMAND_PATTERN = /host\.registerCommand\s*\(/g;
+let gapWarnings = 0;
+
+function countNonNavKeys(src: string): number {
+  const matches = [...src.matchAll(/\.(?:key|on)\(\s*\[?(["'])([^"']+)\1/g)];
+  return matches.filter(m => !NAV_KEYS.has(m[2].toLowerCase())).length;
+}
+
+if (existsSync(MICROAPPS_DIR)) {
+  for (const dir of readdirSync(MICROAPPS_DIR, { withFileTypes: true })) {
+    if (!dir.isDirectory() || dir.name.startsWith(".")) continue;
+    const indexPath = join(MICROAPPS_DIR, dir.name, "index.ts");
+    if (!existsSync(indexPath)) continue;
+    const src = readFileSync(indexPath, "utf-8");
+    const keyCount = countNonNavKeys(src);
+    const cmdCount = (src.match(COMMAND_PATTERN) || []).length;
+    // Warn if state-mutating key bindings substantially outnumber commands
+    // (allow 2:1 ratio — some keys are cosmetic/export)
+    if (keyCount > 0 && keyCount > cmdCount * 2) {
+      console.log(`  ⚠️  ${dir.name}: ~${keyCount} non-nav key bindings, ${cmdCount} registerCommand calls`);
+      console.log(`     → Some keybinds may lack API equivalents (COAT). See SDK-MICROAPP-DEV.md §COAT`);
+      gapWarnings++;
+    }
+  }
+}
+
+if (gapWarnings === 0) {
+  console.log("  ✅ No microapp keyboard/command gaps detected");
+} else {
+  console.log(`  ⚠️  ${gapWarnings} microapp(s) flagged — warnings only, not counted as violations`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Summary
 // ═══════════════════════════════════════════════════════════════════════
 
