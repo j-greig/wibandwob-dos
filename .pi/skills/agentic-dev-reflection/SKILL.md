@@ -62,4 +62,8 @@ Example:
 - If a Fix is itself buildable, copy it to `→ Ideas`
 - One-liners (`devlog.sh "note"`) auto-get IDs — they land under the day's `#### → Ideas` section
 - If there's no friction (pure positive observation or shipped item), skip the `###` block entirely — just add to `#### → Ideas` directly under the session `##` heading
-- When a commit ships an idea: update `[status:open]` → `[status:shipped:abc1234]` and add `Addresses WNN-NNN` to the commit body
+- Tag the `###` heading with a top-level ID+status: `### Pain name \`[id:WNN-001][status:open]\``
+- Sub-ideas use lettered suffixes: `[id:WNN-001a]`, `[id:WNN-001b]`
+- Statuses: `open` → `in-progress` → `partial` → `done:hash` | `wontfix`
+- `partial` = some sub-ideas shipped, pain not fully gone yet
+- When a commit resolves an idea: update to `[status:done:abc1234]` + add `Addresses WNN-001a` to commit body

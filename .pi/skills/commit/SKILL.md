@@ -19,10 +19,14 @@ Optional. Blank line after subject. Explain *why*, not just *what*.
 Chase the 5 whys — scaled to the problem.
 
 **Devlog link — two ways to close the loop:**
-- Add `Addresses W13-001` to the commit body → `devlog-triage.sh` auto-upgrades `[status:open]` → `✅ shipped:<hash>`
-- Or update the tag manually in the reflection file: `[status:shipped:<hash>]`
+- Add `Addresses W13-001a` to the commit body → `devlog-triage.sh` auto-upgrades `open` → `done:<hash>`
+- Or update the tag manually: `[status:done:abc1234]`
 
-Both work. The commit reference is lazier and preferred — write `open`, ship, reference, let the script do the rest.
+Status lifecycle: `open` → `in-progress` → `partial` → `done:hash` | `wontfix`
+- `partial` = some sub-ideas shipped, pain not fully gone — update the `###` heading tag manually
+- `wontfix` = explicitly not doing — add reason inline after the tag
+
+Both paths work. Commit reference is lazier and preferred.
 
 ## Rules
 

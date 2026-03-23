@@ -35,9 +35,26 @@ themes:
 
 ## Tagging convention
 
-- `[id:WNN-001][status:open]` — unactioned
-- `[id:WNN-001][status:shipped:abc1234]` — commit hash that addressed it
-- `[id:WNN-001][status:killed]` — explicitly decided not to do
+Tag the `###` pain heading with a top-level ID + status:
+```
+### Pain name `[id:WNN-001][status:open]`
+```
+
+Sub-ideas in `#### → Ideas` use lettered suffixes:
+```
+- Atomic actionable idea `[id:WNN-001a][status:open]`
+- Another idea `[id:WNN-001b][status:open]`
+```
+
+### Status lifecycle
+
+| Status | Meaning |
+|--------|---------|
+| `open` | Understood, actionable, not started |
+| `in-progress` | Actively being worked on |
+| `partial` | Some sub-ideas shipped, pain reduced but not gone |
+| `done:abc1234` | Fully resolved — include commit hash |
+| `wontfix` | Explicitly not doing — add reason inline |
 
 IDs are week-scoped and sequential. `scripts/devlog.sh "note"` auto-assigns IDs.
 Reference in commits: `Addresses W13-001` in the commit body.

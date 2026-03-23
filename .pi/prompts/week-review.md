@@ -31,9 +31,11 @@ scripts/devlog-triage.sh $1
 If the file has `[id:WXX-NNN]` tags this auto-generates the triage table. Done — skip to Step 5.
 
 If no tags (older files), do it manually: for each idea, check `git log --grep`, filename searches, and your codebase knowledge. Mark each:
-- **✅ Shipped** — commit exists, problem solved
-- **⚠️ Partial** — commit exists but only part of it addressed
-- **❌ Open** — no commit, still a gap
+- **✅ done:hash** — fully resolved, commit exists
+- **🟠 partial** — some sub-ideas shipped, pain reduced not gone
+- **🟡 in-progress** — actively being worked on
+- **🔵 open** — understood, not started
+- **🚫 wontfix** — explicitly not doing
 
 Don't guess — if you can't find evidence, mark it open.
 

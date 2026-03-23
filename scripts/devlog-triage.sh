@@ -32,7 +32,7 @@ echo "📖 Reading $FILE..." >&2
 TMP=$(mktemp -d)
 trap "rm -rf $TMP" EXIT
 
-open_count=0; shipped_count=0; killed_count=0
+open_count=0; inprogress_count=0; partial_count=0; done_count=0; wontfix_count=0
 
 # Scan only lines under "#### → Ideas" or "#### → Quick notes" sections
 # (falls back to scanning everything for older unstructured files)
@@ -41,7 +41,19 @@ has_sections=0
 grep -q "^#### → " "$FILE" && has_sections=1
 
 while IFS= read -r line; do
-    # Track whether we're inside an ideas section
+    # Always scan ### headings for top-level pain IDs
+    if echo "$line" | grep -qE '^### '; then
+        in_ideas=0
+        if echo "$line" | grep -qE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]\[status:([^]]+)\]'; then
+            id=$(echo "$line" | grep -oE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]' | grep -oE 'W[0-9]+-[0-9A-Za-z]+')
+            status=$(echo "$line" | grep -oE '\[status:[^]]+\]' | sed 's/\[status://;s/\]//')
+            desc=$(echo "$line" | sed 's/ `\{0,1\}\[id:[^]]*\]\[status:[^]]*\]`\{0,1\}//g; s/^#{1,6}[[:space:]]*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            echo "$status" > "$TMP/$id.status"
+            echo "$desc"   > "$TMP/$id.desc"
+        fi
+        continue
+    fi
+    # Track → Ideas sections
     if echo "$line" | grep -qE '^#### → '; then
         in_ideas=1; continue
     elif echo "$line" | grep -qE '^#{1,4} '; then
@@ -50,9 +62,9 @@ while IFS= read -r line; do
     # For structured files, only tag inside → sections; for legacy files, scan all
     [[ $has_sections -eq 1 && $in_ideas -eq 0 ]] && continue
 
-    if echo "$line" | grep -qE '\[id:(W[0-9]+-[0-9]+)\]\[status:([^]]+)\]'; then
-        id=$(echo "$line"     | grep -oE '\[id:(W[0-9]+-[0-9]+)\]' | grep -oE 'W[0-9]+-[0-9]+')
-        status=$(echo "$line"  | grep -oE '\[status:[^]]+\]'        | sed 's/\[status://;s/\]//')
+    if echo "$line" | grep -qE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]\[status:([^]]+)\]'; then
+        id=$(echo "$line"     | grep -oE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]' | grep -oE 'W[0-9]+-[0-9A-Za-z]+')
+        status=$(echo "$line"  | grep -oE '\[status:[^]]+\]'              | sed 's/\[status://;s/\]//')
         desc=$(echo "$line"   | sed 's/ `\{0,1\}\[id:[^]]*\]\[status:[^]]*\]`\{0,1\}//g; s/^[[:space:]]*-[[:space:]]*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         echo "$status" > "$TMP/$id.status"
         echo "$desc"   > "$TMP/$id.desc"
@@ -75,9 +87,9 @@ for id in $ids; do
     [[ ! -f "$TMP/$id.status" ]] && continue
     if echo "$GIT_LOG" | grep -qi "Addresses ${id}"; then
         cur=$(cat "$TMP/$id.status")
-        if [[ "$cur" == "open" ]]; then
+        if [[ "$cur" == "open" || "$cur" == "in-progress" ]]; then
             commit=$(echo "$GIT_LOG" | grep -i "Addresses ${id}" | head -1 | awk '{print $1}')
-            echo "shipped:${commit}" > "$TMP/$id.status"
+            echo "done:${commit}" > "$TMP/$id.status"
         fi
     fi
 done
@@ -95,25 +107,29 @@ build_output() {
         status=$(cat "$TMP/$id.status")
         desc=$(cat "$TMP/$id.desc")
         case "$status" in
-            open)       mark="❌ open";        open_count=$(( open_count + 1 ))      ;;
-            shipped:*)  mark="✅ ${status}";   shipped_count=$(( shipped_count + 1 )) ;;
-            killed)     mark="🪦 killed";      killed_count=$(( killed_count + 1 ))  ;;
-            *)          mark="? ${status}"                                             ;;
+            open)          mark="🔵 open";        open_count=$(( open_count + 1 ))           ;;
+            in-progress)   mark="🟡 in-progress"; inprogress_count=$(( inprogress_count + 1 )) ;;
+            partial)       mark="🟠 partial";      partial_count=$(( partial_count + 1 ))     ;;
+            done:*)        mark="✅ ${status}";    done_count=$(( done_count + 1 ))            ;;
+            wontfix*)      mark="🚫 wontfix";      wontfix_count=$(( wontfix_count + 1 ))     ;;
+            *)             mark="? ${status}"                                                   ;;
         esac
         echo "| \`${id}\` | ${mark} | ${desc} |"
     done
 
     total=$(echo "$ids" | wc -w | tr -d ' ')
     echo ""
-    echo "**${total} total — ${shipped_count} shipped · ${open_count} open · ${killed_count} killed**"
+    echo "**${total} total — ✅ ${done_count} done · 🟠 ${partial_count} partial · 🟡 ${inprogress_count} in-progress · 🔵 ${open_count} open · 🚫 ${wontfix_count} wontfix**"
 
-    if [[ $open_count -gt 0 ]]; then
+    active=$(( open_count + inprogress_count + partial_count ))
+    if [[ $active -gt 0 ]]; then
         echo ""
-        echo "## Top open items"
+        echo "## Top open / in-progress items"
         echo ""
         count=0
         for id in $ids; do
-            [[ "$(cat "$TMP/$id.status")" != "open" ]] && continue
+            s=$(cat "$TMP/$id.status" 2>/dev/null || echo "")
+            [[ "$s" == "open" || "$s" == "in-progress" || "$s" == "partial" ]] || continue
             count=$(( count + 1 ))
             echo "${count}. \`${id}\` — $(cat "$TMP/$id.desc")"
             [[ $count -ge 5 ]] && break
