@@ -20,7 +20,8 @@ set -euo pipefail
 
 REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 SHADER_DIR="$REPO_ROOT/assets/shaders"
-ACTIVE_CONFIG="$REPO_ROOT/.ghostty-shaders"
+ACTIVE_CONFIG="$REPO_ROOT/scratch/.ghostty-shaders"
+STALE_CONFIG="$REPO_ROOT/.ghostty-shaders"   # old path — migrated on off/install
 WATCH_PID_FILE="$REPO_ROOT/scratch/.ghostty-shader-watch.pid"
 WATCH_LOG="$REPO_ROOT/scratch/.ghostty-shader-watch.log"
 
@@ -119,6 +120,7 @@ case "${1:-help}" in
     on)
         shader="${2:-wibwob-crt}"; glsl="$SHADER_DIR/${shader}.glsl"
         [[ -f "$glsl" ]] || { echo "❌ Unknown shader: $shader  Available: $(list)"; exit 1; }
+        mkdir -p "$(dirname "$ACTIVE_CONFIG")"
         printf 'custom-shader = %s\ncustom-shader-animation = true\n' "$glsl" > "$ACTIVE_CONFIG"
         echo "✅ Shader: $shader"
         # Restart watcher on the new file if it was already running
@@ -130,6 +132,8 @@ case "${1:-help}" in
 
     off)
         if kill_watcher; then echo "✅ Watcher stopped"; fi
+        # Migrate stale file from old path if present
+        [[ -f "$STALE_CONFIG" ]] && rm "$STALE_CONFIG" && echo "🗑  Removed stale config at old path"
         if [[ -f "$ACTIVE_CONFIG" ]]; then
             rm "$ACTIVE_CONFIG" && echo "✅ Shader off" && reload
         else
@@ -179,11 +183,20 @@ case "${1:-help}" in
             echo "Create the file first, or set GHOSTTY_CONFIG= to point at it."
             exit 1
         }
-        has_hook && { echo "✅ Already installed  ($GHOSTTY_CONFIG)"; exit 0; }
+        # Migrate stale hook pointing at old path
+        if grep -qF "$STALE_CONFIG" "$GHOSTTY_CONFIG" 2>/dev/null; then
+            sed -i.bak "s|${STALE_CONFIG}|${ACTIVE_CONFIG}|g" "$GHOSTTY_CONFIG"
+            echo "🔧 Migrated stale hook path → scratch/.ghostty-shaders"
+        fi
+        has_hook && { echo "✅ Already installed  ($GHOSTTY_CONFIG)"
+            echo "   Hook: config-file = ?${ACTIVE_CONFIG}"
+            exit 0
+        }
         grep -q "^custom-shader = disabled" "$GHOSTTY_CONFIG" 2>/dev/null && \
             echo "⚠️  'custom-shader = disabled' found in config — comment it out or shaders won't load"
         printf '\n# WibWob-DOS: loads shader when active, silent no-op when off\nconfig-file = ?%s\n' "$ACTIVE_CONFIG" >> "$GHOSTTY_CONFIG"
         echo "✅ Installed into $GHOSTTY_CONFIG"
+        echo "   Hook: config-file = ?${ACTIVE_CONFIG}"
         echo "   Reload Ghostty: Cmd+Shift+,"
         ;;
 
