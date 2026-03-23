@@ -89,7 +89,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 - "It typechecks" is not done — run the thing
 - Use '5 whys' approach ("5W") to explain why code was changed - adjusting why count to suit scope/complexity of the change or problem in question
 - Bun-first. No Node-only assumptions.
-- Subagents doing analysis, tagging, or parallel work must write results to `scratch/` paths — return values are ephemeral. Give each agent an explicit output path; merge after all complete.
+- Subagents doing analysis, tagging, or parallel work must write results to `scratch/` paths — return values are ephemeral. Give each agent an explicit output path; merge after all complete. Template: `scratch/.template/worker-pattern.md`.
 
 ---
 

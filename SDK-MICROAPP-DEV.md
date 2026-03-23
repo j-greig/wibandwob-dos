@@ -78,7 +78,7 @@ curl -sf --max-time 5 http://127.0.0.1:8099/state   # verify in state
 `bash scripts/restart.sh --tmux`
 
 **`wibwob` CLI is a compiled binary.** Changes to `src/cli/wibwob.ts` don't
-take effect on restart — rebuild and reinstall: `bun run build:cli && bun run install:cli`.
+take effect on restart — rebuild and reinstall: `bun run cli:install`.
 Server-side changes (commands, control-api) take effect on TUI restart only.
 
 ---
@@ -140,7 +140,7 @@ describeState: () => ({
 
 ```typescript
 host.createWindow({ title, width?, height?, left?, top? })  // → MicroappWindowHandle
-host.registerCommand({ id, label, action, menu?, palette? }) // prefixed: microapp.<appId>.<id>
+host.registerCommand({ id, label, description?, action, menu?, palette?, multiInstance?, direct? })
 host.registerSnapshot({ serialize, restore })                // workspace persistence
 host.theme()                    // ThemeTokens — call in onRestyle
 host.flash("message")           // toast notification
@@ -150,7 +150,17 @@ host.runCommand(localId)        // dispatch local command
 host.runGlobalCommand(id)       // dispatch any command
 host.repoRoot                   // absolute path to repo root
 host.screen                     // raw blessed Screen (avoid)
-host.geometry                   // { width, height }
+host.geometry                   // { width, height, cellAspect }
+```
+
+**Window handle extras** (on the handle returned by `createWindow`):
+```typescript
+win.setTitle(title)             // update window chrome title
+win.focus()                     // bring window to front
+win.close()                     // programmatic close (triggers onCleanup)
+win.registerClickable(node, label)  // expose a button/tab to agents
+                                    // appears in wibwob state under details.clickables
+                                    // called automatically by createButtonBar + createTabs
 ```
 
 ---
