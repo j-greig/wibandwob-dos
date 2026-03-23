@@ -209,7 +209,7 @@ export class CommandRegistry {
       let params: Record<string, unknown> | undefined;
       if (def?.params) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        try { params = zodToJsonSchema(def.params as any, { target: "openApi3" }) as unknown as Record<string, unknown>; } catch { /* skip */ }
+        try { params = (def.params as any).toJSONSchema?.() ?? undefined; } catch { /* skip */ }
       }
       return {
         id: command.id,
@@ -241,8 +241,28 @@ export class CommandRegistry {
     return opts?.includeUnavailable ? forSurface : forSurface.filter((cmd) => cmd.available);
   }
 
+  /** Normalise a command id: underscore→hyphen, then check LEGACY_COMMAND_ALIASES. */
+  private resolveId(id: string): { resolved: string; suggestion?: string } {
+    // 1. Exact alias match
+    const aliased = LEGACY_COMMAND_ALIASES[id];
+    if (aliased) return { resolved: aliased };
+
+    // 2. Underscore→hyphen normalisation (terrain_lab.open → terrain-lab.open)
+    const normalised = id.replace(/_/g, "-");
+    if (normalised !== id) {
+      const aliasedNorm = LEGACY_COMMAND_ALIASES[normalised] ?? normalised;
+      const exists = this.commands.some(c => c.id === aliasedNorm)
+                  || this.dynamicCommands.some(c => c.id === aliasedNorm);
+      if (exists) return { resolved: aliasedNorm };
+      // Normalised form doesn't exist either — return with suggestion
+      return { resolved: id, suggestion: normalised };
+    }
+
+    return { resolved: id };
+  }
+
   run(id: string, args?: Record<string, unknown>): CommandRunResult {
-    const canonicalId = LEGACY_COMMAND_ALIASES[id] ?? id;
+    const { resolved: canonicalId, suggestion } = this.resolveId(id);
     const argsStr = args && Object.keys(args).length > 0
       ? " " + Object.entries(args).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ")
       : "";
@@ -271,7 +291,8 @@ export class CommandRegistry {
       return normalizeActionResult(result);
     }
     log.cmd(`${canonicalId}${argsStr} → unknown command`);
-    return { ok: false, error: `Unknown command: ${id}` };
+    const hint = suggestion ? ` — did you mean: ${suggestion}?` : "";
+    return { ok: false, error: `Unknown command: ${id}${hint}` };
   }
 
   /** Execute only a dynamic command by id, bypassing built-in command ids. */

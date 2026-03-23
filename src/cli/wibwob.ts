@@ -469,11 +469,36 @@ async function cmdCommands() {
     params.set("includeUnavailable", "true");
   }
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  const data = (await api(`/commands/list${suffix}`)) as { commands: Array<{ id: string }> };
+  const data = (await api(`/commands/list${suffix}`)) as {
+    commands: Array<{
+      id: string;
+      label?: string;
+      description?: string;
+      params?: { properties?: Record<string, { type?: string; description?: string }>; required?: string[] };
+    }>
+  };
   if (QUIET) {
     for (const c of data.commands) console.log(c.id);
-  } else {
+  } else if (flags.json) {
     out(data.commands);
+  } else {
+    for (const c of data.commands) {
+      const label = c.label ? `  ${c.label}` : "";
+      process.stdout.write(`${c.id}${label}\n`);
+      if (c.description) {
+        process.stdout.write(`    ${c.description}\n`);
+      }
+      if (c.params?.properties && Object.keys(c.params.properties).length > 0) {
+        const required = new Set(c.params.required ?? []);
+        for (const [name, prop] of Object.entries(c.params.properties)) {
+          const req = required.has(name) ? "" : "?";
+          const type = prop.type ?? "any";
+          const desc = prop.description ? `  — ${prop.description}` : "";
+          process.stdout.write(`    --${name}${req} (${type})${desc}\n`);
+        }
+      }
+      process.stdout.write("\n");
+    }
   }
 }
 
