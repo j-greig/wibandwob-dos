@@ -44,5 +44,19 @@ if $DRY; then
     exit 0
 fi
 
-mv "$TMPFILE" "$FILE"
-echo "✅ Tagged $TAGGED heading(s) in $FILE"
+if diff -q "$FILE" "$TMPFILE" > /dev/null 2>&1; then
+    rm -f "$TMPFILE"
+    echo "ℹ️  No untagged headings found — file unchanged"
+    exit 0
+fi
+echo "── diff preview ──────────────────────────────"
+diff "$FILE" "$TMPFILE" | grep '^[<>]' | head -10
+echo "──────────────────────────────────────────────"
+read -r -p "Apply changes? [y/N] " confirm
+if [[ "${confirm:-N}" =~ ^[Yy]$ ]]; then
+    mv "$TMPFILE" "$FILE"
+    echo "✅ Tagged $TAGGED heading(s) in $FILE"
+else
+    rm -f "$TMPFILE"
+    echo "⏭  Skipped — no changes made"
+fi

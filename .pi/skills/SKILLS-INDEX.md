@@ -200,7 +200,7 @@ Last used: never · See: `.pi/skills/figlet-videographer/SKILL.md`
 
 Triggers on: "smoke-testing the TUI", "verifying a microapp opened correctly", "clicking a menu to check its contents", "simulating user input in an automated test", "or any task that requires acting on the TUI like a human would", "click the menu", "smoke test the TUI".
 
-Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+Does not: Does not write code — launches and manages existing systems.
 
 Last used: never · See: `.pi/skills/ghostty-control/SKILL.md`
 

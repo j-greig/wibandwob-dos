@@ -324,19 +324,25 @@ export function promptForBackroomsRunOptions(
   primers: string,
   defaults: BackroomsChannel
 ): void {
-  context.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
-    context.overlays.openValuePrompt("Backrooms Model", defaults.model, (modelValue) => {
+  const promptTurns = () => {
+    context.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
       const turns = Math.max(1, Math.min(20, Number.parseInt(turnsValue, 10) || defaults.turns));
-      const trimmedModel = modelValue.trim();
-      const model = ["haiku", "sonnet", "opus"].includes(trimmedModel) ? (trimmedModel as BackroomsChannel["model"]) : defaults.model;
-      context.openBackroomsTv({
-        theme,
-        primers,
-        turns,
-        model
-      });
+      context.overlays.openRadioPrompt(
+        "Backrooms Model",
+        [
+          { label: "Haiku  (fast)", value: "haiku" as const },
+          { label: "Sonnet (balanced)", value: "sonnet" as const },
+          { label: "Opus   (deep)", value: "opus" as const }
+        ],
+        defaults.model,
+        (model) => {
+          context.openBackroomsTv({ theme, primers, turns, model });
+        },
+        promptTurns
+      );
     });
-  });
+  };
+  promptTurns();
 }
 
 export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: BackroomsChannel): void {

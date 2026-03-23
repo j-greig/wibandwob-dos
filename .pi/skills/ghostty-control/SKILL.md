@@ -12,6 +12,8 @@ description: >
   "ghostty control", "act like a human in the TUI", "test by clicking",
   "screenshot the TUI", "broadcast a command", "jump to terminal by directory".
   macOS only. Requires Ghostty >= 1.3.0.
+  Scripts: calibrate.sh, click-cell.sh, click-text.sh, menu-click.sh,
+  send-to-terminal.sh, wait-for.sh, restart-wibwob.sh, ghostty-windows.sh.
 ---
 
 # Ghostty AppleScript Control

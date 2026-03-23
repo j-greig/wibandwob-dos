@@ -58,6 +58,7 @@ Example:
 
 - `**Why**` and `**Fix**` can be blank, "TBD", or "to be explored" — don't invent a root cause you don't have
 - `#### → Ideas` is the ONLY place tags live — haiku and `devlog-triage.sh` scan only these sections
+- When prompting haiku to tag a devlog file: "tag ONLY lines starting with `- ` inside `#### → Ideas` sections — not prose, not continuation lines, not `###` headings"
 - One idea per bullet, one tag per idea — no tagging continuation lines or narrative prose
 - If a Fix is itself buildable, copy it to `→ Ideas`
 - One-liners (`devlog.sh "note"`) auto-get IDs — they land under the day's `#### → Ideas` section
