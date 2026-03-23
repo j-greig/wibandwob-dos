@@ -17,7 +17,12 @@ Create a git commit using the project's conventional commit format.
 
 Optional. Blank line after subject. Explain *why*, not just *what*.
 Chase the 5 whys — scaled to the problem.
-If this commit addresses a tagged devlog idea, add: `Addresses W13-001`
+
+**Devlog link — two ways to close the loop:**
+- Add `Addresses W13-001` to the commit body → `devlog-triage.sh` auto-upgrades `[status:open]` → `✅ shipped:<hash>`
+- Or update the tag manually in the reflection file: `[status:shipped:<hash>]`
+
+Both work. The commit reference is lazier and preferred — write `open`, ship, reference, let the script do the rest.
 
 ## Rules
 
@@ -32,6 +37,8 @@ If this commit addresses a tagged devlog idea, add: `Addresses W13-001`
 2. Optionally `git log -n 10 --pretty=format:%s` to see recent style.
 3. Stage intended files.
 4. `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+5. If this commit ships a devlog idea, add `Addresses WXX-NNN` to the body — or update `[status:open]` → `[status:shipped:<hash>]` in the reflection file directly.
+6. Optionally: `bash scripts/devlog-triage.sh W<NN>` to confirm the link resolved.
 
 ## Examples
 
