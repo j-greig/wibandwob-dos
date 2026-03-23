@@ -95,9 +95,25 @@ export default function setup(host: MicroappHost) {
           "  3. Add describeState fields agents can use",
           "  4. Add snapshot support if persist:true",
           "  5. Add onCleanup only when there is real cleanup to do",
+          "  r — refresh (COAT example: key binding + registered command)",
         ].join("\n"),
         style: host.theme().body,
       });
+
+      // COAT compliance example: every state-mutating action needs both
+      // a key binding AND a registered command so agents can drive it.
+      const doRefresh = () => {
+        content.setContent(content.getContent()); // replace with real refresh
+        host.screen.render();
+      };
+      host.registerCommand({
+        id: "refresh",
+        label: "Refresh ${ESC_TITLE}",
+        description: "Re-run the main action (COAT example — replace with real refresh logic).",
+        api: true, agent: true,
+        action: () => { doRefresh(); return { ok: true }; },
+      });
+      content.key(["r"], doRefresh); // same handler as the command above
 
       registerMicroappHooks(win, {
         captureText:   () => content.getContent() || \`${ESC_TITLE} — scaffold\`,
