@@ -1,9 +1,31 @@
 #!/usr/bin/env bash
 # @name    ghostty-shader
 # @desc    Toggle Ghostty custom shaders via scratch/.ghostty-shaders config include
-# Usage:   ghostty-shader.sh on [shader] | off | status | list | install
-# How:     Writes custom-shader= to scratch/.ghostty-shaders, included via
-#          `config-file = ?<path>` — ? means silent no-op when file is absent.
+#
+# Usage:
+#   ghostty-shader.sh on [shader]   # enable shader (default: wibwob-crt)
+#   ghostty-shader.sh off           # disable
+#   ghostty-shader.sh status        # show active shader + hook presence
+#   ghostty-shader.sh list          # list available shaders in assets/shaders/
+#   ghostty-shader.sh install       # one-time: add config-file hook to Ghostty config
+#
+# How it works:
+#   Writes `custom-shader = <path>` to scratch/.ghostty-shaders.
+#   Ghostty config includes it via `config-file = ?<path>` — the ? prefix
+#   means Ghostty silently ignores the file when absent (shader off = delete file).
+#   Reloads Ghostty automatically via Cmd+Shift+, AppleScript.
+#
+# Load the cell-aligned grid + gradient shader:
+#   bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh on wibwob-cell-grid
+#
+# After a terminal resize, regenerate the grid shader with fresh COLS×ROWS:
+#   bash scripts/cell-shader.sh on
+#
+# Available shaders (assets/shaders/wibwob-*.glsl):
+#   wibwob-cell-grid   — cell-aligned grid with dark-pastel gradient (recommended)
+#   wibwob-crt         — subtle CRT scanlines + chromatic aberration
+#   wibwob-glow        — phosphor bloom glow
+#   wibwob-nord-tint   — cool blue tint overlay
 
 set -euo pipefail
 

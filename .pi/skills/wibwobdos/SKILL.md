@@ -1,6 +1,6 @@
 ---
 name: wibwobdos
-description: "Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: open WibWobWorld, show the desktop, take a screenshot, share to Discord, what's on screen, open some art, send a chat message."
+description: "Operate WibWob-DOS: open/move/read windows, check desktop state, send messages to the agent, take screenshots, share to Discord, and manage Ghostty shader overlays (CRT, glow, cell-grid gradient). Use when: opening apps on the desktop, reading window content, controlling the TUI, enabling a shader or visual effect, sharing the desktop state."
 ---
 
 # WibWob-DOS
@@ -60,3 +60,49 @@ backrooms.run                AI backrooms session
 
 Full API, endpoint shapes, and all command ids: `references/api.md`
 SSH tunnel options, env vars, and auth token: `references/connection.md`
+
+## Ghostty shaders (local only)
+
+Ghostty shader overlays are managed via `.pi/skills/wibwobdos/scripts/ghostty-shader.sh`.
+The script writes a one-line config snippet to `scratch/.ghostty-shaders`, which is
+included by the Ghostty config via `config-file = ?<path>` — silent no-op when absent.
+
+```bash
+# One-time setup (adds the config-file hook to Ghostty config)
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh install
+
+# Load the cell-aligned grid + gradient shader
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh on wibwob-cell-grid
+
+# Other built-in shaders
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh on wibwob-crt
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh on wibwob-glow
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh on wibwob-nord-tint
+
+# Turn off
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh off
+
+# Show current state
+bash .pi/skills/wibwobdos/scripts/ghostty-shader.sh status
+```
+
+### wibwob-cell-grid shader
+
+`assets/shaders/wibwob-cell-grid.glsl` — cell-aligned grid overlay with a
+directional colour gradient. All tunables are consts at the top of the file:
+
+```glsl
+const float GRID_OPACITY = 0.20;   // grid line darkness (0 = off)
+const vec3  GRID_COLOR   = vec3(1.0); // grid line colour
+
+const bool  GRAD_ON      = true;   // toggle gradient
+const float GRAD_OPACITY = 0.28;   // blend strength over terminal
+const float GRAD_ANGLE   = 0.0;    // 0=N→S  90=W→E  45=diagonal  180=S→N
+const vec3  C_A = ...;             // gradient start colour (top at 0°)
+const vec3  C_B = ...;             // gradient end colour   (bottom at 0°)
+```
+
+COLS/ROWS are baked at generation time. After a terminal resize, regenerate:
+```bash
+bash scripts/cell-shader.sh on   # re-reads live dims from minimap, reloads
+```

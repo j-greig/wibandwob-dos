@@ -459,9 +459,9 @@ Last used: never · See: `.pi/skills/wibwob-hosting-smoke/SKILL.md`
 ---
 
 ## wibwobdos
-**Your Desktop Operator** — Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windo…
+**Your Desktop Operator** — Operate WibWob-DOS: open/move/read windows, check desktop state, send messages to the agent, take screenshots, share to Discord, and manage Ghostty shader overl…
 
-Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
+Triggers on: "opening apps on the desktop", "reading window content", "controlling the TUI", "enabling a shader or visual effect", "sharing the desktop state".
 
 Does not: Does not overlap with the other wibwob-ops member — see family note.
 
@@ -538,6 +538,6 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | timeline-smoke | Timeline Tester | - Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs at ever |
 | vj-timeline | Show Director | Compose and execute timed music video shows inside WibWob-DOS TUI |
 | wibwob-hosting-smoke | Deployment Validator | Run end-to-end hosting-agnostic smoke validation for WibWob-DOS across Docker/VP |
-| wibwobdos | Desktop Operator | Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generat |
+| wibwobdos | Desktop Operator | Operate WibWob-DOS: open/move/read windows, check desktop state, send messages t |
 | wibwobdos-cinema | Reel Director | Record choreographed WibWob-DOS TUI sessions as retina GIF/MP4 with synced chipt |
 | youtube-transcript | Transcript Fetcher | Fetch the transcript of any YouTube video as plain text |

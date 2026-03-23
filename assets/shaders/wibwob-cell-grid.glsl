@@ -4,19 +4,36 @@
 
 const float COLS           = 142.0;
 const float ROWS           = 81.0;
-const float GRID_OPACITY   = 0.20;   // grid line darkness at cell edges
+// ── Grid ─────────────────────────────────────────
+const float GRID_OPACITY = 0.20;          // grid line darkness (0 = off)
+const vec3  GRID_COLOR   = vec3(1.0);     // grid line colour (default white)
+
+// ── Gradient ─────────────────────────────────────
+const bool  GRAD_ON      = true;   // toggle gradient on/off
+const float GRAD_OPACITY = 0.28;   // blend strength over terminal (0..1)
+
+// Gradient direction — 0° = N→S (top to bottom), 90° = W→E, 180° = S→N etc.
+const float GRAD_ANGLE = 0.0;
+
+// Two colours — wibwob-dark-pastel (Catppuccin Mocha)
+const vec3 C_A = vec3(0.796, 0.651, 0.969) * 0.6;  // #cba6f7  mauve  — start (top at 0°)
+const vec3 C_B = vec3(0.537, 0.706, 0.980) * 0.6;  // #89b4fa  blue   — end   (bottom at 0°)
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    // Snap to integer cell size: Ghostty rounds cell_px internally, but
-    // iResolution may include 1-2px OS rounding remainder (drawable = COLS*cell + r).
-    // round() recovers the true integer cell dimensions.
     vec2 cell = round(iResolution.xy / vec2(COLS, ROWS));
     vec2 uv   = fragCoord / iResolution.xy;
-
-    // Position within the current cell, 0..1
     vec2 cpos = mod(fragCoord, cell) / cell;
 
     vec4 col = texture(iChannel0, uv);
+
+    // Directional gradient at GRAD_ANGLE degrees
+    if (GRAD_ON) {
+        float rad = GRAD_ANGLE * 3.14159265 / 180.0;
+        vec2 dir = vec2(sin(rad), cos(rad));  // 0°=down, 90°=right
+        float t = dot(uv - 0.5, dir) + 0.5;  // 0..1 along gradient axis
+        vec3 grad = mix(C_A, C_B, clamp(t, 0.0, 1.0));
+        col.rgb = mix(col.rgb, grad, GRAD_OPACITY);
+    }
 
     // Grid lines: 1px at right + bottom edge of each cell
     float gx = step(1.0 - 1.0 / cell.x, cpos.x);
