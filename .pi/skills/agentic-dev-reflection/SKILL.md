@@ -60,5 +60,6 @@ Example:
 - `#### → Ideas` is the ONLY place tags live — haiku and `devlog-triage.sh` scan only these sections
 - One idea per bullet, one tag per idea — no tagging continuation lines or narrative prose
 - If a Fix is itself buildable, copy it to `→ Ideas`
-- One-liners (`devlog.sh "note"`) auto-get IDs — they land under a `#### → Quick notes` section
+- One-liners (`devlog.sh "note"`) auto-get IDs — they land under the day's `#### → Ideas` section
+- If there's no friction (pure positive observation or shipped item), skip the `###` block entirely — just add to `#### → Ideas` directly under the session `##` heading
 - When a commit ships an idea: update `[status:open]` → `[status:shipped:abc1234]` and add `Addresses WNN-NNN` to the commit body

@@ -31,7 +31,7 @@ themes:
 - `#### → Ideas` is the ONLY place tags go — keeps triage clean, haiku only needs to scan these sections
 - One idea per bullet = one tag. Don't tag continuation lines or narrative prose
 - If a Fix is itself buildable, copy it to `→ Ideas` too
-- One-liner notes (from `devlog.sh "note"`) go under a `#### → Ideas` or `#### → Quick notes` section
+- One-liner notes (from `devlog.sh "note"`) go under the nearest `#### → Ideas` section, or start one if the entry doesn't have one yet
 
 ## Tagging convention
 
