@@ -346,6 +346,127 @@ Full list: `GOTCHAS.md`
 
 ---
 
+## Patterns & Gotchas
+
+Hard-won patterns from the MAPP 1-10 audit. Each has burned at least one session.
+
+### 1. Two component models — know which you're using
+
+**CompositionHelpers** (`createStatusBar`, `createTextViewer`, `createListPanel`, `createSplitView`, `createTabs`, `createCanvas`) return `{ element, update, destroy }` and self-parent into a blessed box. **Use these for new microapps.**
+
+**LayoutParts** (`createProgressBar`, `createKeyValuePanel`) return `{ node, layout(rect), restyle(), destroy() }`. They do NOT self-parent — you must position them via `createStack` or `createRow`, which are `@internal`.
+
+They are structurally incompatible. You cannot put a CompositionHelper handle into `createStack`. No runtime error — the window just renders blank.
+
+```typescript
+// WRONG — createTextViewer is a CompositionHelper, not a LayoutPart
+const stack = createStack(win.body, [{ key: "text", basis: 1, part: createTextViewer(...) }]);
+
+// RIGHT — CompositionHelpers self-parent, just pass the parent box
+const viewer = createTextViewer(win.body, { ... });
+```
+
+### 2. Three timer mechanisms — pick the right one
+
+| Mechanism | Lifecycle | Use when |
+|-----------|-----------|----------|
+| `setInterval` | Manual `clearInterval` | Never — leaks on close |
+| `createTimer(fn, ms, timers)` | `clearTimers(timers)` clears ALL | Periodic updates with cleanup |
+| `createAnimationClock(fps)` | `subscribe` + `clock.destroy()` | Animation loops |
+
+`createAnimationClock` **starts immediately** — call `clock.pause()` right after creation if you need deferred start. Multiple timers via `createTimer` share one `Set` — if you need independent pause/resume, use separate Sets.
+
+```typescript
+const timers = new Set<ReturnType<typeof setInterval>>();
+createTimer(() => refresh(), 1000, timers);
+onCleanup(() => clearTimers(timers));
+
+// Animation:
+const clock = createAnimationClock(8); // 8fps max — see performance note below
+const unsub = clock.subscribe(() => render());
+onCleanup(() => { unsub(); clock.destroy(); });
+clock.pause(); // pause until ready
+```
+
+### 3. `createCanvas` — call `getSize()` after attach, not during construction
+
+The internal drawille canvas allocates at attach time using whatever blessed dimensions exist then. If you call `getSize()` during construction, you get 0×0.
+
+```typescript
+// WRONG
+const canvas = createCanvas(win.body, {});
+const { width, height } = canvas.getSize(); // 0×0 at construction
+
+// RIGHT — use onResize which fires after layout settles
+canvas.onResize(() => {
+  const { width, height } = canvas.getSize(); // real dimensions
+  initGrid(width, height);
+});
+```
+
+For `blessed-contrib` widgets outside a grid, emit `resize` after layout:
+
+```typescript
+function applyContribRect(widget: any, rect: Rect) {
+  applyRect(widget, rect);
+  widget.emit?.("resize"); // re-allocates internal drawille canvas
+}
+```
+
+### 4. ANSI in grid cells = performance cliff
+
+`paintText` accepts ANSI escape codes in cell content. At 30fps with ANSI-per-cell, bun hits 87% CPU and the HTTP API becomes unresponsive.
+
+```typescript
+// WRONG — ANSI codes in every cell at high fps
+clock = createAnimationClock(30);
+clock.subscribe(() => paintText(grid, row, col, `\x1b[31m${char}\x1b[0m`));
+
+// RIGHT — plain chars, colour via theme or post-process
+clock = createAnimationClock(8); // 8fps ceiling for grid renders
+clock.subscribe(() => paintText(grid, row, col, char));
+```
+
+**Rule:** max 8fps for grid renders. Apply colour globally, not per-cell.
+
+### 5. `createButton` steals focus — use as indicator only
+
+`createButton` sets `focusable: true` + `keys: true` by default. Used as a status indicator, it eats all keyboard shortcuts from the parent widget.
+
+**Workaround:** Don't use `createButton` for non-interactive indicators. Use a plain `blessed.box` with styled content, or `createTextViewer` in read-only mode.
+
+### 6. Focus and input — three separate paths
+
+| Path | What it handles |
+|------|----------------|
+| `win.onInput(text)` | Plumb/write API — text piped from another window or `wibwob write` |
+| `canvas.key(["enter"], fn)` | Keyboard shortcuts on a blessed element |
+| `screen.on("keypress", fn)` | Raw keypress with `(ch, key)` including modifiers |
+
+`win.onInput` is NOT keyboard input. `createInputLine` is modal (`inputOnFocus`) — pressing a key enters edit mode, Escape exits. Tab/Shift-Tab are reliable for focus switching; 1-5 number keys may be captured by the shell.
+
+### 7. Destroy order matters
+
+Destroy children before parents. Destroying a parent while children are still live causes orphan errors in blessed.
+
+```typescript
+onCleanup(() => {
+  childWidget.destroy();  // first
+  parentStack.destroy();  // then
+});
+```
+
+### 8. `host.promptValue()` — undocumented but excellent
+
+Modal text input. Takes focus, returns a promise that resolves to the entered string or `null` on cancel. No docs — found it by reading `microapp-host.ts` types.
+
+```typescript
+const value = await host.promptValue("Enter a name:");
+if (value === null) return; // cancelled
+```
+
+---
+
 ## Import rule
 
 ```typescript
