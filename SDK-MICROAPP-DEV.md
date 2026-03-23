@@ -107,12 +107,28 @@ export default function setup(host: MicroappHost) {
 }
 ```
 
-| Hook | Purpose |
-|------|---------|
-| `captureText` | `wibwob read <id>` — semantic text. Falls back to screen crop if unregistered; prefer explicit. |
-| `describeState` | `/state` API — include a meaningful `summary` |
-| `onCleanup` | Stop every timer, destroy every handle |
-| `onRestyle` | Re-apply `host.theme()` colours on theme switch |
+| Hook | Signature | Purpose |
+|------|-----------|---------|
+| `captureText` | `(fn: () => string): void` | `wibwob read <id>` — semantic text. Never return empty. Falls back to screen crop if missing; prefer explicit. |
+| `describeState` | `(fn: () => { summary: string; [k: string]: unknown }): void` | `/state` API — `summary` is required in practice; agents use it for orientation. |
+| `onCleanup` | `(fn: () => void): void` | Stop every timer, destroy every handle. Fires on window close. |
+| `onRestyle` | `(fn: () => void): void` | Re-apply `host.theme()` colours on theme switch. Must reach every styled node. |
+
+**onRestyle minimum pattern:**
+```typescript
+onRestyle: () => {
+  header.update({});      // CompositionHelpers re-apply theme when called with {}
+  host.screen.render();   // always call render() at the end
+},
+```
+
+**describeState minimum pattern:**
+```typescript
+describeState: () => ({
+  summary: "My App — showing X",   // one sentence, present tense, agent-readable
+  itemCount: items.length,          // any extra state an agent might need
+}),
+```
 
 ---
 
