@@ -101,6 +101,7 @@ const float COLS           = {cols}.0;
 const float ROWS           = {rows}.0;
 const float GRID_OPACITY   = 0.12;   // cell grid darkness
 const float BG_DIM         = 0.45;   // dim terminal content so words pop
+const float WORD_OPACITY   = 0.10;   // word brightness (0=invisible, 1=full colour)
 
 // ── Gradient ─────────────────────────────────────────────────
 const bool  GRAD_ON        = true;
@@ -203,7 +204,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         ivec2 offset = ivec2(cellXY) - ivec2(origin);
 
         if (getBit(wi, offset.y, offset.x)) {
-            col.rgb = mix(col.rgb, WORD_COLORS[wi], alpha);
+            col.rgb = mix(col.rgb, WORD_COLORS[wi], alpha * WORD_OPACITY);
         }
     }
 

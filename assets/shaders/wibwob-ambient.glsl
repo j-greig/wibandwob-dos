@@ -240,7 +240,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         ivec2 offset = ivec2(cellXY) - ivec2(origin);
 
         if (getBit(wi, offset.y, offset.x)) {
-            col.rgb = mix(col.rgb, WORD_COLORS[wi], alpha);
+            col.rgb = mix(col.rgb, WORD_COLORS[wi], alpha * 0.10);
         }
     }
 
