@@ -27,7 +27,7 @@ description: Reflect on implementation friction after sessions. Write for yourse
 
 **Pain:** What went wrong. Specific. One sentence preferred.
 
-**Why:** Root cause (5 whys scaled to complexity). Unknown? Write "unknown — symptoms: X". Blank is fine.
+**Why:** Root cause. Scale the whys to the problem — 1 for obvious causes, 5+ for knotty ones where each layer reveals a deeper cause. Ask 'but why did that happen?' until you hit bedrock. Unknown? Write "unknown — symptoms: X". Blank is fine.
 
 **Fix:** What was done or what would prevent recurrence. Blank / "TBD" / "to be explored" all valid — especially for unknowns or mid-session discoveries.
 

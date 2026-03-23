@@ -14,7 +14,7 @@ themes:
 
 **Pain:** What went wrong or was harder than it should be. Be specific. One sentence preferred.
 
-**Why:** Root cause. Chase the 5 whys scaled to complexity. Unknown root cause? Write "unknown — symptoms: X". Can be left blank or "to be explored".
+**Why:** Root cause. Use as many whys as the problem demands — 1 for obvious causes, 5+ for knotty ones. Each why asks 'but why did that happen?' until you hit bedrock. Unknown? Write "unknown — symptoms: X". Can be left blank or "to be explored".
 
 **Fix:** What was done, or what would prevent recurrence. Can be blank, "TBD", or "to be explored" — especially for bugs with unknowns or things discovered mid-session.
 
