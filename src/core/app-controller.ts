@@ -297,6 +297,25 @@ export class TsTuiMvpApp {
       desktop: this.desktop,
       statusLine: this.statusLine,
       getInstanceDisplayLabel: () => this.getInstanceDisplayLabel(),
+      onFlash: (msg) => this.overlays.flash(msg),
+      getSessionClipboardText: () => {
+        const state = this.state.getState();
+        const w = this.screen.width as number;
+        const h = this.screen.height as number;
+        const port = this.controlApi.getStatus().port
+          ?? parseInt(process.env.WIBWOB_PORT ?? String(CONTROL_API_PORT), 10);
+        return [
+          `[WibWob-DOS session]`,
+          `id: ${this.instanceId}`,
+          `label: ${this.instanceLabel ?? this.instanceDisplayId}`,
+          `pid: ${process.pid}`,
+          `port: ${port}`,
+          `screen: ${w}×${h}`,
+          `theme: ${themeName()}`,
+          `windows: ${state.windows.length}`,
+          `api: http://127.0.0.1:${port}/`,
+        ].join("\n");
+      },
       getDesktopState: () => this.state.sync(),
       getScrambleFace: () =>
         this.scrambleBrain.sleeping ? "(-.-)"
