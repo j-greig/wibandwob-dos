@@ -56,6 +56,9 @@ export interface AppMenuActions {
   openBackroomsLogBrowser: () => void;
   backroomsPickerInfo: () => unknown;
   backroomsPickerSelect: (args?: Record<string, unknown>) => unknown;
+  backroomsPickerToggle: (args?: Record<string, unknown>) => unknown;
+  backroomsPickerToggleByLabel: (args?: Record<string, unknown>) => unknown;
+  backroomsPickerSearch: (args?: Record<string, unknown>) => unknown;
   backroomsPickerConfirm: () => unknown;
   backroomsPickerCancel: () => unknown;
   tileWindows: () => void;
@@ -920,6 +923,33 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     description: "Select an index in Backrooms primer picker. Args: index (number).",
     group: "focus",
     actionKey: "backroomsPickerSelect",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.toggle",
+    label: "Backrooms Picker Toggle",
+    description: "Toggle selection of the current or given index in the primer picker. Args: index? (number).",
+    group: "focus",
+    actionKey: "backroomsPickerToggle",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.toggle-by-label",
+    label: "Backrooms Picker Toggle By Label",
+    description: "Toggle a primer by name in the picker. Args: label (string).",
+    group: "focus",
+    actionKey: "backroomsPickerToggleByLabel",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.search",
+    label: "Backrooms Picker Search",
+    description: "Filter the primer list by query string. Args: query (string). Empty string clears filter.",
+    group: "focus",
+    actionKey: "backroomsPickerSearch",
     api: true,
     agent: true,
   },

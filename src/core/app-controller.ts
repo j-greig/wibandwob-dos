@@ -1185,6 +1185,9 @@ export class TsTuiMvpApp {
   private getBackroomsPickerApi(): {
     info?: () => unknown;
     select?: (index: number) => unknown;
+    toggle?: (index?: number) => unknown;
+    toggleByLabel?: (label: string) => unknown;
+    search?: (query: string) => unknown;
     confirm?: () => unknown;
     cancel?: () => unknown;
   } | null {
@@ -1194,6 +1197,9 @@ export class TsTuiMvpApp {
     return {
       info: typeof dyn._backroomsPickerInfo === "function" ? (dyn._backroomsPickerInfo as () => unknown) : undefined,
       select: typeof dyn._backroomsPickerSelect === "function" ? (dyn._backroomsPickerSelect as (index: number) => unknown) : undefined,
+      toggle: typeof dyn._backroomsPickerToggle === "function" ? (dyn._backroomsPickerToggle as (index?: number) => unknown) : undefined,
+      toggleByLabel: typeof dyn._backroomsPickerToggleByLabel === "function" ? (dyn._backroomsPickerToggleByLabel as (label: string) => unknown) : undefined,
+      search: typeof dyn._backroomsPickerSearch === "function" ? (dyn._backroomsPickerSearch as (query: string) => unknown) : undefined,
       confirm: typeof dyn._backroomsPickerConfirm === "function" ? (dyn._backroomsPickerConfirm as () => unknown) : undefined,
       cancel: typeof dyn._backroomsPickerCancel === "function" ? (dyn._backroomsPickerCancel as () => unknown) : undefined,
     };
@@ -2033,6 +2039,25 @@ export class TsTuiMvpApp {
         const index = Number(args?.index);
         if (!Number.isFinite(index)) return { selected: false, error: "index must be a number" };
         return api.select(index);
+      },
+      backroomsPickerToggle: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.toggle) return { ok: false, error: "Backrooms picker not active" };
+        const index = args?.index !== undefined ? Number(args.index) : undefined;
+        return api.toggle(Number.isFinite(index) ? index : undefined);
+      },
+      backroomsPickerToggleByLabel: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.toggleByLabel) return { ok: false, error: "Backrooms picker not active" };
+        const label = typeof args?.label === "string" ? args.label.trim() : "";
+        if (!label) return { ok: false, error: "label is required" };
+        return api.toggleByLabel(label);
+      },
+      backroomsPickerSearch: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.search) return { ok: false, error: "Backrooms picker not active" };
+        const query = typeof args?.query === "string" ? args.query : "";
+        return api.search(query);
       },
       backroomsPickerConfirm: () => {
         const api = this.getBackroomsPickerApi();
