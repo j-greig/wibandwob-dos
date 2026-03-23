@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 // child_process no longer needed here — FX pipeline extracted to fx-pipeline.ts
 import { log } from "../services/app-logger.js";
+import { shaderSet, shaderList, shaderStatus, shaderLabel } from "../services/ghostty-shader-service.js";
 import {
   resolveSmearSource as fxResolveSmearSource,
   runFxScript as fxRunFxScript,
@@ -496,7 +497,8 @@ export class TsTuiMvpApp {
     this.microappDeps = this.buildMicroappDeps();
     await loadMicroapps(this.microappDeps);
 
-    // Rebuild menus after microapps may have registered dynamic commands
+    // Register dynamic commands, then rebuild menus so they're included
+    this.registerShaderMenu();
     this.rebuildMenusFromCommands();
     registerAllHostWindows();
 
@@ -576,6 +578,35 @@ export class TsTuiMvpApp {
   private rebuildMenusFromCommands(): void {
     this.menus.length = 0;
     this.menus.push(...this.commands.buildMenus());
+  }
+
+  /** Register "Shaders ▸" in the View menu — opens a popup with live shader list. */
+  private registerShaderMenu(): void {
+    this.commands.addDynamic({
+      id: "ghostty.shaders",
+      label: "Shaders ▸",
+      group: "system",
+      description: "Toggle Ghostty GPU shaders",
+      menuPlacements: [{ category: "view" as any, order: 96 }],
+      action: () => {
+        const shaders = shaderList();
+        const { active } = shaderStatus();
+        const items = shaders.map((name) => ({
+          label: `${active === name ? "✓ " : "  "}${shaderLabel(name)}`,
+          action: () => shaderSet(name),
+        }));
+        items.push({
+          label: `${active === null ? "✓ " : "  "}Off`,
+          action: () => shaderSet("off"),
+        });
+        // Position submenu to the right of the View dropdown
+        const viewMenu = this.menus.find((m) => m.category === "view");
+        const viewLeft = viewMenu?.left ?? 15;
+        const dropdownWidth = Math.max(...(viewMenu?.items ?? []).map((i) => i.label.length), 10) + 4;
+        const shaderRow = (viewMenu?.items ?? []).length + 2;
+        this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow);
+      },
+    });
   }
 
   private collectReloadInvalidationFiles(limit = 6): string[] {
@@ -2263,47 +2294,18 @@ export class TsTuiMvpApp {
         }
       },
 
-      // ── Ghostty shader control ──────────────────────────
+      // ── Ghostty shader control (logic in ghostty-shader-service.ts) ──
       ghosttyShaderSet: (args) => {
         const name = typeof args?.name === "string" ? args.name : "";
-        if (!name) return { ok: false, error: "Missing shader name" };
-        const action = name === "off" ? "off" : "on";
-        const shaderArgs = action === "on" ? [action, name] : [action];
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" ${shaderArgs.join(" ")}`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          return { ok: true, shader: name, action, output };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        return shaderSet(name);
       },
       ghosttyShaderList: () => {
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" list`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          const shaders = output.split("\n").filter(Boolean);
-          return { ok: true, shaders };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        const shaders = shaderList();
+        return { ok: true, shaders };
       },
       ghosttyShaderStatus: () => {
-        try {
-          const { execSync } = require("node:child_process") as typeof import("node:child_process");
-          const scriptPath = require("node:path").resolve(process.cwd(), "scripts/ghostty-shader.sh");
-          const output = execSync(`bash "${scriptPath}" status`, {
-            timeout: 5000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          return { ok: true, status: output };
-        } catch (err) {
-          return { ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
+        const { active, output } = shaderStatus();
+        return { ok: true, active, status: output };
       },
     };
   }
