@@ -127,3 +127,59 @@ standard UI components with canvas-rendered content.
 - GitHub issue #137 — TUI audit: WibWob-DOS vs OpenTUI (brainfart capture, graduated here)
 - `GOTCHAS.md` — runtime failure entries, many tracing back to concerns above
 - `src/services/microapp-sdk.ts` — the stability boundary these concerns sit against
+
+---
+
+## Handover prompt
+
+> Copy-paste this to a fresh agent session to get it oriented on this work.
+
+---
+
+You are picking up architectural debt investigation work on WibWob-DOS, a terminal
+desktop runtime for composable microapps (Bun + blessed + local HTTP API).
+
+**Read these files first, in order — they ground every decision:**
+1. `PHILOSOPHY.md` — five decision filters, SDK stability contract, north star
+2. `ARCHITECTURE.md` — COAT pattern, four seams, subsystem owners, shell invariants
+3. `GOTCHAS.md` — runtime failure modes; many trace directly to the concerns below
+4. `.planning/chores/architectural-debt-sdk.md` — this file; the problem ledger you're working from
+
+**Branch:** `chore/w13-reflections`
+**Do not merge to main.** This is investigation only — no implementation yet.
+
+---
+
+**Your task:** Work through the 5 ranked architectural concerns in this doc.
+For each concern, your job is to:
+1. Investigate the affected surface in the codebase (key files named per concern)
+2. Produce a concrete acceptance criteria definition
+3. Decide: promote to spike brief, epic brief, or inline fix?
+4. Tick the checkbox tasks as you go
+
+**Start with DUAL_API (rank 1)** — it causes the most silent failures per session.
+
+Key files for DUAL_API investigation:
+- `src/sdk/composition-helpers.ts` — the old API (`{ element, update, destroy }`)
+- `src/ui/` — the new LayoutPart API (`{ node, layout(), update(), restyle(), destroy() }`)
+- `src/services/microapp-sdk.ts` — the single import surface for microapp authors
+- `GOTCHAS.md` entry: *"Never mix CompositionHelpers and LayoutParts in createStack"*
+
+To count how many callsites are affected:
+```bash
+grep -rn "createStack\|createRow\|createGrid" microapps/ src/windows/ --include="*.ts" | wc -l
+grep -rn "createTextViewer\|createListPanel\|createSplitView\|createCanvas\|createStatusBar" microapps/ --include="*.ts" | wc -l
+```
+
+**Conventions to follow:**
+- COAT test: would this work without the TUI, using only the HTTP API?
+- Philosophy filter 1: prefer composition over new primitives
+- Philosophy filter 4: host owns complexity; microapps stay small
+- Commit format: `type(scope): imperative summary`
+- AC format: observable, binary, scoped, testable (see `.planning/CONVENTIONS.md`)
+
+**What not to do:**
+- Don't implement solutions — investigate and define ACs only
+- Don't import from `src/core/` or `src/services/` in microapps — SDK surface only
+- Don't add new abstractions without passing the five philosophy filters
+- Don't touch `main` branch
