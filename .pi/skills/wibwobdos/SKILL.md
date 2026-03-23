@@ -64,7 +64,7 @@ SSH tunnel options, env vars, and auth token: `references/connection.md`
 ## Ghostty shaders (local only)
 
 Ghostty shader overlays are managed via `.pi/skills/wibwobdos/scripts/ghostty-shader.sh`.
-The script writes a one-line config snippet to `scratch/.ghostty-shaders`, which is
+The script writes a one-line config snippet to `.ghostty-shaders` (repo root), which is
 included by the Ghostty config via `config-file = ?<path>` — silent no-op when absent.
 
 ```bash

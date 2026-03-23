@@ -45,6 +45,7 @@ cache/
 
 # Local workspace snapshots/artifacts (ephemeral)
 scratch/
+.ghostty-shaders
 .trash/
 
 # Codex logs (local ephemeral)

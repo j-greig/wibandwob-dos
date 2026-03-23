@@ -125,7 +125,7 @@ Triggers on: "add a command", "new command", "wire a command", "scaffold command
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
-Last used: today (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
 
 ---
 
@@ -327,7 +327,7 @@ Triggers on: "users ask to search notes", "find documents", "or look up informat
 
 Does not: Does not make changes — reads and reports only.
 
-Last used: today (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
 
 ---
 
@@ -421,7 +421,7 @@ Triggers on: "building a new skill", "restructuring an existing one", "writing a
 
 Does not: Does not make broad changes — stays within its narrow defined scope.
 
-Last used: today (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
+Last used: yesterday (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
 
 ---
 
