@@ -26,3 +26,6 @@
 [submodule "vendor/defuddle"]
 	path = vendor/defuddle
 	url = https://github.com/kepano/defuddle
+[submodule "vendor/minimax-ai-skills"]
+	path = vendor/minimax-ai-skills
+	url = https://github.com/MiniMax-AI/skills

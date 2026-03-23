@@ -140,6 +140,17 @@ Last used: never · See: `.pi/skills/commit/SKILL.md`
 
 ---
 
+## desktop-arrange
+**Your Specialist** — Arrange open WibWob-DOS windows into named layout presets: golden, magazine, cinema, triptych, diagonal, spotlight, asymmetric. Use when: "arrange windows", "la…
+
+Triggers on: "arrange windows", "lay out the desktop", "golden ratio layout", "magazine layout", "cinema mode", "triptych", "diagonal cascade".
+
+Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+
+Last used: never · See: `.pi/skills/desktop-arrange/SKILL.md`
+
+---
+
 ## devlog-briefing
 **Your Session Briefer** — Read the current devlog and standing notes to get oriented on recent work, open ideas, process friction, and improvement opportunities. Use at the start of any…
 
@@ -342,6 +353,17 @@ Last used: never · See: `.pi/skills/session-archaeology/SKILL.md`
 
 ---
 
+## shader-dev
+**Your Specialist** — Comprehensive GLSL shader techniques for creating stunning visual effects — ray marching, SDF modeling, fluid simulation, particle systems, procedural generatio…
+
+Triggers on: "SDF modeling", "fluid simulation", "particle systems", "procedural generation", "lighting", "post-processing", "and more".
+
+Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
+
+Last used: never · See: `.pi/skills/shader-dev/SKILL.md`
+
+---
+
 ## signls
 **Your Sequencer Pilot** — Manage the signls generative MIDI sequencer. Install, launch in tmux, stop, check status, and inspect bank files. Use when composing generative MIDI sequences,…
 
@@ -488,6 +510,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | codex | Codex Delegate | Delegate tasks to OpenAI Codex CLI as a subagent |
 | command-scaffold | Specialist | Add a new command to WibWob-DOS — walks the 4-file wiring path so you don't miss |
 | commit | Commit Gatekeeper | Read this skill before making git commits |
+| desktop-arrange | Specialist | Arrange open WibWob-DOS windows into named layout presets: golden, magazine, cin |
 | devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | doc-agent | Specialist | Autopoietic documentation agent |
@@ -506,6 +529,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | qmd | Knowledge Searcher | Search markdown knowledge bases, notes, and documentation using QMD |
 | repo-hygiene | Repo Janitor | - Monthly repo health check — branch census, worktree audit, stale docs, plannin |
 | session-archaeology | Confusion Miner | Mine pi agent session logs (~/ |
+| shader-dev | Specialist | Comprehensive GLSL shader techniques for creating stunning visual effects — ray  |
 | signls | Sequencer Pilot | Manage the signls generative MIDI sequencer |
 | simplify | Code Simplifier | - Three-pass code review and cleanup after a batch of changes |
 | simplify-docs | Docs Simplifier | - Radically simplify documentation by applying the system-knowledge test: if a s |
