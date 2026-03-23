@@ -77,6 +77,10 @@ curl -sf --max-time 5 http://127.0.0.1:8099/state   # verify in state
 `src/services/*`, `src/core/*`, or `src/sdk/*` → full restart required:
 `bash scripts/restart.sh --tmux`
 
+**`wibwob` CLI is a compiled binary.** Changes to `src/cli/wibwob.ts` don't
+take effect on restart — rebuild and reinstall: `bun run build:cli && bun run install:cli`.
+Server-side changes (commands, control-api) take effect on TUI restart only.
+
 ---
 
 ## The four required hooks
@@ -359,6 +363,30 @@ curl -sf --max-time 5 -X POST http://127.0.0.1:8099/commands/run \
 7. **Batch-verify loop** → rapid curl overwhelms single-threaded bun, one at a time
 
 Full list: `GOTCHAS.md`
+
+---
+
+## COAT compliance — every keybind needs a command
+
+**Rule:** Any key binding that mutates state (playback, selection, mode, data) must have a `host.registerCommand` equivalent so agents and the API can trigger it without a human at the keyboard.
+
+**Paired pattern — the only acceptable form:**
+
+```typescript
+// ✅ COAT-compliant: key binding paired with registered command
+const doRefresh = () => { /* mutates state */ refreshList(); };
+
+host.registerCommand({
+  id: "refresh",
+  label: "Refresh",
+  description: "Re-scan and refresh the list.",
+  action: () => { doRefresh(); },
+});
+
+canvas.element.key(["r"], doRefresh); // same handler — zero duplication
+```
+
+Navigation-only keys (scroll, focus) don't need commands. Cosmetic keys (toggle viz mode) are optional. When in doubt: if an agent needs to drive it, register it.
 
 ---
 

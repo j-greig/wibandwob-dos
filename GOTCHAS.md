@@ -31,6 +31,8 @@ to a single change or the loop can't learn.
 
 ## Microapps
 
+**`zodToJsonSchema` returns `{}` silently with Zod v4.** The library is incompatible with Zod v4 and never throws — it just returns an empty schema. Use Zod v4's native `.toJSONSchema()` instead: `(schema as any).toJSONSchema?.()`. Affects any microapp using Zod schemas for command params or API validation.
+
 **Never import from `src/core/` or `src/services/` directly.** Only
 `src/services/microapp-sdk.js` is the stable import surface. Everything else is a COAT violation.
 
@@ -81,6 +83,8 @@ A scaffold script is planned — see `.planning/autopoietic-next/README.md §5`.
 ---
 
 ## Bash scripting
+
+**`xargs` breaks on backticks, single quotes, and backslashes in input.** Any unmatched quote is a syntax error and `xargs` exits silently. Replace `| xargs some-cmd` with a `while read` loop or `| sed 's/^[[:space:]]*//;s/[[:space:]]*$//'` when input is untrusted (e.g. devlog lines, file names, user text).
 
 **`grep -c` returns multiline output.** Always pipe through `| tail -1 | tr -d " \n"` or
 use `|| echo 0`. Raw `grep -c` breaks bash arithmetic (`[[ $count -gt 0 ]]`) silently.
