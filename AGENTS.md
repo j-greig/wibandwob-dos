@@ -64,6 +64,8 @@ produces binary evidence (pass/fail + artefact path). 3 small slices > 1 large o
 `bash scripts/ensure-running.sh` · `bash scripts/restart.sh` · `bash scripts/reload-microapp.sh <id>`
 `curl localhost:8099/health` · `curl localhost:8099/state` · `wibwob --help` for full CLI.
 
+TUI control: `ghostty-control` skill (terminal emulator — keystrokes, clicks) · `wibwobdos-control` skill (HTTP API — windows, state, commands).
+
 ---
 
 ## Planning

@@ -1,9 +1,19 @@
 ---
-name: wibwobdos
-description: "Operate WibWob-DOS: open/move/read windows, check desktop state, send messages to the agent, take screenshots, share to Discord, and manage Ghostty shader overlays (CRT, glow, cell-grid gradient). Use when: opening apps on the desktop, reading window content, controlling the TUI, enabling a shader or visual effect, sharing the desktop state."
+name: wibwobdos-control
+description: >
+  APPLICATION LAYER — control what runs inside Ghostty, not Ghostty itself.
+  Talks to the WibWob-DOS HTTP API (port 8099) to open/move/read windows,
+  check desktop state, send messages, screenshot, share to Discord, manage
+  shaders. Use when: opening a microapp, reading a window's content, checking
+  desktop layout, sending a command, managing shaders.
+  NOT for: clicking menus, sending keystrokes, or interacting with the terminal
+  emulator itself — use ghostty-control for that.
 ---
 
-# WibWob-DOS
+# WibWob-DOS Control
+
+> **Layer:** application (inside Ghostty) · **Sibling:** `ghostty-control` (terminal emulator layer below)
+> If it needs a human at the keyboard — use `ghostty-control`. If the HTTP API can do it — use this.
 
 A live shared terminal desktop shell. Everything is controlled through an HTTP API
 on port 8099 — open windows, move them, read their text, send input, check state.
