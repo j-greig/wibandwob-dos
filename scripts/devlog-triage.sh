@@ -47,7 +47,7 @@ while IFS= read -r line; do
         if echo "$line" | grep -qE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]\[status:([^]]+)\]'; then
             id=$(echo "$line" | grep -oE '\[id:(W[0-9]+-[0-9A-Za-z]+)\]' | grep -oE 'W[0-9]+-[0-9A-Za-z]+')
             status=$(echo "$line" | grep -oE '\[status:[^]]+\]' | sed 's/\[status://;s/\]//')
-            desc=$(echo "$line" | sed 's/ `\{0,1\}\[id:[^]]*\]\[status:[^]]*\]`\{0,1\}//g; s/^#{1,6}[[:space:]]*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            desc=$(echo "$line" | sed 's/ `\{0,1\}\[id:[^]]*\]\[status:[^]]*\]`\{0,1\}//g; s/^[#[:space:]]*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             echo "$status" > "$TMP/$id.status"
             echo "$desc"   > "$TMP/$id.desc"
         fi
