@@ -47,6 +47,8 @@ Apply each lens. Skip any with no purchase — but name it so the skip is visibl
 | **NAMES** | Could another developer understand every new name in under 30 seconds? |
 | **GRAVITY** | Will any of these additions attract future growth? Flag attractors. |
 | **SEQUENCE** | Is there a safe order of changes? Any circular dependency risk? |
+| **COAT** | Would this work without the TUI, using only the API? If no — it isn't done. Every user-visible surface needs a typed representation in state and a path in control-api. |
+| **COMPOSITION** | Does this add a new primitive, or compose from existing ones? Prefer composition. New SDK surface is a last resort. |
 
 Adaptive — fire only when triggered:
 
@@ -54,13 +56,23 @@ Adaptive — fire only when triggered:
 - **New abstraction** → Justify in one sentence or inline it.
 - **3+ files touched** → Name the coupling. Is it essential or accidental?
 - **Refactor** → How do you prove old and new behave identically?
+- **Microapp changed** → Does `describeState()` still expose everything an agent needs?
 
 Then ask yourself:
 - *What assumption is this plan making that might be wrong?*
 - *What does this plan not say?*
 - *What's the hidden cost?*
 
-If blast radius exceeds 3 files or the plan introduces new abstractions, read `/simplicity-review` and apply its lenses to the plan before finalizing.
+### Auto-checks — run these, don't just read them
+
+| Trigger | Command |
+|---------|---------|
+| Any `.ts` file in scope | `bun run typecheck` |
+| Any `src/` file in scope | `bun run check-coat` (COAT boundary violations) |
+| Blast radius > 3 files | Read `/simplicity-review` and apply its lenses |
+| Any CAPS doc (`AGENTS.md`, `ARCHITECTURE.md` etc.) in scope | `bash scripts/doc-review.sh` |
+
+For adversarial self-questioning of the plan, load `/grill-me`.
 
 ---
 
