@@ -19,8 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
-import * as childProcess from "node:child_process";
+import { execSync, spawnSync as _spawnSync } from "node:child_process";
 import { safeWriteFile } from "../core/safe-fs.js";
 import { APP_ROOT, DATA_ROOT, SCRATCH_BASE } from "../core/config.js";
 
@@ -324,7 +323,7 @@ function tryResolveBase(): string | null {
     // Prefer instances with a real screen over headless ones (screen 1×1 = zombie)
     const realScreen = alive.filter((inst) => {
       try {
-        const res = childProcess.spawnSync("curl", [
+        const res = _spawnSync("curl", [
           "-sf", "--unix-socket", inst.socketPath, "http://localhost/health",
         ], { timeout: 800, encoding: "utf-8" });
         const health = JSON.parse(res.stdout ?? "{}") as { screen?: { width: number; height: number } };
@@ -363,7 +362,7 @@ function resolveBase(): string {
   if (base.startsWith("unix://") && !findFlag("--instance", "-i")) {
     try {
       const sock = base.slice("unix://".length);
-      const res = childProcess.spawnSync("curl", [
+      const res = _spawnSync("curl", [
         "-sf", "--unix-socket", sock, "http://localhost/health",
       ], { timeout: 800, encoding: "utf-8" });
       const health = JSON.parse(res.stdout ?? "{}") as { screen?: { width: number; height: number } };
