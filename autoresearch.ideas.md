@@ -34,3 +34,10 @@
 - Eliminates click-text.sh for SDK widgets — agent reads position from state, clicks directly
 - COAT: if a human can click it, the API must know where it is
 - Would also enable: `wibwob click <window-id> <label>` CLI command
+
+## Parked: TUI projection mapping via Ghostty shaders
+- Cell-aligned grid shader works well (round() fix for sub-pixel drift)
+- 3D cube rotation proof-of-concept built but not visually compelling
+- The approach works: ray-box intersection, per-face TUI window drawing, theme-matched colours
+- Needs better visual design / use case to justify the complexity
+- Assets: `wibwob-window-cube.glsl`, `wibwob-3d-tilt.glsl` (keep for reference)
