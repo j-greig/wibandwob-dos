@@ -92,3 +92,4 @@ deploy/test_agent_key
 deploy/test_agent_key.pub
 
 /.tmp
+vendor/opentui/

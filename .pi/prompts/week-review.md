@@ -24,14 +24,18 @@ For each bucket, list every idea/pain as a one-liner.
 
 ## Step 3 · Cross-reference
 
-For each idea, check: did a commit land that addresses it?
+First, try the fast path:
+```bash
+scripts/devlog-triage.sh $1
+```
+If the file has `[id:WXX-NNN]` tags this auto-generates the triage table. Done — skip to Step 5.
 
-Mark each item:
+If no tags (older files), do it manually: for each idea, check `git log --grep`, filename searches, and your codebase knowledge. Mark each:
 - **✅ Shipped** — commit exists, problem solved
-- **⚠️ Partial** — commit exists but only addresses part of it
+- **⚠️ Partial** — commit exists but only part of it addressed
 - **❌ Open** — no commit, still a gap
 
-Use `git log --grep`, filename searches, and your knowledge of the codebase. Don't guess — if you can't find evidence, mark it open.
+Don't guess — if you can't find evidence, mark it open.
 
 ---
 

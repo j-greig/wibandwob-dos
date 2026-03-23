@@ -55,11 +55,14 @@ if [ -z "$MSG" ]; then
   exit 1
 fi
 
-# Append timestamped entry with breathing room
+# Auto-generate sequential ID for this entry
+NEXT_ID=$(printf "W%s-%03d" "$WEEK" $(( $(grep -oE '\[id:W[0-9]+-[0-9]+\]' "$FILE" 2>/dev/null | wc -l | tr -d ' ') + 1 )))
+
+# Append timestamped entry with ID + status tag
 TIMESTAMP=$(date "+%H:%M")
 echo "" >> "$FILE"
-echo "- **${TIMESTAMP}** — ${MSG}" >> "$FILE"
-echo "✏️  W${WEEK} devlog ← ${MSG}"
+echo "- **${TIMESTAMP}** — ${MSG} \`[id:${NEXT_ID}][status:open]\`" >> "$FILE"
+echo "✏️  W${WEEK} devlog [${NEXT_ID}] ← ${MSG}"
 
 # Journal-compatible output (for microapps/journal ingestion)
 if [ "$JOURNAL" = true ]; then

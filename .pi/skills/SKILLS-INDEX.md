@@ -14,7 +14,7 @@ do-not-edit: true
 ## agentic-dev-reflection
 **Your Friction Journalist** — Reflect on implementation friction after sessions. Write for yourself and future agents. Focus on pain → why → fix. Skip git-log style entries.
 
-Triggers on: "Reflect on implementation friction after sessions", "agentic dev reflection", "agentic reflection".
+Triggers on: "Reflect on implementation friction after sessions", "to be explored", "agentic dev reflection".
 
 Does not: Does not make changes — reads and reports only.
 

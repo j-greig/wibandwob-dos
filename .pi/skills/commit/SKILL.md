@@ -17,6 +17,7 @@ Create a git commit using the project's conventional commit format.
 
 Optional. Blank line after subject. Explain *why*, not just *what*.
 Chase the 5 whys — scaled to the problem.
+If this commit addresses a tagged devlog idea, add: `Addresses W13-001`
 
 ## Rules
 

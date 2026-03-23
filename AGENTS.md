@@ -87,6 +87,7 @@ Self-directing, self-debugging. Smallest slice that proves the direction.
 - "It typechecks" is not done — run the thing
 - Use '5 whys' to explain why code was changed (adjuting why count to suit scope/complexity of changes)
 - Bun-first. No Node-only assumptions.
+- Subagents doing analysis, tagging, or parallel work must write results to `scratch/` paths — return values are ephemeral. Give each agent an explicit output path; merge after all complete.
 
 ---
 
