@@ -154,7 +154,7 @@ export class BackroomsService {
     // Guard against broken symlinks and missing sources before attempting anything.
     // fs.existsSync follows symlinks, so it returns false for a broken symlink.
     if (!fs.existsSync(sourcePath)) {
-      console.warn(`[backrooms] skipping missing/broken source: ${sourcePath}`);
+      // silently skip — external source repos may not be present locally
       return;
     }
     if (overwrite && fs.existsSync(targetPath)) {
