@@ -81,16 +81,12 @@ print(json.dumps({'content': content}))
 
 post_png() {
   local TMP_PNG="/tmp/wibwob-tui-$$.png"
-  local TITLE="WibWob-DOS · $INSTANCE"
 
-  local EXTRA_ARGS=()
-  [[ -n "$WINDOW_ID" ]] && EXTRA_ARGS+=(--window-id "$WINDOW_ID")
-
-  python3 "$SKILL_DIR/tui-to-png.py" \
-    --api "$API" \
-    --out "$TMP_PNG" \
-    --title "$TITLE" \
-    "${EXTRA_ARGS[@]}"
+  # Use capture-tui-png.sh (CGWindowList, exact pixels) rather than the
+  # deprecated tui-to-png.py (Pillow fake-render). Window-id arg not yet
+  # supported by capture-tui-png.sh — full TUI capture only.
+  bash "$SKILL_DIR/../../.pi/skills/wibwobdos-cinema/scripts/capture-tui-png.sh" \
+    --out "$TMP_PNG"
 
   # Post as file attachment with caption
   curl -sf -X POST \
