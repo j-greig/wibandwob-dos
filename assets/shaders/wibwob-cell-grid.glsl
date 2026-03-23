@@ -4,13 +4,13 @@
 
 const float COLS           = 142.0;
 const float ROWS           = 81.0;
-const float GRID_OPACITY   = 0.10;   // grid line darkness at cell edges
-const float SCANLINE_DARK  = 0.15;   // row-bottom scanline shadow depth
-const float CELL_VIGNETTE  = 0.08;   // per-cell center-bright / edge-dark
+const float GRID_OPACITY   = 0.20;   // grid line darkness at cell edges
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    // Exact cell size in physical pixels (Ghostty window = COLS×cell_w exactly)
-    vec2 cell = iResolution.xy / vec2(COLS, ROWS);
+    // Snap to integer cell size: Ghostty rounds cell_px internally, but
+    // iResolution may include 1-2px OS rounding remainder (drawable = COLS*cell + r).
+    // round() recovers the true integer cell dimensions.
+    vec2 cell = round(iResolution.xy / vec2(COLS, ROWS));
     vec2 uv   = fragCoord / iResolution.xy;
 
     // Position within the current cell, 0..1
@@ -22,13 +22,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float gx = step(1.0 - 1.0 / cell.x, cpos.x);
     float gy = step(1.0 - 1.0 / cell.y, cpos.y);
     col.rgb *= 1.0 - max(gx, gy) * GRID_OPACITY;
-
-    // Scanline: darken the bottom 20% of each row (aligns to character descenders)
-    col.rgb *= 1.0 - smoothstep(0.80, 1.0, cpos.y) * SCANLINE_DARK;
-
-    // Per-cell vignette: subtle centre-glow, edge-dark within each character cell
-    vec2 cv = cpos * 2.0 - 1.0;
-    col.rgb *= 1.0 - dot(cv * cv, vec2(0.5)) * CELL_VIGNETTE;
 
     fragColor = col;
 }

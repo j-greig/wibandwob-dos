@@ -41,8 +41,9 @@ const float SCANLINE_DARK  = 0.15;   // row-bottom scanline shadow depth
 const float CELL_VIGNETTE  = 0.08;   // per-cell center-bright / edge-dark
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    // Exact cell size in physical pixels (Ghostty window = COLS×cell_w exactly)
-    vec2 cell = iResolution.xy / vec2(COLS, ROWS);
+    // round() snaps to true integer cell size — Ghostty rounds cell_px internally
+    // but iResolution may carry 1-2px OS remainder: drawable = COLS*cell_px + r
+    vec2 cell = round(iResolution.xy / vec2(COLS, ROWS));
     vec2 uv   = fragCoord / iResolution.xy;
 
     // Position within the current cell, 0..1
