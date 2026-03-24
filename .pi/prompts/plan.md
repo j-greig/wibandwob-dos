@@ -113,6 +113,20 @@ Then output the adjusted final plan in `<plan-final>` tags. Same format as Phase
 
 Then: **Evidence** — how do you prove it works? Name the specific command, test, or observation that confirms the change landed correctly.
 
-Write the final plan (Phase 2 output through Evidence) to `scratch/plans/<YYYY-MM-DD>-<slug>.md` where `<slug>` is a short kebab-case summary of the task. Create the directory if needed.
+### Actionable steps *(optional — use judgment)*
+
+If the plan has more than one concrete action, append a `## Steps` section inside `<plan-final>` with `[ ]` checkboxes for every action and every Evidence item. Pick the shape that fits:
+
+| Shape | When to use |
+|-------|-------------|
+| **Flat list** — single ordered `[ ]` sequence | ≤ 3 files, obvious execution order, no blockers between steps |
+| **Grouped** — `[ ]` items under per-file or per-domain headings | Multi-file change where steps cluster naturally by location |
+| **Phased** — `[ ]` items under `### Phase 1 / Phase 2 …` headings | Complex change with hard sequencing dependencies or parallel tracks |
+
+These are starting points. If none fits, invent a shape that does — the goal is a checklist someone can actually work through, not a format for its own sake. If the plan is trivial (single file, one obvious action), skip the section entirely and say so in one line.
+
+---
+
+Write the final plan (Phase 2 output through Steps) to `scratch/plans/<YYYY-MM-DD>-<slug>.md` where `<slug>` is a short kebab-case summary of the task. Create the directory if needed.
 
 Begin your response with `<phase-1-orient>`.
