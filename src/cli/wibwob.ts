@@ -455,10 +455,19 @@ function parseFlags(args: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
+
+    // JSON positional: '{"key":"val"}' — merge directly into result
+    if (arg.startsWith("{")) {
+      try { Object.assign(result, JSON.parse(arg)); } catch { /* not valid JSON — skip */ }
+      continue;
+    }
+
+    // --key [val]  or  -key [val]  (single-dash treated identically)
+    if (arg.startsWith("-")) {
+      const key = arg.startsWith("--") ? arg.slice(2) : arg.slice(1);
+      if (!key) continue; // bare `-` or `--` separator — skip
       const next = args[i + 1];
-      if (next === undefined || next.startsWith("--")) {
+      if (next === undefined || next.startsWith("-")) {
         result[key] = true;
       } else {
         // Try to parse as number or JSON, fall back to string
@@ -473,6 +482,7 @@ function parseFlags(args: string[]): Record<string, unknown> {
         i++;
       }
     }
+    // other positional strings (non-JSON, non-flag) — silently ignored as before
   }
   return result;
 }
