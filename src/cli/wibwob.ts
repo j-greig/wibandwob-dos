@@ -455,10 +455,19 @@ function parseFlags(args: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
+
+    // JSON positional: '{"key":"val"}' — merge directly into result
+    if (arg.startsWith("{")) {
+      try { Object.assign(result, JSON.parse(arg)); } catch { /* not valid JSON — skip */ }
+      continue;
+    }
+
+    // --key [val]  or  -key [val]  (single-dash treated identically)
+    if (arg.startsWith("-")) {
+      const key = arg.startsWith("--") ? arg.slice(2) : arg.slice(1);
+      if (!key) continue; // bare `-` or `--` separator — skip
       const next = args[i + 1];
-      if (next === undefined || next.startsWith("--")) {
+      if (next === undefined || next.startsWith("-")) {
         result[key] = true;
       } else {
         // Try to parse as number or JSON, fall back to string
@@ -473,6 +482,7 @@ function parseFlags(args: string[]): Record<string, unknown> {
         i++;
       }
     }
+    // other positional strings (non-JSON, non-flag) — silently ignored as before
   }
   return result;
 }
@@ -906,6 +916,110 @@ async function cmdRestart(args: string[]) {
   ], {
     cwd: repoRoot,
     env: process.env,
+    stdio: "inherit",
+  });
+  process.exit(result.status ?? 1);
+}
+
+async function cmdTui() {
+  const { spawnSync } = await import("node:child_process");
+  const repoRoot = APP_ROOT;
+  const force = process.argv.includes("--force");
+
+  const alive = findAliveInstances();
+
+  // ── No instance: start fresh ──────────────────────────────────────
+  if (alive.length === 0) {
+    process.stderr.write("[tui] no instance running — starting fresh\n");
+    const result = spawnSync("bun", ["run", "src/app.ts"], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: "inherit",
+    });
+    process.exit(result.status ?? 1);
+    return;
+  }
+
+  // ── Multiple instances need -i to disambiguate ────────────────────
+  if (alive.length > 1 && !findFlag("--instance", "-i")) {
+    process.stderr.write(`Multiple instances: ${alive.map(i => i.label).join(", ")}\n`);
+    process.stderr.write(`Use: wibwob -i <label> tui\n`);
+    process.exit(1);
+    return;
+  }
+
+  // ── Find target ───────────────────────────────────────────────────
+  const targetInst = alive.length === 1
+    ? alive[0]
+    : findAliveInstanceBySelector(findFlag("--instance", "-i") ?? process.env.WIBWOB_INSTANCE ?? alive[0].label) ?? alive[0];
+  const sockPath = targetInst.socketPath;
+  const attachLabel = targetInst.instanceLabel ?? targetInst.label;
+  const orphanWorkspace = `orphan-${attachLabel}`;
+
+  // ── Health probe: check if instance has a real display ────────────
+  type HealthShape = { screen?: { width: number; height: number } | null; pid?: number };
+  let health: HealthShape = {};
+  let instanceAlive = false;
+  if (sockPath && fs.existsSync(sockPath)) {
+    try {
+      const res = await fetch("http://localhost/health", {
+        ...unixFetchOpts(sockPath),
+        signal: AbortSignal.timeout(800),
+      } as RequestInit);
+      if (res.ok) {
+        health = await res.json() as HealthShape;
+        instanceAlive = true;
+      }
+    } catch { /* not responding */ }
+  }
+
+  const w = health.screen?.width ?? 0;
+  const h = health.screen?.height ?? 0;
+  const hasDisplay = w > 10 && h > 5;
+
+  // ── Already open in another terminal — start a fresh independent instance ──
+  if (hasDisplay && !force) {
+    process.stderr.write(`[tui] instance ${health.pid} already running (${w}×${h}) — starting new instance here\n`);
+    const result = spawnSync("bun", ["run", "src/app.ts"], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: "inherit",
+    });
+    process.exit(result.status ?? 1);
+    return;
+  }
+
+  // ── Take over: save workspace → kill → restart here ───────────────
+  if (instanceAlive && sockPath) {
+    try {
+      await fetch("http://localhost/workspace/save", {
+        ...unixFetchOpts(sockPath),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: orphanWorkspace }),
+      });
+      process.stderr.write(`[tui] saved workspace as ${orphanWorkspace}\n`);
+    } catch {
+      process.stderr.write("[tui] warning: could not save workspace\n");
+    }
+    if (health.pid) {
+      try {
+        process.kill(Number(health.pid), "SIGTERM");
+        process.stderr.write(`[tui] stopped instance ${health.pid}\n`);
+      } catch {}
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+
+  // Clean stale socket
+  if (sockPath && fs.existsSync(sockPath)) {
+    try { fs.unlinkSync(sockPath); } catch {}
+  }
+
+  process.stderr.write(`[tui] launching (workspace=${orphanWorkspace})...\n`);
+  const result = spawnSync("bun", ["run", "src/app.ts", "--workspace", orphanWorkspace], {
+    cwd: repoRoot,
+    env: { ...process.env, WIBWOB_INSTANCE_LABEL: attachLabel },
     stdio: "inherit",
   });
   process.exit(result.status ?? 1);
@@ -1584,6 +1698,7 @@ const CLI_COMMANDS: CliCommand[] = [
   { name: "instances",   aliases: ["list", "ls"], desc: "List running instances (PID-checked)",   fn: () => cmdInstances() },
   { name: "crash-bundle", args: "[--out <dir>]", desc: "Collect health/state/log/tmux crash evidence bundle", fn: (a) => cmdCrashBundle(a) },
   { name: "clean",       args: "[--kill] [--force]", desc: "Find orphan processes + stale files (dry run unless --kill)", fn: (a) => cmdClean(a) },
+  { name: "tui",         args: "[--force]",       desc: "Open TUI in this terminal (takes over headless instance)", fn: () => cmdTui() },
   { name: "attach",      desc: "Resurrect from orphan workspace",                 fn: () => cmdAttach() },
   { name: "open",        args: "<path|url> [--app A] [--line N]", desc: "Open file/dir/URL in WibWob-DOS (fallback: system)", fn: (a) => cmdOpen(a) },
   { name: "completions", args: "[--zsh|--bash]",  desc: "Generate shell completions",           fn: () => cmdCompletions() },

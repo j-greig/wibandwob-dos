@@ -1,4 +1,4 @@
-import type { WindowSnapshot } from "../core/types.js";
+import type { TuiSkin, WindowSnapshot } from "../core/types.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 
 export interface RuntimeWorkspaceResultSuccess {
@@ -7,6 +7,7 @@ export interface RuntimeWorkspaceResultSuccess {
   path: string;
   windows: number;
   theme?: string;
+  skin?: Partial<TuiSkin>;
 }
 
 export interface RuntimeWorkspaceResultFailure {
@@ -39,9 +40,11 @@ interface RuntimeWorkspaceServiceDeps {
   workspace: WorkspaceService;
   snapshotWindows: () => WindowSnapshot[];
   getThemeName: () => string;
+  getSkin: () => Partial<TuiSkin>;
   clearWindows: () => void;
   restoreWindows: (snapshots: WindowSnapshot[]) => void;
   applyThemeByName: (name: string) => void;
+  applyWorkspaceSkin: (skin: Partial<TuiSkin> | undefined) => void;
   persistState: () => void;
 }
 
@@ -64,12 +67,14 @@ export function createRuntimeWorkspaceService(
   const success = (
     windows: number,
     theme?: string,
+    skin?: Partial<TuiSkin>,
   ): RuntimeWorkspaceResultSuccess => ({
     ok: true,
     name: deps.workspace.currentName,
     path: deps.workspace.path,
     windows,
     theme,
+    skin,
   });
 
   const loadSelected = (
@@ -83,10 +88,12 @@ export function createRuntimeWorkspaceService(
 
     let snapshots: WindowSnapshot[] = [];
     let savedTheme: string | undefined;
+    let savedSkin: Partial<TuiSkin> | undefined;
     try {
       const loaded = deps.workspace.load();
       snapshots = loaded.windows;
       savedTheme = loaded.theme;
+      savedSkin = loaded.skin;
     } catch (error) {
       return failure(
         `Cannot parse workspace: ${error instanceof Error ? error.message : String(error)}`,
@@ -96,6 +103,7 @@ export function createRuntimeWorkspaceService(
     if (savedTheme) {
       deps.applyThemeByName(savedTheme);
     }
+    deps.applyWorkspaceSkin(savedSkin);
     if (options?.replaceExisting !== false) {
       deps.clearWindows();
     }
@@ -103,7 +111,7 @@ export function createRuntimeWorkspaceService(
     if (options?.persistState !== false) {
       deps.persistState();
     }
-    return success(snapshots.length, savedTheme);
+    return success(snapshots.length, savedTheme, savedSkin);
   };
 
   return {
@@ -119,9 +127,10 @@ export function createRuntimeWorkspaceService(
       try {
         const snapshots = deps.snapshotWindows();
         const theme = deps.getThemeName();
-        deps.workspace.save(snapshots, theme);
+        const skin = deps.getSkin();
+        deps.workspace.save(snapshots, theme, skin);
         deps.persistState();
-        return success(snapshots.length, theme);
+        return success(snapshots.length, theme, skin);
       } catch (error) {
         return failure(
           `Cannot save workspace: ${error instanceof Error ? error.message : String(error)}`,
@@ -131,7 +140,8 @@ export function createRuntimeWorkspaceService(
     autoSave: (name) => {
       selectWorkspace(name);
       try {
-        deps.workspace.save(deps.snapshotWindows(), deps.getThemeName());
+        const skin = deps.getSkin();
+        deps.workspace.save(deps.snapshotWindows(), deps.getThemeName(), skin);
       } catch {
         // Best-effort only. Shutdown and reload paths must not block on autosave.
       }

@@ -5,7 +5,8 @@ import type { WindowFacade } from "./window-facade.js";
 import { theme } from "./theme/resolver.js";
 import { safeSetStyle } from "./ui-primitives.js";
 import type { RenderScheduler } from "./render-scheduler.js";
-import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
+import type { Box, BorderStyle, DragState, ResizeState, TuiSkin, WindowKind, WindowRecord } from "./types.js";
+import { DEFAULT_SKIN } from "./types.js";
 
 /** Called when an editor window receives input text. Return true if handled. */
 export type EditorWriteHook = (id: number, text: string) => boolean;
@@ -47,6 +48,8 @@ export class WindowManager implements WindowFacade {
   private lastTitleClickTime = 0;
   private lastTitleClickWindowId = -1;
   private editorWriteHook?: EditorWriteHook;
+  /** Injected by AppController — returns the current effective merged TuiSkin. */
+  private skinProvider: () => TuiSkin = () => DEFAULT_SKIN;
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
@@ -59,6 +62,37 @@ export class WindowManager implements WindowFacade {
   /** Set the editor write hook. Called by AppController after construction. */
   setEditorWriteHook(hook: EditorWriteHook): void {
     this.editorWriteHook = hook;
+  }
+
+  /** Inject the skin provider. Called by AppController after all services are wired. */
+  setSkinProvider(provider: () => TuiSkin): void {
+    this.skinProvider = provider;
+  }
+
+  /** Return the current effective skin. */
+  getEffectiveSkin(): TuiSkin {
+    return this.skinProvider();
+  }
+
+  /** Apply a border style to an existing frame. Handles line/bg/none transitions. */
+  private applyBorderStyle(frame: Box, style: BorderStyle, borderChar: string, active: boolean): void {
+    if (style === "none") {
+      frame.border = undefined as unknown as blessed.Widgets.Border;
+      frame.style = { ...frame.style, border: undefined };
+    } else if (style === "bg") {
+      (frame as unknown as Record<string, unknown>).border = { type: "bg", ch: borderChar };
+      frame.style = {
+        ...frame.style,
+        border: active ? theme().windowBorderFocused : theme().windowBorderUnfocused,
+      };
+    } else {
+      // "line" — default Unicode box chars
+      frame.border = { type: "line" } as unknown as blessed.Widgets.Border;
+      frame.style = {
+        ...frame.style,
+        border: active ? theme().windowBorderFocused : theme().windowBorderUnfocused,
+      };
+    }
   }
 
   getFocusedWindow(): WindowRecord | undefined {
@@ -110,28 +144,43 @@ export class WindowManager implements WindowFacade {
     const screenHeight = Number(this.screen.height);
     const frameWidth = Math.min(screenWidth - 6, 72);
     const frameHeight = Math.min(screenHeight - 6, 20);
+    const skin = this.skinProvider();
     const sh = theme().windowShadow;
-    const shadow = blessed.box({
-      parent: this.desktop,
-      top: offset + 1,
-      left: 2 + offset + 2,
-      width: frameWidth,
-      height: frameHeight,
-      content: Array.from({ length: frameHeight }, () => sh.char.repeat(frameWidth)).join("\n"),
-      style: { fg: sh.fg, bg: sh.bg },
-    });
+
+    // Shadow: only create if skin.shadowEnabled
+    let shadow: Box | undefined;
+    if (skin.shadowEnabled) {
+      shadow = blessed.box({
+        parent: this.desktop,
+        top: offset + 1,
+        left: 2 + offset + 2,
+        width: frameWidth,
+        height: frameHeight,
+        content: Array.from({ length: frameHeight }, () => sh.char.repeat(frameWidth)).join("\n"),
+        style: { fg: sh.fg, bg: sh.bg },
+      });
+    }
+
+    // Border: line / bg / none
+    const borderOpt: blessed.Widgets.BoxOptions["border"] =
+      skin.borderStyle === "none"
+        ? undefined
+        : skin.borderStyle === "bg"
+          ? ({ type: "bg", ch: skin.borderChar } as unknown as blessed.Widgets.Border)
+          : "line";
+
     const frame = blessed.box({
       parent: this.desktop,
       top: offset,
       left: 2 + offset,
       width: frameWidth,
       height: frameHeight,
-      border: "line",
+      ...(borderOpt !== undefined ? { border: borderOpt } : {}),
       tags: true,
       mouse: true,
       style: {
         ...theme().windowFrame,
-        border: theme().windowBorderUnfocused
+        ...(skin.borderStyle !== "none" ? { border: theme().windowBorderUnfocused } : {}),
       }
     });
     const titleBar = blessed.box({
@@ -144,12 +193,13 @@ export class WindowManager implements WindowFacade {
       content: ` ${title} `,
       style: theme().titleBarUnfocused
     });
+    const hasBorder = skin.borderStyle !== "none";
     const body = blessed.box({
       parent: frame,
-      top: 1,
-      left: 2,
-      right: 2,
-      bottom: 1,
+      top: hasBorder ? 1 : 0,
+      left: hasBorder ? 2 : 0,
+      right: hasBorder ? 2 : 0,
+      bottom: hasBorder ? 1 : 0,
       style: theme().body
     });
     const closeHint = blessed.box({
@@ -188,7 +238,7 @@ export class WindowManager implements WindowFacade {
       shadow,
       close: () => {
         record.cleanup?.();
-        shadow.destroy();
+        record.shadow?.destroy();
         frame.destroy();
         const index = this.windows.findIndex((window) => window.id === record.id);
         if (index >= 0) {
@@ -381,7 +431,7 @@ export class WindowManager implements WindowFacade {
     if (!record) return false;
 
     if (mode === "none") {
-      // Hide chrome elements
+      // Hide chrome elements (shadow may be undefined when skin.shadowEnabled=false)
       if (record.shadow) { record.shadow.hide(); }
       if (record.titleBar) { record.titleBar.hide(); }
       if (record.closeHint) { record.closeHint.hide(); }
@@ -395,20 +445,19 @@ export class WindowManager implements WindowFacade {
       record.body.bottom = 0;
       record.chromeless = true;
     } else {
-      // Restore chrome
-      if (record.shadow) { record.shadow.show(); }
+      // Restore chrome — respect current skin
+      const skin = this.skinProvider();
+      if (record.shadow && skin.shadowEnabled) { record.shadow.show(); }
       if (record.titleBar) { record.titleBar.show(); }
       if (record.closeHint) { record.closeHint.show(); }
       if (record.resizeGrip) { record.resizeGrip.show(); }
-      record.frame.border = { type: "line" };
-      record.frame.style = {
-        ...record.frame.style,
-        border: theme().windowBorderUnfocused
-      };
-      record.body.top = 1;
-      record.body.left = 2;
-      record.body.right = 2;
-      record.body.bottom = 1;
+      const active = this.focusedWindow?.id === record.id;
+      this.applyBorderStyle(record.frame, skin.borderStyle, skin.borderChar, active);
+      const hasBorder = skin.borderStyle !== "none";
+      record.body.top = hasBorder ? 1 : 0;
+      record.body.left = hasBorder ? 2 : 0;
+      (record.body as unknown as Record<string, unknown>).right = hasBorder ? 2 : 0;
+      (record.body as unknown as Record<string, unknown>).bottom = hasBorder ? 1 : 0;
       record.chromeless = false;
     }
 
@@ -500,11 +549,32 @@ export class WindowManager implements WindowFacade {
     }));
   }
 
-  /** Restyle all open windows to match the current theme tokens. */
+  /** Restyle all open windows to match the current theme tokens and skin. */
   restyleAll(): void {
+    const skin = this.skinProvider();
     for (const window of this.windows) {
+      // Skip frameless (chromeless) windows — they opted out of chrome entirely.
+      if (window.chromeless) {
+        safeSetStyle(window.body, theme().body);
+        window.onRestyle?.();
+        continue;
+      }
       const active = this.focusedWindow?.id === window.id;
-      window.frame.style = { ...theme().windowFrame, border: active ? theme().windowBorderFocused : theme().windowBorderUnfocused };
+
+      // Border style — applyBorderStyle sets frame.style.border; merge windowFrame tokens after
+      this.applyBorderStyle(window.frame, skin.borderStyle, skin.borderChar, active);
+      window.frame.style = {
+        ...theme().windowFrame,
+        border: window.frame.style?.border,
+      };
+
+      // Body padding: adjust if border mode changed since window was created
+      const hasBorder = skin.borderStyle !== "none";
+      window.body.top = hasBorder ? 1 : 0;
+      window.body.left = hasBorder ? 2 : 0;
+      (window.body as unknown as Record<string, unknown>).right = hasBorder ? 2 : 0;
+      (window.body as unknown as Record<string, unknown>).bottom = hasBorder ? 1 : 0;
+
       if (window.titleBar) {
         window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
       }
@@ -515,9 +585,16 @@ export class WindowManager implements WindowFacade {
         window.resizeGrip.style = theme().resizeGrip;
       }
       safeSetStyle(window.body, theme().body);
+
+      // Shadow: show/hide based on skin (skip chromeless and maximized windows)
       if (window.shadow) {
-        const sh = theme().windowShadow;
-        window.shadow.style = { fg: sh.fg, bg: sh.bg };
+        if (skin.shadowEnabled && !window.savedBounds) {
+          const sh = theme().windowShadow;
+          window.shadow.style = { fg: sh.fg, bg: sh.bg };
+          window.shadow.show();
+        } else {
+          window.shadow.hide();
+        }
       }
       window.onRestyle?.();
     }

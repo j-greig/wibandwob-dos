@@ -13,6 +13,23 @@
  *   bun extensions/pi-defuddle/defuddle.ts <url> --no-fallback
  */
 
+// Self-heal: ensure linkedom is available before the imports that need it.
+// If missing, install it into the repo root so Bun can resolve it.
+import { existsSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+const __dir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dir, "../..");
+if (!existsSync(resolve(repoRoot, "node_modules/linkedom"))) {
+  console.error("⚙️  linkedom not found — installing into repo root (one-time setup)...");
+  const { spawnSync } = await import("child_process");
+  const r = spawnSync("bun", ["add", "linkedom"], { cwd: repoRoot, stdio: "inherit" });
+  if (r.status !== 0) {
+    console.error("❌ Failed to install linkedom. Run: bun add linkedom");
+    process.exit(1);
+  }
+}
+
 import { fetchPage, getInitialUA } from "../../vendor/defuddle/src/fetch.ts";
 import { parseLinkedomHTML } from "../../vendor/defuddle/src/utils/linkedom-compat.ts";
 import { Defuddle } from "../../vendor/defuddle/src/node.ts";

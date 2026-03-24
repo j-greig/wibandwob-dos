@@ -2,6 +2,35 @@ import blessed from "blessed";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 
 export type Box = blessed.Widgets.BoxElement;
+
+// ── TUI Skin ──────────────────────────────────────────────────────────────
+// Controls structural rendering preferences for window chrome.
+// Color is owned by ThemeTokens. Structure (border chars, shadow) is owned here.
+
+/** Border rendering style. Determines which blessed border mode is used. */
+export type BorderStyle = "line" | "bg" | "none";
+
+/**
+ * TuiSkin — structural rendering preferences for window chrome.
+ * Orthogonal to ThemeTokens (colour). A dark theme can have any border style.
+ *
+ * Merge stack (lowest → highest priority):
+ *   DEFAULT_SKIN → theme().skin → settings.json skin → workspace skin
+ */
+export interface TuiSkin {
+  /** Border drawing mode. "line" = Unicode box chars, "bg" = fill char, "none" = frameless. */
+  borderStyle: BorderStyle;
+  /** Character used when borderStyle = "bg". Default "░". Single wide char only. */
+  borderChar: string;
+  /** Whether window drop shadows are rendered. */
+  shadowEnabled: boolean;
+}
+
+export const DEFAULT_SKIN: TuiSkin = {
+  borderStyle: "line",
+  borderChar: "░",
+  shadowEnabled: true,
+};
 export type List = blessed.Widgets.ListElement;
 export type Textbox = blessed.Widgets.TextboxElement;
 export type LogBox = Box & { log: (text: string) => void };
@@ -215,6 +244,8 @@ export interface DesktopState {
     label?: string;
   };
   windows: DesktopWindowState[];
+  /** Effective merged TUI skin (DEFAULT → theme → settings → workspace). */
+  skin?: TuiSkin;
 }
 
 /**

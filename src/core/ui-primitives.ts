@@ -36,14 +36,21 @@ export function scrollableStyle(base: Record<string, any>): Record<string, any> 
 export function safeSetStyle(el: { scrollable?: boolean; type?: string; style: Record<string, any> }, newStyle: Record<string, any>): void {
   const patched = { ...newStyle };
 
-  // Blessed scrollable elements need style.scrollbar + style.track
-  if (el.scrollable && !patched.scrollbar) {
-    patched.scrollbar = { fg: theme().scrollbar.fg, bg: theme().scrollbar.bg };
-    patched.track = { fg: theme().scrollbar.track, bg: theme().scrollbar.bg };
+  // Blessed scrollable elements need style.scrollbar + style.track.
+  // Check both el.scrollable (set at creation) AND el.style.scrollbar/track
+  // (element may not expose scrollable as a JS property but had these styles before).
+  const needsScrollbar = el.scrollable || el.style?.scrollbar || el.style?.track;
+  if (needsScrollbar) {
+    if (!patched.scrollbar) {
+      patched.scrollbar = { fg: theme().scrollbar.fg, bg: theme().scrollbar.bg };
+    }
+    if (!patched.track) {
+      patched.track = { fg: theme().scrollbar.track, bg: theme().scrollbar.bg };
+    }
   }
 
   // Blessed list elements need style.item
-  if (el.type === "list" && !patched.item) {
+  if ((el.type === "list" || el.style?.item) && !patched.item) {
     patched.item = { fg: patched.fg, bg: patched.bg };
   }
 

@@ -33,6 +33,13 @@ Use `--no-fallback` to skip step 2 and fail fast.
 
 Defuddle has native extractors (better than generic Readability) for: GitHub, Hacker News, Reddit, Twitter/X, YouTube, ChatGPT, Claude, Gemini, Grok.
 
-## No setup needed
+## Setup
 
-Deps live in `vendor/defuddle/node_modules/` — no install step required.
+The script is self-healing — if `linkedom` is missing it installs itself automatically on first run.
+If that somehow fails, run this once from the repo root:
+
+```bash
+cd /Users/james/Repos/wibandwob-dos && bun add linkedom
+```
+
+`linkedom` lives in the repo root `node_modules/` (not `vendor/defuddle/`). It only needs to be installed once per machine.

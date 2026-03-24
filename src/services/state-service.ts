@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { safeReadFile, safeWriteFile } from "../core/safe-fs.js";
 import path from "node:path";
 
-import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
+import type { AppType, DesktopState, DesktopWindowState, TuiSkin, WindowRecord, WindowStateDetails } from "../core/types.js";
 import type { RuntimeNodeDescriptor } from "../runtime/runtime-node.js";
 import { themeName } from "../core/theme/resolver.js";
 import { capabilityService } from "./capability-service.js";
@@ -26,6 +26,7 @@ interface StateDependencies {
   getWindows: () => WindowRecord[];
   getFocusedWindow: () => WindowRecord | undefined;
   getOpenMenuLabel: () => string | undefined;
+  getEffectiveSkin?: () => TuiSkin;
 }
 
 /**
@@ -153,7 +154,8 @@ export class StateService {
         open: Boolean(openMenuLabel),
         label: openMenuLabel
       },
-      windows: windows.map((window, index) => this.describeWindow(window, index, focused?.id))
+      windows: windows.map((window, index) => this.describeWindow(window, index, focused?.id)),
+      skin: this.dependencies.getEffectiveSkin?.(),
     };
   }
 

@@ -102,6 +102,8 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/skin",                          description: "Effective TUI skin: borderStyle, borderChar, shadowEnabled" },
+  { method: "POST", path: "/skin/set",                      body: { borderStyle: "'line'|'bg'|'none' (optional)", borderChar: "string (optional, used when borderStyle='bg')", shadowEnabled: "boolean (optional)" }, description: "Set TUI skin properties. Applies live to all open windows and persists to settings.json." },
   { method: "GET",  path: "/errors/recent",                  description: "Last 20 runtime errors from microapp lifecycle hooks (setup, onRestyle, onResize) with microappId, hook, message, stack, timestamp" },
   { method: "GET",  path: "/runtime/inspection",            description: "Structured runtime snapshot: desktop state, menu/overlay UI state, runtime stats, and Scramble inspection." },
   { method: "GET",  path: "/runtime/stats",                 description: "Shell-level runtime stats: render FPS, frame time, RAM, and agent activity" },
@@ -590,6 +592,18 @@ export class ControlApiService {
       // Always rebuild state fresh — internal window state may have changed
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.deps.inspection.syncState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/skin") {
+      const state = this.deps.inspection.syncState();
+      return Response.json({ ok: true, skin: state.skin });
+    }
+
+    if (request.method === "POST" && url.pathname === "/skin/set") {
+      const body = (await request.json()) as Record<string, unknown>;
+      return Response.json(
+        await this.deps.commands.run("skin.set", body)
+      );
     }
 
     if (request.method === "GET" && url.pathname === "/errors/recent") {

@@ -68,14 +68,21 @@ import type {
   GalleryTab,
   MenuConfig,
   Textbox,
+  TuiSkin,
   WindowKind,
   WindowRecord,
   WindowSnapshot,
 } from "./types.js";
+import { DEFAULT_SKIN } from "./types.js";
 import {
   contentToWindowSize,
   getChromeModeForWindow,
 } from "./window-chrome.js";
+import {
+  loadSettings,
+  getSettingsSkin,
+  patchSkin as patchSettingsSkin,
+} from "./settings-service.js";
 import { WindowManager } from "./window-manager.js";
 import { createRenderScheduler, type RenderScheduler } from "./render-scheduler.js";
 import { ShellChromeController } from "./shell-chrome.js";
@@ -219,6 +226,8 @@ export class TsTuiMvpApp {
   private activeAgentSession?: WibWobAgentSession;
   private readonly scrambleBrain: ScrambleBrain = new ScrambleBrain();
   private scramblePopupWindowId?: string;
+  /** Workspace-level skin override — merged on top of settings.json skin at load time. */
+  private workspaceSkin: Partial<TuiSkin> | undefined;
   private readonly instanceLabel?: string;
   private readonly instanceId: string;
   private readonly instanceDisplayId: string;
@@ -376,6 +385,7 @@ export class TsTuiMvpApp {
     this.windowManager.setEditorWriteHook((id, text) =>
       this.editor.writeTextById(id, text),
     );
+    this.windowManager.setSkinProvider(() => this.getEffectiveSkin());
     this.geometry = new DesktopGeometryService(this.screen);
     this.customCursor = appFlags().customCursor
       ? new CustomCursor(this.screen)
@@ -384,6 +394,7 @@ export class TsTuiMvpApp {
       this.windowManager.restoreWindowFocus(),
     );
     capabilityService.probe();
+    loadSettings(); // load ~/.wibwob/settings.json (or project .wibwob/settings.json)
     this.workspace = new WorkspaceService(this.runtimeNode.workspacesDir);
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
@@ -460,9 +471,11 @@ export class TsTuiMvpApp {
       workspace: this.workspace,
       snapshotWindows: () => this.snapshotWindows(),
       getThemeName: () => themeName(),
+      getSkin: () => this.getEffectiveSkin(),
       clearWindows: () => this.clearWorkspaceWindows(),
       restoreWindows: (snapshots) => this.restoreWorkspaceSnapshots(snapshots),
       applyThemeByName: (name) => this.applyThemeByName(name),
+      applyWorkspaceSkin: (skin) => this.applyWorkspaceSkin(skin),
       persistState: () => this.persistState(),
     });
     this.controlApi = new ControlApiService(
@@ -491,6 +504,7 @@ export class TsTuiMvpApp {
         getWindows: () => this.windowManager.getWindows(),
         getFocusedWindow: () => this.windowManager.getFocusedWindow(),
         getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel(),
+        getEffectiveSkin: () => this.getEffectiveSkin(),
       },
     );
 
@@ -813,7 +827,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  /** Apply current theme tokens to all shell chrome and open windows. */
+  /** Apply current theme tokens and effective skin to all shell chrome and open windows. */
   private applyTheme(): void {
     log.app(`theme → ${themeName()}`);
     this.menuUi.restyle();
@@ -821,6 +835,66 @@ export class TsTuiMvpApp {
     this.windowManager.restyleAll();
     this.shellChrome.applyTheme();
     this.runtimeStats.applyTheme();
+    this.persistState();
+    this.screen.render();
+  }
+
+  // ── TUI Skin ─────────────────────────────────────────────────────────────
+
+  /**
+   * Resolve the effective skin using the merge stack:
+   *   DEFAULT_SKIN → theme().skin → settings.json skin → workspace skin
+   */
+  private getEffectiveSkin(): TuiSkin {
+    return {
+      ...DEFAULT_SKIN,
+      ...theme().skin,
+      ...getSettingsSkin(),
+      ...this.workspaceSkin,
+    };
+  }
+
+  /** Apply a workspace-level skin override (called on workspace load). */
+  private applyWorkspaceSkin(skin: Partial<TuiSkin> | undefined): void {
+    this.workspaceSkin = skin;
+    // Don't call restyleAll here — workspace load handles full apply after windows are restored.
+  }
+
+  /** Cycle through border style presets: line → bg → none → line. */
+  private skinCycle(): void {
+    const current = this.getEffectiveSkin();
+    const next: Record<string, "line" | "bg" | "none"> = {
+      line: "bg",
+      bg: "none",
+      none: "line",
+    };
+    patchSettingsSkin({ borderStyle: next[current.borderStyle] ?? "line" });
+    this.applySkinLive();
+  }
+
+  /** Set one or more skin properties from command args. */
+  private skinSet(args?: Record<string, unknown>): void {
+    const partial: Partial<TuiSkin> = {};
+    if (typeof args?.borderStyle === "string" &&
+        ["line", "bg", "none"].includes(args.borderStyle)) {
+      partial.borderStyle = args.borderStyle as TuiSkin["borderStyle"];
+    }
+    if (typeof args?.borderChar === "string" && args.borderChar.length > 0) {
+      partial.borderChar = args.borderChar[0];
+    }
+    if (typeof args?.shadowEnabled === "boolean") {
+      partial.shadowEnabled = args.shadowEnabled;
+    }
+    if (Object.keys(partial).length === 0) return;
+    patchSettingsSkin(partial);
+    this.applySkinLive();
+  }
+
+  /** Re-apply the effective skin to all open windows and re-render. */
+  private applySkinLive(): void {
+    const skin = this.getEffectiveSkin();
+    log.app(`skin → borderStyle:${skin.borderStyle} shadow:${skin.shadowEnabled}`);
+    this.windowManager.restyleAll();
     this.persistState();
     this.screen.render();
   }
@@ -2180,6 +2254,8 @@ export class TsTuiMvpApp {
       toggleTheme: () => this.toggleTheme(),
       chooseTheme: () => this.chooseTheme(),
       setTheme: (args) => this.setThemeByName(args),
+      skinCycle: () => this.skinCycle(),
+      skinSet: (args) => this.skinSet(args),
       // ── Finder ──────────────────────────────────────────
       finderSearch: (args) => {
         const finder = this.getFocusedFinder();

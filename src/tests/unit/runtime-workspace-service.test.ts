@@ -54,6 +54,7 @@ describe("runtime workspace service", () => {
       workspace,
       snapshotWindows: () => makeSnapshots(),
       getThemeName: () => "wibwob-dark",
+      getSkin: () => ({}),
       clearWindows: () => {
         cleared += 1;
       },
@@ -63,6 +64,7 @@ describe("runtime workspace service", () => {
       applyThemeByName: (name) => {
         appliedThemes.push(name);
       },
+      applyWorkspaceSkin: () => undefined,
       persistState: () => {
         persistCalls += 1;
       },
@@ -88,9 +90,11 @@ describe("runtime workspace service", () => {
       workspace,
       snapshotWindows: () => [],
       getThemeName: () => "wibwob-dark",
+      getSkin: () => ({}),
       clearWindows: () => undefined,
       restoreWindows: () => undefined,
       applyThemeByName: () => undefined,
+      applyWorkspaceSkin: () => undefined,
       persistState: () => undefined,
     });
 
