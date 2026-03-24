@@ -27,6 +27,8 @@ bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
 2. microapp-developer (one slice)
 3. microapp-doc-refiner (update docs)
 
+**`/plan`** — use before touching code when: cross-machine, cross-version, blast radius > 3 files, or the fix has hidden assumptions. Skip it and say why if truly trivial.
+
 ## Ops
 ```
 bash scripts/ensure-running.sh
