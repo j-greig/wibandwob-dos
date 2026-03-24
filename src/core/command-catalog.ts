@@ -73,7 +73,6 @@ export interface AppMenuActions {
   openScrambleSmol: () => void;
   openScrambleFloating: () => void;
   scrambleSay: (args?: Record<string, unknown>) => void;
-  scrambleExpand: () => void;
   scramblePopOut: () => void;
   scramblePet: () => void;
   scrambleSleep: () => void;
@@ -1124,15 +1123,6 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     description: "Send a message to Scramble. Args: { text: string }",
     group: "surface",
     actionKey: "scrambleSay",
-    api: true,
-    agent: true
-  },
-  {
-    id: "scramble.expand",
-    label: "Scramble: expand/collapse",
-    description: "Toggle Scramble popup between smol and tall.",
-    group: "surface",
-    actionKey: "scrambleExpand",
     api: true,
     agent: true
   },

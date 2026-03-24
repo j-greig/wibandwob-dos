@@ -13,7 +13,7 @@ interface ShellChromeDeps {
   statusLine: blessed.Widgets.BoxElement;
   getInstanceDisplayLabel: () => string;
   getDesktopState: () => DesktopState;
-  getScrambleFace: () => string;
+  getScrambleFace?: () => string;
   getSessionClipboardText: () => string;
   onFlash: (msg: string) => void;
   onResize: () => void;
@@ -60,10 +60,8 @@ export class ShellChromeController {
       ? ` Focus ${focus.id}:${focus.appType} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
       : " Focus none";
     const left = `Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary}`;
-    const scrLabel = ` ${this.deps.getScrambleFace()}`;
     const width = Math.max(1, Number(this.deps.screen.width));
-    const trimLeft = left.slice(0, width - scrLabel.length);
-    this.deps.statusLine.setContent(trimLeft.padEnd(width - scrLabel.length) + scrLabel);
+    this.deps.statusLine.setContent(left.slice(0, width).padEnd(width));
   }
 
   applyTheme(): void {

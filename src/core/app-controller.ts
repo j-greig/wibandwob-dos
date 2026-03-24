@@ -1306,8 +1306,8 @@ export class TsTuiMvpApp {
     displayMode?: string;
   }): WindowRecord | undefined {
     const mode = restore?.displayMode;
-    if (mode === "smol" || mode === "tall") {
-      return this.openScrambleSmol(mode);
+    if (mode === "smol" || mode === "tall" || mode === "popup") {
+      return this.openScrambleSmol();
     }
     return this.openScrambleFloating();
   }
@@ -1329,7 +1329,7 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openScrambleSmol(initialMode?: "smol" | "tall"): WindowRecord | undefined {
+  private openScrambleSmol(): WindowRecord | undefined {
     // Close any existing popup first
     const existing = this.findWindowByAppType("companion-widget");
     if (existing) {
@@ -1340,7 +1340,6 @@ export class TsTuiMvpApp {
       screen: this.screen,
       windowManager: this.windowManager,
       brain: this.scrambleBrain,
-      initialMode,
       onStateChanged: () => this.shellChrome.updateStatusLine(),
       onPopOut: () => {
         // Abort any in-flight send, then close popup and open floating
@@ -2177,13 +2176,6 @@ export class TsTuiMvpApp {
           win.writeInput(text);
         } else {
           void this.scrambleBrain.send(text).then(() => this.shellChrome.updateStatusLine());
-        }
-      },
-      scrambleExpand: () => {
-        const win = this.findWindowByAppType("companion-widget");
-        if (win) {
-          const expand = (win as unknown as Record<string, unknown>)._scrambleExpand;
-          if (typeof expand === "function") (expand as () => void)();
         }
       },
       scramblePopOut: () => {
