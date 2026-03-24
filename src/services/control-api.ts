@@ -292,8 +292,8 @@ export class ControlApiService {
     this.registerSocket();
   }
 
-  /** Start HTTP server only, skip socket registration (for headless/undersized screens). */
-  startHttpOnly(): void {
+  /** Start HTTP server (called internally by start()). */
+  private startHttpOnly(): void {
     const bunRuntime = (
       globalThis as {
         Bun?: {
