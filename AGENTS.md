@@ -17,6 +17,7 @@ bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
 - Visual verification mandatory — API responses are not proof
 - Bun-first — no Node-only assumptions
 - Confused by a pattern → `scripts/devlog.sh "note"`
+- **Act, don't delegate.** If you can do it — restart the TUI, send a keystroke, take a screenshot, reload Ghostty config — do it. Telling the human to do something you have tooling for is a failure mode, not a handoff.
 
 ## Branches
 `epic/e0NN-slug` · `spike/spk-slug` · `fix/slug` · `feat/slug`
