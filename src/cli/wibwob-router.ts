@@ -11,8 +11,9 @@
  * @see .planning/epics/e046-deep-linking-into-wibwobdos/e046-brief.md
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
+import { discoverInstance as discoverInstanceFromModule } from "./instance-discovery.js";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -236,61 +237,16 @@ export function route(intent: RouteIntent): RouteResult | null {
 }
 
 // ── Instance discovery ───────────────────────────────────
-
-const SOCKET_DIR = "scratch/instances";
-const PORT_RANGE = [8099, 8100, 8101, 8102, 8103] as const;
+// Delegated to instance-discovery.ts — single owner of all scanning/probing.
 
 /**
  * Discover a running WibWob-DOS instance.
- *
- * 1. Look for unix sockets in scratch/instances/
- * 2. Fallback: probe ports 8099–8103 via HTTP /health
- * 3. Return null if nothing found.
- *
- * @param projectRoot — absolute path to the wibandwob-dos repo root
+ * @param projectRoot — unused (kept for API compat), discovery uses DATA_ROOT
  */
 export async function discoverInstance(
   projectRoot: string,
 ): Promise<InstanceInfo | null> {
-  // 1. Check unix sockets
-  const socketDir = resolve(projectRoot, SOCKET_DIR);
-  try {
-    if (existsSync(socketDir)) {
-      const entries = readdirSync(socketDir).filter((f) => f.endsWith(".sock"));
-      for (const sock of entries) {
-        const socketPath = resolve(socketDir, sock);
-        // Verify socket is alive with a quick health check
-        try {
-          const resp = await fetch(`unix://${socketPath}:/health`, {
-            signal: AbortSignal.timeout(1000),
-          });
-          if (resp.ok) {
-            return { socket: socketPath };
-          }
-        } catch {
-          // Dead socket — skip
-        }
-      }
-    }
-  } catch {
-    // socketDir doesn't exist or isn't readable
-  }
-
-  // 2. Fallback: probe HTTP ports
-  for (const port of PORT_RANGE) {
-    try {
-      const resp = await fetch(`http://127.0.0.1:${port}/health`, {
-        signal: AbortSignal.timeout(500),
-      });
-      if (resp.ok) {
-        return { port };
-      }
-    } catch {
-      // Port not responding — try next
-    }
-  }
-
-  return null;
+  return discoverInstanceFromModule(projectRoot);
 }
 
 /**
