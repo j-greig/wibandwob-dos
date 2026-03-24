@@ -18,6 +18,7 @@ import { darkPastel } from "./dark-pastel.js";
 import { monochromeDark } from "./monochrome-dark.js";
 import { phosphor } from "./phosphor.js";
 import { light } from "./light.js";
+import { cga } from "./cga.js";
 
 /** Built-in variants in cycle order. External variants append after these. */
 const BUILTIN_VARIANTS: readonly ThemeVariant[] = [
@@ -27,6 +28,7 @@ const BUILTIN_VARIANTS: readonly ThemeVariant[] = [
   monochromeDark,
   phosphor,
   light,
+  cga,
 ];
 
 /** External variants registered by microapp-loader.ts at startup. */
