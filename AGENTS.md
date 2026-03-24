@@ -9,6 +9,7 @@ CAPS `.md` at root = sole doc surface. Don't create docs elsewhere.
 ls *.md          # PHILOSOPHY ARCHITECTURE GOTCHAS SDK-MICROAPP-DEV
 cat .pi/skills/skills.md
 curl localhost:8099/state
+bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
 ```
 
 ## Rules

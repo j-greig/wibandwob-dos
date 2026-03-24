@@ -152,9 +152,9 @@ Last used: never · See: `.pi/skills/desktop-arrange/SKILL.md`
 ---
 
 ## devlog-briefing
-**Your Session Briefer** — Read the current devlog and standing notes to get oriented on recent work, open ideas, process friction, and improvement opportunities. Use at the start of any…
+**Your Session Briefer** — Surface open ideas and contribute friction back. Run scripts/devlog-open.sh to see unresolved pains and ideas from this week's reflection. Use at the start of a…
 
-Triggers on: "devlog", "briefing", "what's been happening", "catch me up", "standing notes", "open ideas".
+Triggers on: "devlog", "briefing", "what's been happening", "catch me up", "open ideas", "what should I work on".
 
 Does not: Does not write code — launches and manages existing systems.
 
@@ -327,7 +327,7 @@ Triggers on: "users ask to search notes", "find documents", "or look up informat
 
 Does not: Does not make changes — reads and reports only.
 
-Last used: yesterday (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
+Last used: 2d ago (2026-03-22) · See: `.pi/skills/qmd/SKILL.md`
 
 ---
 
@@ -421,7 +421,7 @@ Triggers on: "building a new skill", "restructuring an existing one", "writing a
 
 Does not: Does not make broad changes — stays within its narrow defined scope.
 
-Last used: yesterday (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
+Last used: 2d ago (2026-03-22) · See: `.pi/skills/skill-creator/SKILL.md`
 
 ---
 
@@ -509,7 +509,7 @@ Last used: never · See: `.pi/skills/youtube-transcript/SKILL.md`
 | command-scaffold | Specialist | Add a new command to WibWob-DOS — walks the 4-file wiring path so you don't miss |
 | commit | Commit Gatekeeper | Read this skill before making git commits |
 | desktop-arrange | Specialist | Arrange open WibWob-DOS windows into named layout presets: golden, magazine, cin |
-| devlog-briefing | Session Briefer | Read the current devlog and standing notes to get oriented on recent work, open  |
+| devlog-briefing | Session Briefer | Surface open ideas and contribute friction back |
 | discord-tui-share | TUI Broadcaster | Share WibWob-DOS TUI to a Discord channel |
 | doc-agent | Specialist | Autopoietic documentation agent |
 | figlet-videographer | Typography VJ | Create typographic video sequences using figlet text animations in WibWob-DOS |
