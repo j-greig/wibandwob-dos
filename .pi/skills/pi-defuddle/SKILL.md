@@ -15,13 +15,23 @@ bun /Users/james/Repos/wibandwob-dos/extensions/pi-defuddle/defuddle.ts <url> --
 bun /Users/james/Repos/wibandwob-dos/extensions/pi-defuddle/defuddle.ts <url> --no-fallback
 ```
 
-## How it works
+## How it works — three-tier fallback chain
 
-1. Fetches the URL directly (fast, no browser)
-2. If that gets a 403/429/timeout, automatically retries via pi-web-browse (`--no-daemon`)
-3. If pi-web-browse also fails (CAPTCHA, DataDome), exits with an error
+1. **Direct fetch + Defuddle** (fast, no browser) — works for static/SSR pages
+2. **pi-web-browse** (headless Chromium extension) — if fetch fails (403/429) or page is a JS-rendered SPA (empty content)
+3. **Playwright** (globally-installed) — if pi-web-browse isn't installed or also fails. Launches headless Chromium, waits for JS to render, then pipes the rendered HTML back through Defuddle for clean markdown extraction
 
-Use `--no-fallback` to skip step 2 and fail fast.
+SPA detection: if direct fetch succeeds but Defuddle extracts zero words (wordCount=0), the page is likely JS-rendered and fallbacks are triggered automatically.
+
+Use `--no-fallback` to skip tiers 2–3 and fail fast.
+
+### Playwright setup (one-time, optional)
+
+```bash
+npm i -g playwright && npx playwright install chromium
+```
+
+If Playwright is installed globally, it's found automatically. No project-level dependency needed.
 
 ## Output
 
