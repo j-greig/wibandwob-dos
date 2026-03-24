@@ -977,11 +977,15 @@ async function cmdTui() {
   const h = health.screen?.height ?? 0;
   const hasDisplay = w > 10 && h > 5;
 
-  // ── Already open in another terminal ─────────────────────────────
+  // ── Already open in another terminal — start a fresh independent instance ──
   if (hasDisplay && !force) {
-    process.stderr.write(`WibWob-DOS is already open (pid ${health.pid}, screen ${w}×${h}).\n`);
-    process.stderr.write(`Use --force to take it over in this terminal.\n`);
-    process.exit(1);
+    process.stderr.write(`[tui] instance ${health.pid} already running (${w}×${h}) — starting new instance here\n`);
+    const result = spawnSync("bun", ["run", "src/app.ts"], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: "inherit",
+    });
+    process.exit(result.status ?? 1);
     return;
   }
 
