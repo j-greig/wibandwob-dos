@@ -41,6 +41,7 @@ bash .pi/skills/ghostty-control/scripts/click-cell.sh 75 36 --single
 bash .pi/skills/ghostty-control/scripts/send-to-terminal.sh wibandwob-dos "bun run dev"
 bash .pi/skills/ghostty-control/scripts/wait-for.sh health
 bash .pi/skills/ghostty-control/scripts/wait-for.sh window "Figlet" --timeout 5
+bash .pi/skills/ghostty-control/scripts/open-instance.sh --worktree cga-theme --theme wibwob-cga
 eval "$(bash .pi/skills/ghostty-control/scripts/calibrate.sh)"
 ```
 

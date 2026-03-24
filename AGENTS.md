@@ -6,8 +6,7 @@ CAPS `.md` at root = sole doc surface. Don't create docs elsewhere.
 
 ## Orient fast
 ```
-ls *.md          # PHILOSOPHY ARCHITECTURE GOTCHAS SDK-MICROAPP-DEV
-cat .pi/skills/skills.md
+ls *.md | grep '^[A-Z-]*\.md$'   # CAPS doc surface only
 wibwob health                         # instance, port, screen, uptime
 bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
 ```
