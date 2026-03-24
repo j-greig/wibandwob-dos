@@ -1,0 +1,24 @@
+{
+  "name": "starfield",
+  "version": "1.0.0",
+  "description": "3D warp-speed starfield — stars stream past as you hurtle through the galaxy.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dev": {
+    "watch": ["index.ts", "microapp.json"],
+    "reopenCommand": "microapp.wibwob.starfield.open"
+  },
+  "microapp": {
+    "id": "wibwob.starfield",
+    "title": "Starfield",
+    "description": "3D warp-speed starfield simulation.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 85, "label": "✦ Starfield" }
+    ],
+    "palette": { "order": 85, "label": "✦ Starfield — warp simulation" },
+    "agent": true,
+    "api": true
+  }
+}

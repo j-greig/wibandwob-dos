@@ -43,12 +43,17 @@ fi
 
 python3 - "$MODE" "$SEARCH" << 'PYEOF'
 import sys
-from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionOnScreenOnly, kCGNullWindowID
+from Quartz import (CGWindowListCopyWindowInfo, kCGWindowListOptionAll,
+                     kCGWindowListExcludeDesktopElements, kCGNullWindowID)
 
 mode    = sys.argv[1]   # "label" or "pid"
 pattern = sys.argv[2].lower()
 
-windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
+# kCGWindowListOptionAll so windows on other displays are included
+windows = CGWindowListCopyWindowInfo(
+    kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements,
+    kCGNullWindowID
+)
 for w in windows:
     if 'Ghostty' not in w.get('kCGWindowOwnerName', ''):
         continue

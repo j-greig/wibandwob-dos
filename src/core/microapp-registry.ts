@@ -35,6 +35,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.workspace-beacon":   "beta",
   "wibwob.poetry-clock":       "core",
   "wibwob.spore-clock":        "beta",
+  "wibwob.starfield":          "beta",
   "wibwob.sy2chronicles":      "beta",
   "wibwob.tr808":              "beta",
   "wibwob.wiretext":           "beta",
