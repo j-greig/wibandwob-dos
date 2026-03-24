@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { WindowSnapshot } from "../core/types.js";
+import type { TuiSkin, WindowSnapshot } from "../core/types.js";
 import { safeReadJSON, safeWriteFile } from "../core/safe-fs.js";
 
 /**
@@ -18,6 +18,8 @@ import { safeReadJSON, safeWriteFile } from "../core/safe-fs.js";
 export interface WorkspaceFile {
   version: 2;
   theme?: string;
+  /** TUI skin override for this workspace. Merged on top of settings.json skin. */
+  skin?: Partial<TuiSkin>;
   windows: WindowSnapshot[];
 }
 
@@ -38,17 +40,18 @@ export class WorkspaceService {
     this.currentWorkspaceName = this.sanitizeName(name);
   }
 
-  save(snapshots: WindowSnapshot[], theme?: string): void {
-    const file: WorkspaceFile = { version: 2, theme, windows: snapshots };
+  save(snapshots: WindowSnapshot[], theme?: string, skin?: Partial<TuiSkin>): void {
+    const file: WorkspaceFile = { version: 2, theme, ...(skin ? { skin } : {}), windows: snapshots };
     safeWriteFile(this.path, JSON.stringify(file, null, 2));
   }
 
-  load(): { windows: WindowSnapshot[]; theme?: string } {
+  load(): { windows: WindowSnapshot[]; theme?: string; skin?: Partial<TuiSkin> } {
     const raw = safeReadJSON<WorkspaceFile | WindowSnapshot[]>(this.path);
     if (!raw) return { windows: [] };
     // Backward compat: old files are bare WindowSnapshot[]
     if (Array.isArray(raw)) return { windows: raw };
-    return { windows: (raw as WorkspaceFile).windows ?? [], theme: (raw as WorkspaceFile).theme };
+    const f = raw as WorkspaceFile;
+    return { windows: f.windows ?? [], theme: f.theme, skin: f.skin };
   }
 
   exists(): boolean {

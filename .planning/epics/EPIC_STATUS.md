@@ -15,3 +15,4 @@ e051-programmatic-tool-calling — ?
 e052-instance-lifecycle — not-started
 e053-external-config-packaging — ?
 
+e056-tui-skin — in-progress

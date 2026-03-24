@@ -125,7 +125,7 @@ Triggers on: "add a command", "new command", "wire a command", "scaffold command
 
 Does not: Does not perform tasks outside its described scope — check the SKILL.md for boundaries.
 
-Last used: yesterday (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
+Last used: 2d ago (2026-03-22) · See: `.pi/skills/command-scaffold/SKILL.md`
 
 ---
 

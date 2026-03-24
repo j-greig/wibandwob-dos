@@ -87,6 +87,8 @@ export interface AppMenuActions {
   toggleTheme: () => void;
   chooseTheme: () => void;
   setTheme: (args?: Record<string, unknown>) => void;
+  skinCycle: () => void;
+  skinSet: (args?: Record<string, unknown>) => void;
   // ── Finder ────────────────────────────────────────────
   finderSearch: (args?: Record<string, unknown>) => void;
   finderNavigate: (args?: Record<string, unknown>) => void;
@@ -697,6 +699,32 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     returns: "json",
     params: z.object({
       name: z.string().describe("Theme name"),
+    })
+  },
+  {
+    id: "skin.cycle",
+    label: "Cycle TUI Skin",
+    description: "Cycle the TUI skin border style: line → bg → none → line. Applies live to all open windows.",
+    group: "system",
+    actionKey: "skinCycle",
+    menuPlacements: [{ category: "view", order: 32 }],
+    palettePlacement: { order: 192 },
+    api: true,
+    agent: true,
+  },
+  {
+    id: "skin.set",
+    label: "Set TUI Skin",
+    description: "Set TUI skin properties. Args: borderStyle ('line'|'bg'|'none'), borderChar (single char, used when borderStyle='bg'), shadowEnabled (boolean).",
+    group: "system",
+    actionKey: "skinSet",
+    api: true,
+    agent: true,
+    returns: "json",
+    params: z.object({
+      borderStyle: z.enum(["line", "bg", "none"]).optional().describe("Border style"),
+      borderChar: z.string().max(1).optional().describe("Fill char for bg border mode"),
+      shadowEnabled: z.boolean().optional().describe("Show/hide window drop shadows"),
     })
   },
   {

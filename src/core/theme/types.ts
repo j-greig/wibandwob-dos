@@ -5,6 +5,8 @@
  * No window or service should use raw blessed colour strings as the source of truth.
  */
 
+import type { TuiSkin } from "../types.js";
+
 type AppearanceMode = "system" | "light" | "dark";
 
 /** A blessed-compatible style pair. */
@@ -48,6 +50,10 @@ export interface ThemeTokens {
   selected: StylePair;
   input: StylePair;
   scrollbar: { fg: string; bg: string; track: string };
+
+  // TUI skin preference — theme can declare a preferred structural skin.
+  // Settings and workspace override this. Leave undefined to use DEFAULT_SKIN.
+  skin?: Partial<TuiSkin>;
 
   // Semantic
   accent: StylePair;
