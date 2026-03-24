@@ -613,8 +613,12 @@ export class TsTuiMvpApp {
         // Position submenu to the right of the View dropdown
         const viewMenu = this.menus.find((m) => m.category === "view");
         const viewLeft = viewMenu?.left ?? 15;
-        const dropdownWidth = Math.max(...(viewMenu?.items ?? []).map((i) => i.label.length), 10) + 4;
-        const shaderRow = (viewMenu?.items ?? []).length + 2;
+        const viewItems = viewMenu?.items ?? [];
+        const dropdownWidth = Math.max(...viewItems.map((i) => i.label.length), 10) + 4;
+        // Align submenu top with the "Shaders ▸" row — same y as the item, not below the whole menu.
+        // +2 accounts for the menu border (top:1 for menubar + 1 for border).
+        const shadersIndex = viewItems.findIndex((i) => i.label === "Shaders ▸");
+        const shaderRow = 2 + (shadersIndex >= 0 ? shadersIndex : viewItems.length);
         this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow, true);
       },
     });
