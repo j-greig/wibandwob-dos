@@ -36,12 +36,18 @@ status: not-started | in-progress | blocked | done | dropped
 
 Checkboxes: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
 
+## Scratch pads
+
+- **GitHub issues** — brainfart capture only. Open → graduate or close same session.
+- **`.pi/todos`** — session whiteboard. Two sessions max → promote to brief or close.
+
 ## Brainfart capture
 
 GitHub issues = inbox. Must graduate same session:
 - Epic-level → create brief, keep issue as tracker
 - Story/task → add to existing brief, close issue
 - Vague → add to `ideas/` or `parking-lot.md`, close issue
+- Already done → close with a note
 
 Never leave a non-epic issue open across sessions.
 

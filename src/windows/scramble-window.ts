@@ -30,12 +30,12 @@ function catArt(brain: ScrambleBrain): string {
 }
 
 function statusLabel(brain: ScrambleBrain): string {
-  if (brain.sleeping) return " ( -.- ) zzz";
+  if (brain.sleeping) return "zzz";
   switch (brain.status) {
-    case "thinking": return " ( o.O ) thinking...";
-    case "error":    return " ( x.x ) error";
-    case "offline":  return " ( -.- ) offline";
-    default:         return " ( =^..^= ) ready";
+    case "thinking": return "thinking...";
+    case "error":    return "error";
+    case "offline":  return "offline";
+    default:         return "ready";
   }
 }
 
@@ -316,46 +316,40 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
 // ── S2: Three-state clippy popup ──────────────────────────────────────────────
 
-export type ScramblePopupMode = "smol" | "tall";
-
-export interface ScrambleSmolDeps {
+export interface ScramblePopupDeps {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
   brain: ScrambleBrain;
-  initialMode?: ScramblePopupMode;
-  onPopOut?: () => void;   // called when user clicks pop-out
+  onPopOut?: () => void;
   onStateChanged?: () => void;
 }
 
-export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
+export function openScrambleSmolPopup(deps: ScramblePopupDeps): void {
   const { screen, windowManager, brain, onStateChanged } = deps;
   const frame = windowManager.createFrame("Scramble", "companion");
 
-  const SMOL_W = 34;
-  const SMOL_H = 12;
-  const TALL_H = 24;
-
-  let mode: ScramblePopupMode = deps.initialMode ?? "smol";
+  const POPUP_W = 34;
+  const POPUP_H = 24;
 
   // Anchor bottom-right
-  const positionFrame = (h: number) => {
+  const positionFrame = () => {
     const sw = Math.max(1, Number(screen.width) || 80);
     const sh = Math.max(1, Number(screen.height) || 24);
-    frame.frame.width = SMOL_W;
-    frame.frame.height = h;
-    frame.frame.left = sw - SMOL_W - 2;
-    frame.frame.top = sh - h - 2;
+    frame.frame.width = POPUP_W;
+    frame.frame.height = POPUP_H;
+    frame.frame.left = sw - POPUP_W - 2;
+    frame.frame.top = sh - POPUP_H - 2;
   };
 
-  positionFrame(mode === "tall" ? TALL_H : SMOL_H);
+  positionFrame();
 
-  // Button bar — top of window body: [↗ expand] [□ pop-out]
+  // Button bar — pop-out only
   const btnBar = blessed.box({
     parent: frame.body,
     top: 0,
     right: 0,
     height: 1,
-    width: 12,
+    width: 5,
     tags: true,
     mouse: true,
     clickable: true,
@@ -373,21 +367,10 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     style: theme().body,
   });
 
-  // Speech bubble / last message (smol only — 1 line below cat)
-  const bubbleLine = blessed.box({
-    parent: frame.body,
-    top: 4,
-    left: 0,
-    right: 0,
-    height: 1,
-    tags: true,
-    style: theme().muted,
-  });
-
-  // Message history (tall only)
+  // Message history — always visible
   const transcript = blessed.box({
     parent: frame.body,
-    top: 5,
+    top: 4,
     left: 0,
     right: 0,
     bottom: 2,
@@ -398,7 +381,6 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     style: theme().agentBg,
-    hidden: true,
   });
 
   // Status + input row
@@ -424,55 +406,25 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
 
   const renderBtnBar = () => {
     const c = C();
-    const expandIcon = mode === "smol" ? "↗" : "↙";
-    btnBar.setContent(
-      `{${c.muted}-fg}[${expandIcon}] [□]{/${c.muted}-fg}`
-    );
+    btnBar.setContent(`{${c.muted}-fg}[□]{/${c.muted}-fg}`);
   };
 
   const renderCat = () => { catHeader.setContent(catArt(brain)); };
   const renderStatus = () => { statusLine.setContent(statusLabel(brain)); };
-
-  const renderBubble = () => {
-    const last = brain.history.at(-1);
-    const text = last
-      ? (last.role === "assistant" ? last.content : `you: ${last.content}`)
-      : "lurking...";
-    const c = C();
-    bubbleLine.setContent(`{${c.muted}-fg}${escBraces(text.slice(0, SMOL_W - 2))}{/${c.muted}-fg}`);
-  };
 
   const renderTranscriptContent = () => {
     transcript.setContent(renderHistory(brain));
     transcript.setScrollPerc(100);
   };
 
-  const applyMode = () => {
-    if (mode === "smol") {
-      positionFrame(SMOL_H);
-      bubbleLine.show();
-      transcript.hide();
-    } else {
-      positionFrame(TALL_H);
-      bubbleLine.hide();
-      transcript.show();
-    }
-    renderBtnBar();
-    renderCat();
-    renderBubble();
-    renderTranscriptContent();
-    renderStatus();
-    screen.render();
-  };
-
   const { getDraft } = wireInput(screen, inputEl, () => {
     const width = Math.max(1, Number(inputEl.width) || 1);
     const full = getDraft() + "_";
-    inputEl.setContent(full.slice(0, width).padEnd(width, " "));
+    // Show the tail so the cursor is always visible — scrolling-input behaviour
+    inputEl.setContent(full.slice(Math.max(0, full.length - width)).padEnd(width, " "));
   }, (text) => {
     void brain.send(text).then(() => {
       renderCat();
-      renderBubble();
       renderTranscriptContent();
       renderStatus();
       onStateChanged?.();
@@ -483,28 +435,13 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     screen.render();
   });
 
-  // Button click handling
-  btnBar.on("click", (mouse) => {
-    const clickX = (mouse as unknown as { x: number }).x - (Number(frame.frame.left) || 0) - 1;
-    const barRight = Math.max(1, Number(frame.frame.width) || SMOL_W);
-    // [↗/↙] is chars 0-2, [□] is chars 4-6 relative to btnBar right edge
-    // btnBar starts at right=0, width=12 so it's last 12 chars
-    const relX = clickX - (barRight - 12);
-
-    if (relX <= 4) {
-      // expand/collapse toggle
-      mode = mode === "smol" ? "tall" : "smol";
-      applyMode();
-    } else {
-      // pop-out
-      deps.onPopOut?.();
-    }
-  });
+  // Button click → pop-out
+  btnBar.on("click", () => { deps.onPopOut?.(); });
 
   frame.describeState = () => ({
     appType: "companion-widget" as const,
-    summary: `Scramble — ${mode} — ${brain.status}`,
-    displayMode: mode,
+    summary: `Scramble — popup — ${brain.status}`,
+    displayMode: "popup",
     status: brain.status,
     messageCount: brain.history.length,
     lastMessage: brain.history.at(-1)?.content ?? null,
@@ -514,7 +451,6 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     renderCat();
     renderStatus();
     renderTranscriptContent();
-    renderBubble();
     screen.render();
   };
 
@@ -539,18 +475,11 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
   frame.writeInput = (text: string) => {
     void brain.send(text).then(() => {
       renderCat();
-      renderBubble();
       renderTranscriptContent();
       renderStatus();
       onStateChanged?.();
       screen.render();
     });
-  };
-
-  // Expose expand method so app-controller can call it
-  (frame as unknown as Record<string, unknown>)._scrambleExpand = () => {
-    mode = mode === "smol" ? "tall" : "smol";
-    applyMode();
   };
 
   (frame as unknown as Record<string, unknown>)._scramblePopOut = () => {
@@ -559,13 +488,17 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
 
   windowManager.registerWindow(frame);
 
+  renderBtnBar();
+  renderCat();
+  renderTranscriptContent();
+  renderStatus();
+
   // Fix initial sizing/positioning after registration
   const sw = Math.max(1, Number(screen.width) || 80);
   const sh = Math.max(1, Number(screen.height) || 24);
-  const h = mode === "tall" ? TALL_H : SMOL_H;
-  windowManager.resizeWindow(frame.id, SMOL_W, h);
-  windowManager.moveWindow(frame.id, Math.max(0, sw - SMOL_W - 2), Math.max(0, sh - h - 3));
+  windowManager.resizeWindow(frame.id, POPUP_W, POPUP_H);
+  windowManager.moveWindow(frame.id, Math.max(0, sw - POPUP_W - 2), Math.max(0, sh - POPUP_H - 3));
 
-  applyMode();
   inputEl.focus();
+  screen.render();
 }

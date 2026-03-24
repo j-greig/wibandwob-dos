@@ -6,7 +6,7 @@ CAPS `.md` at root = sole doc surface. Don't create docs elsewhere.
 
 ## Orient fast
 ```
-ls *.md          # PHILOSOPHY ARCHITECTURE GOTCHAS SDK-MICROAPP-DEV
+ls *.md | grep '^[A-Z-]*\.md$'   # CAPS doc surface only
 cat .pi/skills/skills.md
 wibwob health                         # instance, port, screen, uptime
 bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
@@ -19,13 +19,8 @@ bash scripts/devlog-open.sh   # open ideas + unresolved pains this week
 - Confused by a pattern → `scripts/devlog.sh "note"`
 - **Act, don't delegate.** If you can do it — restart the TUI, send a keystroke, take a screenshot, reload Ghostty config — do it. Telling the human to do something you have tooling for is a failure mode, not a handoff.
 
-## Branches
-`epic/e0NN-slug` · `spike/spk-slug` · `fix/slug` · `feat/slug`
-
 ## Planning
-- issues → brainfart (graduate or close same session)
-- `.pi/todos` → session whiteboard (2-session max)
-- `.planning/` → permanent source of truth
+`.planning/` → permanent source of truth. See [`.planning/CONVENTIONS.md`](.planning/CONVENTIONS.md) for hierarchy, branches, brainfart pipeline, and status tracking.
 
 ## Microapps — triad, in order
 1. microapp-product-owner (scope/cut)
