@@ -223,7 +223,9 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   const MAX_INPUT_ROWS = 4;
 
   const renderInputEl = () => {
-    const width = Math.max(1, Number(inputEl.width) || 1);
+    const raw = Number(inputEl.width);
+    if (!raw || raw < 4) { screen.render(); return; } // not laid out yet — skip
+    const width = raw;
     const cursor = inputEl === screen.focused ? "█" : " ";
     const full = getDraft() + cursor;
     const rows: string[] = [];
@@ -468,7 +470,8 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
   const { getDraft } = wireInput(screen, inputEl, () => {
     const width = Math.max(1, Number(inputEl.width) || 1);
     const full = getDraft() + "_";
-    inputEl.setContent(full.slice(0, width).padEnd(width, " "));
+    // Show the tail so the cursor is always visible — scrolling-input behaviour
+    inputEl.setContent(full.slice(Math.max(0, full.length - width)).padEnd(width, " "));
   }, (text) => {
     void brain.send(text).then(() => {
       renderCat();
