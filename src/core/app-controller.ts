@@ -618,7 +618,7 @@ export class TsTuiMvpApp {
         // Align submenu top with the "Shaders ▸" row — same y as the item, not below the whole menu.
         // +2 accounts for the menu border (top:1 for menubar + 1 for border).
         const shadersIndex = viewItems.findIndex((i) => i.label === "Shaders ▸");
-        const shaderRow = shadersIndex >= 0 ? shadersIndex : viewItems.length;
+        const shaderRow = 1 + (shadersIndex >= 0 ? shadersIndex : viewItems.length);
         this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow, true);
       },
     });
