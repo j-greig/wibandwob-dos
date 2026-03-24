@@ -179,7 +179,7 @@ export { createTimer, clearTimers, toEvenCellWidth, safeDestroy, safeDestroyAll 
 
 // Scroll helpers — use with scrollable blessed boxes
 /** @internal */
-export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
+export { createScrollbar, scrollableStyle, safeSetStyle } from "../core/ui-primitives.js";
 
 // Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
 /** @internal */

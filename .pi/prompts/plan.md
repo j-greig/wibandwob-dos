@@ -19,6 +19,37 @@ Each phase gates the next. Skip a phase only if you can state in one sentence wh
 Read the files, patterns, and constraints relevant to the task.
 Then state the simplest version of this change in one sentence.
 
+**Micro-diagram heuristic** *(use when it helps — skip when it doesn't)*: if a bug, dependency, or state change would take a human 3+ sentences to follow in prose, compress it into a small ASCII diagram instead. The format doesn't matter — pick whatever makes the structure visible. Trigger: you catch yourself wanting to write "which then causes… which means that… so when…"
+
+A few shapes to draw from — mix freely, invent others:
+
+```
+# causal chain (who breaks whom)
+onRestyle fires
+  └─ el.style = newStyle          ← wipes style.track
+     └─ this.track widget persists (set at construction, not in style)
+        └─ render: if (this.track) → this.style.track.fg → CRASH
+
+# state mutation (what a value looks like before vs after)
+BEFORE restyle:  el.style = { fg, bg, track: { fg, bg } }   ok
+AFTER  restyle:  el.style = { fg, bg }                       MISSING
+                                          ^ this.track still set → crash
+
+# flow with a break point
+createScrollbar() → scrollbar.track unset → this.track never set → safe
+scrollbar:{track:{}} → this.track set at init ─────────────────────┐
+                                                                    ↓
+                                               el.style = newStyle (no track)
+                                                                    ↓
+                                                          render → CRASH
+
+# two-path divergence (why one case works and the other doesn't)
+safeSetStyle(el, s)   →  injects style.track if el.scrollable  →  ok
+el.style = s directly →  no injection                           →  CRASH on next render
+```
+
+One diagram per distinct structure. Don't force it onto simple one-step changes.
+
 > ⚑ Write the closing tag before continuing to Phase 2.
 
 Wrap this phase's output in `<phase-1-orient>` tags.
