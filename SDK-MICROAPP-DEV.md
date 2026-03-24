@@ -126,6 +126,26 @@ onRestyle: () => {
 },
 ```
 
+**Scrollable elements — use `safeSetStyle`, not `el.style =`**
+
+For any element created with `scrollable: true` or a `scrollbar` option, always use
+`safeSetStyle` instead of direct assignment:
+
+```typescript
+import { safeSetStyle } from "../../src/services/microapp-sdk.js";
+
+// BAD — wipes blessed's internal scrollbar state, crashes on next render:
+viewer.style = host.theme().body;
+
+// GOOD:
+safeSetStyle(viewer, host.theme().body);
+```
+
+Blessed sets an internal `this.track` widget at construction time when `scrollbar.track`
+is provided. A direct `el.style = newStyle` replaces the entire style object and removes
+`style.track`, while `this.track` persists — causing a `TypeError` on the next render.
+`safeSetStyle` detects this and re-injects the required sub-styles automatically.
+
 **describeState minimum pattern:**
 ```typescript
 describeState: () => ({

@@ -26,7 +26,7 @@ Four seams connect every adapter to the core:
 | **Window** | `window-facade.ts` + `window-manager.ts` | 11-method interface; all consumers identical |
 | **Workspace** | `workspace-service.ts` | Named layout persistence |
 
-Live surface: `curl localhost:8099/` · `wibwob -i <label> commands`
+Live surface: `wibwob health` · `wibwob -i <label> commands`
 
 
 > Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).

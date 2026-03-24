@@ -39,7 +39,7 @@ export function safeSetStyle(el: { scrollable?: boolean; type?: string; style: R
   // Blessed scrollable elements need style.scrollbar + style.track.
   // Check both el.scrollable (set at creation) AND el.style.scrollbar/track
   // (element may not expose scrollable as a JS property but had these styles before).
-  const needsScrollbar = el.scrollable || el.style?.scrollbar || el.style?.track;
+  const needsScrollbar = el.scrollable || el.style?.scrollbar || el.style?.track || (el as any).track;
   if (needsScrollbar) {
     if (!patched.scrollbar) {
       patched.scrollbar = { fg: theme().scrollbar.fg, bg: theme().scrollbar.bg };

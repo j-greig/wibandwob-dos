@@ -242,7 +242,8 @@ the state before the keystroke.
 
 **Cinema worktrees and second `ensure-running.sh` instances get a different port (e.g. 8101).**
 Scripts hardcoded to `8099` silently talk to the wrong instance or get ECONNREFUSED with no
-helpful error. Use `$WW_API` env var or read port from `/health`. Never hardcode `8099`.
+helpful error. Use `$WW_API` env var, read port from `/health`, or use `wibwob` CLI (socket-first
+resolution). `runtime-env.sh` reads the runtime control manifest for port. Never hardcode `8099`.
 
 ---
 

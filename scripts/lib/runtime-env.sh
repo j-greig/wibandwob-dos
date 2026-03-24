@@ -2,13 +2,17 @@
 
 WW_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 _ww_detect_port() {
-  local port
-  for port in "${CONTROL_API_PORT:-8099}" 8099 8100 8098; do
-    if curl -sf --max-time 0.5 "http://127.0.0.1:${port}/health" &>/dev/null; then
+  # Read port from runtime control manifest (written by last instance to start)
+  local manifest="$WW_ROOT_DIR/.wibwob/runtime/control-manifest.json"
+  if [[ -f "$manifest" ]]; then
+    local port
+    port=$(python3 -c "import json; print(json.load(open('$manifest')).get('apiPort',''))" 2>/dev/null)
+    if [[ -n "$port" ]] && curl -sf --max-time 0.5 "http://127.0.0.1:${port}/health" &>/dev/null; then
       printf '%s' "$port"
       return
     fi
-  done
+  fi
+  # Fallback: env var or default
   printf '%s' "${CONTROL_API_PORT:-8099}"
 }
 

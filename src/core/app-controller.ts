@@ -549,31 +549,9 @@ export class TsTuiMvpApp {
       width: this.screen.width as number,
       height: this.screen.height as number,
     }));
-    const sw = this.screen.width as number;
-    const sh = this.screen.height as number;
-    if (sw < 40 || sh < 10) {
-      log.app(`screen ${sw}×${sh} below minimum 40×10 — socket registration skipped`);
-      this.controlApi.startHttpOnly();
-    } else {
-      this.controlApi.start();
-    }
-
-    // ── Resize handler: deregister/reregister socket on threshold crossing ──
-    this.screen.on("resize", () => {
-      const w = this.screen.width as number;
-      const h = this.screen.height as number;
-      if (w < 40 || h < 10) {
-        if (this.controlApi.hasSocket()) {
-          log.app(`screen resized to ${w}×${h} — deregistering socket`);
-          this.controlApi.deregisterSocket();
-        }
-      } else {
-        if (!this.controlApi.hasSocket()) {
-          log.app(`screen resized to ${w}×${h} — re-registering socket`);
-          this.controlApi.registerSocket();
-        }
-      }
-    });
+    // Always register socket — discovery is not rendering.
+    // Consumer health gate in resolveBase warns/refuses headless (screen ≤1×1) targets.
+    this.controlApi.start();
 
     // Update env var with actual bound port (may differ from requested 8099)
     const apiStatus = this.controlApi.getStatus();

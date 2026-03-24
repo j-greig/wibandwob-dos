@@ -7,6 +7,7 @@ import {
   getFigletCatalogue,
   getFigletWindowContentSize,
   toggleFigletFavourite,
+  safeSetStyle,
 } from "../../src/services/microapp-sdk.js";
 // eslint-disable-next-line no-restricted-imports
 import blessed from "blessed";
@@ -231,7 +232,7 @@ export default function setup(host: MicroappHost) {
     win.onRestyle(() => {
       const nt = host.theme();
       header.style = nt.header;
-      viewer.style = nt.body;
+      safeSetStyle(viewer, nt.body);
       host.screen.render();
     });
 
@@ -658,7 +659,7 @@ export default function setup(host: MicroappHost) {
       favsBtn.style = { ...nt.footer, hover: nt.selected };
       fontBtn.style = { ...nt.footer, hover: nt.selected };
       editBtn.style = { ...nt.footer, hover: nt.selected };
-      viewer.style = nt.body;
+      safeSetStyle(viewer, nt.body);
       host.screen.render();
     });
 

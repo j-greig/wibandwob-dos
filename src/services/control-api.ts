@@ -226,8 +226,6 @@ export class ControlApiService {
   private socketPath?: string;
   private pidPath?: string;
   private discoveryPath?: string;
-  private legacySocketPath?: string;
-  private legacyPidPath?: string;
   private runtimeManifestPath?: string;
   private readonly startedAt = Date.now();
   private enabled = false;
@@ -294,8 +292,8 @@ export class ControlApiService {
     this.registerSocket();
   }
 
-  /** Start HTTP server only, skip socket registration (for headless/undersized screens). */
-  startHttpOnly(): void {
+  /** Start HTTP server (called internally by start()). */
+  private startHttpOnly(): void {
     const bunRuntime = (
       globalThis as {
         Bun?: {
@@ -333,6 +331,7 @@ export class ControlApiService {
         this.enabled = true;
         setActualControlApiPort(port);
         log.app(`control API listening on port ${port}`);
+        process.stderr.write(`⚡ port=${port}  instance=${this.identity.instanceDisplayId}  label=${this.identity.instanceLabel ?? "(none)"}\n`);
         break;
       } catch {
         continue;
@@ -351,8 +350,6 @@ export class ControlApiService {
         this.socketPath,
         this.pidPath,
         this.discoveryPath,
-        this.legacySocketPath,
-        this.legacyPidPath,
       ]) {
         if (!fp) continue;
         try { fs.unlinkSync(fp); } catch {}
@@ -376,21 +373,8 @@ export class ControlApiService {
     const canonicalPidPath = path.join(instanceRoot, "control.pid");
     const discoveryPath = path.join(instanceRoot, "discovery.json");
 
-    // Legacy compatibility aliases (temporary)
-    const label = this.identity.instanceLabel || this.identity.instanceId;
-    const legacyInstancesDir = this.identity.scratchBase
-      ? path.join(this.identity.scratchBase, "instances")
-      : undefined;
-    const legacySockPath = legacyInstancesDir
-      ? path.join(legacyInstancesDir, `${label}.sock`)
-      : undefined;
-    const legacyPidPath = legacyInstancesDir
-      ? path.join(legacyInstancesDir, `${label}.pid`)
-      : undefined;
-
     try {
       fs.mkdirSync(instanceRoot, { recursive: true });
-      if (legacyInstancesDir) fs.mkdirSync(legacyInstancesDir, { recursive: true });
 
       // Clean stale canonical socket from previous run
       try { fs.unlinkSync(canonicalSockPath); } catch {}
@@ -403,11 +387,9 @@ export class ControlApiService {
       this.socketPath = canonicalSockPath;
       this.pidPath = canonicalPidPath;
       this.discoveryPath = discoveryPath;
-      this.legacySocketPath = legacySockPath;
-      this.legacyPidPath = legacyPidPath;
 
       fs.writeFileSync(canonicalPidPath, String(process.pid));
-      fs.writeFileSync(
+      safeWriteFile(
         discoveryPath,
         `${JSON.stringify({
           instanceId: this.identity.instanceId,
@@ -415,18 +397,10 @@ export class ControlApiService {
           instanceLabel: this.identity.instanceLabel ?? null,
           socketPath: canonicalSockPath,
           pid: process.pid,
+          port: this.actualPort,
           updatedAt: new Date().toISOString(),
         }, null, 2)}\n`,
       );
-
-      // Legacy compatibility: alias socket path + pid file under scratch/instances.
-      if (legacySockPath && legacyPidPath) {
-        try { fs.unlinkSync(legacySockPath); } catch {}
-        try { fs.symlinkSync(canonicalSockPath, legacySockPath); } catch {
-          // symlink may fail on some systems; fallback to leaving no alias
-        }
-        try { fs.writeFileSync(legacyPidPath, String(process.pid)); } catch {}
-      }
 
       this.writeRuntimeControlManifest(canonicalSockPath);
       log.app(`control API socket at ${canonicalSockPath} (pid ${process.pid})`);
@@ -446,8 +420,6 @@ export class ControlApiService {
       this.socketPath,
       this.pidPath,
       this.discoveryPath,
-      this.legacySocketPath,
-      this.legacyPidPath,
     ]) {
       if (!fp) continue;
       try { fs.unlinkSync(fp); } catch {}
@@ -455,8 +427,6 @@ export class ControlApiService {
     this.socketPath = undefined;
     this.pidPath = undefined;
     this.discoveryPath = undefined;
-    this.legacySocketPath = undefined;
-    this.legacyPidPath = undefined;
     this.cleanupRuntimeControlManifest();
     log.app("control API socket deregistered");
   }
@@ -571,6 +541,7 @@ export class ControlApiService {
         dataRoot: this.identity.dataRoot,
         instanceRoot: this.identity.instanceRoot,
         screen: screen ? { width: screen.width, height: screen.height } : null,
+        cwd: process.cwd(),
       });
     }
 
@@ -1254,7 +1225,7 @@ function scalarDocsHtml(port: number): string {
     &middot; <a href="/health">Health</a>
     &middot; <a href="/help">Endpoints</a>
   </div>
-  <script id="api-reference" data-url="http://127.0.0.1:${port}/openapi.json" data-configuration='${config}'></script>
+  <script id="api-reference" data-url="/openapi.json" data-configuration='${config}'></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`;
