@@ -99,10 +99,16 @@ Adaptive — fire only when triggered:
 - **Refactor** → How do you prove old and new behave identically?
 - **Microapp changed** → Does `describeState()` still expose everything an agent needs?
 
-Then ask yourself:
+### Adversarial self-review
+
+Scale to the problem. Trivial changes (one-line fix, doc update) get a quick gut-check. Complex, uncertain, or multi-file changes get the full treatment — argue against your own plan as if reviewing someone else's PR.
+
 - *What assumption is this plan making that might be wrong?*
 - *What does this plan not say?*
 - *What's the hidden cost?*
+- *If this fails in production, what's the most likely cause?*
+- *Am I solving the symptom or the root cause?* (If the same pain has appeared in multiple WXX reflections, you're probably looking at a symptom.)
+- *What would a skeptic who knows this codebase say?*
 
 End with a kill count: **Killed: N files · N abstractions · N LOC**
 (If zero: say so explicitly — it means the review found nothing to cut.)
