@@ -185,7 +185,7 @@ export class CommandRegistry {
       for (const placement of dyn.menuPlacements ?? []) {
         const menu = menus.find((m) => m.category === placement.category);
         if (menu) {
-          menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action() });
+          menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action(), ...(placement.submenu ? { submenu: true as const } : {}) });
         }
       }
     }

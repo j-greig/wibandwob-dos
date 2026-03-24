@@ -5,7 +5,7 @@
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 
-const SCRIPT = resolve(process.cwd(), ".pi/skills/wibwobdos/scripts/ghostty-shader.sh");
+const SCRIPT = resolve(process.cwd(), ".pi/skills/wibwobdos-control/scripts/ghostty-shader.sh");
 
 function run(args: string): string {
   return execSync(`bash "${SCRIPT}" ${args}`, {
