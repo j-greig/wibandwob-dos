@@ -1254,7 +1254,7 @@ function scalarDocsHtml(port: number): string {
     &middot; <a href="/health">Health</a>
     &middot; <a href="/help">Endpoints</a>
   </div>
-  <script id="api-reference" data-url="http://127.0.0.1:${port}/openapi.json" data-configuration='${config}'></script>
+  <script id="api-reference" data-url="/openapi.json" data-configuration='${config}'></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`;
