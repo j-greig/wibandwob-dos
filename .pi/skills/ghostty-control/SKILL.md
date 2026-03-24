@@ -22,30 +22,25 @@ description: >
 Drive WibWob-DOS TUI as a human would — click menus, send keys, move the mouse.
 macOS only. Requires Ghostty >= 1.3.0 with AppleScript enabled.
 
-## Scripts — use these first
+## Scripts — signatures and valid flags
 
-```bash
-bash .pi/skills/ghostty-control/scripts/index.sh   # list all scripts
-```
+> **Before invoking any script, run this to see every script's real args and flags:**
+> ```bash
+> bash .pi/skills/ghostty-control/scripts/index.sh
+> ```
+> **Do not guess flags.** These scripts have minimal, specific interfaces — not generic CLI conventions. There is no `--port`, no `--help`. If a flag isn't shown by `index.sh`, it doesn't exist.
 
 All scripts auto-detect the running wibwob instance. No port or instance args needed.
 
-```bash
-# Click a menu item by name
-bash .pi/skills/ghostty-control/scripts/menu-click.sh "File" "Quit"
-bash .pi/skills/ghostty-control/scripts/menu-click.sh "Core Apps" "Figlet Banner"
+Common usage:
 
-# Click any TUI cell (double-click default, --single for one click)
+```bash
+bash .pi/skills/ghostty-control/scripts/menu-click.sh "File" "Quit"
 bash .pi/skills/ghostty-control/scripts/click-cell.sh 35 3
 bash .pi/skills/ghostty-control/scripts/click-cell.sh 75 36 --single
-
-# Send a command to a Ghostty terminal matched by cwd
 bash .pi/skills/ghostty-control/scripts/send-to-terminal.sh wibandwob-dos "bun run dev"
-
-# List Ghostty windows with sizes and terminal cwds
-bash .pi/skills/ghostty-control/scripts/ghostty-windows.sh
-
-# Get cell dimensions (for manual coord work)
+bash .pi/skills/ghostty-control/scripts/wait-for.sh health
+bash .pi/skills/ghostty-control/scripts/wait-for.sh window "Figlet" --timeout 5
 eval "$(bash .pi/skills/ghostty-control/scripts/calibrate.sh)"
 ```
 
@@ -60,7 +55,7 @@ eval "$(bash .pi/skills/ghostty-control/scripts/calibrate.sh)"
 | Click a button visible on screen | `click-cell.sh` | Find row/col from screenshot |
 | Type into a shell terminal | `send-to-terminal.sh` | Clears line, types, presses enter |
 | Navigate TUI with keyboard | Raw `send key` AppleScript | For escape, tab, letters |
-| Visual verification | `screencapture -x -D 1 /tmp/snap.png` | Only way to see colors |
+| Visual verification | `bash scripts/ghostty-capture.sh --port <n> /tmp/snap.png` | Targets exact Ghostty window by port — no display guessing |
 | Semantic verification | `wibwob state` / `wibwob windows` | Structured, parseable |
 | Find text position on screen | `wibwob screenshot` + Python `.find()` | For dynamic click targets |
 
@@ -93,7 +88,7 @@ curl -sf http://127.0.0.1:$(wibwob health 2>&1 | awk '/^port:/{print $2}')/menu/
 wibwob screenshot          # text screenshot (strips ANSI)
 wibwob state               # full semantic state as JSON
 wibwob windows             # list open windows
-screencapture -x -D 1 /tmp/snap.png   # visual proof (PNG)
+bash scripts/ghostty-capture.sh --port <n> /tmp/snap.png  # visual proof — exact window, any display
 ```
 
 ## Raw AppleScript (when scripts don't cover it)
@@ -132,7 +127,7 @@ throws a coercion error.
 `return` and `down` do NOT work. Arrow keys may not be supported.
 
 **`wibwob screenshot` strips ANSI — no highlight visibility.**
-Can't see which menu item is hovered. Use `screencapture` for visual proof.
+Can't see which menu item is hovered. Use `ghostty-capture.sh --port <n>` for visual proof.
 
 **Wrong Ghostty window targeted.**
 With multiple windows, `front window` may not be the WibWob TUI. `calibrate.sh`

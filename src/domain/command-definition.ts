@@ -31,6 +31,8 @@ export interface MenuPlacement {
   appTypes?: AppType[];
   separatorAfter?: true;
   favourite?: true;
+  /** If true, selecting this item keeps the parent dropdown open (submenu behaviour) */
+  submenu?: true;
 }
 
 export interface PalettePlacement {

@@ -598,24 +598,28 @@ export class TsTuiMvpApp {
       label: "Shaders ▸",
       group: "system",
       description: "Toggle Ghostty GPU shaders",
-      menuPlacements: [{ category: "view" as any, order: 96 }],
+      menuPlacements: [{ category: "view" as any, order: 96, submenu: true }],
       action: () => {
         const shaders = shaderList();
         const { active } = shaderStatus();
         const items = shaders.map((name) => ({
           label: `${active === name ? "✓ " : "  "}${shaderLabel(name)}`,
-          action: () => shaderSet(name),
+          action: () => { shaderSet(name); this.menuUi.closeMenus(); },
         }));
         items.push({
           label: `${active === null ? "✓ " : "  "}Off`,
-          action: () => shaderSet("off"),
+          action: () => { shaderSet("off"); this.menuUi.closeMenus(); },
         });
         // Position submenu to the right of the View dropdown
         const viewMenu = this.menus.find((m) => m.category === "view");
         const viewLeft = viewMenu?.left ?? 15;
-        const dropdownWidth = Math.max(...(viewMenu?.items ?? []).map((i) => i.label.length), 10) + 4;
-        const shaderRow = (viewMenu?.items ?? []).length + 2;
-        this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow);
+        const viewItems = viewMenu?.items ?? [];
+        const dropdownWidth = Math.max(...viewItems.map((i) => i.label.length), 10) + 4;
+        // Align submenu top with the "Shaders ▸" row — same y as the item, not below the whole menu.
+        // +2 accounts for the menu border (top:1 for menubar + 1 for border).
+        const shadersIndex = viewItems.findIndex((i) => i.label === "Shaders ▸");
+        const shaderRow = 1 + (shadersIndex >= 0 ? shadersIndex : viewItems.length);
+        this.openPopupMenu(items, viewLeft + dropdownWidth, shaderRow, true);
       },
     });
   }
@@ -941,8 +945,9 @@ export class TsTuiMvpApp {
     items: Array<{ label: string; action: () => void }>,
     x?: number,
     y?: number,
+    keepDropdown = false,
   ): void {
-    this.menuUi.openPopupMenu(items, x, y);
+    this.menuUi.openPopupMenu(items, x, y, keepDropdown);
   }
 
   private openWindowContextMenu(

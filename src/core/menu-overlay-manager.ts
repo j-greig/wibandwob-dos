@@ -166,7 +166,7 @@ export class MenuOverlayManager {
         }
         return;
       }
-      this.closeMenu();
+      if (!selectedItem.submenu) this.closeMenu();
       selectedItem.action();
     });
     this.menuList.on("keypress", (_, key) => {
@@ -288,8 +288,12 @@ export class MenuOverlayManager {
     shadow?.destroy();
   }
 
-  openPopupMenu(items: MenuItem[], x?: number, y?: number): void {
-    this.closeMenus();
+  openPopupMenu(items: MenuItem[], x?: number, y?: number, keepDropdown = false): void {
+    if (keepDropdown) {
+      this.closePopupMenu(); // close any existing popup but keep the parent dropdown
+    } else {
+      this.closeMenus();
+    }
     if (items.length === 0) {
       return;
     }
