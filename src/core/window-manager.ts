@@ -561,11 +561,11 @@ export class WindowManager implements WindowFacade {
       }
       const active = this.focusedWindow?.id === window.id;
 
-      // Border style
+      // Border style — applyBorderStyle sets frame.style.border; merge windowFrame tokens after
       this.applyBorderStyle(window.frame, skin.borderStyle, skin.borderChar, active);
       window.frame.style = {
         ...theme().windowFrame,
-        ...window.frame.style,
+        border: window.frame.style?.border,
       };
 
       // Body padding: adjust if border mode changed since window was created
