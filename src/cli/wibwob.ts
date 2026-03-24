@@ -880,25 +880,15 @@ async function cmdInstances() {
     return;
   }
 
-  // Enrich with health probe (200ms timeout — don't block on hung instances)
+  // Enrich with health probe — uses shared probeInstanceHealth()
   const manifest = readRuntimeControlManifest();
   const canonicalSocket = manifest?.socketPath;
   const results: Array<Record<string, unknown>> = [];
   const seenIdentity = new Set<string>();
 
   for (const inst of alive) {
-    try {
-      const res = await fetch("http://localhost/health", {
-        ...unixFetchOpts(inst.socketPath),
-        signal: AbortSignal.timeout(200),
-      } as any);
-
-      if (!res.ok) {
-        results.push({ label: inst.label, socket: inst.socketPath, ok: true, error: `HTTP ${res.status}` });
-        continue;
-      }
-
-      const health = await res.json() as Record<string, unknown>;
+    const health = await probeInstanceHealth(inst.socketPath);
+    if (health) {
       const identity = String(
         health.instanceId ?? health.instanceLabel ?? health.instanceDisplayId ?? health.pid ?? inst.socketPath,
       );
@@ -911,8 +901,7 @@ async function cmdInstances() {
         canonical: canonicalSocket != null && canonicalSocket === inst.socketPath,
         ...health,
       });
-    } catch {
-      // PID alive but not responding — probably starting up
+    } else {
       const identity = `starting:${inst.socketPath}`;
       if (seenIdentity.has(identity)) continue;
       seenIdentity.add(identity);
@@ -925,6 +914,19 @@ async function cmdInstances() {
       });
     }
   }
+
+  // Summary line to stderr — visible in first line of TUI without parsing JSON
+  const MIN_W = 40, MIN_H = 10;
+  const summaries = results.map((r) => {
+    const id = r.instanceLabel || r.instanceDisplayId || r.label || "?";
+    const port = r.port ? String(r.port) : "?";
+    const screen = r.screen as { width: number; height: number } | null | undefined;
+    const w = screen?.width ?? 0;
+    const h = screen?.height ?? 0;
+    const headless = (w < MIN_W || h < MIN_H) ? ",HEADLESS" : "";
+    return `${id}(${port},${w}×${h}${headless})`;
+  });
+  process.stderr.write(`${results.length} instances: ${summaries.join("  ")}\n`);
 
   out(results);
 }
