@@ -61,10 +61,10 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 - [x] **C1** `window.focus` — action now returns `{ ok: false }` on missing window; route wired through `commandId`
 - [x] **C2** `window.close` — same
 - [x] **C3** `window.toggle_maximize` — action accepts `id` arg; route wired through `commandId`
-- [-] **C4** `/windows/editor/write` — kept as direct deps call; `writeEditorText` (set content) ≠ `editor.write` (type text)
-- [-] **C5** `/windows/input`, `/windows/agent-message` — no matching command with equivalent semantics
-- [-] **C6** `/workspace/save`, `/workspace/load` — command actions return void; deps service returns result object; shape mismatch
-- [-] **C7** GET inspection routes (`/state`, `/skin`, `/scramble/*`, etc.) — read-only queries, fine as direct deps
+- [-] **C4** `/windows/editor/write` — kept as direct deps call; `writeEditorText` (set content) ≠ `editor.write` (type text) — **by design**
+- [x] **C5** `/windows/input` → `window.input` command; `/windows/agent-message` → `window.agent-message` command
+- [x] **C6** `/workspace/save`, `/workspace/load` → `workspace.save`, `workspace.load` commands; actions now return `RuntimeWorkspaceResult`
+- [-] **C7** GET inspection routes (`/state`, `/skin`, `/scramble/*`, etc.) — read-only queries, fine as direct deps — **by design**
 
 ---
 
@@ -82,9 +82,9 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 **Why parked:** Modals differ substantially in input handling, preview logic, button layout.
 **Resume trigger:** New overlay type close enough to justify shared scaffolding.
 
-### C4/C5/C6 — remaining direct deps routes
-**Why parked:** Semantic mismatches between the API endpoint contract and the command action contract. Forcing them through `commandId` would either change the API response shape (breaking callers) or require new commands that duplicate existing action logic. Better to fix when the commands themselves are redesigned to return typed results.
-**Resume trigger:** Command registry redesign to support typed return values.
+### C5/C6 — COAT command gap resolution (2026-03-25)
+**Status:** Done — new `window.input`, `window.agent-message`, `workspace.save`, `workspace.load` commands wired through command registry. Actions now return typed result objects instead of void.
+**See:** `scratch/plans/2026-03-25-coat-command-gaps.md`
 
 ---
 
@@ -102,6 +102,10 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 | API smoke: /windows/maximize | ✅ |
 | API smoke: /windows/editor/write | ✅ (set content, not append) |
 | API smoke: /commands/run, /screenshot, /overlay/* | ✅ |
+| API smoke: /workspace/save | ✅ (returns RuntimeWorkspaceResult) |
+| API smoke: /workspace/load | ✅ (returns RuntimeWorkspaceResult) |
+| API smoke: /windows/input | ✅ (via window.input command) |
+| API smoke: /windows/agent-message | ✅ (via window.agent-message command) |
 
 ## Related spikes
 

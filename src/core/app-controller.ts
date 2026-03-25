@@ -1849,6 +1849,23 @@ export class TsTuiMvpApp {
           this.overlays.flash("No agent chat window open");
         }
       },
+      windowInput: (args?: Record<string, unknown>) => {
+        const id = typedArg(args, "id", "number");
+        const text = typedArg(args, "input", "string") ?? "";
+        const sender = typedArg(args, "sender", "string");
+        if (id === undefined) return { ok: false, error: "id (number) is required" };
+        const ok = this.windowManager.sendInput(id, text, sender);
+        return ok ? { ok: true } : { ok: false, error: `Window ${id} not found` };
+      },
+      agentMessage: (args?: Record<string, unknown>) => {
+        const id = typedArg(args, "id", "number");
+        // Accept either "text" or "input" for backward compat
+        const text = typedArg(args, "text", "string") ?? typedArg(args, "input", "string") ?? "";
+        const sender = typedArg(args, "sender", "string");
+        if (id === undefined) return { ok: false, error: "id (number) is required" };
+        const ok = this.windowManager.sendInput(id, text, sender);
+        return ok ? { ok: true } : { ok: false, error: `Window ${id} not found` };
+      },
       reloadAgentPrompt: () => {
         if (!this.activeAgentSession) {
           this.overlays.flash("No active agent session to reload");
@@ -2164,19 +2181,23 @@ export class TsTuiMvpApp {
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: (args) => {
         const name = trimmedArg(args, "name");
-        if (name) {
-          this.saveWorkspaceNamed(name);
+        const result = this.runtimeWorkspace.save(name ?? undefined);
+        if (result.ok) {
+          this.overlays.flash(`Saved workspace to ${result.path}`);
         } else {
-          this.saveWorkspace();
+          this.overlays.flash(result.error);
         }
+        return result;
       },
       loadWorkspace: (args) => {
         const name = trimmedArg(args, "name");
-        if (name) {
-          this.loadWorkspaceNamed(name);
+        const result = this.runtimeWorkspace.load(name ?? undefined);
+        if (result.ok) {
+          this.overlays.flash(`Loaded workspace from ${result.path}`);
         } else {
-          this.loadWorkspace();
+          this.overlays.flash(result.error);
         }
+        return result;
       },
       toggleTheme: () => this.toggleTheme(),
       chooseTheme: () => this.chooseTheme(),

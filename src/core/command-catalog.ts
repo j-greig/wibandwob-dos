@@ -42,6 +42,8 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   agentSend: (args?: Record<string, unknown>) => void;
+  windowInput: (args?: Record<string, unknown>) => unknown;
+  agentMessage: (args?: Record<string, unknown>) => unknown;
   editorWrite: (args?: Record<string, unknown>) => void;
   reloadAgentPrompt: () => void;
   reloadMicroapps: () => unknown;
@@ -81,8 +83,8 @@ export interface AppMenuActions {
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
-  saveWorkspace: (args?: Record<string, unknown>) => void;
-  loadWorkspace: (args?: Record<string, unknown>) => void;
+  saveWorkspace: (args?: Record<string, unknown>) => unknown;
+  loadWorkspace: (args?: Record<string, unknown>) => unknown;
   toggleTheme: () => void;
   chooseTheme: () => void;
   setTheme: (args?: Record<string, unknown>) => void;
@@ -583,6 +585,24 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     actionKey: "exportFocusedWindowText",
     menuPlacements: [{ category: "edit", order: 20 }],
     palettePlacement: { order: 210 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "window.input",
+    label: "Send Input to Window",
+    description: "Send text input to a window. Args: id (number, required), input (string, required), sender (string, optional — attribution tag).",
+    group: "focus",
+    actionKey: "windowInput",
+    api: true,
+    agent: true
+  },
+  {
+    id: "window.agent-message",
+    label: "Send Agent Message",
+    description: "Send a message to the Wib&Wob Agent window. Args: id (number, required), text (string, required), sender (string, optional).",
+    group: "focus",
+    actionKey: "agentMessage",
     api: true,
     agent: true
   },

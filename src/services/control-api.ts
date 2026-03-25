@@ -439,17 +439,13 @@ function buildRoutes(): RouteDefinition[] {
     },
     {
       method: "POST", path: "/windows/input", description: "Send text input to a window",
-      body: { id: "number", input: "string (trailing \\r submits)" },
-      handler: { post: (body, ctx) => ({
-        ok: ctx.deps.windows.sendInput(Number(body.id), String(body.input ?? ""), body.sender ? String(body.sender) : undefined),
-      }) },
+      body: { id: "number", input: "string (trailing \\r submits)", sender: "string (optional)" },
+      handler: { commandId: "window.input", argsMapper: (b) => ({ id: Number(b.id), input: String(b.input ?? ""), ...(b.sender ? { sender: String(b.sender) } : {}) }) },
     },
     {
       method: "POST", path: "/windows/agent-message", description: "Send a message to the Wib&Wob Agent window",
       body: { id: "number", text: "string", sender: "string (optional)" },
-      handler: { post: (body, ctx) => ({
-        ok: ctx.deps.windows.sendInput(Number(body.id), String(body.text ?? body.input ?? ""), body.sender ? String(body.sender) : undefined),
-      }) },
+      handler: { commandId: "window.agent-message", argsMapper: (b) => ({ id: Number(b.id), text: String(b.text ?? b.input ?? ""), ...(b.sender ? { sender: String(b.sender) } : {}) }) },
     },
     {
       method: "POST", path: "/windows/editor/write", description: "Write content to an editor window buffer",
@@ -623,13 +619,13 @@ function buildRoutes(): RouteDefinition[] {
     // ── Workspace persistence ──
     {
       method: "POST", path: "/workspace/save", description: "Save current workspace layout",
-      body: { name: "string" },
-      handler: { post: (body, ctx) => ctx.deps.workspace.save(typedArg(body, "name", "string")) },
+      body: { name: "string (optional)" },
+      handler: { commandId: "workspace.save", argsMapper: (b) => b.name ? { name: String(b.name) } : undefined },
     },
     {
       method: "POST", path: "/workspace/load", description: "Load a named workspace layout",
-      body: { name: "string" },
-      handler: { post: (body, ctx) => ctx.deps.workspace.load(typedArg(body, "name", "string")) },
+      body: { name: "string (optional)" },
+      handler: { commandId: "workspace.load", argsMapper: (b) => b.name ? { name: String(b.name) } : undefined },
     },
 
     // ── SSE ──
