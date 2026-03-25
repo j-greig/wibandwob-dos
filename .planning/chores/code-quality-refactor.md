@@ -24,6 +24,9 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 - `a029738f` — SDK: extract scrollbarConfig(), rename t2 → current
 - `c8f540ad` — chrome-browser-service: decompose navigate() into pipeline stages
 - `f41ad9e2` — wire focus/close/maximize through command registry
+- `2c50fb73` — extract viz modes from music-player to separate module
+- `74328267` — extract IIFE in command-catalog into named menu builders
+- `b3e5930e` — split wibwob-agent-session initialize() into named phases
 
 ---
 
@@ -48,9 +51,9 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 
 ## Tier 3 — Deferred (follow-up PR)
 
-- [-] **D1** `wibwob-agent-session.ts` — extract `SessionTranscript` class, split `initialize()` — **parked**, separate concern
-- [-] **D2** `command-catalog.ts` — extract IIFE into named fn — **parked**, low impact
-- [-] **D3** `music-player-window.ts` — move viz modes to separate module — **parked**, low priority
+- [x] **D1** `wibwob-agent-session.ts` — split `initialize()` into `assembleTools()` + `startSessionControlServer()`
+- [x] **D2** `command-catalog.ts` — extract IIFE into `buildStandardMenuItems()` + `buildApplicationsMenuItems()`
+- [x] **D3** `music-player-window.ts` — viz modes extracted to `music-player-viz.ts` (1227 → 848 LOC)
 - [x] **D4** `composition-helpers.ts` — `scrollbarConfig()` extracted (4× dedup), `t2` → `current` (10 renames)
 
 ## COAT alignment — command registry expansion
@@ -83,10 +86,6 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 **Why parked:** Semantic mismatches between the API endpoint contract and the command action contract. Forcing them through `commandId` would either change the API response shape (breaking callers) or require new commands that duplicate existing action logic. Better to fix when the commands themselves are redesigned to return typed results.
 **Resume trigger:** Command registry redesign to support typed return values.
 
-### D1/D2/D3 — deferred tier 3
-**Why parked:** Low impact relative to effort. Each is a standalone refactor with no dependencies on this branch.
-**Resume trigger:** Next time someone works in those files.
-
 ---
 
 ## Evidence (final verification)
@@ -106,5 +105,5 @@ Branch: `claude/plan-refactor-code-quality-uLyOn`
 
 ## Related spikes
 
-- [hono-migration-interrogation.md](../spikes/hono-migration-interrogation.md) — conclusion: kill the TODO
+- [hono-migration-interrogation.md](../spikes/hono-migration-interrogation.md) — conclusion: [DONE!] kill the TODO
 - [control-api-refactor-options.md](../spikes/control-api-refactor-options.md) — Option E (typed route table) chosen and implemented
