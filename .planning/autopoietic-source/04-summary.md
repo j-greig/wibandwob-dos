@@ -1,10 +1,10 @@
 # Summary — The Autopoietic Source Proposal
 
-> Revised after architectural critique (06) and second adversarial pass.
+> Revised after architectural critique (06), second adversarial pass, and devil's advocate challenge (08).
 
 ## One sentence
 
-Add a typed `MODULE_MANIFEST` constant and extend `check-coat` so the codebase describes its own architecture through the same patterns it already uses — zero new dependencies, CLI-first, with quality trajectory from day one.
+Refactor the code first (decompose god objects, establish barrel-file boundaries), THEN add a typed `MODULE_MANIFEST` + minimal check-coat extension (~190 LOC of infrastructure, not ~400) to keep it that way.
 
 ## What gets built
 
@@ -62,20 +62,31 @@ Each level uses the same pattern: a typed constant or function → a tool that r
 
 **Secondary risk:** Pre-commit hook could be slow on large changesets. Mitigation: scoped to changed files only (`git diff --name-only`). If still slow (>2s), make it opt-in.
 
-## Phased implementation
+## Phased implementation (revised after devil's advocate)
 
-**Phase 1 — Foundation (smallest useful slice):**
-- Write `MODULE_MANIFEST` with `ModuleId` type constraint
-- Add boundary check to `check-coat`
+> Key insight from 08-devils-advocate.md: building monitoring for a codebase that's on fire is backwards. Fix the code first, then add the thermometer.
+
+**Phase 0 — Refactor (the actual work):**
+- Decompose Tier 1 god objects (app-controller, control-api, file-manager-window) per `code-quality-refactor-plan.md`
+- Establish barrel-file boundaries: each `src/` subdirectory gets an `index.ts` re-exporting its public surface
+- Apply the 30 CODE-STYLE principles to the refactored code
+- ~3000-4000 LOC changed, ~14 files modified, ~5 new files
+- **This is 90% of the value.** Everything after this is insurance.
+
+**Phase 1 — Foundation (~90 LOC of infrastructure):**
+- Write `MODULE_MANIFEST` with `ModuleId` type constraint (~40 LOC) — describes the barrel-file convention as a typed constant
+- Add one check-coat check: validate src/ imports go through barrel files (~50 LOC)
 - Verify with `bun run check-coat`
 
-**Phase 2 — Visibility:**
-- Write `wibwob code-health` CLI command (file/function metrics + boundary status)
-- Add snapshot persistence to `.code-health/`
-- Add `--diff` flag for trajectory
+**Phase 2 — Trajectory (~100 LOC):**
+- Add code-health snapshot: file/function sizes + boundary violations as JSON
+- Persist to `.code-health/` (gitignored), diff on demand
+- `wibwob code-health` CLI or script — standalone, works without TUI
 
-**Phase 3 — Loop closure:**
-- Add `GET /code-health` COAT endpoint
-- Add pre-commit warning (changed files only)
-- Update ARCHITECTURE.md to point to MODULE_MANIFEST
-- Add `@module` JSDoc tags to directory main files, validated by check-coat
+**Phase 3 — Deferred (only if Phases 0-2 prove insufficient):**
+- COAT endpoint (`GET /code-health`)
+- Pre-commit warning (changed files only, warns not blocks)
+- `@module` JSDoc tags validated by check-coat
+- Full CLI command with `--diff` flag
+
+**Total infrastructure: ~190 LOC (halved from original ~400 after devil's advocate)**
