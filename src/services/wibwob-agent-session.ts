@@ -514,6 +514,45 @@ export class WibWobAgentSession {
     return `${message}\n\n<sender_info>${this.senderInfo}</sender_info>`;
   }
 
+  /** Assemble the tool set for this session mode. */
+  private assembleTools() {
+    const jailedCodingTools = this.mode === "agent" ? createJailedCodingTools(REPO_ROOT) : [];
+    const piSessionTools = this.mode === "agent" ? createPiSessionTools((msg) => this.withSenderInfo(msg)) : [];
+
+    const baseToolsOverride = jailedCodingTools.reduce<Record<string, AgentTool<any>>>((acc, tool) => {
+      acc[tool.name] = tool;
+      return acc;
+    }, {});
+
+    const customTools = this.mode === "agent" && this.tuiContext
+      ? [
+          ...createTuiToolDefinitions(this.tuiContext),
+          ...toToolDefinitionList(piSessionTools),
+        ]
+      : [];
+
+    const initialActiveToolNames = [...Object.keys(baseToolsOverride), ...customTools.map(t => t.name)];
+
+    return { baseToolsOverride, customTools, initialActiveToolNames };
+  }
+
+  /** Start the session control server for cross-session communication. */
+  private startSessionControlServer(): void {
+    if (this.sessionServer) return;
+    const self = this;
+    try {
+      this.sessionServer = startSessionServer({
+        sessionId: this.sessionId,
+        send: (text, sender) => self.send(text, sender),
+        getLastReply: () => self.getLastReply(),
+        abort: () => { void self.abort(); },
+        reset: () => { void self.reset(); },
+      });
+    } catch (e) {
+      console.error("[wibwob-agent-session] could not start session server:", e);
+    }
+  }
+
   /** Build the underlying Agent, choose model, inject tools/context, and start the session-control server. */
   async initialize(): Promise<void> {
     if (this.agent) return;
@@ -524,6 +563,7 @@ export class WibWobAgentSession {
     this.emit();
 
     try {
+      // Bootstrap: auth, model, settings, resources
       const authStorage = AuthStorage.create();
       const modelRegistry = new ModelRegistry(authStorage);
       const settingsManager = SettingsManager.create(this.cwd, PI_DIR);
@@ -540,29 +580,10 @@ export class WibWobAgentSession {
       });
       await resourceLoader.reload();
 
-      const tuiTools = this.mode === "agent" && this.tuiContext ? createTuiTools(this.tuiContext) : [];
-      const jailedCodingTools = this.mode === "agent" ? createJailedCodingTools(REPO_ROOT) : [];
-      const piSessionTools = this.mode === "agent" ? createPiSessionTools((msg) => this.withSenderInfo(msg)) : [];
-      const musicTools = this.mode === "agent" && this.tuiContext ? createMusicTools(this.tuiContext.runCommand) : [];
+      // Tool assembly
+      const { baseToolsOverride, customTools, initialActiveToolNames } = this.assembleTools();
 
-      // Tools are registered through AgentSession (customTools + baseToolsOverride),
-      // NOT on the raw Agent. Passing tools here would create duplicates.
-      const tools: AgentTool<any>[] = [];
-      const baseToolsOverride = jailedCodingTools.reduce<Record<string, AgentTool<any>>>((acc, tool) => {
-        acc[tool.name] = tool;
-        return acc;
-      }, {});
-      // Music tools (play_music, list_music) are registered by .pi/extensions/music-player.ts
-      // Session bridge tools are registered here — control.ts extension is NOT loaded for the in-app agent.
-      const customTools = this.mode === "agent" && this.tuiContext
-        ? [
-            ...createTuiToolDefinitions(this.tuiContext),
-            ...toToolDefinitionList(piSessionTools),
-          ]
-        : [];
-      // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
-      const initialActiveToolNames = [...Object.keys(baseToolsOverride), ...customTools.map(t => t.name)];
-
+      // System prompt + context injection
       const systemPrompt = this.mode === "agent"
         ? loadAgentSystemPrompt()
         : loadChatSystemPrompt();
@@ -571,28 +592,27 @@ export class WibWobAgentSession {
         ? async (messages: import("@mariozechner/pi-agent-core").AgentMessage[]) => {
             const state = this.tuiContext!.getState();
             const summary = formatDesktopSummary(state);
-            const stateMessage = {
+            return [{
               role: "user" as const,
               content: `[Current desktop state]\n${summary}`,
               timestamp: Date.now(),
-            };
-            return [stateMessage, ...messages];
+            }, ...messages];
           }
         : undefined;
 
-      // Create a persistent SessionManager so conversation history is saved
-      // to ~/.pi/agent/sessions/ as JSONL — same location as regular pi sessions.
+      // Session persistence
       if (!this.sessionManager) {
         this.sessionManager = SessionManager.create(this.cwd);
         log.sys(`session log: ${this.sessionManager.getSessionFile()}`);
       }
 
+      // Agent + session construction
       this.agent = new Agent({
         initialState: {
           systemPrompt,
           model: initial.model,
           thinkingLevel: initial.thinkingLevel,
-          tools,
+          tools: [],
           messages: [],
         },
         transformContext,
@@ -612,6 +632,7 @@ export class WibWobAgentSession {
         initialActiveToolNames: initialActiveToolNames.length > 0 ? initialActiveToolNames : undefined,
       });
       this.session.subscribe((event) => this.handleSessionEvent(event));
+
       this.ready = true;
       const totalTools = initialActiveToolNames.length;
       this.status = totalTools > 0
@@ -619,27 +640,7 @@ export class WibWobAgentSession {
         : `Ready. Model: ${initial.model.provider}/${initial.model.id}`;
       this.lastError = undefined;
 
-      // Start the session control server so wibwob-tui appears in list_sessions
-      if (!this.sessionServer) {
-        const self = this;
-        try {
-          this.sessionServer = startSessionServer({
-            sessionId: this.sessionId,
-            send: (text, sender) => self.send(text, sender),
-            getLastReply: () => self.getLastReply(),
-            abort: () => {
-              void self.abort();
-            },
-            reset: () => {
-              void self.reset();
-            },
-          });
-        } catch (e) {
-          // Non-fatal — agent runs fine without peer socket
-          console.error("[wibwob-agent-session] could not start session server:", e);
-        }
-      }
-
+      this.startSessionControlServer();
       this.emit();
     } catch (error) {
       this.ready = false;
