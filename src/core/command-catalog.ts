@@ -545,7 +545,7 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
   {
     id: "editor.write",
     label: "Write to Editor",
-    description: "Replace the content of the focused editor window. Args: text (string, required).",
+    description: "Type text into the focused editor window (appends at cursor). Args: text (string, required).",
     group: "edit",
     actionKey: "editorWrite",
     api: true,
