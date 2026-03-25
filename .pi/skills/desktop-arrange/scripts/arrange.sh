@@ -21,11 +21,22 @@ usage() {
 [[ $# -eq 0 ]] && usage 1
 
 if [[ "$1" == "--list" ]]; then
-  PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
+  # Try common ports first, fall back to wibwob CLI
+  PORT=""
+  for try_port in 8099 8100 8101 8102; do
+    if curl -sf "http://127.0.0.1:${try_port}/health" > /dev/null 2>&1; then
+      PORT="$try_port"
+      break
+    fi
+  done
+  if [[ -z "$PORT" ]]; then
+    PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
+  fi
+  
   echo "Presets: $PRESETS"
   echo ""
-  echo "Open windows:"
-  wibwob windows 2>/dev/null | jq -r '.[] | "  \(.id)  \(.title)  \(.left),\(.top) \(.width)×\(.height)"'
+  echo "Open windows on port $PORT:"
+  curl -sf "http://127.0.0.1:${PORT}/state" | jq -r '.windows[] | "  \(.id)  \(.title)  \(.left),\(.top) \(.width)×\(.height)"'
   exit 0
 fi
 
@@ -47,7 +58,20 @@ if ! echo "$PRESETS" | grep -qw "$PRESET"; then
 fi
 
 # Get port, desktop size, windows
-PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
+# Try wibwob health first (uses socket), fall back to scanning common ports
+PORT=""
+for try_port in 8099 8100 8101 8102; do
+  if curl -sf "http://127.0.0.1:${try_port}/health" > /dev/null 2>&1; then
+    PORT="$try_port"
+    break
+  fi
+done
+
+if [[ -z "$PORT" ]]; then
+  # Fallback: try wibwob health (uses socket detection)
+  PORT=$(wibwob health 2>&1 | awk '/^port:/{print $2}')
+fi
+
 if [[ -z "$PORT" ]]; then
   echo "ERROR: no running wibwob instance. Run: bun run dev" >&2
   exit 1
