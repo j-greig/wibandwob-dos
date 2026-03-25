@@ -130,6 +130,14 @@ export function openFileManagerWindow(params: {
     }
   };
 
+  // §6 DRY — extension→color mapping used by preview pane and icon views
+  const extColor = (ext: string): string =>
+    [".md", ".txt"].includes(ext) ? "green"
+      : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+      : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+      : [".sh", ".bash"].includes(ext) ? "cyan"
+      : "white";
+
   // ── Icon helpers ───────────────────────────────────────
   const fileIcon = (entry: { isDirectory: boolean; label: string }): string => {
     if (entry.isDirectory) {
@@ -791,11 +799,7 @@ export function openFileManagerWindow(params: {
         });
         const fileItems = childFiles.slice(0, maxFiles).map(c => {
           const ext = path.extname(c.name).toLowerCase();
-          const col = [".md", ".txt"].includes(ext) ? "green"
-            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
-            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
-            : [".sh", ".bash"].includes(ext) ? "cyan"
-            : "white";
+          const col = extColor(ext);
           // Try to get size
           let sizeStr = "";
           try {
@@ -815,11 +819,7 @@ export function openFileManagerWindow(params: {
         }
         const extEntries = Object.entries(extCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
         const extBar = extEntries.map(([ext, count]) => {
-          const col = [".md", ".txt"].includes(ext) ? "green"
-            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
-            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
-            : [".sh", ".bash"].includes(ext) ? "cyan"
-            : "white";
+          const col = extColor(ext);
           return `{${col}-fg}${ext}:${count}{/${col}-fg}`;
         }).join("  ");
 
