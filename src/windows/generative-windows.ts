@@ -8,6 +8,7 @@ import { createRestyleBundle } from "../core/ui-parts.js";
 import { createLivePlayer, type LiveFrameGenerator } from "../services/animation-service.js";
 import { animationAppType } from "../core/types.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
+import { getSelectedIndex } from "../ui/index.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 export interface BaseWindowDeps {
@@ -234,7 +235,7 @@ export function openWorkspaceManagerWindow(params: {
   frame.describeState = () => ({
     appType: "workspace-manager",
     summary: "Workspace save/load command window.",
-    selectedAction: list.getItem((list as List & { selected: number }).selected ?? 0)?.getText().trim(),
+    selectedAction: list.getItem(getSelectedIndex(list))?.getText().trim(),
     workspaceName: params.workspace.currentName,
     workspacePath: params.workspace.path,
     knownWorkspaces: params.workspace.list()
@@ -273,7 +274,7 @@ export function openCommandPaletteWindow(params: {
   frame.describeState = () => ({
     appType: "command-palette",
     summary: `Command palette with ${params.commands.length} actions.`,
-    selectedCommand: params.commands[(list as List & { selected: number }).selected ?? 0]?.label,
+    selectedCommand: params.commands[getSelectedIndex(list)]?.label,
     commandCount: params.commands.length
   });
   frame.setFocusTarget(list);

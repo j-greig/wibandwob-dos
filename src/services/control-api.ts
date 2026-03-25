@@ -35,6 +35,7 @@ import type { CommandListItem, CommandSurface } from "../core/command-registry.j
 import { log } from "./app-logger.js";
 import { getRecentErrors } from "../core/error-buffer.js";
 import { getCommandDefinition } from "../core/command-catalog.js";
+import { typedArg, trimmedArg, enumArg, clampedArg } from "../core/arg-helpers.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
 
@@ -780,7 +781,7 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof body.id === "string" ? body.id : "";
+      const id = typedArg(body, "id", "string") ?? "";
       if (!id) {
         return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
@@ -835,12 +836,8 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/figlet/open-default") {
-      const text = typeof body.text === "string" && body.text.trim()
-        ? body.text.trim()
-        : "WIB WOB";
-      const font = typeof body.font === "string" && body.font.trim()
-        ? body.font.trim()
-        : undefined;
+      const text = trimmedArg(body, "text") ?? "WIB WOB";
+      const font = trimmedArg(body, "font");
       const result = this.runApiCommand(
         "figlet.open",
         font ? { text, font } : { text },
@@ -854,13 +851,11 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/view/zine/open") {
-      const filePath = typeof body.filePath === "string" && body.filePath.trim()
-        ? body.filePath.trim()
-        : undefined;
+      const filePath = trimmedArg(body, "filePath");
       let args: Record<string, unknown> | undefined;
       if (filePath) {
         args = { filePath };
-      } else if (typeof body.index === "number") {
+      } else if (typedArg(body, "index", "number") !== undefined) {
         const listed = this.runApiCommand("microapp.wibwob.zine.list-canvases");
         if (!listed.ok) {
           return Response.json(listed, { status: 404 });
@@ -905,9 +900,9 @@ export class ControlApiService {
       "/view/inspector/open":       { id: "inspector.open" },
       "/view/editor/open":          { id: "editor.open", argsMapper: (b) => {
         const args: Record<string, unknown> = {};
-        if (typeof b.filePath === "string") args.filePath = b.filePath;
-        if (typeof b.title === "string") args.title = b.title;
-        if (typeof b.initial === "string") args.initial = b.initial;
+        if (typedArg(b, "filePath", "string")) args.filePath = b.filePath;
+        if (typedArg(b, "title", "string")) args.title = b.title;
+        if (typedArg(b, "initial", "string")) args.initial = b.initial;
         return Object.keys(args).length ? args : undefined;
       }},
     };
@@ -1069,9 +1064,9 @@ export class ControlApiService {
         ? path.resolve(this.identity.capturesDir)
         : path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
-      const name = typeof body.name === "string" ? body.name
-        : typeof body.label === "string" ? body.label
-        : `window-${id}`;
+      const name = typedArg(body, "name", "string")
+        ?? typedArg(body, "label", "string")
+        ?? `window-${id}`;
       const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
       const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
       const filePath = path.join(capturesDir, fileName);
@@ -1155,15 +1150,13 @@ export class ControlApiService {
       return Response.json(result);
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
-      const rawName = body.name;
       return Response.json(
-        this.deps.workspace.save(typeof rawName === "string" ? rawName : undefined),
+        this.deps.workspace.save(typedArg(body, "name", "string")),
       );
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
-      const rawName = body.name;
       return Response.json(
-        this.deps.workspace.load(typeof rawName === "string" ? rawName : undefined),
+        this.deps.workspace.load(typedArg(body, "name", "string")),
       );
     }
 
@@ -1173,25 +1166,12 @@ export class ControlApiService {
 
 function normalizeBackroomsChannel(raw: unknown): BackroomsChannel {
   const body = (raw ?? {}) as Record<string, unknown>;
-  const model =
-    typeof body.model === "string" &&
-    ["haiku", "sonnet", "opus"].includes(body.model)
-      ? (body.model as BackroomsChannel["model"])
-      : "sonnet";
-  const mode =
-    typeof body.mode === "string" &&
-    ["auto", "live", "fake-live"].includes(body.mode)
-      ? (body.mode as BackroomsChannel["mode"])
-      : "auto";
   return {
-    theme:
-      typeof body.theme === "string" && body.theme.trim()
-        ? body.theme.trim()
-        : "liminal fluorescent maze",
-    primers: typeof body.primers === "string" ? body.primers.trim() : "",
-    turns: Math.max(1, Math.min(20, Number(body.turns) || 3)),
-    model,
-    mode,
+    theme: trimmedArg(body, "theme") ?? "liminal fluorescent maze",
+    primers: typedArg(body, "primers", "string")?.trim() ?? "",
+    turns: clampedArg(body, "turns", 1, 20) ?? 3,
+    model: enumArg(body, "model", ["haiku", "sonnet", "opus"] as const) ?? "sonnet",
+    mode: enumArg(body, "mode", ["auto", "live", "fake-live"] as const) ?? "auto",
   };
 }
 

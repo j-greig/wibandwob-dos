@@ -14,6 +14,7 @@ import { safeReadFile, safeWriteFile } from "./safe-fs.js";
 import { getDefaultFigletFont } from "../services/figlet-service.js";
 import type { PersistableAppType, WindowRecord, WindowSnapshot, BackroomsChannel } from "./types.js";
 import type { WindowFacade } from "./window-facade.js";
+import { typedArg, enumArg } from "./arg-helpers.js";
 
 
 
@@ -107,18 +108,16 @@ export const snapshotRegistry = {
         : undefined;
     },
     restore: (snapshot, payload, actions) => {
-      const viewMode = typeof payload.viewMode === "string" ? payload.viewMode as "edit" | "view" : undefined;
       return actions.openEditorWindow(
         snapshot.filePath,
         snapshot.title,
-        typeof payload.content === "string"
-          ? payload.content
-          : (snapshot.filePath ? safeReadFile(snapshot.filePath) : undefined) ?? "",
+        typedArg(payload, "content", "string")
+          ?? (snapshot.filePath ? safeReadFile(snapshot.filePath) : undefined) ?? "",
         {
-          cursor: typeof payload.cursor === "number" ? payload.cursor : undefined,
-          viewMode,
-          scrollOffset: typeof payload.scrollOffset === "number" ? payload.scrollOffset : undefined,
-          figlet: typeof payload.figlet === "boolean" ? payload.figlet : undefined,
+          cursor: typedArg(payload, "cursor", "number"),
+          viewMode: enumArg(payload, "viewMode", ["edit", "view"] as const),
+          scrollOffset: typedArg(payload, "scrollOffset", "number"),
+          figlet: typedArg(payload, "figlet", "boolean"),
         }
       );
     },
@@ -148,9 +147,9 @@ export const snapshotRegistry = {
     },
     restore: (_snapshot, payload, actions) => {
       return actions.openPrimerGalleryWindow({
-        activeTabIndex: typeof payload.activeTabIndex === "number" ? payload.activeTabIndex : undefined,
-        searchValue: typeof payload.searchValue === "string" ? payload.searchValue : undefined,
-        selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
+        activeTabIndex: typedArg(payload, "activeTabIndex", "number"),
+        searchValue: typedArg(payload, "searchValue", "string"),
+        selectedIndex: typedArg(payload, "selectedIndex", "number"),
       });
     },
   },
@@ -163,7 +162,7 @@ export const snapshotRegistry = {
     }),
     restore: (_snapshot, payload, actions) => {
       return actions.openPrimerBrowserWindow({
-        selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
+        selectedIndex: typedArg(payload, "selectedIndex", "number"),
       });
     },
   },
@@ -184,14 +183,14 @@ export const snapshotRegistry = {
     },
     restore: (_snapshot, payload, actions) => {
       return actions.openFileManagerWindow({
-        currentPath: typeof payload.currentPath === "string" ? payload.currentPath : undefined,
-        filterValue: typeof payload.filterValue === "string" ? payload.filterValue : undefined,
-        selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
-        searchQuery: typeof payload.searchQuery === "string" ? payload.searchQuery : undefined,
-        searchMode: payload.searchMode === "simple" || payload.searchMode === "advanced" ? payload.searchMode : undefined,
-        viewMode: payload.viewMode === "list" || payload.viewMode === "icon" ? payload.viewMode : undefined,
-        showHidden: typeof payload.showHidden === "boolean" ? payload.showHidden : undefined,
-        sortField: ["name", "size", "modified", "type"].includes(payload.sortField as string) ? payload.sortField as "name" | "size" | "modified" | "type" : undefined,
+        currentPath: typedArg(payload, "currentPath", "string"),
+        filterValue: typedArg(payload, "filterValue", "string"),
+        selectedIndex: typedArg(payload, "selectedIndex", "number"),
+        searchQuery: typedArg(payload, "searchQuery", "string"),
+        searchMode: enumArg(payload, "searchMode", ["simple", "advanced"] as const),
+        viewMode: enumArg(payload, "viewMode", ["list", "icon"] as const),
+        showHidden: typedArg(payload, "showHidden", "boolean"),
+        sortField: enumArg(payload, "sortField", ["name", "size", "modified", "type"] as const),
       });
     },
   },
@@ -209,7 +208,7 @@ export const snapshotRegistry = {
     }),
     restore: (_snapshot, payload, actions) => {
       return actions.openChromeBrowserWindow({
-        url: typeof payload.currentUrl === "string" ? payload.currentUrl : undefined,
+        url: typedArg(payload, "currentUrl", "string"),
       });
     },
   },
@@ -239,15 +238,11 @@ export const snapshotRegistry = {
     },
     restore: (_snapshot, payload, actions) => {
       return actions.openBackroomsTv({
-        theme: typeof payload.theme === "string" ? payload.theme : "liminal fluorescent maze",
-        primers: typeof payload.primers === "string" ? payload.primers : "",
-        turns: typeof payload.turns === "number" ? payload.turns : 3,
-        model:
-          payload.model === "haiku" || payload.model === "opus" || payload.model === "sonnet"
-            ? payload.model : "sonnet",
-        mode:
-          payload.mode === "live" || payload.mode === "fake-live" || payload.mode === "auto"
-            ? payload.mode : "auto",
+        theme: typedArg(payload, "theme", "string") ?? "liminal fluorescent maze",
+        primers: typedArg(payload, "primers", "string") ?? "",
+        turns: typedArg(payload, "turns", "number") ?? 3,
+        model: enumArg(payload, "model", ["haiku", "sonnet", "opus"] as const) ?? "sonnet",
+        mode: enumArg(payload, "mode", ["auto", "live", "fake-live"] as const) ?? "auto",
       });
     },
   },
@@ -263,8 +258,8 @@ export const snapshotRegistry = {
     },
     restore: (_snapshot, payload, actions) => {
       return actions.openCompanionWindow({
-        tick: typeof payload.tick === "number" ? payload.tick : undefined,
-        displayMode: typeof payload.displayMode === "string" ? payload.displayMode : undefined,
+        tick: typedArg(payload, "tick", "number"),
+        displayMode: typedArg(payload, "displayMode", "string"),
       });
     },
   },

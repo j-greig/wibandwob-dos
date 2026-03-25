@@ -18,6 +18,7 @@ import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
 import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../services/syntax-highlight.js";
 import type { Box, List } from "../core/types.js";
+import { getSelectedIndex } from "../ui/index.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 
 import type { WindowManager } from "../core/window-manager.js";
@@ -1195,7 +1196,7 @@ export function openFileManagerWindow(params: {
       iconGrid.width = "100%";
       preview.hidden = true;
       // Sync selection from list -> icon
-      iconSelected = (list as List & { selected: number }).selected ?? 0;
+      iconSelected = getSelectedIndex(list);
       renderIconGrid();
       renderStatusBar();
       iconGrid.focus();
@@ -1211,10 +1212,10 @@ export function openFileManagerWindow(params: {
 
   const getEntryPath = (index?: number): string | null => {
     if (searchActive) {
-      const idx = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      const idx = typeof index === "number" ? index : getSelectedIndex(list);
       return searchResults[idx]?.file ?? null;
     }
-    const entry = entries[typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0];
+    const entry = entries[typeof index === "number" ? index : getSelectedIndex(list)];
     return entry?.fullPath ?? null;
   };
 
@@ -1385,13 +1386,13 @@ export function openFileManagerWindow(params: {
   // ── Entry interaction ──────────────────────────────────
 
   const getSelectedEntry = (index?: number) => {
-    const currentIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+    const currentIndex = typeof index === "number" ? index : getSelectedIndex(list);
     return entries[currentIndex];
   };
 
   const openSelected = (index?: number) => {
     if (searchActive) {
-      const idx = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      const idx = typeof index === "number" ? index : getSelectedIndex(list);
       const result = searchResults[idx];
       if (result) params.onOpenFile(result.file);
       return;
@@ -1407,7 +1408,7 @@ export function openFileManagerWindow(params: {
 
   const viewSelected = (index?: number) => {
     if (searchActive) {
-      const idx = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      const idx = typeof index === "number" ? index : getSelectedIndex(list);
       const result = searchResults[idx];
       if (result) params.onViewFile(result.file);
       return;
@@ -1430,7 +1431,7 @@ export function openFileManagerWindow(params: {
 
   // Update preview on mouse click — "select item" fires on any selection change including clicks
   list.on("select item", () => {
-    const idx = (list as List & { selected: number }).selected ?? 0;
+    const idx = getSelectedIndex(list);
     if (searchActive && searchResults[idx]) {
       updatePreviewForSearchResult(searchResults[idx]);
     } else {
@@ -1523,7 +1524,7 @@ export function openFileManagerWindow(params: {
     }
     if (["up", "down", "j", "k"].includes(key.name ?? "")) {
       setTimeout(() => {
-        const idx = (list as List & { selected: number }).selected ?? 0;
+        const idx = getSelectedIndex(list);
         if (searchActive && searchResults[idx]) {
           updatePreviewForSearchResult(searchResults[idx]);
         } else {
@@ -1535,7 +1536,7 @@ export function openFileManagerWindow(params: {
     }
     // Jump-to-letter (only in browse mode)
     if (!searchActive && typeof ch === "string" && /^[a-zA-Z0-9]$/.test(ch) && ch !== "s" && ch !== "v") {
-      const startIndex = ((list as List & { selected: number }).selected ?? 0) + 1;
+      const startIndex = (getSelectedIndex(list)) + 1;
       const normalized = ch.toLowerCase();
       const ordered = entries.slice(startIndex).concat(entries.slice(0, startIndex));
       const match = ordered.find((entry) => entry.label.toLowerCase().startsWith(normalized));
@@ -1759,8 +1760,8 @@ export function openFileManagerWindow(params: {
     showHidden,
     sortField,
     searchActive,
-    selectedIndex: (list as List & { selected: number }).selected ?? 0,
-    selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
+    selectedIndex: getSelectedIndex(list),
+    selectedLabel: entries[getSelectedIndex(list)]?.label,
     entryCount: entries.length,
     searchResultCount: searchActive ? searchResults.length : undefined,
     contentPreview: preview.getContent().split("\n").slice(0, 10).join("\n")

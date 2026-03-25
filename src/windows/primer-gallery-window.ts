@@ -9,6 +9,7 @@ import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BrowserEntry, List } from "../core/types.js";
+import { getSelectedIndex } from "../ui/index.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { PREVIEW_SPLIT_RATIO, cleanLabel, setViewportContent } from "./browser-utils.js";
@@ -110,7 +111,7 @@ export function openPrimerGalleryWindow(params: {
     params.screen.render();
   };
   const openSelected = (index?: number) => {
-    const currentIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+    const currentIndex = typeof index === "number" ? index : getSelectedIndex(list);
     const entry = activeEntries[currentIndex];
     if (entry) params.onOpenPrimer(entry.filePath);
   };
@@ -164,7 +165,7 @@ export function openPrimerGalleryWindow(params: {
   });
   list.on("keypress", (_, key) => {
     if (["up", "down", "j", "k"].includes(key.name ?? "")) {
-      deferRender(() => updatePreview((list as List & { selected: number }).selected ?? 0));
+      deferRender(() => updatePreview(getSelectedIndex(list)));
     } else if (key.name === "left") {
       switchTab((activeTabIndex - 1 + tabs.length) % tabs.length);
     } else if (key.name === "right") {
@@ -189,9 +190,9 @@ export function openPrimerGalleryWindow(params: {
     activeTabIndex,
     activeTab: tabs[activeTabIndex]?.label,
     searchValue,
-    selectedIndex: (list as List & { selected: number }).selected ?? 0,
+    selectedIndex: getSelectedIndex(list),
     visibleEntryCount: activeEntries.length,
-    selectedLabel: activeEntries[(list as List & { selected: number }).selected ?? 0]?.label,
+    selectedLabel: activeEntries[getSelectedIndex(list)]?.label,
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.focus = () => {
@@ -226,11 +227,11 @@ export function openPrimerGalleryWindow(params: {
     filterBox.setValue(searchValue);
     applySearch();
     list.select(Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
-    updatePreview((list as List & { selected: number }).selected ?? 0);
+    updatePreview(getSelectedIndex(list));
   } else {
     switchTab(activeTabIndex);
     list.select(Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
-    updatePreview((list as List & { selected: number }).selected ?? 0);
+    updatePreview(getSelectedIndex(list));
   }
   frame.focus();
 }

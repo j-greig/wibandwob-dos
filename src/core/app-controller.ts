@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 // child_process no longer needed here — FX pipeline extracted to fx-pipeline.ts
 import { log } from "../services/app-logger.js";
+import { typedArg, trimmedArg, enumArg, clampedArg } from "./arg-helpers.js";
 import { shaderSet, shaderList, shaderStatus, shaderLabel } from "../services/ghostty-shader-service.js";
 import {
   resolveSmearSource as fxResolveSmearSource,
@@ -857,16 +858,12 @@ export class TsTuiMvpApp {
   /** Set one or more skin properties from command args. */
   private skinSet(args?: Record<string, unknown>): void {
     const partial: Partial<TuiSkin> = {};
-    if (typeof args?.borderStyle === "string" &&
-        ["line", "bg", "none"].includes(args.borderStyle)) {
-      partial.borderStyle = args.borderStyle as TuiSkin["borderStyle"];
-    }
-    if (typeof args?.borderChar === "string" && args.borderChar.length > 0) {
-      partial.borderChar = args.borderChar[0];
-    }
-    if (typeof args?.shadowEnabled === "boolean") {
-      partial.shadowEnabled = args.shadowEnabled;
-    }
+    const borderStyle = enumArg(args, "borderStyle", ["line", "bg", "none"] as const);
+    if (borderStyle) partial.borderStyle = borderStyle;
+    const borderChar = typedArg(args, "borderChar", "string");
+    if (borderChar && borderChar.length > 0) partial.borderChar = borderChar[0];
+    const shadowEnabled = typedArg(args, "shadowEnabled", "boolean");
+    if (shadowEnabled !== undefined) partial.shadowEnabled = shadowEnabled;
     if (Object.keys(partial).length === 0) return;
     patchSettingsSkin(partial);
     this.applySkinLive();
@@ -1037,19 +1034,14 @@ export class TsTuiMvpApp {
 
   private getRuntimeOverlayInspection(): RuntimeOverlayInspection | null {
     const info = this.overlays.getActiveOverlayInfo();
-    if (!info || typeof info.type !== "string") {
-      return null;
-    }
+    const type = typedArg(info, "type", "string");
+    if (!type) return null;
     return {
-      type: info.type,
-      label: typeof info.label === "string" ? info.label : undefined,
-      selectedIndex:
-        typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
-      count: typeof info.count === "number" ? info.count : undefined,
-      currentDirectory:
-        typeof info.currentDirectory === "string"
-          ? info.currentDirectory
-          : undefined,
+      type,
+      label: typedArg(info, "label", "string"),
+      selectedIndex: typedArg(info, "selectedIndex", "number"),
+      count: typedArg(info, "count", "number"),
+      currentDirectory: typedArg(info, "currentDirectory", "string"),
     };
   }
 
@@ -1093,15 +1085,12 @@ export class TsTuiMvpApp {
       blockers.push({
         kind: "picker-window",
         type: "backrooms-primer-picker",
-        label:
-          typeof info.theme === "string"
-            ? `Backrooms Primer Picker: ${info.theme}`
-            : "Backrooms Primer Picker",
+        label: typedArg(info, "theme", "string")
+          ? `Backrooms Primer Picker: ${info.theme}`
+          : "Backrooms Primer Picker",
         windowId: this.findWindowByAppType("backrooms-primer-picker")?.id,
-        selectedIndex:
-          typeof info.selectedIndex === "number" ? info.selectedIndex : undefined,
-        count:
-          typeof info.filteredCount === "number" ? info.filteredCount : undefined,
+        selectedIndex: typedArg(info, "selectedIndex", "number"),
+        count: typedArg(info, "filteredCount", "number"),
         escapeCommands: ["backrooms.picker.cancel", "desktop.clear-all"],
         continueCommands: ["backrooms.picker.select", "backrooms.picker.confirm"],
       });
@@ -1729,8 +1718,7 @@ export class TsTuiMvpApp {
       openFileManager: () => this.openHostWindow("file-manager"),
       openPrimerPicker: () => this.openPrimerPicker(),
       openPrimerPrompt: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" ? args.filePath : undefined;
+        const filePath = trimmedArg(args, "filePath");
         if (!filePath) {
           if (this.isNonInteractiveCommand(args)) {
             return {
@@ -1745,18 +1733,14 @@ export class TsTuiMvpApp {
         if (!window) {
           return;
         }
-        const x =
-          typeof args?.x === "number" ? args.x : Number(window.frame.left);
-        const y =
-          typeof args?.y === "number" ? args.y : Number(window.frame.top);
-        const w =
-          typeof args?.w === "number" ? args.w : Number(window.frame.width);
-        const h =
-          typeof args?.h === "number" ? args.h : Number(window.frame.height);
-        if (typeof args?.x === "number" || typeof args?.y === "number") {
+        const x = typedArg(args, "x", "number") ?? Number(window.frame.left);
+        const y = typedArg(args, "y", "number") ?? Number(window.frame.top);
+        const w = typedArg(args, "w", "number") ?? Number(window.frame.width);
+        const h = typedArg(args, "h", "number") ?? Number(window.frame.height);
+        if (typedArg(args, "x", "number") !== undefined || typedArg(args, "y", "number") !== undefined) {
           this.windowManager.moveWindow(window.id, x, y);
         }
-        if (typeof args?.w === "number" || typeof args?.h === "number") {
+        if (typedArg(args, "w", "number") !== undefined || typedArg(args, "h", "number") !== undefined) {
           this.windowManager.resizeWindow(window.id, w, h);
         }
       },
@@ -1780,23 +1764,17 @@ export class TsTuiMvpApp {
       fxFlip: (args) => this.runFxScript("flip", args),
       openEditorPicker: () => this.openEditorPicker(),
       openTextFile: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" && args.filePath.trim()
-            ? args.filePath.trim()
-            : undefined;
+        const filePath = trimmedArg(args, "filePath");
         if (filePath) {
           // Path A: open a specific file
           this.editor.openFile(filePath, args);
         } else if (
-          typeof args?.title === "string" ||
-          typeof args?.initial === "string"
+          typedArg(args, "title", "string") !== undefined ||
+          typedArg(args, "initial", "string") !== undefined
         ) {
           // Path B: open an unsaved buffer with title/initial content
-          const title =
-            typeof args?.title === "string" ? args.title : undefined;
-          // (fall through to existing logic)
-          const initial =
-            typeof args?.initial === "string" ? args.initial : undefined;
+          const title = typedArg(args, "title", "string");
+          const initial = typedArg(args, "initial", "string");
           const onSave = typeof args?.onSave === "function" ? args.onSave as (content: string) => void : undefined;
           const win = this.editor.openWindow(undefined, title, initial);
           if (win && onSave) win.onSave = onSave;
@@ -1819,20 +1797,14 @@ export class TsTuiMvpApp {
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       copyFocusedWindowText: () => this.copyFocusedWindowText(),
       exportFocusedWindowText: (args) => {
-        const id = typeof args?.id === "number" ? args.id : undefined;
-        const name =
-          typeof args?.name === "string" && args.name.trim()
-            ? args.name.trim()
-            : undefined;
+        const id = typedArg(args, "id", "number");
+        const name = trimmedArg(args, "name");
         this.exportFocusedWindowText(id, name);
       },
       openTerrainLab: () => this.openHostWindow("terrain-lab"),
       openMarkdownPicker: () => this.openMarkdownPicker(),
       openMarkdownViewer: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" && args.filePath.trim()
-            ? args.filePath.trim()
-            : undefined;
+        const filePath = trimmedArg(args, "filePath");
         if (!filePath && this.isNonInteractiveCommand(args)) {
           return {
             ok: false,
@@ -1855,8 +1827,8 @@ export class TsTuiMvpApp {
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       editorWrite: (args?: Record<string, unknown>) => {
-        const text = typeof args?.text === "string" ? args.text : "";
-        const windowId = typeof args?.windowId === "number" ? args.windowId : undefined;
+        const text = typedArg(args, "text", "string") ?? "";
+        const windowId = typedArg(args, "windowId", "number");
         const win = windowId
           ? this.windowManager.getWindowById(windowId)
           : this.windowManager.getFocusedWindow();
@@ -1868,7 +1840,7 @@ export class TsTuiMvpApp {
         }
       },
       agentSend: (args?: Record<string, unknown>) => {
-        const text = typeof args?.text === "string" ? args.text : typeof args?.message === "string" ? args.message : "";
+        const text = typedArg(args, "text", "string") ?? typedArg(args, "message", "string") ?? "";
         if (!text.trim()) return;
         const win = this.findWindowByAppType("wibwob-agent");
         if (win?.writeInput) {
@@ -1930,7 +1902,7 @@ export class TsTuiMvpApp {
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
       clickWindowElement: (args) => {
         const id = Number(args?.id);
-        const label = typeof args?.label === "string" ? args.label : undefined;
+        const label = typedArg(args, "label", "string");
         if (!label) return { ok: false, error: "label (string) is required" };
         const record = this.windowManager.getWindowById(id);
         if (!record) return { ok: false, error: `no window with id ${id}` };
@@ -2011,7 +1983,7 @@ export class TsTuiMvpApp {
           : { selected: false, error: result.error ?? "Selection failed", count: result.count };
       },
       reloadMicroapp: (args) => {
-        const microappId = typeof args?.microappId === "string" ? args.microappId : undefined;
+        const microappId = trimmedArg(args, "microappId");
         if (!microappId) return { ok: false, error: "microappId (string) is required" };
         // 1. Close matching windows
         const closed: number[] = [];
@@ -2050,7 +2022,7 @@ export class TsTuiMvpApp {
         return { openMenu: openMenuLabel ?? null, menus };
       },
       overlaySetText: (args) => {
-        const text = typeof args?.text === "string" ? args.text : undefined;
+        const text = typedArg(args, "text", "string");
         if (text === undefined) {
           return { ok: false, error: "text (string) is required" };
         }
@@ -2063,24 +2035,10 @@ export class TsTuiMvpApp {
       },
       openBackroomsPrompt: () => this.openHostWindow("backrooms-primer-picker"),
       openBackroomsTv: (args?: Record<string, unknown>) => {
-        const theme =
-          typeof args?.theme === "string" && args.theme.trim()
-            ? args.theme.trim()
-            : "liminal fluorescent maze";
-        const model =
-          typeof args?.model === "string" &&
-          ["haiku", "sonnet", "opus"].includes(args.model)
-            ? (args.model as "haiku" | "sonnet" | "opus")
-            : "sonnet";
-        const turns =
-          typeof args?.turns === "number"
-            ? Math.max(1, Math.min(20, args.turns))
-            : 6;
-        const mode =
-          typeof args?.mode === "string" &&
-          ["auto", "live", "fake-live"].includes(args.mode)
-            ? (args.mode as "auto" | "live" | "fake-live")
-            : "auto";
+        const theme = trimmedArg(args, "theme") ?? "liminal fluorescent maze";
+        const model = enumArg(args, "model", ["haiku", "sonnet", "opus"] as const) ?? "sonnet";
+        const turns = clampedArg(args, "turns", 1, 20) ?? 6;
+        const mode = enumArg(args, "mode", ["auto", "live", "fake-live"] as const) ?? "auto";
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
       openBackroomsLogBrowser: () => this.openHostWindow("backrooms-log-browser"),
@@ -2105,14 +2063,14 @@ export class TsTuiMvpApp {
       backroomsPickerToggleByLabel: (args) => {
         const api = this.getBackroomsPickerApi();
         if (!api?.toggleByLabel) return { ok: false, error: "Backrooms picker not active" };
-        const label = typeof args?.label === "string" ? args.label.trim() : "";
+        const label = trimmedArg(args, "label") ?? "";
         if (!label) return { ok: false, error: "label is required" };
         return api.toggleByLabel(label);
       },
       backroomsPickerSearch: (args) => {
         const api = this.getBackroomsPickerApi();
         if (!api?.search) return { ok: false, error: "Backrooms picker not active" };
-        const query = typeof args?.query === "string" ? args.query : "";
+        const query = typedArg(args, "query", "string") ?? "";
         return api.search(query);
       },
       backroomsPickerConfirm: () => {
@@ -2128,29 +2086,24 @@ export class TsTuiMvpApp {
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       toggleMaximizeFocused: (args?: Record<string, unknown>) => {
-        const byId = typeof args?.windowId === "number"
-          ? this.windowManager.getWindowById(args.windowId)
+        const wId = typedArg(args, "windowId", "number");
+        const byId = wId !== undefined
+          ? this.windowManager.getWindowById(wId)
           : undefined;
         const target = byId ?? this.windowManager.getFocusedWindow();
         if (target) this.windowManager.toggleMaximize(target);
       },
       openGallery: () => this.openHostWindow("primer-gallery"),
       openBrowserReader: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" && args.filePath.trim()
-            ? args.filePath.trim()
-            : undefined;
+        const filePath = trimmedArg(args, "filePath");
         this.openHostWindow("reader-viewer", { filePath });
       },
       openChromeBrowser: (args) => {
-        const url =
-          typeof args?.url === "string" && args.url.trim()
-            ? args.url.trim()
-            : undefined;
+        const url = trimmedArg(args, "url");
         this.openHostWindow("web-reader", url ? { url } : undefined);
       },
       navigateChromeBrowser: (args) => {
-        const url = typeof args?.url === "string" ? args.url.trim() : "";
+        const url = trimmedArg(args, "url") ?? "";
         if (!url) return { ok: false, error: "url is required" };
         // Find an open browser window and navigate it
         const browserWin = this.windowManager.getWindows().find(w => w.kind === "browser");
@@ -2159,17 +2112,14 @@ export class TsTuiMvpApp {
         return { ok: true, windowId: browserWin.id, url };
       },
       openMusicPlayer: (args) => {
-        const filePath =
-          typeof args?.filePath === "string" && args.filePath.trim()
-            ? args.filePath.trim()
-            : undefined;
+        const filePath = trimmedArg(args, "filePath");
         this.openHostWindow("music-player", filePath ? { filePath } : undefined);
       },
       openCompanionWindow: () => this.openCompanionWindow(),
       openScrambleSmol: () => { this.openScrambleSmol(); },
       openScrambleFloating: () => { this.openScrambleFloating(); },
       scrambleSay: (args) => {
-        const text = typeof args?.text === "string" ? args.text.trim() : "";
+        const text = trimmedArg(args, "text") ?? "";
         if (!text) return;
         const win = this.findWindowByAppType("companion-widget");
         if (win?.writeInput) {
@@ -2205,10 +2155,7 @@ export class TsTuiMvpApp {
       openCommandPalette: () => this.openHostWindow("command-palette"),
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: (args) => {
-        const name =
-          typeof args?.name === "string" && args.name.trim()
-            ? args.name.trim()
-            : undefined;
+        const name = trimmedArg(args, "name");
         if (name) {
           this.saveWorkspaceNamed(name);
         } else {
@@ -2216,10 +2163,7 @@ export class TsTuiMvpApp {
         }
       },
       loadWorkspace: (args) => {
-        const name =
-          typeof args?.name === "string" && args.name.trim()
-            ? args.name.trim()
-            : undefined;
+        const name = trimmedArg(args, "name");
         if (name) {
           this.loadWorkspaceNamed(name);
         } else {
@@ -2238,8 +2182,8 @@ export class TsTuiMvpApp {
           this.overlays.flash("No Finder window focused");
           return;
         }
-        const query = typeof args?.query === "string" ? args.query : "";
-        const glob = typeof args?.glob === "string" ? args.glob : undefined;
+        const query = typedArg(args, "query", "string") ?? "";
+        const glob = typedArg(args, "glob", "string");
         finder.search(query, glob);
       },
       finderNavigate: (args) => {
@@ -2248,7 +2192,7 @@ export class TsTuiMvpApp {
           this.overlays.flash("No Finder window focused");
           return;
         }
-        const dirPath = typeof args?.path === "string" ? args.path : "";
+        const dirPath = typedArg(args, "path", "string") ?? "";
         finder.navigateTo(dirPath);
       },
       finderToggleView: () => {
@@ -2266,7 +2210,7 @@ export class TsTuiMvpApp {
           this.overlays.flash("No Finder window focused");
           return;
         }
-        const query = typeof args?.query === "string" ? args.query : "";
+        const query = typedArg(args, "query", "string") ?? "";
         // Stub — will dispatch to QMD when implemented
         this.overlays.flash("Advanced search (QMD) coming soon");
         void query;
@@ -2294,11 +2238,7 @@ export class TsTuiMvpApp {
           this.overlays.flash("No Finder window focused");
           return;
         }
-        const field =
-          typeof args?.field === "string" &&
-          ["name", "size", "modified", "type"].includes(args.field)
-            ? (args.field as "name" | "size" | "modified" | "type")
-            : "name";
+        const field = enumArg(args, "field", ["name", "size", "modified", "type"] as const) ?? "name";
         finder.sortBy(field);
       },
 
@@ -2323,7 +2263,7 @@ export class TsTuiMvpApp {
         else { this.overlays.flash("No Finder window focused"); }
       },
       finderShare: (args) => {
-        const mode = typeof args?.mode === "string" ? args.mode : "path";
+        const mode = typedArg(args, "mode", "string") ?? "path";
         const finder = this.getFocusedFinder();
         if (!finder) { this.overlays.flash("No Finder window focused"); return; }
         if (mode === "contents") { finder.yankContents?.(); }
@@ -2335,7 +2275,7 @@ export class TsTuiMvpApp {
 
       // ── Canvas documents ─────────────────────────────────
       loadCanvas: (args) => {
-        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        const filePath = typedArg(args, "filePath", "string") ?? "";
         if (!filePath) {
           this.overlays.flash("canvas.load requires filePath arg");
           return;
@@ -2352,12 +2292,12 @@ export class TsTuiMvpApp {
         }
       },
       exportCanvas: (args) => {
-        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        const filePath = typedArg(args, "filePath", "string") ?? "";
         if (!filePath) {
           this.overlays.flash("canvas.export requires filePath arg");
           return;
         }
-        const title = typeof args?.title === "string" ? args.title : "Untitled Canvas";
+        const title = typedArg(args, "title", "string") ?? "Untitled Canvas";
         try {
           const windows = this.windowManager.getWindows();
           const yaml = exportCanvasDocument(windows, this.windowManager, title);
@@ -2391,7 +2331,7 @@ export class TsTuiMvpApp {
 
       // ── Ghostty shader control (logic in ghostty-shader-service.ts) ──
       ghosttyShaderSet: (args) => {
-        const name = typeof args?.name === "string" ? args.name : "";
+        const name = typedArg(args, "name", "string") ?? "";
         return shaderSet(name);
       },
       ghosttyShaderList: () => {
