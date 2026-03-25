@@ -215,3 +215,31 @@ That closes the loop. The system doesn't just describe itself. It nudges itself 
 | `MODULE_MANIFEST` with string arrays | `MODULE_MANIFEST` with `ModuleId` type constraints |
 | ARCHITECTURE.md parallel to manifest | ARCHITECTURE.md points to manifest |
 | Passive reporting | Pre-commit health warning |
+
+---
+
+## Second adversarial pass — resolving tensions in this critique
+
+This critique was itself reviewed for internal tensions. Four were found and resolved:
+
+### Tension 1: dependency-cruiser recommendation vs zero-dep philosophy
+**This critique said:** Use dependency-cruiser with generated config.
+**Second pass found:** `madge` is already in the toolchain (`bun run health` uses `npx madge --circular`). dep-cruiser overlaps with madge on circular deps and graph generation. check-coat already does boundary enforcement.
+**Resolution:** Don't add dependency-cruiser. Extend check-coat (~50-80 LOC) + keep madge. Zero new deps.
+
+### Tension 2: "Extend check-coat" vs "use ts-arch" (contradictory recommendations)
+**This critique said:** Both "extend check-coat" (Critique 2) and implicitly endorsed ts-arch (from research doc).
+**Second pass found:** check-coat's string-matching approach already works for microapp boundaries. Same pattern handles src/ subdirectory boundaries. ts-arch would be a new dep for the same capability.
+**Resolution:** Extend check-coat. One tool, one command, already Bun-native.
+
+### Tension 3: Level 3 "trivial — 20 lines" estimate
+**This critique said:** Level 3 is 20 lines of code.
+**Second pass found:** Persist JSON (5 LOC) + read previous (5 LOC) + semantic diff, not JSON diff (50-80 LOC) + format output (20 LOC) = ~80-100 LOC.
+**Resolution:** Still worth building day one. Corrected estimate in vision and summary docs.
+
+### Tension 4: Pre-commit hook warns-not-blocks + performance concern
+**This critique said:** Warns-not-blocks.
+**Second pass found:** Running analysis on 150 files in a pre-commit hook could be slow (>2s). Blocking would lead to `--no-verify` muscle memory.
+**Resolution:** Scope to changed files only (`git diff --name-only`). Keep warns-not-blocks. If still slow, relegate to parking lot.
+
+All resolved decisions have been propagated to 02-vision.md, 03-candidates-and-ranking.md, 04-summary.md. Relegated ideas collected in 07-parking-lot.md.
