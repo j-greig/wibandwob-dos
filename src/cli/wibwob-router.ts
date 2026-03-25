@@ -39,10 +39,9 @@ export interface RouteResult {
 }
 
 export interface InstanceInfo {
-  /** Unix socket path if available. */
   socket?: string;
-  /** HTTP port if available. */
   port?: number;
+  label?: string;
 }
 
 // ── File-type → command mapping ──────────────────────────
