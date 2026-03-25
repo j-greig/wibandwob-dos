@@ -15,6 +15,7 @@ import path from "node:path";
 import { log } from "../services/app-logger.js";
 import { typedArg, trimmedArg, enumArg, clampedArg } from "./arg-helpers.js";
 import { shaderSet, shaderList, shaderStatus, shaderLabel } from "../services/ghostty-shader-service.js";
+import { createMcpServer } from "../services/mcp-server.js";
 import {
   resolveSmearSource as fxResolveSmearSource,
   runFxScript as fxRunFxScript,
@@ -217,6 +218,9 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  // MCP server for external agent access (stdio + httpStream)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mcpServer?: { start: (opts: any) => Promise<void>; stop: () => Promise<void> };
   private readonly runtimeCommands: RuntimeCommandService;
   private readonly runtimeInspection: RuntimeInspectionService;
   private readonly runtimeWindows: RuntimeWindowService;
@@ -554,10 +558,22 @@ export class TsTuiMvpApp {
     // Consumer health gate in resolveBase warns/refuses headless (screen ≤1×1) targets.
     this.controlApi.start();
 
-    // Update env var with actual bound port (may differ from requested 8099)
+    // Start MCP server for external agent access (after HTTP API is listening)
     const apiStatus = this.controlApi.getStatus();
     if (apiStatus.baseUrl) {
-      process.env.WIBWOB_API_BASE_URL = apiStatus.baseUrl;
+      const mcpBaseUrl = apiStatus.baseUrl;
+      this.mcpServer = createMcpServer({ apiBaseUrl: mcpBaseUrl });
+      // httpStream transport on port+10 — pi connects via scripts/mcp-bridge.mjs
+      // (stdio transport can't work here: blessed TUI owns stdin/stdout)
+      const port = parseInt(new URL(mcpBaseUrl).port || "8099", 10);
+      this.mcpServer.start({ transportType: "httpStream", httpStream: { port: port + 10 } });
+      log.app(`MCP server started on httpStream:${port + 10}`);
+    }
+
+    // Update env var with actual bound port (may differ from requested 8099)
+    if (this.mcpServer) {
+      // Already have the baseUrl from MCP startup above
+      process.env.WIBWOB_API_BASE_URL = apiStatus.baseUrl!;
     }
 
     this.persistState();
