@@ -130,7 +130,6 @@ export function openFileManagerWindow(params: {
     }
   };
 
-  // §6 DRY — extension→color mapping used by preview pane and icon views
   const extColor = (ext: string): string =>
     [".md", ".txt"].includes(ext) ? "green"
       : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"

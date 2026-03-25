@@ -32,7 +32,6 @@ export * from "./patterns.js";
  * This helper replaces the repetitive `(list as List & { selected: number }).selected ?? 0`
  * cast pattern scattered across window files.
  *
- * §6 Say Things Once — one cast, used everywhere.
  */
 export function getSelectedIndex(list: import("blessed").Widgets.ListElement): number {
   return (list as import("blessed").Widgets.ListElement & { selected: number }).selected ?? 0;

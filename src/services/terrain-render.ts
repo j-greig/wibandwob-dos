@@ -102,7 +102,6 @@ function renderContourCell(char: string, map: TerrainMap, x: number, y: number, 
 // Ported from scratch/iso_view.py — see that file for algorithm notes.
 // ---------------------------------------------------------------------------
 
-// §19 Named Constants — rendering tuning parameters
 const FP_FOV = Math.PI / 2.4;             // horizontal field of view (radians)
 const FP_HORIZON_FRACTION = 0.38;         // base horizon as fraction of screen height
 const FP_HORIZON_PITCH_SCALE = 0.5;       // pitch sensitivity for horizon shift
@@ -122,7 +121,6 @@ const FP_NEAR_BAND = 0.2;                 // distance fraction threshold for nea
 const FP_MID_BAND = 0.5;                  // distance fraction threshold for mid band
 const FP_FAR_CLIFF_BAND = 0.6;            // distance fraction threshold for far cliff band
 
-// §6 DRY — biome colour maps used by renderFirstPerson (hoisted to module scope)
 const FP_BIOME_COLORS_NEAR: Record<TerrainBiome, string> = {
   "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
   "plain": "green", "forest": "light-green", "hill": "white",

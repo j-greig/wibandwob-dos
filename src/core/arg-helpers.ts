@@ -4,9 +4,6 @@
  * Eliminates repetitive `typeof args?.x === "string" ? args.x : undefined`
  * guards scattered across app-controller, control-api, and snapshot-registry.
  *
- * §6 Say Things Once — single implementation of safe arg extraction.
- * §9 Guard Clauses — early returns baked into the helper.
- * §29 Narrow First — runtime narrowing, no `as` casts.
  */
 
 type ArgType = "string" | "number" | "boolean";
