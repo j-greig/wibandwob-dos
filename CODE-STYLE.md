@@ -1,149 +1,312 @@
 # Code Quality Best Practices — TypeScript Edition
 
-30 principles for TypeScript codebases. The first 26 are adapted from Kent Beck's *Smalltalk Best Practice Patterns*, rewritten for TypeScript's type system, structural typing, and ecosystem conventions. The last 4 are TS-native principles that Beck's Smalltalk couldn't anticipate.
+> These principles operate within the constraints of [`PHILOSOPHY.md`](PHILOSOPHY.md) (decision filters, SDK contract) and [`ARCHITECTURE.md`](ARCHITECTURE.md) (COAT, shell invariants).
 
-**Prerequisite:** `strict: true` in `tsconfig.json`. These principles assume the compiler is already catching `null`, uninitialized fields, implicit `any`, and unsafe operations. If strict mode is off, enable it before applying anything here.
+30 principles for TypeScript codebases. The first 26 are adapted from Kent Beck's *Smalltalk Best Practice Patterns*, rewritten for TypeScript's type system, structural typing, runtime boundaries, and modern toolchain realities. The last 4 are TypeScript-native principles.
+
+This version is tuned for **WibWob-DOS**: a small, legible, terminal-native host with thin adapters, explicit seams, agent-readable state, and composition over framework sprawl.
+
+**Prerequisite:** `strict: true` in `tsconfig.json`. Also treat type-checking as a distinct correctness gate in CI. Modern runtimes and bundlers can execute or transpile TypeScript without actually checking it.
 
 ---
 
 ## 1. Composed Method
 
-Divide every function into sub-functions that each perform one identifiable task. Keep all operations at the same level of abstraction. This naturally produces many small functions, each a few lines long.
+In WibWob-DOS terms: **services own logic, windows own wiring**.
+
+Divide every function into sub-functions that each perform one identifiable task. Keep all operations at the same level of abstraction. The body should read as a sequence of named intentions, not a pile of mixed detail.
+
+If one function is discovering files, mutating state, styling widgets, and binding keys, it is already at the wrong abstraction level.
+
+This also tends to produce more testable code. Small functions with clear inputs and outputs are easier to verify than large closures full of hidden setup and mixed concerns.
 
 ## 2. Intention-Revealing Names
 
 Name functions after what they accomplish, never how they accomplish it. A reader should understand the purpose of a call without reading its body.
 
+Prefer names that expose the domain role clearly: `restoreWorkspace`, `describeState`, `applyThemeToChrome`, `runCommandById`.
+
 ## 3. Replace Comments with Clear Code
 
-If a comment restates what the code does, delete it. If you can't delete a comment, refactor the code (extract a well-named function, rename a variable) until the comment is redundant. Reserve comments for *why*, not *what*. TypeScript's type annotations already document *what* — let them.
+If a comment restates what the code does, delete it. If you can't delete a comment, refactor the code until the comment becomes redundant.
+
+Reserve comments for one of four things only:
+
+* why a decision exists
+* an external constraint
+* a non-obvious invariant
+* a deliberate trade-off
+
+Type annotations, discriminants, and function names should carry most of the "what".
 
 ## 4. Constructor Clarity
 
-Provide factory functions or typed constructors that produce fully-formed values. Leverage `strictPropertyInitialization` in classes. In functional code, return complete typed objects from factories — never expose `Partial<T>` as a creation API. Callers should never receive half-initialized values.
+Provide factory functions or typed constructors that produce fully-formed values. Never expose half-built values as a public creation style.
+
+Avoid returning `Partial<T>` from creation APIs. Internally, `Partial<T>` may be useful during assembly. Externally, it weakens the contract and leaks construction order.
+
+For host systems, prefer factories that encode invariants once: `createWindowHandle`, `createThemeTokens`, `createCommandRegistry`.
 
 ## 5. Single Responsibility for Methods
 
-Each function should have exactly one reason to change. If a function requires a paragraph to explain, it is doing too much.
+Each function should have one reason to change. If a function needs a paragraph to explain, split it.
+
+A good test: when a bug appears, can you name one concept that owns the fix? If not, the function is mixing responsibilities.
 
 ## 6. Say Things Once and Only Once
 
-Every piece of knowledge should exist in exactly one place — at both the value level and the type level. Use utility types (`Pick`, `Omit`, `Partial`, `Required`) and type inference (`typeof`, `ReturnType`, `Parameters`) to derive types from a single source rather than duplicating definitions. Duplicate code is a multiple-update liability — extract it.
+Every piece of knowledge should exist in exactly one place: at the value level, type level, or behavior level.
+
+Use TypeScript to derive types from real values instead of duplicating shape definitions by hand. Prefer `typeof`, `ReturnType`, `Parameters`, indexed access types, and utility types over manually mirrored declarations.
+
+This rule also applies at the architectural level.
+
+In WibWob-DOS, **the command catalog is the source of truth**, not a second copy in API glue, menus, docs, or agent tooling.
 
 ## 7. Behavior Over State
 
-Get the behavior (public interface) right first. Internal representation can always change later if it's hidden behind a clean API. TypeScript's structural typing reinforces this — consumers depend on shape, not identity.
+Get the behavior right first. Internal representation can change later if it stays hidden behind a stable interface.
+
+Structural typing amplifies this principle. Consumers depend on shape and capability, not lineage. Design the public seam first; optimize storage later.
 
 ## 8. Intention-Revealing Function Names
 
-Name functions after the concept they represent, not the algorithm they use. `includes(item)` is better than `linearSearchFor(item)`. Imagine a second, very different implementation — would you give it the same name? If not, generalize.
+Name functions after the concept they represent, not the algorithm they use. `focusWindow`, `captureText`, and `persistWorkspace` are better than `walkWindowList`, `stringifyBox`, or `saveJsonToDisk` when the higher-level concept is what matters.
+
+If a different implementation would require a different name, the current name is too coupled to mechanism.
 
 ## 9. Guard Clauses Over Deep Nesting
 
-Handle edge cases and error conditions at the top of a function and return early. The main logic path should read without indentation. TypeScript's type narrowing makes guard clauses especially powerful — an early `if (!x) return` narrows the type of `x` in the rest of the function automatically.
+Handle edge cases and invalid states at the top and return early. The main path should read left-to-right without excessive indentation.
+
+This is especially strong in TypeScript because guard clauses improve narrowing. An early return removes uncertainty from the rest of the function and reduces assertion pressure.
 
 ## 10. Query Methods Return; Commands Mutate
 
-Separate functions that answer questions (return a value, no side effects) from functions that change state. Name query methods with `is`, `has`, `can` prefixes for booleans. Enforce the boundary with `readonly` return types for queries and `void` returns for commands.
+Separate functions that answer questions from functions that change state.
+
+Queries should be safe to call repeatedly and should not surprise the caller with side effects. Commands should mutate deliberately and be named as actions.
+
+In a shared human/agent runtime, this boundary matters even more. If a method both inspects and mutates, automation becomes harder to trust.
 
 ## 11. Explaining Variables
 
-When a complex expression is hard to read, assign its result to a well-named local variable. The variable name becomes the explanation — and in TypeScript, it also carries an inferred type.
+When an expression is hard to read, assign it to a well-named local. The local name becomes the explanation.
+
+This is not about adding temporary clutter. It is about naming an intermediate concept once so the reader does not need to re-parse the expression mentally.
 
 ## 12. Role-Suggesting Names
 
-Name variables after the role they play, not their type. `employees` not `employeeList`; `query` not `queryString`. TypeScript's type annotations and hover tooltips make encoding the type in the name doubly redundant.
+Name variables after the role they play, not their type. `theme`, `layout`, `command`, `summary`, `selection`, `snapshot` are better than `themeObject`, `layoutData`, `commandArray`, or `summaryString`.
+
+TypeScript already carries type information. Repeating it in names adds noise.
 
 ## 13. Discriminated Unions Over Repeated Conditionals
 
-When the same if/switch structure appears in multiple places, eliminate it. In TypeScript, prefer discriminated unions with exhaustive `switch` (enforced via `never` or `satisfies never`) when operations evolve faster than data types. Use class polymorphism when data types evolve faster than operations. The goal is the same — adding a new case shouldn't require editing existing code.
+When the same `if` or `switch` pattern appears in many places, eliminate it.
+
+In TypeScript app code, prefer discriminated unions with exhaustive switches when modeling evolving states and message shapes.
+
+In this codebase, class polymorphism is rare and should stay that way. Reach for it only when object lifecycle and encapsulated behavior genuinely justify it.
+
+For WibWob-DOS, state machines, command results, load states, theme modes, and window kinds should usually be modeled as explicit unions rather than boolean soup.
 
 ## 14. Compose, Don't Inherit
 
-Share implementation by composing functions, passing work to collaborator values, or injecting dependencies — not by subclassing. In functional TypeScript, higher-order functions and closures replace object delegation. Structural typing means collaborators need the right shape, not the right class.
+Share behavior by composing functions, strategies, small helpers, and collaborator values. Avoid subclass trees.
+
+Composition fits TypeScript's structural system, keeps seams thin, and aligns with the host philosophy: **small stable surfaces, mutable implementation**.
+
+If a new variant only swaps one or two behaviors, it does not need a subclass.
 
 ## 15. Extract Complex Logic into Dedicated Units
 
-When a function has grown huge and shares many temporaries, extract the computation into its own module-level function. Pass shared context as a typed options object. Use closures to capture intermediate state. Reserve a dedicated class only when the computation has genuine lifecycle needs (setup, compute, teardown).
+When a function grows large because it juggles too many temporaries or stages, extract the computation into a dedicated unit.
+
+In WibWob-DOS, that usually means a module-level function or a focused service. Services are the normal home for extracted logic that needs a named owner or a stable seam. Introduce a new class only when there is real lifecycle, identity, or evolving internal state to manage.
+
+Parsing, measuring, discovering, transforming, persisting, and aggregating belong in services or dedicated functions, not inside windows.
 
 ## 16. Resource Bracketing
 
-When two actions must always happen together (acquire/release, open/close, lock/unlock), use TypeScript 5.2+ `using` declarations with `Disposable`/`AsyncDisposable` for resource lifecycle. For non-resource bracketing (transactions, timing), use the callback wrapper pattern. The caller should never be responsible for the second action.
+When two actions must always happen together, make that pairing explicit in code.
+
+Use `using` / `await using` when your runtime and target support explicit resource management cleanly. Otherwise, use `try/finally` or a callback wrapper that guarantees cleanup.
+
+The caller should never have to remember the second half manually.
 
 ## 17. Explicit Initialization
 
-Initialize all state at construction time. Enable `strictPropertyInitialization` so the compiler catches uninitialized fields. In functional code, define complete required types and let the compiler reject incomplete objects. Never rely on callers to set fields in the right order after creation.
+Initialize required state at construction time. Make illegal states impossible to create.
+
+Avoid post-construction setup phases for public values. If something is required, require it now.
+
+This applies equally to class fields, factory outputs, and semantic state returned from adapters. A window description that might or might not have a `summary` is not explicit enough.
 
 ## 18. Lazy Initialization
 
-When computing or fetching a value is expensive and may not be needed, defer it to first access. The `??=` operator makes the pattern concise: `return this._cache ??= expensiveComputation()`.
+When a value is expensive and may not be needed, defer it to first access. Use lazy initialization deliberately, not as a substitute for uncertain ownership.
+
+`??=` is the normal form when caching a stable derived value.
+
+Do not use laziness to hide an ownership problem. If a value is lazy only because nobody knows which module or service should create it, fix the ownership first. Lazy values still need a clear owner and reset story.
 
 ## 19. Named Constants Over Magic Literals
 
-Replace magic literals with named constants. Use `as const` objects with derived union types (`typeof X[keyof typeof X]`) rather than enums. Use `satisfies` to validate constants against a type without widening. Avoid `const enum` in shared libraries — it breaks `isolatedModules`.
+Replace unexplained literals with named constants.
+
+Prefer `as const` objects with derived union types over enums for most application code. Use `satisfies` to validate shape without widening.
+
+Good constants explain domain meaning: command IDs, theme names, layout bounds, animation ceilings, file roots, default retry counts.
 
 ## 20. Start with Plain Fields
 
-Don't preemptively wrap fields in getters/setters. TypeScript's native `get`/`set` accessors let you add validation, computation, or side effects later without changing the API. Start with plain public properties. In functional code, prefer `readonly` properties over getters/setters.
+Do not preemptively hide every field behind getters and setters. Start with the simplest representation that preserves invariants.
+
+In TypeScript, plain `readonly` fields and plain object properties are often enough. Add accessors later only when they add real behavior or validation.
 
 ## 21. Immutable Collections by Default
 
-Never return a mutable collection from a function. Use `ReadonlyArray<T>`, `Readonly<T>`, and `as const` to prevent mutation at compile time. Mutate only in controlled scope (inside a function, before returning a readonly type). Reserve defensive copies for boundaries where TypeScript's type system doesn't reach (external JS consumers).
+Do not expose mutable collections casually. Use `readonly` arrays, readonly object shapes, and immutable return values by default.
+
+Mutation is allowed inside a controlled scope with a clear owner. Once data crosses a module boundary, prefer a readonly surface.
+
+This is especially important in shared-state runtimes: hidden mutation multiplies debugging cost for both humans and agents.
 
 ## 22. Explicit Collaboration Interfaces
 
-When two modules collaborate heavily, define an explicit interface or type alias for the messages between them. TypeScript's structural typing ensures any value with the right shape satisfies the contract. In functional code, the protocol is the callback/function type. Name collaborating interfaces coherently so a third party can implement the same shape.
+When modules collaborate heavily, define an explicit protocol between them.
+
+That protocol can be an interface, a type alias, a discriminated union, or a function signature. The key is that both sides agree on a named seam.
+
+In WibWob-DOS this is central: `WindowFacade`, command definitions, microapp host handles, state descriptions, snapshot payloads, and API responses should all be deliberate contracts.
 
 ## 23. Pluggable Behavior Over Subclass Explosion
 
-When many variants differ in only one or two behaviors, accept strategy functions (callbacks/lambdas) instead of creating subclasses. Use a typed options object when multiple behaviors are pluggable. Constrain strategy types with generics. Reserve class hierarchies for genuinely different families of behavior.
+When variants differ in only one or two behaviors, accept strategy functions or typed options instead of building a family tree.
+
+Use callbacks, function-valued fields, or small strategy objects. Keep the host stable and let behavior swap at the edge.
 
 ## 24. Collecting Parameter
 
-When multiple sub-functions need to contribute to a single result collection, pass the collection as a parameter rather than concatenating return values or stashing state in a field.
+When several sub-functions contribute to one result, pass the accumulating structure explicitly instead of hiding it in outer state or concatenating partial fragments blindly.
+
+Use this carefully. It clarifies ownership when building command lists, diagnostics, registries, manifests, or layout plans.
+
+If the collecting parameter starts acquiring unrelated responsibilities, extract a dedicated builder.
 
 ## 25. Intentional Return Values
 
-A function should return a value only when the caller needs it. TypeScript's `void` return type makes this explicit — if a function returns `void`, the caller knows not to use the return value. Don't return internal state by default — return something meaningful or nothing at all.
+A function should return a value only when the caller needs one. Do not return internal state just because it is available.
+
+Use `void` when mutation or signaling is the entire point. Use a meaningful return type when the caller truly needs the result.
+
+Avoid vague mixed patterns like mutating internal state and also returning a maybe-useful object unless that contract is explicit and justified.
 
 ## 26. Adopt Patterns Incrementally
 
-Don't try to apply all rules at once. Write code, notice friction, then apply the pattern that resolves it. Patterns are refactoring targets, not upfront mandates. Clean up as you go. This applies to TypeScript's own strict mode flags too — enable them one at a time when migrating.
+Do not cargo-cult all 30 rules into every file at once. Use them as refactoring targets and review language.
+
+The right pattern appears when the wrong shape starts hurting. Clean code is often the residue of many small corrections, not one grand rewrite.
+
+For planned refactors, apply the rules systematically to the files in scope. For everyday work, raise standards in layers: strictness, seams, runtime validation, import hygiene, then deeper shape improvements.
 
 ---
 
 ## TypeScript-Native Principles
 
-These address concepts that have no equivalent in Beck's Smalltalk — they arise from TypeScript's static type system, structural typing, and the JS runtime.
+These address concerns that arise from TypeScript's static type system, JavaScript runtime boundaries, and modern tooling.
 
-## 27. Discriminated Unions for State Modeling
+## 27. Model State and Messages as Discriminated Unions
 
-Model mutually exclusive states as discriminated unions with a literal tag property (`type`, `kind`, `status`). Use exhaustive `switch` with `never` or `satisfies never` to catch unhandled cases at compile time. Prefer `type` aliases for unions; use `interface` when declaration merging or extension is needed.
+Represent mutually exclusive states, events, and results as discriminated unions with a literal tag such as `kind`, `type`, or `status`.
 
-```typescript
-type Result<T, E> =
-  | { ok: true; data: T }
-  | { ok: false; error: E };
-```
+Use exhaustive `switch` and force the impossible case to `never`.
 
-## 28. Branded Types for Semantic Safety
-
-When primitive types carry semantic meaning (UserId vs PostId, Pixels vs Rem), use branded types to get nominal typing within TypeScript's structural system. Zero runtime cost, catches category errors at compile time.
+This is the default modeling tool for app-level workflows. It keeps control flow honest, makes state transitions legible, and works well for agent-readable state surfaces.
 
 ```typescript
-type UserId = string & { readonly __brand: unique symbol };
+type LoadState<T> =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ready"; value: T }
+  | { kind: "error"; error: Error };
 ```
 
-## 29. Type Narrowing as Control Flow
+## 28. Brand Types Only Where Semantic Confusion Is Expensive
 
-Use TypeScript's narrowing (`typeof`, `instanceof`, `in`, discriminant checks, custom type predicates) as the primary mechanism for safe branching. Favor narrowing over type assertions (`as`). Write assertion functions (`asserts value is T`) for validation boundaries. Every `as` cast is a place where the compiler stopped helping you.
+Use branded types when two values share the same runtime representation but mean different things and confusion would be costly.
 
-## 30. Make Error States Visible in Types
+Typical cases: IDs from different domains, file-system roots vs arbitrary paths, terminal cells vs pixels, window IDs vs command IDs.
 
-Make error paths visible in the type system. Use discriminated union Result types to force callers to handle errors. Reserve `try/catch` for boundaries with external code and truly exceptional conditions. Use `unknown` (never `any`) in catch blocks.
+Do not brand everything. Branding is a precision tool, not a lifestyle. Use it where structural typing is too permissive for the domain.
+
+## 29. Narrow First; Assert Last
+
+Use narrowing as the primary way to make code safe: `typeof`, `instanceof`, `in`, discriminants, custom predicates, and assertion functions.
+
+Treat `as` as a last resort at boundaries where the compiler cannot follow reality. Every assertion should answer a hard question: why is this safe here?
+
+Prefer `unknown` over `any` at uncertain boundaries. Force proof before use.
+
+## 30. Validate at Runtime Boundaries; Make Failures Visible in Types
+
+TypeScript does not validate runtime data. Any value from JSON, env vars, user input, IPC, file contents, HTTP, plugin boundaries, or external libraries is untrusted until checked.
+
+Validate boundary data explicitly, then convert it into trusted domain values. After that, model fallible outcomes in the type system so callers must handle them.
+
+Use discriminated `Result`-style unions, explicit error states, or typed failure variants. Reserve thrown exceptions for truly exceptional situations or outer boundaries.
+
+As a general direction in this codebase, services should return typed results where failure is expected. Windows, CLI adapters, HTTP adapters, and other boundary layers may catch and translate errors at the edge.
+
+For WibWob-DOS this rule is foundational: **user-visible surfaces must also be machine-readable surfaces**, and that only stays reliable when boundary data is validated and failure modes are made explicit.
+
+---
+
+## WibWob-DOS Addendum
+
+These are not extra rules. They are the project-specific reading of the 30 rules above.
+
+### A. Code style serves architecture
+
+A style rule is good only if it reinforces the runtime's real shape:
+
+* command once, adapt thin
+* one concept, one owner
+* services own logic, windows own wiring
+* user-visible means API-visible
+* SDK surface stable, implementation mutable
+
+### B. Thin adapters beat clever abstractions
+
+TUI glue, CLI glue, HTTP glue, agent glue, and microapp glue should stay thin. Do not bury core behavior in adapters.
+
+### C. Agent-readable state is a first-class code quality concern
+
+Anything important to a human should be representable semantically to an agent. `describeState()`, explicit summaries, typed command surfaces, and readable errors are part of clean code here, not afterthoughts.
+
+### D. Prefer boring TypeScript
+
+Use the type system aggressively for safety, but not theatrically. Avoid elaborate type-level puzzles in application code when a clearer runtime model or simpler union would do.
+
+Fast understanding beats clever compression.
+
+### E. Modules and imports are part of code style
+
+Use the import style that matches the real runtime.
+
+In this codebase, prefer relative imports with `.js` extensions where the runtime expects them. Use `import type` for type-only imports. Avoid path aliases unless there is a clear, project-wide reason to introduce them. The import path should show the real dependency, not hide it behind convenience.
+
+### F. Type-checking is mandatory, transpilation is not enough
+
+A passing bundle is not evidence of a safe program. `tsc --noEmit` or project-build type-checking belongs in the normal workflow.
 
 ---
 
 ## How to Use This File
 
-Reference a principle by number (e.g., "Principle 13: discriminated unions over repeated conditionals") during code review, pair programming, and AI-assisted development. Principles 1–26 are Beck-derived and universal in spirit. Principles 27–30 are TypeScript-specific and have no equivalent in other paradigms.
+Reference a principle by number during code review, refactoring, and AI-assisted development.
+
+Use the early rules to improve readability and ownership. Use the later TypeScript rules to harden contracts, boundary safety, and state modeling. When two rules seem to compete, prefer the version that produces a smaller, clearer, more explicit seam.
+
+The target is a codebase that stays legible under pressure: agent-operated, API-driven, self-documenting and self-improving when possible.
