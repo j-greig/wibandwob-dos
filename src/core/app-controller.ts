@@ -1891,7 +1891,11 @@ export class TsTuiMvpApp {
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
-      closeWindowById: (args) => { this.windowManager.closeWindow(Number(args?.id)); },
+      closeWindowById: (args) => {
+        const id = Number(args?.id);
+        if (!this.windowManager.getWindowById(id)) return { ok: false, error: `Window ${id} not found` };
+        this.windowManager.closeWindow(id);
+      },
       setWindowChrome: (args) => {
         const id = Number(args?.id);
         const mode = String(args?.mode ?? "standard") as "standard" | "none";
@@ -1899,7 +1903,10 @@ export class TsTuiMvpApp {
           return { ok: false, error: `Window ${id} not found` };
         }
       },
-      focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
+      focusWindowById: (args) => {
+        const ok = this.windowManager.focusWindowById(Number(args?.id));
+        if (!ok) return { ok: false, error: `Window ${Number(args?.id)} not found` };
+      },
       clickWindowElement: (args) => {
         const id = Number(args?.id);
         const label = typedArg(args, "label", "string");
@@ -2086,12 +2093,13 @@ export class TsTuiMvpApp {
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       toggleMaximizeFocused: (args?: Record<string, unknown>) => {
-        const wId = typedArg(args, "windowId", "number");
+        const wId = typedArg(args, "windowId", "number") ?? typedArg(args, "id", "number");
         const byId = wId !== undefined
           ? this.windowManager.getWindowById(wId)
           : undefined;
         const target = byId ?? this.windowManager.getFocusedWindow();
-        if (target) this.windowManager.toggleMaximize(target);
+        if (!target) return { ok: false, error: "No window to maximize" };
+        this.windowManager.toggleMaximize(target);
       },
       openGallery: () => this.openHostWindow("primer-gallery"),
       openBrowserReader: (args) => {

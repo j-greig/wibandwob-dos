@@ -393,7 +393,7 @@ function buildRoutes(): RouteDefinition[] {
     {
       method: "POST", path: "/windows/focus", description: "Focus a window by id",
       body: { id: "number" },
-      handler: { post: (body, ctx) => ({ ok: ctx.deps.windows.focus(Number(body.id)) }) },
+      handler: { commandId: "window.focus", argsMapper: (b) => ({ id: Number(b.id) }) },
     },
     {
       method: "POST", path: "/windows/click", description: "Click a named element in a window.",
@@ -425,12 +425,12 @@ function buildRoutes(): RouteDefinition[] {
     {
       method: "POST", path: "/windows/close", description: "Close a window by id",
       body: { id: "number" },
-      handler: { post: (body, ctx) => ({ ok: ctx.deps.windows.close(Number(body.id)) }) },
+      handler: { commandId: "window.close", argsMapper: (b) => ({ id: Number(b.id) }) },
     },
     {
       method: "POST", path: "/windows/maximize", description: "Toggle maximize for a window",
       body: { id: "number" },
-      handler: { post: (body, ctx) => ({ ok: ctx.deps.windows.toggleMaximize(Number(body.id)) }) },
+      handler: { commandId: "window.toggle_maximize", argsMapper: (b) => ({ id: Number(b.id) }) },
     },
     {
       method: "POST", path: "/windows/batch", description: "Move/resize/close multiple windows in one request.",
