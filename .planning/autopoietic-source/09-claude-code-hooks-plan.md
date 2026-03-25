@@ -234,3 +234,42 @@ True — P10 (Query/Command), P13 (Discriminated Unions), P14 (Compose Don't Inh
 **"Three hooks? The project already has 10. Isn't this bloat?"**
 
 The existing 10 hooks cover planning, commit format, file naming, desktop state, context management. None of them check code quality. These 3 fill a real gap. And the total hook count (13) is reasonable for a project of this size.
+
+---
+
+## Prior art: pi-system-reminders
+
+> Prompted by: https://github.com/Michaelliv/pi-system-reminders
+
+This open-source repo provides 13 example reminders that monitor Claude Code agent behavior and inject steering guidance at critical moments. Here's how they map to our planned hooks:
+
+| pi-system-reminder | Our planned hook | Match? |
+|---|---|---|
+| **file-churn** (same file edited 5+ times) | **Hook 1: PostToolUse principle mirror** | Directly relevant — file churn is a symptom of P1/P5 violations. If Claude keeps editing the same file, the file is probably too big or doing too much. |
+| **bash-spiral** (3 consecutive bash failures) | — | Not code-quality related, but good general hygiene. Already useful as-is. |
+| **prefer-edit** (3+ writes to same file → suggest Edit) | **Hook 1: PostToolUse principle mirror** | Adjacent — our hook catches the *quality* of what's written, prefer-edit catches the *method* of writing. Complementary. |
+| **read-before-edit** (edit with stale content) | — | Not principle-related, but prevents bugs. Good general practice. |
+| **context-large** / **token-usage** | — | Not principle-related, but the project already has a context window warning hook. |
+| **post-compaction** (file contents lost after compaction) | — | Not principle-related but operationally important. |
+| **task-tools-reminder** (20 tool calls without task update) | — | Not directly related, but interesting for discipline. |
+
+### The strongest overlap is `file-churn`
+
+It's a proxy for exactly what we care about — if Claude is churning on a file, that file likely violates P1 (Composed Method) or P5 (Single Responsibility). Our principle mirror hook would catch the *cause* (file too big, function too long), while file-churn catches the *symptom* (repeated edits).
+
+### What we should steal
+
+- **file-churn** — adopt it, and enhance the message to reference the specific principle being violated ("This file has been edited 5 times. Consider P1: Composed Method — is this file doing too much?")
+- **prefer-edit** — adopt as-is, it's good hygiene
+- **bash-spiral** — adopt as-is, prevents agent frustration loops
+
+### What we don't need from pi-system-reminders
+
+- context-large / token-usage — already have a context window hook
+- session-resumed — already have session-context.sh
+- malware-awareness — not relevant to this codebase
+- file-empty / file-truncated — nice-to-have but low priority
+
+### Two complementary layers
+
+The pi-system-reminders are *behavioral guardrails* (stop the agent doing dumb things). Our planned hooks are *quality guardrails* (stop the agent writing bad code). They're complementary layers — pi catches process problems, ours catch product problems.
