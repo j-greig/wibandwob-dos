@@ -39,10 +39,9 @@ export interface RouteResult {
 }
 
 export interface InstanceInfo {
-  /** Unix socket path if available. */
   socket?: string;
-  /** HTTP port if available. */
   port?: number;
+  label?: string;
 }
 
 // ── File-type → command mapping ──────────────────────────
@@ -258,9 +257,10 @@ export async function dispatch(
   instance: InstanceInfo,
   result: RouteResult,
 ): Promise<boolean> {
-  const baseUrl = instance.socket
-    ? `unix://${instance.socket}:`
-    : `http://127.0.0.1:${instance.port}`;
+  const baseUrl = `http://127.0.0.1:${instance.port}`;
+  const fetchOpts: Record<string, unknown> = instance.socket
+    ? { unix: instance.socket }
+    : {};
 
   for (const cmd of result.commands) {
     try {
@@ -269,6 +269,7 @@ export async function dispatch(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: cmd.id, args: cmd.args }),
         signal: AbortSignal.timeout(5000),
+        ...fetchOpts,
       });
       if (!resp.ok) {
         console.error(`Command ${cmd.id} failed: ${resp.status} ${resp.statusText}`);

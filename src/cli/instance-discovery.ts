@@ -237,14 +237,14 @@ export async function probeInstanceHealth(
  */
 export async function discoverInstance(
   projectRoot?: string,
-): Promise<{ socket?: string; port?: number } | null> {
+): Promise<{ socket?: string; port?: number; label?: string } | null> {
   // Use the standard instance scanning
   const alive = findAliveInstances();
 
   for (const inst of alive) {
     const health = await probeInstanceHealth(inst.socketPath, 1000);
     if (health) {
-      return { socket: inst.socketPath, port: health.port };
+      return { socket: inst.socketPath, port: health.port, label: health.instanceLabel ?? undefined };
     }
   }
 

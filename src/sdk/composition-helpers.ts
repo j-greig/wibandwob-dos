@@ -14,6 +14,17 @@
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 
+type ThemeTokens = ReturnType<typeof theme>;
+
+/** Scrollbar config block used by all scrollable SDK widgets. */
+function scrollbarConfig(t: ThemeTokens) {
+  return {
+    ch: "▐",
+    track: { bg: t.scrollbar.track },
+    style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
+  };
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export interface StatusBarOptions {
@@ -160,9 +171,9 @@ export function createStatusBar(
     update(o) {
       if (o.left !== undefined) left = o.left;
       if (o.right !== undefined) right = o.right;
-      const t2 = theme();
-      el.style.fg = t2.footer.fg;
-      el.style.bg = t2.footer.bg;
+      const current = theme();
+      el.style.fg = current.footer.fg;
+      el.style.bg = current.footer.bg;
       render();
     },
     destroy() {
@@ -195,11 +206,7 @@ export function createTextViewer(
     scrollable: true,
     alwaysScroll: true,
     wrap: opts.wrap ?? true,
-    scrollbar: {
-      ch: "▐",
-      track: { bg: t.scrollbar.track },
-      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
-    },
+    scrollbar: scrollbarConfig(t),
     style: { fg: t.body.fg, bg: t.body.bg },
     content: opts.content ?? "",
   });
@@ -208,9 +215,9 @@ export function createTextViewer(
     element: el,
     update(o) {
       if (o.content !== undefined) el.setContent(o.content);
-      const t2 = theme();
-      el.style.fg = t2.body.fg;
-      el.style.bg = t2.body.bg;
+      const current = theme();
+      el.style.fg = current.body.fg;
+      el.style.bg = current.body.bg;
     },
     getContent() {
       return el.getContent();
@@ -244,11 +251,7 @@ export function createListPanel(
     items: opts.items,
     scrollable: true,
     alwaysScroll: true,
-    scrollbar: {
-      ch: "▐",
-      track: { bg: t.scrollbar.track },
-      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
-    },
+    scrollbar: scrollbarConfig(t),
     style: {
       fg: t.body.fg,
       bg: t.body.bg,
@@ -269,10 +272,10 @@ export function createListPanel(
         el.setItems(o.items as string[]);
       }
       if (o.selected !== undefined) el.select(o.selected);
-      const t2 = theme();
-      el.style.fg = t2.body.fg;
-      el.style.bg = t2.body.bg;
-      ((el.style as Record<string, any>)).selected = { fg: t2.selected.fg, bg: t2.selected.bg };
+      const current = theme();
+      el.style.fg = current.body.fg;
+      el.style.bg = current.body.bg;
+      ((el.style as Record<string, any>)).selected = { fg: current.selected.fg, bg: current.selected.bg };
     },
     getSelected() {
       return (el as Record<string, any>).selected ?? 0;
@@ -369,11 +372,7 @@ export function createManagedList(
     items: currentItems,
     scrollable: true,
     alwaysScroll: true,
-    scrollbar: {
-      ch: "▐",
-      track: { bg: t.scrollbar.track },
-      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
-    },
+    scrollbar: scrollbarConfig(t),
     style: safeStyle,
   };
 
@@ -417,12 +416,12 @@ export function createManagedList(
       if (o.items !== undefined) {
         this.setItems(o.items);
       }
-      const t2 = theme();
+      const current = theme();
       // Always restore item + scrollbar keys — prevents theme-switch crash
-      (el.style as Record<string, unknown>).fg = t2.body.fg;
-      (el.style as Record<string, unknown>).bg = t2.body.bg;
-      (el.style as Record<string, unknown>).selected = { fg: t2.selected.fg, bg: t2.selected.bg };
-      (el.style as Record<string, unknown>).item = { fg: t2.body.fg, bg: t2.body.bg };
+      (el.style as Record<string, unknown>).fg = current.body.fg;
+      (el.style as Record<string, unknown>).bg = current.body.bg;
+      (el.style as Record<string, unknown>).selected = { fg: current.selected.fg, bg: current.selected.bg };
+      (el.style as Record<string, unknown>).item = { fg: current.body.fg, bg: current.body.bg };
     },
 
     destroy() {
@@ -573,9 +572,9 @@ export function createButtonBar(
         render();
         bindKeys();
       }
-      const t2 = theme();
-      el.style.fg = t2.header.fg;
-      el.style.bg = t2.header.bg;
+      const current = theme();
+      el.style.fg = current.header.fg;
+      el.style.bg = current.header.bg;
     },
     destroy() {
       for (const kl of keyListeners) {
@@ -641,9 +640,9 @@ export function createHeaderBar(
     update(o) {
       if (o.left !== undefined) left = o.left;
       if (o.right !== undefined) right = o.right;
-      const t2 = theme();
-      el.style.fg = t2.header.fg;
-      el.style.bg = t2.header.bg;
+      const current = theme();
+      el.style.fg = current.header.fg;
+      el.style.bg = current.header.bg;
       render();
     },
     destroy() {
@@ -696,11 +695,7 @@ export function createScrollView(
     scrollable: true,
     alwaysScroll: true,
     wrap: opts.wrap ?? false,
-    scrollbar: {
-      ch: "▐",
-      track: { bg: t.scrollbar.track },
-      style: { bg: t.scrollbar.bg, fg: t.scrollbar.fg },
-    },
+    scrollbar: scrollbarConfig(t),
     style: { fg: t.body.fg, bg: t.body.bg },
     content: opts.content ?? "",
   });
@@ -709,9 +704,9 @@ export function createScrollView(
     element: el,
     update(o) {
       if (o.content !== undefined) el.setContent(o.content);
-      const t2 = theme();
-      el.style.fg = t2.body.fg;
-      el.style.bg = t2.body.bg;
+      const current = theme();
+      el.style.fg = current.body.fg;
+      el.style.bg = current.body.bg;
     },
     getContent() {
       return el.getContent();
@@ -793,21 +788,21 @@ export function createTabs(
   });
 
   function renderTabBar() {
-    const t2 = theme();
+    const current = theme();
     const parts = tabs.map((tab, i) => {
       if (i === active) return `{bold} ${tab.label} {/bold}`;
       return ` ${tab.label} `;
     });
     tabBar.setContent(parts.join("│"));
-    tabBar.style.fg = t2.header.fg;
-    tabBar.style.bg = t2.header.bg;
+    tabBar.style.fg = current.header.fg;
+    tabBar.style.bg = current.header.bg;
   }
 
   function renderContent() {
-    const t2 = theme();
+    const current = theme();
     contentArea.setContent(tabs[active]?.content ?? "");
-    contentArea.style.fg = t2.body.fg;
-    contentArea.style.bg = t2.body.bg;
+    contentArea.style.fg = current.body.fg;
+    contentArea.style.bg = current.body.bg;
   }
 
   function switchTo(idx: number) {
@@ -900,9 +895,9 @@ export function createRule(
     element: el,
     update(o) {
       if (o.char !== undefined) char = o.char;
-      const t2 = theme();
-      el.style.fg = t2.muted.fg;
-      el.style.bg = t2.muted.bg;
+      const current = theme();
+      el.style.fg = current.muted.fg;
+      el.style.bg = current.muted.bg;
       render();
     },
     destroy() {

@@ -11,6 +11,7 @@ import { escapeBlessedTags } from "../core/blessed-escape.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
+import { getSelectedIndex } from "../ui/index.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
 import { openBackroomsLogBrowserWindow as openBackroomsLogBrowser } from "./backrooms-log-browser-window.js";
@@ -151,11 +152,11 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       ? Math.max(0, filteredEntries.findIndex((entry) => entry.label === preserveLabel))
       : 0;
     renderList(nextIndex < 0 ? 0 : nextIndex);
-    updatePreview((list as List & { selected: number }).selected ?? 0);
+    updatePreview(getSelectedIndex(list));
   };
 
   const toggleSelected = () => {
-    const index = (list as List & { selected: number }).selected ?? 0;
+    const index = getSelectedIndex(list);
     const entry = filteredEntries[index];
     if (!entry) {
       return;
@@ -191,10 +192,10 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     frame.close();
   };
 
-  const getSelectedIndex = () => (list as List & { selected: number }).selected ?? 0;
+  const getListSelectedIndex = () => getSelectedIndex(list);
 
   const confirmSelection = () => {
-    const focusedIndex = getSelectedIndex();
+    const focusedIndex = getListSelectedIndex();
     const fallback = filteredEntries[focusedIndex]?.label;
     const selected = selectedLabels.size > 0 ? [...selectedLabels] : fallback ? [fallback] : [];
     closePicker();
@@ -217,20 +218,20 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     }
     if (key.name === "enter") {
       searchValue = searchBox.getValue().trim();
-      applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+      applyFilter(filteredEntries[getSelectedIndex(list)]?.label);
       list.focus();
       context.screen.render();
       return;
     }
     setTimeout(() => {
       searchValue = searchBox.getValue().trim();
-      applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+      applyFilter(filteredEntries[getSelectedIndex(list)]?.label);
     }, 0);
   });
   searchBox.on("submit", (value) => {
     if (pickerClosed) return;
     searchValue = (value ?? "").trim();
-    applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+    applyFilter(filteredEntries[getSelectedIndex(list)]?.label);
     list.focus();
     context.screen.render();
   });
@@ -254,7 +255,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       return;
     }
     if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
-      deferRender(() => updatePreview((list as List & { selected: number }).selected ?? 0));
+      deferRender(() => updatePreview(getSelectedIndex(list)));
       return;
     }
     if (ch && /^[a-z]$/i.test(ch)) {
@@ -265,9 +266,9 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
   // API bridge hooks for command-driven picker automation.
   (frame as unknown as Record<string, unknown>)._backroomsPickerInfo = () => ({
     active: !pickerClosed,
-    selectedIndex: getSelectedIndex(),
+    selectedIndex: getListSelectedIndex(),
     visibleEntryCount: filteredEntries.length,
-    selectedLabel: filteredEntries[getSelectedIndex()]?.label,
+    selectedLabel: filteredEntries[getListSelectedIndex()]?.label,
     selectedPrimers: [...selectedLabels],
     searchValue,
     theme,
@@ -291,7 +292,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
       list.select(index);
     }
-    const index = (list as List & { selected: number }).selected ?? 0;
+    const index = getSelectedIndex(list);
     const label = filteredEntries[index]?.label;
     toggleSelected();
     context.syncState();
@@ -334,7 +335,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     searchValue,
     selectedPrimers: [...selectedLabels],
     visibleEntryCount: filteredEntries.length,
-    selectedLabel: filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label,
+    selectedLabel: filteredEntries[getSelectedIndex(list)]?.label,
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.setFocusTarget(list);

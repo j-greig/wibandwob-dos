@@ -6,6 +6,7 @@ import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import type { BrowserEntry, List } from "../core/types.js";
+import { getSelectedIndex } from "../ui/index.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 
@@ -38,7 +39,7 @@ export function openPrimerBrowserWindow(params: {
   const list = listHandle.node;
   const initialSelectedIndex = Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, entries.length - 1));
   const openSelected = (index?: number) => {
-    const itemIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+    const itemIndex = typeof index === "number" ? index : getSelectedIndex(list);
     const entry = entries[itemIndex];
     if (entry) params.onOpenPrimer(entry.filePath);
   };
@@ -48,8 +49,8 @@ export function openPrimerBrowserWindow(params: {
   frame.describeState = () => ({
     appType: "primer-browser",
     summary: `Primer browser listing ${entries.length} entries.`,
-    selectedIndex: (list as List & { selected: number }).selected ?? 0,
-    selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
+    selectedIndex: getSelectedIndex(list),
+    selectedLabel: entries[getSelectedIndex(list)]?.label,
     entryCount: entries.length
   });
   frame.setFocusTarget(list);

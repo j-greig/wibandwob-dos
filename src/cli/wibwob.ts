@@ -1426,7 +1426,7 @@ async function cmdOpen(args: string[]) {
   if (instance) {
     const ok = await dispatch(instance, result);
     if (ok) {
-      out({ ok: true, routed: result.commands.map((c: { id: string }) => c.id), target });
+      out({ ok: true, instance: instance.label ?? `port:${instance.port}`, routed: result.commands.map((c: { id: string }) => c.id), target });
       return;
     }
     process.stderr.write("WibWob-DOS dispatch failed — falling back to system open\n");

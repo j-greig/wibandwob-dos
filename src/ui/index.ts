@@ -21,3 +21,18 @@ export * from "./data.js";
 export * from "./feedback.js";
 export * from "./forms.js";
 export * from "./patterns.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS — cross-cutting utilities for blessed list widgets
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Safely read the `selected` index from a blessed List widget.
+ * blessed lists expose `.selected` at runtime but it's not in the type defs.
+ * This helper replaces the repetitive `(list as List & { selected: number }).selected ?? 0`
+ * cast pattern scattered across window files.
+ *
+ */
+export function getSelectedIndex(list: import("blessed").Widgets.ListElement): number {
+  return (list as import("blessed").Widgets.ListElement & { selected: number }).selected ?? 0;
+}

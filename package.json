@@ -54,6 +54,7 @@
     "blessed": "^0.1.81",
     "blessed-contrib": "^4.11.0",
     "blessed-xterm": "^1.5.1",
+    "fastmcp": "^3.34.0",
     "get-east-asian-width": "^1.5.0",
     "irc-framework": "^4.14.0",
     "jsdom": "^28.1.0",

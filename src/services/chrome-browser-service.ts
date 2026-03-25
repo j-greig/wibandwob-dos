@@ -22,10 +22,152 @@ import { capabilityService } from "./capability-service.js";
 /** Suppress jsdom CSS parse warnings that leak to stderr. */
 function quietConsole(): VirtualConsole {
   const vc = new VirtualConsole();
-  // Forward everything except jsdom's internal CSS errors
   vc.on("error", () => {});
   vc.on("warn", () => {});
   return vc;
+}
+
+// Noise selectors removed before Readability extraction.
+const NOISE_SELECTORS = [
+  "nav", "[role='navigation']", "[role='banner']", "[role='contentinfo']",
+  "[aria-label='navigation']", "[aria-label='breadcrumb']",
+  ".nav", ".navbar", ".navigation", ".breadcrumb", ".breadcrumbs",
+  "[class*='cookie']", "[id*='cookie']", "[class*='consent']", "[id*='consent']",
+  "[class*='popup']", "[class*='modal']", "[class*='overlay']",
+  "[class*='gdpr']", "[id*='gdpr']",
+  "[class*='ad-']", "[class*='advert']", "[id*='ad-']",
+  "[class*='promo']", "[class*='banner']",
+  ".sidebar", "[role='complementary']", ".toc", ".table-of-contents",
+  ".share-buttons", ".social-share", "[class*='share']",
+  ".comments", "#comments", ".comment-section",
+  ".mw-jump-link", ".mw-editsection", ".reference", ".reflist",
+  ".navbox", ".sistersitebox", ".portalbox", ".noprint",
+  ".skip-link", ".skip-nav", "[class*='skip-to']",
+];
+
+/** Resolve lazy-loaded images using 4 strategies (data-src, srcset, noscript, picture). */
+async function resolveImages(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    document.querySelectorAll("img[data-src]").forEach((img) => {
+      const src = img.getAttribute("src") ?? "";
+      if (!src || src.includes("data:") || src.includes("placeholder") || src.includes("1x1")) {
+        img.setAttribute("src", img.getAttribute("data-src")!);
+      }
+    });
+    document.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") ?? "";
+      if (!src || src.includes("data:") || src.includes("1x1")) {
+        const srcset = img.getAttribute("srcset") ?? img.getAttribute("data-srcset") ?? "";
+        if (srcset) {
+          const entries = srcset.split(",").map(s => s.trim().split(/\s+/));
+          const best = entries.sort((a, b) => {
+            const aw = parseInt(a[1] ?? "0");
+            const bw = parseInt(b[1] ?? "0");
+            return bw - aw;
+          })[0];
+          if (best?.[0]) img.setAttribute("src", best[0]);
+        }
+      }
+    });
+    document.querySelectorAll("noscript").forEach((ns) => {
+      const html = ns.textContent ?? "";
+      const match = html.match(/src=["']([^"']+)["']/);
+      if (match?.[1] && ns.parentElement) {
+        const existingImg = ns.parentElement.querySelector("img");
+        if (existingImg) {
+          const curSrc = existingImg.getAttribute("src") ?? "";
+          if (!curSrc || curSrc.includes("data:")) {
+            existingImg.setAttribute("src", match[1]);
+          }
+        }
+      }
+    });
+    document.querySelectorAll("picture").forEach((pic) => {
+      const img = pic.querySelector("img");
+      if (!img) return;
+      const src = img.getAttribute("src") ?? "";
+      if (src && !src.includes("data:")) return;
+      const source = pic.querySelector("source[srcset]");
+      if (source) {
+        const srcset = source.getAttribute("srcset") ?? "";
+        const first = srcset.split(",")[0]?.trim().split(/\s+/)[0];
+        if (first) img.setAttribute("src", first);
+      }
+    });
+  }).catch(() => {});
+}
+
+/** Scroll to bottom and back to trigger IntersectionObserver lazy loads. */
+async function triggerLazyLoads(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+    window.scrollTo(0, document.body.scrollHeight);
+    await delay(1500);
+    window.scrollTo(0, 0);
+    await delay(500);
+  }).catch(() => {});
+}
+
+/** Get full page HTML via CDP session (bypasses TrustedScriptURL restrictions). */
+async function extractHtmlViaCDP(page: Page): Promise<string> {
+  const client = await page.createCDPSession();
+  const { root } = await client.send("DOM.getDocument", { depth: -1, pierce: true });
+  const { outerHTML } = await client.send("DOM.getOuterHTML", { nodeId: root.nodeId });
+  await client.detach();
+  return outerHTML;
+}
+
+/** Remove noise elements from a JSDOM document in place. */
+function removeNoiseElements(doc: Document, selectors: string[]): void {
+  for (const sel of selectors) {
+    try {
+      doc.querySelectorAll(sel).forEach((el: Element) => el.remove());
+    } catch { /* invalid selector on this page */ }
+  }
+}
+
+/** Extract readable content using Readability, falling back to manual DOM walk. */
+function extractReadableContent(
+  outerHTML: string,
+  finalUrl: string,
+  htmlToMarkdown: (html: string) => string,
+): { title: string; markdown: string } {
+  const preCleanDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
+  removeNoiseElements(preCleanDoc.window.document, NOISE_SELECTORS);
+  const cleanedHTML = preCleanDoc.window.document.documentElement.outerHTML;
+
+  const doc = new JSDOM(cleanedHTML, { url: finalUrl, virtualConsole: quietConsole() });
+  const reader = new Readability(doc.window.document);
+  const article = reader.parse();
+
+  let title = article?.title ?? "";
+
+  if (article?.content) {
+    return { title, markdown: htmlToMarkdown(article.content) };
+  }
+
+  // Fallback: strip noise and extract main content
+  const fallbackDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
+  const fallbackBody = fallbackDoc.window.document;
+  fallbackBody
+    .querySelectorAll(
+      "script, style, noscript, nav, header, footer, aside, " +
+      "[role='navigation'], [role='banner'], [role='contentinfo'], " +
+      "[class*='cookie'], [class*='consent'], [class*='gdpr']"
+    )
+    .forEach((el: Element) => el.remove());
+  const main =
+    fallbackBody.querySelector(
+      "main, article, [role='main'], .content, #content, .post, .entry"
+    ) || fallbackBody.body;
+  const fallbackHtml = main?.innerHTML || "";
+  const markdown = fallbackHtml.trim().length > 100
+    ? htmlToMarkdown(fallbackHtml)
+    : "(Could not extract readable content from this page)";
+  if (!title) {
+    title = fallbackBody.querySelector("title")?.textContent?.trim() ?? "";
+  }
+  return { title, markdown };
 }
 
 export interface BrowseResult {
@@ -127,23 +269,17 @@ export class ChromeBrowserService {
     if (!this.browser || !this.page) {
       const connected = await this.connect();
       if (!connected) {
-        return {
-          ok: false,
-          url,
-          title: "",
-          markdown: "",
-          error: "Cannot launch or connect to Chrome. Install Chrome and try again.",
-        };
+        return { ok: false, url, title: "", markdown: "", error: "Cannot launch or connect to Chrome. Install Chrome and try again." };
       }
     }
 
     try {
+      // Load page and wait for DOM to settle
       await Promise.race([
         this.page!.goto(url, { waitUntil: "networkidle2" }),
         new Promise((r) => setTimeout(r, 15000)),
       ]).catch(() => {});
 
-      // Wait for DOM to settle after JS hydration (React, Next.js, etc.)
       await this.page!.evaluate(() => new Promise<void>((resolve) => {
         let timer: ReturnType<typeof setTimeout>;
         const done = () => { observer.disconnect(); resolve(); };
@@ -152,155 +288,16 @@ export class ChromeBrowserService {
           timer = setTimeout(done, 800);
         });
         observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-        timer = setTimeout(done, 2000); // max 2s wait
+        timer = setTimeout(done, 2000);
       })).catch(() => {});
 
       const finalUrl = this.page!.url();
 
-      // Resolve lazy-loaded images: multiple strategies for different sites
-      await this.page!.evaluate(() => {
-        // 1. data-src → src (common lazy-load pattern)
-        document.querySelectorAll("img[data-src]").forEach((img) => {
-          const src = img.getAttribute("src") ?? "";
-          if (!src || src.includes("data:") || src.includes("placeholder") || src.includes("1x1")) {
-            img.setAttribute("src", img.getAttribute("data-src")!);
-          }
-        });
-        // 2. srcset → src (responsive images without src)
-        document.querySelectorAll("img").forEach((img) => {
-          const src = img.getAttribute("src") ?? "";
-          if (!src || src.includes("data:") || src.includes("1x1")) {
-            const srcset = img.getAttribute("srcset") ?? img.getAttribute("data-srcset") ?? "";
-            if (srcset) {
-              // Pick the largest from srcset
-              const entries = srcset.split(",").map(s => s.trim().split(/\s+/));
-              const best = entries.sort((a, b) => {
-                const aw = parseInt(a[1] ?? "0");
-                const bw = parseInt(b[1] ?? "0");
-                return bw - aw;
-              })[0];
-              if (best?.[0]) img.setAttribute("src", best[0]);
-            }
-          }
-        });
-        // 3. <noscript> tags often contain real <img> for JS-disabled fallback
-        document.querySelectorAll("noscript").forEach((ns) => {
-          const html = ns.textContent ?? "";
-          const match = html.match(/src=["']([^"']+)["']/);
-          if (match?.[1] && ns.parentElement) {
-            const existingImg = ns.parentElement.querySelector("img");
-            if (existingImg) {
-              const curSrc = existingImg.getAttribute("src") ?? "";
-              if (!curSrc || curSrc.includes("data:")) {
-                existingImg.setAttribute("src", match[1]);
-              }
-            }
-          }
-        });
-        // 4. <picture> <source> → img src
-        document.querySelectorAll("picture").forEach((pic) => {
-          const img = pic.querySelector("img");
-          if (!img) return;
-          const src = img.getAttribute("src") ?? "";
-          if (src && !src.includes("data:")) return;
-          const source = pic.querySelector("source[srcset]");
-          if (source) {
-            const srcset = source.getAttribute("srcset") ?? "";
-            const first = srcset.split(",")[0]?.trim().split(/\s+/)[0];
-            if (first) img.setAttribute("src", first);
-          }
-        });
-      }).catch(() => {});
-
-      // Scroll to bottom and back to trigger IntersectionObserver lazy loads
-      await this.page!.evaluate(async () => {
-        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-        window.scrollTo(0, document.body.scrollHeight);
-        await delay(1500);
-        window.scrollTo(0, 0);
-        await delay(500);
-      }).catch(() => {});
-
-      // Get HTML via CDP (works even with TrustedScriptURL restrictions)
-      const client = await this.page!.createCDPSession();
-      const { root } = await client.send("DOM.getDocument", {
-        depth: -1,
-        pierce: true,
-      });
-      const { outerHTML } = await client.send("DOM.getOuterHTML", {
-        nodeId: root.nodeId,
-      });
-      await client.detach();
-
-      // Pre-clean the HTML before Readability gets it
-      const preCleanDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
-      const preCleanBody = preCleanDoc.window.document;
-      // Remove noise elements that confuse Readability
-      const noiseSelectors = [
-        // Navigation and chrome
-        "nav", "[role='navigation']", "[role='banner']", "[role='contentinfo']",
-        "[aria-label='navigation']", "[aria-label='breadcrumb']",
-        ".nav", ".navbar", ".navigation", ".breadcrumb", ".breadcrumbs",
-        // Cookie banners, popups, modals
-        "[class*='cookie']", "[id*='cookie']", "[class*='consent']", "[id*='consent']",
-        "[class*='popup']", "[class*='modal']", "[class*='overlay']",
-        "[class*='gdpr']", "[id*='gdpr']",
-        // Ads and promos
-        "[class*='ad-']", "[class*='advert']", "[id*='ad-']",
-        "[class*='promo']", "[class*='banner']",
-        // Site furniture
-        ".sidebar", "[role='complementary']", ".toc", ".table-of-contents",
-        ".share-buttons", ".social-share", "[class*='share']",
-        ".comments", "#comments", ".comment-section",
-        // Wikipedia-specific noise
-        ".mw-jump-link", ".mw-editsection", ".reference", ".reflist",
-        ".navbox", ".sistersitebox", ".portalbox", ".noprint",
-        // Skip-to-content links
-        ".skip-link", ".skip-nav", "[class*='skip-to']",
-      ];
-      for (const sel of noiseSelectors) {
-        try {
-          preCleanBody.querySelectorAll(sel).forEach((el: Element) => el.remove());
-        } catch { /* invalid selector on this page, skip */ }
-      }
-      const cleanedHTML = preCleanBody.documentElement.outerHTML;
-
-      // Extract with Readability
-      const doc = new JSDOM(cleanedHTML, { url: finalUrl, virtualConsole: quietConsole() });
-      const reader = new Readability(doc.window.document);
-      const article = reader.parse();
-
-      let markdown: string;
-      let title = article?.title ?? "";
-
-      if (article?.content) {
-        markdown = this.htmlToMarkdown(article.content);
-      } else {
-        // Fallback: strip noise and extract main content from original HTML
-        const fallbackDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
-        const fallbackBody = fallbackDoc.window.document;
-        fallbackBody
-          .querySelectorAll(
-            "script, style, noscript, nav, header, footer, aside, " +
-            "[role='navigation'], [role='banner'], [role='contentinfo'], " +
-            "[class*='cookie'], [class*='consent'], [class*='gdpr']"
-          )
-          .forEach((el: Element) => el.remove());
-        const main =
-          fallbackBody.querySelector(
-            "main, article, [role='main'], .content, #content, .post, .entry"
-          ) || fallbackBody.body;
-        const fallbackHtml = main?.innerHTML || "";
-        if (fallbackHtml.trim().length > 100) {
-          markdown = this.htmlToMarkdown(fallbackHtml);
-        } else {
-          markdown = "(Could not extract readable content from this page)";
-        }
-        if (!title) {
-          title =
-            fallbackBody.querySelector("title")?.textContent?.trim() ?? "";
-        }
-      }
+      // Pipeline: resolve images → trigger lazy loads → extract HTML → extract content
+      await resolveImages(this.page!);
+      await triggerLazyLoads(this.page!);
+      const outerHTML = await extractHtmlViaCDP(this.page!);
+      let { title, markdown } = extractReadableContent(outerHTML, finalUrl, (html) => this.htmlToMarkdown(html));
 
       // Post-check: if markdown still contains significant HTML, the extraction failed —
       // fall back to a clean text-only extraction from the rendered page.

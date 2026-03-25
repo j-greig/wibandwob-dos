@@ -16,6 +16,7 @@ import { EMPTY_FILE_SELECTED } from "./empty-states.js";
 import { createModal, createButtonBar, showToast, type ModalPosition } from "./modal.js";
 import { createRadioGroup } from "../ui/forms.js";
 import type { Box, List, Textbox } from "./types.js";
+import { getSelectedIndex } from "../ui/index.js";
 
 interface BrowserPromptItem {
   label: string;
@@ -536,7 +537,7 @@ export class OverlayManager {
 
     /** Apply the current selection (used by API confirm). */
     const applySelection = () => {
-      const index = (list as List & { selected: number }).selected ?? 0;
+      const index = getSelectedIndex(list);
       const item = filteredItems[index];
       if (item) {
         closePrompt();
@@ -551,7 +552,7 @@ export class OverlayManager {
       } else {
         list.select(0);
       }
-      updatePreview((list as List & { selected: number }).selected ?? 0);
+      updatePreview(getSelectedIndex(list));
       this.screen.render();
     };
 
@@ -634,7 +635,7 @@ export class OverlayManager {
     });
     list.on("click", () => {
       setTimeout(() => {
-        updatePreview((list as List & { selected: number }).selected ?? 0);
+        updatePreview(getSelectedIndex(list));
         this.screen.render();
       }, 0);
     });
@@ -649,7 +650,7 @@ export class OverlayManager {
       }
       if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
         setTimeout(() => {
-          updatePreview((list as List & { selected: number }).selected ?? 0);
+          updatePreview(getSelectedIndex(list));
           this.screen.render();
         }, 0);
         return;
@@ -677,7 +678,7 @@ export class OverlayManager {
         return { ok: true, index, count };
       },
       info: () => ({
-        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        selectedIndex: getSelectedIndex(list),
         count: filteredItems.length,
       }),
     };
@@ -862,7 +863,7 @@ export class OverlayManager {
 
     /** Apply the current selection (used by API confirm). */
     const applySelection = () => {
-      const index = (list as List & { selected: number }).selected ?? 0;
+      const index = getSelectedIndex(list);
       const entry = visibleEntries[index];
       if (!entry) return;
       if (entry.isDirectory) {
@@ -938,7 +939,7 @@ export class OverlayManager {
       } else {
         list.select(0);
       }
-      buildPreview(visibleEntries[(list as List & { selected: number }).selected ?? 0]);
+      buildPreview(visibleEntries[getSelectedIndex(list)]);
       this.screen.render();
     };
 
@@ -1012,7 +1013,7 @@ export class OverlayManager {
       }
       if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
         setTimeout(() => {
-          buildPreview(visibleEntries[(list as List & { selected: number }).selected ?? 0]);
+          buildPreview(visibleEntries[getSelectedIndex(list)]);
           this.screen.render();
         }, 0);
         return;
@@ -1040,7 +1041,7 @@ export class OverlayManager {
         return { ok: true, index, count };
       },
       info: () => ({
-        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        selectedIndex: getSelectedIndex(list),
         count: visibleEntries.length,
         currentDirectory,
       }),

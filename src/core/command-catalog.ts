@@ -42,6 +42,8 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   agentSend: (args?: Record<string, unknown>) => void;
+  windowInput: (args?: Record<string, unknown>) => unknown;
+  agentMessage: (args?: Record<string, unknown>) => unknown;
   editorWrite: (args?: Record<string, unknown>) => void;
   reloadAgentPrompt: () => void;
   reloadMicroapps: () => unknown;
@@ -81,8 +83,8 @@ export interface AppMenuActions {
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
-  saveWorkspace: (args?: Record<string, unknown>) => void;
-  loadWorkspace: (args?: Record<string, unknown>) => void;
+  saveWorkspace: (args?: Record<string, unknown>) => unknown;
+  loadWorkspace: (args?: Record<string, unknown>) => unknown;
   toggleTheme: () => void;
   chooseTheme: () => void;
   setTheme: (args?: Record<string, unknown>) => void;
@@ -583,6 +585,24 @@ const APP_COMMANDS: AppCommandDefinition<keyof AppMenuActions>[] = [
     actionKey: "exportFocusedWindowText",
     menuPlacements: [{ category: "edit", order: 20 }],
     palettePlacement: { order: 210 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "window.input",
+    label: "Send Input to Window",
+    description: "Send text input to a window. Args: id (number, required), input (string, required), sender (string, optional — attribution tag).",
+    group: "focus",
+    actionKey: "windowInput",
+    api: true,
+    agent: true
+  },
+  {
+    id: "window.agent-message",
+    label: "Send Agent Message",
+    description: "Send a message to the Wib&Wob Agent window. Args: id (number, required), text (string, required), sender (string, optional).",
+    group: "focus",
+    actionKey: "agentMessage",
     api: true,
     agent: true
   },
@@ -1325,6 +1345,71 @@ export function listAppCommands(): AppCommandDescriptor<keyof AppMenuActions>[] 
   }));
 }
 
+/** Build menu items for a standard category (File, Edit, View, etc.). */
+function buildStandardMenuItems(category: string, actions: AppMenuActions): MenuItem[] {
+  return listAppCommands()
+    .flatMap((command) =>
+      command.menuPlacements
+        .filter((placement) => placement.category === category)
+        .map((placement) => ({
+          order: placement.order,
+          label: placement.label ?? command.label,
+          action: actions[command.actionKey],
+          appTypes: placement.appTypes,
+          separatorAfter: placement.separatorAfter,
+          favourite: placement.favourite
+        })),
+    )
+    .sort(byPlacementOrder)
+    .reduce((acc, item) => {
+      acc.push({
+        label: item.label,
+        action: item.action,
+        ...(item.appTypes ? { appTypes: item.appTypes } : {})
+      });
+      if (item.separatorAfter) {
+        acc.push({ label: "---separator---", action: () => {}, separator: true as const });
+      }
+      return acc;
+    }, [] as MenuItem[]);
+}
+
+/** Build menu items for the Applications menu (favourites first, then alphabetical). */
+function buildApplicationsMenuItems(actions: AppMenuActions): MenuItem[] {
+  const allWithIds = listAppCommands()
+    .flatMap((command) =>
+      command.menuPlacements
+        .filter((placement) => placement.category === "applications")
+        .map((placement) => ({
+          commandId: command.id,
+          order: placement.order,
+          label: placement.label ?? command.label,
+          action: actions[command.actionKey],
+          appTypes: placement.appTypes,
+          favourite: placement.favourite,
+        })),
+    );
+
+  const favourites = allWithIds.filter((item) => item.favourite).sort(byPlacementOrder);
+  const rest = allWithIds.filter((item) => !item.favourite);
+
+  const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
+  rest.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
+
+  const toMenuItem = (item: typeof allWithIds[0]): MenuItem => ({
+    label: item.label,
+    action: item.action,
+    ...(item.appTypes ? { appTypes: item.appTypes } : {}),
+  });
+
+  const result: MenuItem[] = favourites.map(toMenuItem);
+  if (favourites.length > 0 && rest.length > 0) {
+    result.push({ label: "---separator---", action: () => {}, separator: true as const });
+  }
+  result.push(...rest.map(toMenuItem));
+  return result;
+}
+
 /** Build runtime MenuConfig[] by projecting catalog commands into their menu placements. */
 export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   return MENU_DEFINITIONS.map((menu) => ({
@@ -1332,71 +1417,9 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
     label: menu.label,
     key: menu.key,
     left: menu.left,
-    items: (() => {
-      if (menu.category !== "applications") {
-        return listAppCommands()
-          .flatMap((command) =>
-            command.menuPlacements
-              .filter((placement) => placement.category === menu.category)
-              .map((placement) => ({
-                order: placement.order,
-                label: placement.label ?? command.label,
-                action: actions[command.actionKey],
-                appTypes: placement.appTypes,
-                separatorAfter: placement.separatorAfter,
-                favourite: placement.favourite
-              })),
-          )
-          .sort(byPlacementOrder)
-          .reduce((acc, item) => {
-            acc.push({
-              label: item.label,
-              action: item.action,
-              ...(item.appTypes ? { appTypes: item.appTypes } : {})
-            });
-            if (item.separatorAfter) {
-              acc.push({ label: "---separator---", action: () => {}, separator: true as const });
-            }
-            return acc;
-          }, [] as MenuItem[]);
-      }
-
-      const allWithIds = listAppCommands()
-        .flatMap((command) =>
-          command.menuPlacements
-            .filter((placement) => placement.category === "applications")
-            .map((placement) => ({
-              commandId: command.id,
-              order: placement.order,
-              label: placement.label ?? command.label,
-              action: actions[command.actionKey],
-              appTypes: placement.appTypes,
-              favourite: placement.favourite,
-            })),
-        );
-
-      const favourites = allWithIds.filter((item) => item.favourite).sort(byPlacementOrder);
-      const rest = allWithIds.filter((item) => !item.favourite);
-
-      const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
-      rest.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
-
-      const toMenuItem = (item: typeof allWithIds[0]): MenuItem => ({
-        label: item.label,
-        action: item.action,
-        ...(item.appTypes ? { appTypes: item.appTypes } : {}),
-      });
-
-      const result: MenuItem[] = favourites.map(toMenuItem);
-
-      if (favourites.length > 0 && rest.length > 0) {
-        result.push({ label: "---separator---", action: () => {}, separator: true as const });
-      }
-
-      result.push(...rest.map(toMenuItem));
-
-      return result;
-    })()
+    items: menu.category === "applications"
+      ? buildApplicationsMenuItems(actions)
+      : buildStandardMenuItems(menu.category, actions),
   }));
 }
 

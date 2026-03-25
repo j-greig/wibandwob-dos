@@ -29,7 +29,7 @@ Four seams connect every adapter to the core:
 Live surface: `wibwob health` · `wibwob -i <label> commands`
 
 
-> Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Unfamiliar term? `LEXICON.md` (human-facing).
+> Confused by a decision here? The *why* lives in `PHILOSOPHY.md`. Writing code? `CODE-STYLE.md` — 30 principles for TypeScript in this codebase.
 
 ---
 

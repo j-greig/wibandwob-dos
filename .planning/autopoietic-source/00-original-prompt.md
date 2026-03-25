@@ -1,0 +1,3 @@
+# Original Prompt (user, verbatim)
+
+> first I want you to freely and imaginatively paint a picture of a future code base which compounds on the real set we've just researched but also bakes into a source coat and architecture is self documenting principle. A bit like the option D automated.map.md idea but a type script native deeply integrated inherent mutable level of the source code so that our system becomes autopeatic. Use advisorial questioning to explore the rank any plausible approaches to this include a research step if you think it would be helpful. Make this prompt better before you executed it and ensure your thinking is documented into a new sub directory of this repo starting with this prompt and your enhance version of it.
