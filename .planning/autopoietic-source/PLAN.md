@@ -7,7 +7,7 @@
 
 ## The thesis
 
-A codebase that follows its own principles doesn't need monitoring infrastructure. A 681-LOC function doesn't need a scanner to tell you it's too big — you can see it. A barrel-file boundary doesn't need a config file to explain it — the re-exports ARE the boundary. A discriminated union doesn't need a comment to explain the states — the types ARE the documentation.
+A codebase that follows its own principles doesn't need monitoring infrastructure. A 681-LOC function doesn't need a scanner to tell you it's too big — you can see it. A well-named direct import doesn't need a manifest to explain the dependency — the path IS the intent. A discriminated union doesn't need a comment to explain the states — the types ARE the documentation.
 
 **The goal is not to build tools that detect bad code. The goal is to write code so clear, so small, so well-typed that the tools have nothing to report.**
 
@@ -41,6 +41,15 @@ Pass 4 — Devil's advocate: "Do we need any of this?"
   → BUT: principles alone didn't prevent the current state, TS has no module
     access control, agents need machine-readable structure, trajectory needs measurement
   → Synthesis: REFACTOR FIRST. Infrastructure halved to ~190 LOC. Deferred the rest.
+
+Pass 5 — Kill the barrels: "The codebase already uses direct imports everywhere"
+  → Research found: only 2 barrel files exist (sdk/index.ts, ui/index.ts) — special purpose
+  → The entire codebase uses direct imports: `from "../core/theme/resolver.js"`
+  → Barrel files would be a new pattern imposed on a codebase that doesn't use them
+  → Direct imports are more honest — you see the real dependency, not a re-export
+  → check-coat already validates import paths with string matching (microapp boundaries)
+  → Extending check-coat to validate src/ directory boundaries against MODULE_MANIFEST
+    is ~50 LOC and works with direct imports — no barrels needed
 ```
 
 **The final position:** 95% of the value is writing better code. 5% is a thin safety net to keep it that way.
@@ -67,20 +76,13 @@ These are the structural properties that eliminate the need for external monitor
 
 **Self-regulating test:** Delete all comments from the file. Is the code still understandable? If not, the types aren't carrying enough weight.
 
-### 3. Barrel files ARE the boundaries
+### 3. Direct imports show the real dependency graph
 
-**Target:** Each `src/` subdirectory has an `index.ts` that re-exports its public surface. Import from `../services`, not `../services/control-api`. The barrel IS the module boundary — no manifest needed to explain it.
+**Target:** Every import names the exact file it depends on. `import { theme } from "../core/theme/resolver.js"` is honest — you see the real dependency, not a re-export barrel that hides it. MODULE_MANIFEST + check-coat validate that the directory-level boundary is respected.
 
-```typescript
-// src/services/index.ts — this IS the boundary definition
-export { StateService } from "./state-service.ts";
-export { MicroappSdk } from "./microapp-sdk.ts";
-// control-api is NOT exported = it's internal to services
-```
+**How:** P22 Explicit Collaboration Interfaces — the import path IS the collaboration interface. P3 Replace Comments with Clear Code — a direct import is clearer than a barrel that obscures which file you actually depend on. The codebase already uses this pattern consistently.
 
-**How:** P22 Explicit Collaboration Interfaces — the barrel file is the interface between modules. P7 Behavior Over State — consumers depend on the exported shape, not the internal structure.
-
-**Self-regulating test:** Can a new developer understand what this module offers by reading only its `index.ts`? If not, the barrel is too noisy or the module does too much.
+**Self-regulating test:** Read the imports at the top of a file. Can you tell exactly which modules it depends on and why? If so, the boundaries are self-evident. check-coat validates the rest.
 
 ### 4. Named constants replace magic values
 
@@ -143,20 +145,6 @@ Execute `code-quality-refactor-plan.md` at repo root. The concrete steps below a
 | C6 | Replace all `(list as List & {selected}).selected` casts with `getSelectedIndex()` | P6, P20 |
 | | `bun run typecheck` + `bun run check-coat` + full integration suite + visual verification | |
 
-### Phase D — Barrel files (the boundary layer)
-
-After decomposition, each `src/` subdirectory gets its boundary:
-
-| Directory | `index.ts` exports | Internal (not exported) |
-|-----------|-------------------|------------------------|
-| `src/core/` | app-controller, command-catalog, window-manager, types, arg-helpers, menu-actions | microapp-registry, snapshot-registry |
-| `src/services/` | state-service, microapp-sdk | control-api, chrome-browser-service, terrain-render |
-| `src/sdk/` | microapp-sdk (re-export), composition-helpers | |
-| `src/ui/` | forms, containers, primitives, getSelectedIndex | |
-| `src/windows/` | Individual window modules (each consumed by core) | |
-
-The barrel files encode the same boundary rules as MODULE_MANIFEST — but as actual TypeScript, not metadata.
-
 ### Evidence gates (run after each phase)
 
 ```
@@ -199,7 +187,7 @@ ARCHITECTURE.md's boundary section becomes a pointer: "See `MODULE_MANIFEST` in 
 
 ### check-coat extension (~50 LOC)
 
-One new check in `scripts/checks/check-coat.ts`: read MODULE_MANIFEST, walk all `src/` imports, verify each import goes through a barrel file or stays within its own boundary. Same string-matching approach as the existing microapp boundary check.
+One new check in `scripts/checks/check-coat.ts`: read MODULE_MANIFEST, walk all `src/` import paths, extract the target directory (e.g., `../services/control-api` → `services`), verify it's in the source module's `mayImportFrom` list. Same string-matching approach as the existing microapp boundary check — direct imports validated at the directory level.
 
 ### code-health snapshot (~100 LOC)
 
@@ -216,7 +204,7 @@ These are in the parking lot. Each has a "reconsider when" condition.
 | `GET /code-health` COAT endpoint | Agents need live code health data during a running session |
 | `wibwob code-health` CLI command | The script-and-JSON approach proves too manual |
 | `wibwob code-health --diff` | Trajectory tracking is used frequently enough to justify a CLI flag |
-| Pre-commit health warning | The codebase regresses despite barrel files and check-coat |
+| Pre-commit health warning | The codebase regresses despite check-coat enforcement |
 | `@module` JSDoc tags in each directory | Directory names alone aren't communicating module purpose |
 | dependency-cruiser | madge + check-coat proves insufficient for import analysis |
 | ts-arch boundary tests | check-coat's regex produces false positives that can't be fixed |
@@ -234,14 +222,14 @@ This is the larger vision. Phase 0 + Phase 1 achieves Levels 1 and 2. Level 3 is
 Level 1: RUNTIME (exists)      describeState() → GET /state
   The system knows what it's showing right now.
 
-Level 2: SOURCE (Phase 0 + 1)  Barrel files + MODULE_MANIFEST → check-coat
+Level 2: SOURCE (Phase 0 + 1)  MODULE_MANIFEST + direct imports → check-coat
   The system knows what it's made of and where the boundaries are.
 
 Level 3: EVOLUTION (Phase 1)   .code-health/ snapshots → diff on demand
   The system knows whether it's getting better or worse.
 ```
 
-The autopoietic loop: the code describes itself (barrel files, types, manifest) → tools verify the description matches reality (check-coat, typecheck) → violations surface at development time → the code is fixed → the description stays true.
+The autopoietic loop: the code describes itself (direct imports, types, manifest) → tools verify the description matches reality (check-coat, typecheck) → violations surface at development time → the code is fixed → the description stays true.
 
 But the deepest form of autopoiesis isn't the loop. It's code that's so well-structured the loop has nothing to catch.
 
@@ -251,7 +239,7 @@ But the deepest form of autopoiesis isn't the loop. It's code that's so well-str
 
 - **Zero new dependencies.** `madge` and `check-coat` already exist. Extend, don't add.
 - **`bun run health` must pass** before and after every phase.
-- **Barrel files are primary.** MODULE_MANIFEST describes the convention. The barrels ARE the boundaries.
+- **Direct imports are honest.** The import path shows the real dependency. MODULE_MANIFEST + check-coat validate directory-level boundaries without barrel indirection.
 - **CLI-first, API adapts.** Any tool must work without a running TUI instance.
 - **Never commit to `main`.** Feature branch per tier.
 - **Visual verification mandatory.** API responses are not proof.
