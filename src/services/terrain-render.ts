@@ -102,6 +102,75 @@ function renderContourCell(char: string, map: TerrainMap, x: number, y: number, 
 // Ported from scratch/iso_view.py — see that file for algorithm notes.
 // ---------------------------------------------------------------------------
 
+// §19 Named Constants — rendering tuning parameters
+const FP_FOV = Math.PI / 2.4;             // horizontal field of view (radians)
+const FP_HORIZON_FRACTION = 0.38;         // base horizon as fraction of screen height
+const FP_HORIZON_PITCH_SCALE = 0.5;       // pitch sensitivity for horizon shift
+const FP_HORIZON_MIN_MARGIN = 2;          // minimum rows above horizon
+const FP_HORIZON_MAX_MARGIN = 4;          // minimum rows below horizon
+const FP_RAYCAST_STEPS = 150;             // ray march iterations per column
+const FP_ELEV_SCALE_HIGH = 1.2;           // elevation scale when altitude > 0.15
+const FP_ELEV_SCALE_ELEVATED = 0.75;      // elevation scale when above sea level
+const FP_ELEV_SCALE_GROUND = 0.45;        // elevation scale at ground level
+const FP_HIGH_ALT_THRESHOLD = 0.15;       // altitude threshold for high-altitude rendering
+const FP_ELEVATED_THRESHOLD = 0.05;       // elevation above sea level to count as elevated
+const FP_FAR_DISTANCE_SCALE = 1.6;        // far plane scale relative to peak distance
+const FP_FAR_HIGH_ALT_SCALE = 1.4;        // far plane scale when elevated
+const FP_FAR_GROUND_SCALE = 0.9;          // far plane scale at ground level
+const FP_SUN_WORLD_YAW = 1.0;             // sun position in world space (radians from east)
+const FP_NEAR_BAND = 0.2;                 // distance fraction threshold for near band
+const FP_MID_BAND = 0.5;                  // distance fraction threshold for mid band
+const FP_FAR_CLIFF_BAND = 0.6;            // distance fraction threshold for far cliff band
+
+// §6 DRY — biome colour maps used by renderFirstPerson (hoisted to module scope)
+const FP_BIOME_COLORS_NEAR: Record<TerrainBiome, string> = {
+  "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
+  "plain": "green", "forest": "light-green", "hill": "white",
+  "ridge": "light-white", "peak": "light-white",
+};
+const FP_BIOME_COLORS_MID: Record<TerrainBiome, string> = {
+  "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
+  "plain": "green", "forest": "green", "hill": "light-black",
+  "ridge": "white", "peak": "light-white",
+};
+const FP_BIOME_COLORS_FAR: Record<TerrainBiome, string> = {
+  "deep-water": "blue", "shallow-water": "blue", "shore": "light-black",
+  "plain": "light-black", "forest": "light-black", "hill": "light-black",
+  "ridge": "light-black", "peak": "light-black",
+};
+
+// Surface glyphs by distance band
+const FP_SURF_NEAR: Record<TerrainBiome, string[]> = {
+  "deep-water": ["≈", "~", "≈", "∽"],
+  "shallow-water": ["~", "∽", "~", "·"],
+  "shore": ["·", ".", ",", "·", "°"],
+  "plain": [",", ".", "'", ";", ",", "·"],
+  "forest": ["♣", "♠", "t", "♣", ","],
+  "hill": ["∧", "n", "^", "∧", "."],
+  "ridge": ["▲", "^", "△", "▲"],
+  "peak": ["▲", "△", "▲", "^"],
+};
+const FP_SURF_MID: Record<TerrainBiome, string[]> = {
+  "deep-water": ["~", "~"], "shallow-water": ["~", "∽"],
+  "shore": [".", "·"], "plain": [",", "."],
+  "forest": [":", "♣"], "hill": ["^", "n"],
+  "ridge": ["^", "△"], "peak": ["▲", "△"],
+};
+const FP_SURF_FAR: Record<TerrainBiome, string> = {
+  "deep-water": "~", "shallow-water": "~", "shore": "·",
+  "plain": "·", "forest": "·", "hill": "·",
+  "ridge": "·", "peak": "·",
+};
+
+// Column fill glyphs (the vertical face of terrain slopes)
+const FP_CLIFF_NEAR: Record<TerrainBiome, string[]> = {
+  "deep-water": ["~"], "shallow-water": ["~"],
+  "shore": ["░", "."], "plain": ["▒", "░", ":"],
+  "forest": ["▓", "▒", "│"], "hill": ["▓", "▒", "░"],
+  "ridge": ["█", "▓", "▒"], "peak": ["█", "▓"],
+};
+const FP_CLIFF_FAR: string[] = ["│", ":", "."];
+
 export function findTerrainPeak(map: TerrainMap): { x: number; y: number; elevation: number } {
   let best = { x: Math.floor(map.width / 2), y: Math.floor(map.height / 2), elevation: 0 };
   for (let y = 0; y < map.height; y += 4) {
@@ -183,20 +252,18 @@ function renderFirstPerson(
   const SH  = height;
   const SW1 = SW - 1;
   const sea = map.seaLevel;
-  const FOV = Math.PI / 2.4;
+  const FOV = FP_FOV;
   // HORIZON: pitch shifts it — nose up (pitch>0) → HORIZON row increases → more sky visible
-  const HORIZON = Math.max(2, Math.min(SH - 4,
-    Math.floor(SH * 0.38) + Math.round(pitch * SH * 0.5)));
-  const isElevated = camElev > sea + 0.05;
-  const ELEV_SC = SH * (alt > 0.15 ? 1.2 : isElevated ? 0.75 : 0.45);
+  const HORIZON = Math.max(FP_HORIZON_MIN_MARGIN, Math.min(SH - FP_HORIZON_MAX_MARGIN,
+    Math.floor(SH * FP_HORIZON_FRACTION) + Math.round(pitch * SH * FP_HORIZON_PITCH_SCALE)));
+  const isElevated = camElev > sea + FP_ELEVATED_THRESHOLD;
+  const ELEV_SC = SH * (alt > FP_HIGH_ALT_THRESHOLD ? FP_ELEV_SCALE_HIGH : isElevated ? FP_ELEV_SCALE_ELEVATED : FP_ELEV_SCALE_GROUND);
   const FAR = Math.max(
-    Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * 1.6,
-    Math.max(map.width, map.height) * (alt > 0.1 ? 1.4 : 0.9),
+    Math.sqrt((peak.x - cam.x) ** 2 + (peak.y - cam.y) ** 2) * FP_FAR_DISTANCE_SCALE,
+    Math.max(map.width, map.height) * (alt > 0.1 ? FP_FAR_HIGH_ALT_SCALE : FP_FAR_GROUND_SCALE),
   );
-  const STEPS = 150;
-  // Sun: fixed in world space at SUN_WORLD_YAW — moves across screen as you turn
-  const SUN_WORLD_YAW = 1.0; // radians from world east
-  const sunFrac = (SUN_WORLD_YAW - yaw) / FOV + 0.5;
+  const STEPS = FP_RAYCAST_STEPS;
+  const sunFrac = (FP_SUN_WORLD_YAW - yaw) / FOV + 0.5;
   const sunCol  = Math.round(sunFrac * SW1); // may be off-screen — that's correct
   const sunRow  = Math.floor(HORIZON * 0.15);
   // Sky parallax: wx = skyXOff + col gives world-space x so clouds/stars
@@ -211,54 +278,17 @@ function renderFirstPerson(
   );
   const yBuf = Array<number>(SW).fill(SH);
 
-  // Biome colours at 3 depth bands
-  const COL_NEAR: Record<TerrainBiome, string> = {
-    "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
-    "plain": "green", "forest": "light-green", "hill": "white",
-    "ridge": "light-white", "peak": "light-white",
-  };
-  const COL_MID: Record<TerrainBiome, string> = {
-    "deep-water": "blue", "shallow-water": "cyan", "shore": "yellow",
-    "plain": "green", "forest": "green", "hill": "light-black",
-    "ridge": "white", "peak": "light-white",
-  };
-  const COL_FAR: Record<TerrainBiome, string> = {
-    "deep-water": "blue", "shallow-water": "blue", "shore": "light-black",
-    "plain": "light-black", "forest": "light-black", "hill": "light-black",
-    "ridge": "light-black", "peak": "light-black",
-  };
+  // Biome colours at 3 depth bands (module-level constants referenced locally)
+  const COL_NEAR = FP_BIOME_COLORS_NEAR;
+  const COL_MID = FP_BIOME_COLORS_MID;
+  const COL_FAR = FP_BIOME_COLORS_FAR;
 
-  // Surface glyphs by distance band
-  const SURF_NEAR: Record<TerrainBiome, string[]> = {
-    "deep-water": ["≈", "~", "≈", "∽"],
-    "shallow-water": ["~", "∽", "~", "·"],
-    "shore": ["·", ".", ",", "·", "°"],
-    "plain": [",", ".", "'", ";", ",", "·"],
-    "forest": ["♣", "♠", "t", "♣", ","],
-    "hill": ["∧", "n", "^", "∧", "."],
-    "ridge": ["▲", "^", "△", "▲"],
-    "peak": ["▲", "△", "▲", "^"],
-  };
-  const SURF_MID: Record<TerrainBiome, string[]> = {
-    "deep-water": ["~", "~"], "shallow-water": ["~", "∽"],
-    "shore": [".", "·"], "plain": [",", "."],
-    "forest": [":", "♣"], "hill": ["^", "n"],
-    "ridge": ["^", "△"], "peak": ["▲", "△"],
-  };
-  const SURF_FAR: Record<TerrainBiome, string> = {
-    "deep-water": "~", "shallow-water": "~", "shore": "·",
-    "plain": "·", "forest": "·", "hill": "·",
-    "ridge": "·", "peak": "·",
-  };
-
-  // Column fill glyphs (the vertical face of terrain slopes)
-  const CLIFF_NEAR: Record<TerrainBiome, string[]> = {
-    "deep-water": ["~"], "shallow-water": ["~"],
-    "shore": ["░", "."], "plain": ["▒", "░", ":"],
-    "forest": ["▓", "▒", "│"], "hill": ["▓", "▒", "░"],
-    "ridge": ["█", "▓", "▒"], "peak": ["█", "▓"],
-  };
-  const CLIFF_FAR: string[] = ["│", ":", "."];
+  // Surface + cliff glyph maps (module-level constants referenced locally)
+  const SURF_NEAR = FP_SURF_NEAR;
+  const SURF_MID = FP_SURF_MID;
+  const SURF_FAR = FP_SURF_FAR;
+  const CLIFF_NEAR = FP_CLIFF_NEAR;
+  const CLIFF_FAR = FP_CLIFF_FAR;
 
   // ── Precompute per-column ray directions (cos/sin only needed once per column) ──
   const rayDX = new Float64Array(SW);
@@ -277,9 +307,9 @@ function renderFirstPerson(
     const d = dist / FAR; // 0=near, 1=far
     // Hoist per-step constants out of the column loop
     const invDepth = 1 / (1 + d * 0.5); // replaces per-col division in projection
-    const dNear = d < 0.2;              // surface glyph band thresholds
-    const dMid  = !dNear && d < 0.5;
-    const dFarCliff = d >= 0.6;         // cliff colour band
+    const dNear = d < FP_NEAR_BAND;     // surface glyph band thresholds
+    const dMid  = !dNear && d < FP_MID_BAND;
+    const dFarCliff = d >= FP_FAR_CLIFF_BAND; // cliff colour band
     for (let col = 0; col < SW; col++) {
       if (yBuf[col]! <= 0) continue;
       const wx = cam.x + rayDX[col]! * dist;
