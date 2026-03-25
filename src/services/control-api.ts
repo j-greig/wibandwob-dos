@@ -448,7 +448,7 @@ function buildRoutes(): RouteDefinition[] {
       handler: { commandId: "window.agent-message", argsMapper: (b) => ({ id: Number(b.id), text: String(b.text ?? b.input ?? ""), ...(b.sender ? { sender: String(b.sender) } : {}) }) },
     },
     {
-      method: "POST", path: "/windows/editor/write", description: "Write content to an editor window buffer",
+      method: "POST", path: "/windows/editor/write", description: "Replace the content of an editor window buffer (set, not append). Use editor.write command to type at cursor.",
       body: { id: "number", content: "string" },
       handler: { post: (body, ctx) => ({
         ok: ctx.deps.windows.writeEditorText(Number(body.id), String(body.text ?? "")),
