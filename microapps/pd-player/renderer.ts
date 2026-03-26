@@ -14,7 +14,7 @@
  *  - Context-sensitive keyboard help
  */
 
-import type { PdEngine, PdObject, PdConnection, PdPatch } from "./engine.js";
+import type { PdEngine, PdObject, PdConnection, PdPatch, MelodyNote } from "./engine.js";
 
 // ---------------------------------------------------------------------------
 // ANSI escape codes
@@ -358,7 +358,11 @@ export function renderPdPlayer(
   );
   lines.push("");
 
-  // ── PATCH GRAPH ───────────────────────────────────────────
+  // ── PATCH GRAPH or MELODY ─────────────────────────────────
+  if (engine.melody) {
+    const melH = Math.max(4, h - lines.length - 10);
+    lines.push(...renderMelodySection(engine, w, melH));
+  } else {
   lines.push(`  ${B}${FG.cyan}\u2500\u2500 Patch Graph ${"\u2500".repeat(Math.max(0, w - 18))}${R}`);
 
   if (patch.objects.length === 0) {
@@ -406,6 +410,7 @@ export function renderPdPlayer(
     }
     lines.push("");
   }
+  } // end melody else
 
   // ── SELECTED OBJECT DETAIL PANEL ──────────────────────────
   if (engine.selectedObjectId >= 0 && patch.objects.length > 0) {
@@ -449,7 +454,13 @@ export function renderPdPlayer(
 
   // ── KEYBOARD HELP ─────────────────────────────────────────
   // Context-sensitive: show different hints depending on state
-  if (playing) {
+  if (engine.melody) {
+    if (playing) {
+      lines.push(`  ${FG.gray}SPC:stop  m:next-melody  w:cycle-wave  x:back-to-patch  q:close${R}`);
+    } else {
+      lines.push(`  ${FG.gray}SPC:play  r:re-render  m:next-melody  w:cycle-wave  x:back-to-patch  q:close${R}`);
+    }
+  } else if (playing) {
     lines.push(`  ${FG.gray}SPC:stop  r:render  p:preset  q:close${R}`);
   } else if (patch.objects.length === 0) {
     lines.push(`  ${FG.gray}a:add object  p:preset  q:close${R}`);
@@ -466,6 +477,67 @@ const PRESET_DISPLAY = [
   "sine-drone", "detuned-pad", "bass-pulse", "noise-filter",
   "fm-bell", "dual-saw", "sub-bass", "delay-drone",
 ];
+
+// ---------------------------------------------------------------------------
+// Melody section renderer
+// ---------------------------------------------------------------------------
+
+function noteOctave(note: string | number): number {
+  if (typeof note === "number") return 4;
+  const m = String(note).match(/(\d+)$/);
+  return m ? parseInt(m[1]!) : 4;
+}
+
+const OCT_COLORS = [FG.blue, FG.blue, FG.blue, FG.cyan, FG.green, FG.yellow, FG.red, FG.red];
+
+function noteDisplayColor(note: string | number): string {
+  const s = String(note);
+  if (s === "rest" || s === "-" || s === "_") return FG.gray;
+  const oct = noteOctave(note);
+  return OCT_COLORS[Math.max(0, Math.min(7, oct))] ?? FG.white;
+}
+
+function noteDisplayLabel(note: string | number): string {
+  const s = String(note);
+  if (s === "rest" || s === "-" || s === "_") return "  ";
+  const m = s.match(/^([A-Ga-g][#b]?)(\d+)$/);
+  if (!m) return s.slice(0, 2).padEnd(2);
+  const name = m[1]!;
+  const oct  = m[2]!;
+  return name.length === 1 ? name + oct : name.slice(0, 2);
+}
+
+function renderMelodySection(engine: PdEngine, w: number, maxH: number): string[] {
+  const melody   = engine.melody!;
+  const lines: string[] = [];
+  const totalDur = melody.reduce((s, n) => s + n.dur, 0);
+
+  lines.push(
+    `  ${B}${FG.mag}\u2500\u2500 Melody: ${FG.white}${engine.melodyName}${FG.mag}` +
+    `  [${engine.melodyWave}]  ${melody.length} notes  ${totalDur.toFixed(1)}s` +
+    `  ${"\u2500".repeat(Math.max(0, w - 22 - engine.melodyName.length - engine.melodyWave.length))}${R}`
+  );
+  lines.push("");
+
+  const cellW  = 4; // "[XX]" = 4 chars visual
+  const indent = 4;
+  const rowCap = Math.max(1, Math.floor((w - indent) / cellW));
+
+  for (let start = 0; start < melody.length; start += rowCap) {
+    if (lines.length >= maxH - 2) break;
+    let row = "    ";
+    for (let j = start; j < Math.min(start + rowCap, melody.length); j++) {
+      const n   = melody[j]!;
+      const col = noteDisplayColor(n.note);
+      const lbl = noteDisplayLabel(n.note);
+      row += `${col}[${lbl}]${R}`;
+    }
+    lines.push(row);
+  }
+
+  lines.push("");
+  return lines.slice(0, maxH);
+}
 
 /**
  * Compact state summary for API/agent consumption.
