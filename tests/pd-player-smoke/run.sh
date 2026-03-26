@@ -466,13 +466,160 @@ else
   fail "Bounce" "WAV file not created at $BOUNCE_PATH"
 fi
 
-# ── Test 18: Window close ────────────────────────────────
+# ── Test 19: Visual — tmux capture-pane ────────────────
+# Only run if we own the tmux session (not using live dev instance)
 
-log "Test 18: Close window"
+if [ "$OWN_APP" = true ]; then
+  log "Test 19: Visual verification via tmux capture-pane"
+
+  # Reload a preset so we have visible content
+  api_post "/commands/run" '{"id":"microapp.wibwob.pd-player.load-preset","args":{"preset":"fm-bell"}}' > /dev/null
+  sleep 1
+
+  PANE_TEXT=$(tmux capture-pane -t "$TMUX_SESSION" -p 2>/dev/null || echo "")
+  echo "$PANE_TEXT" > "$RESULTS_DIR/19-tmux-capture.txt"
+
+  VIS_OK=true
+
+  # Check for title text
+  if ! echo "$PANE_TEXT" | grep -qi "pure.*data"; then
+    VIS_OK=false
+    fail "Visual: tmux title" "Missing 'PURE DATA' header in tmux capture"
+  fi
+
+  # Check for object type names (fm-bell has osc~ and *~)
+  if ! echo "$PANE_TEXT" | grep -q "osc~"; then
+    VIS_OK=false
+    fail "Visual: tmux objects" "Missing 'osc~' in tmux capture"
+  fi
+
+  # Check for Patch Graph section header
+  if ! echo "$PANE_TEXT" | grep -qi "patch.*graph"; then
+    VIS_OK=false
+    fail "Visual: tmux patch graph" "Missing 'Patch Graph' section"
+  fi
+
+  # Check for Waveform section header
+  if ! echo "$PANE_TEXT" | grep -qi "waveform"; then
+    VIS_OK=false
+    fail "Visual: tmux waveform" "Missing 'Waveform' section"
+  fi
+
+  # Check for keyboard help line
+  if ! echo "$PANE_TEXT" | grep -q "play.*stop\|render\|preset"; then
+    VIS_OK=false
+    fail "Visual: tmux help" "Missing keyboard help line in tmux capture"
+  fi
+
+  if [ "$VIS_OK" = true ]; then
+    pass "Visual tmux capture: title, objects, patch graph, waveform, help all present"
+  fi
+else
+  skip "Visual tmux capture — not available in PD_USE_DEV mode"
+fi
+
+# ── Test 20: Visual — /screenshot/text API ─────────────
+
+log "Test 20: Visual verification via /screenshot/text"
+SCREEN_TEXT=$(curl -sf "${API}/screenshot/text" 2>/dev/null || echo "")
+echo "$SCREEN_TEXT" > "$RESULTS_DIR/20-screenshot-text.txt"
+
+if [ -n "$SCREEN_TEXT" ]; then
+  SCREEN_VIS_OK=true
+
+  # Check for Pd Player title
+  if ! echo "$SCREEN_TEXT" | grep -qi "pure.*data\|pd.*player"; then
+    SCREEN_VIS_OK=false
+    fail "Visual: screenshot title" "Missing Pd Player title in screenshot/text"
+  fi
+
+  # Check for object boxes (should see box-drawing chars or object names)
+  if ! echo "$SCREEN_TEXT" | grep -q "osc~\|phasor~\|noise~\|dac~\|fm-bell"; then
+    SCREEN_VIS_OK=false
+    fail "Visual: screenshot objects" "Missing DSP object names in screenshot/text"
+  fi
+
+  if [ "$SCREEN_VIS_OK" = true ]; then
+    pass "Visual screenshot/text: Pd Player content verified"
+  fi
+else
+  skip "Visual screenshot/text — endpoint returned empty"
+fi
+
+# ── Test 21: Visual — /windows/text API ────────────────
+
+log "Test 21: Visual verification via /windows/text"
+WIN_TEXT_RAW=$(curl -sf "${API}/windows/text?id=${PD_ID}" 2>/dev/null || echo "")
+WIN_TEXT=$(echo "$WIN_TEXT_RAW" | python3 -c "
+import sys, json
+try:
+  data = json.load(sys.stdin)
+  print(data.get('text', ''))
+except: pass
+" 2>/dev/null || echo "")
+echo "$WIN_TEXT" > "$RESULTS_DIR/21-windows-text.txt"
+
+if [ -n "$WIN_TEXT" ]; then
+  WIN_VIS_OK=true
+
+  if ! echo "$WIN_TEXT" | grep -qi "pure.*data"; then
+    WIN_VIS_OK=false
+    fail "Visual: window text title" "Missing 'PURE DATA' in window text"
+  fi
+
+  # Verify fm-bell objects are rendered
+  if ! echo "$WIN_TEXT" | grep -q "osc~"; then
+    WIN_VIS_OK=false
+    fail "Visual: window text objects" "Missing 'osc~' in window text capture"
+  fi
+
+  # Check signal flow summary
+  if ! echo "$WIN_TEXT" | grep -qi "flow"; then
+    WIN_VIS_OK=false
+    fail "Visual: window text flow" "Missing signal flow summary"
+  fi
+
+  if [ "$WIN_VIS_OK" = true ]; then
+    pass "Visual window text: title, objects, flow all present"
+  fi
+else
+  skip "Visual /windows/text — returned empty"
+fi
+
+# ── Test 22: Visual — rendered waveform shows after render ──
+
+log "Test 22: Visual verification of rendered waveform"
+api_post "/commands/run" '{"id":"microapp.wibwob.pd-player.render"}' > /dev/null
+sleep 1
+
+WIN_TEXT_POST=$(curl -sf "${API}/windows/text?id=${PD_ID}" 2>/dev/null || echo "")
+WIN_TEXT_POST=$(echo "$WIN_TEXT_POST" | python3 -c "
+import sys, json
+try:
+  data = json.load(sys.stdin)
+  print(data.get('text', ''))
+except: pass
+" 2>/dev/null || echo "")
+echo "$WIN_TEXT_POST" > "$RESULTS_DIR/22-waveform-check.txt"
+
+if [ -n "$WIN_TEXT_POST" ]; then
+  # After render, waveform section should NOT say "no audio rendered"
+  if echo "$WIN_TEXT_POST" | grep -q "no audio rendered"; then
+    fail "Visual: waveform" "Still showing 'no audio rendered' after render command"
+  else
+    pass "Visual waveform: rendered audio waveform present"
+  fi
+else
+  skip "Visual waveform check — window text empty"
+fi
+
+# ── Test 23: Close window ────────────────────────────────
+
+log "Test 23: Close window"
 api_post "/windows/close" "{\"id\":${PD_ID}}" > /dev/null
 sleep 0.5
 
-STATE=$(get_state "18-after-close")
+STATE=$(get_state "23-after-close")
 FOUND=$(find_window_by_apptype "$STATE" "wibwob.pd-player")
 
 if [ -z "$FOUND" ]; then

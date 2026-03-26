@@ -84,9 +84,16 @@ export default function setup(host: MicroappHost) {
         right: `${engine.transport === "playing" ? "\u25B6" : "\u25A0"} ${engine.patch.objects.length} obj`,
       });
       (display.node as any).setContent(content);
+      const playing = engine.transport === "playing";
+      const selObj = engine.patch.objects.find(o => o.id === engine.selectedObjectId);
+      const statusLeft = playing
+        ? `\u25B6 Playing ${engine.patch.name} \u2014 SPC to stop`
+        : selObj
+          ? `Selected: ${selObj.type} (id:${selObj.id}) \u2014 [c]connect [d]del [Cd]disconnect`
+          : `[SPC] play [r] render [p] preset [\u2191\u2193] select [a] add`;
       statusBar.update({
-        left: "[SPC] play [r] render [p] preset [\u2191\u2193] select [a] add [d] del [c] conn",
-        right: "[q] close",
+        left: statusLeft,
+        right: `${engine.patch.objects.length} obj | ${engine.patch.connections.length} conn | [q] close`,
       });
       host.screen.render();
     }
