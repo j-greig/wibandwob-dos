@@ -566,7 +566,7 @@ export class TsTuiMvpApp {
       // httpStream transport on port+10 — pi connects via scripts/mcp-bridge.mjs
       // (stdio transport can't work here: blessed TUI owns stdin/stdout)
       const port = parseInt(new URL(mcpBaseUrl).port || "8099", 10);
-      this.mcpServer.start({ transportType: "httpStream", httpStream: { port: port + 10 } });
+      this.mcpServer!.start({ transportType: "httpStream", httpStream: { port: port + 10 } });
       log.app(`MCP server started on httpStream:${port + 10}`);
     }
 

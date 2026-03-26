@@ -187,7 +187,7 @@ export function createMcpServer(options: McpServerOptions): FastMCP {
           name: toolName,
           description,
           parameters: z.object(queryShape),
-          execute: async (args) => {
+          execute: async (args: Record<string, unknown>) => {
             const url = new URL(`${apiBaseUrl}${path}`);
             for (const [key, value] of Object.entries(args)) {
               if (value !== undefined && value !== null) {
@@ -212,7 +212,7 @@ export function createMcpServer(options: McpServerOptions): FastMCP {
           name: toolName,
           description,
           parameters: inputSchema,
-          execute: async (args) => {
+          execute: async (args: Record<string, unknown>) => {
             const response = await fetch(`${apiBaseUrl}${path}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

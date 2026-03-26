@@ -5,6 +5,8 @@
 > Purpose: replace fragmented shell-side instance guessing with one machine-safe resolver, while explicitly avoiding runtime symlink registration.
 >
 > Created: 2026-03-26 · Platform: macOS + Linux
+>
+> **Progress tracking:** actionable steps prefixed `[ ]`. Mark `[x]` when done.
 
 ---
 
@@ -33,7 +35,7 @@ The immediate fix is not to invent a second runtime-discovery mechanism. The imm
 
 ## Decision
 
-v1 uses a CLI resolver, not runtime symlinks.
+v1 should use a CLI resolver.
 
 This is a deliberate simplification.
 
@@ -45,32 +47,6 @@ This is a deliberate simplification.
 - No default-rotation logic
 - No label-alias collision rules
 
-Symlink aliases may be revisited later as a performance optimization. They are not part of this design.
-
----
-
-## Why this is the simpler correct design
-
-The rejected v1 alternative was to add a second mechanism:
-
-- app startup writes label/default symlinks
-- app shutdown rotates them
-- shell reads those symlinks
-
-That approach has real cost:
-
-- new lifecycle logic in control API startup/shutdown
-- default ownership semantics to define and maintain
-- duplicate-label collision policy
-- stale-link cleanup after crashes
-- another discovery surface to keep consistent with CLI discovery
-
-The CLI-resolver design avoids all of that. Shell scripts ask the existing discovery layer what the target is. The answer is either:
-
-- a unix socket path for local instance control, or
-- an HTTP URL for deploy / remote / explicit env override cases
-
-The only new interface is a machine-safe CLI command.
 
 ---
 
@@ -249,9 +225,9 @@ Behavior:
 
 Important:
 
-- `runtime-env.sh` must stop reading `control-manifest.json`
-- it must stop inferring `8099` as a local default for multi-instance local usage
-- it must not replicate selector matching or instance scanning in shell
+- [ ] `runtime-env.sh` must stop reading `control-manifest.json`
+- [ ] It must stop inferring `8099` as a local default for multi-instance local usage
+- [ ] It must not replicate selector matching or instance scanning in shell
 
 ### `ww_curl`
 
@@ -287,7 +263,7 @@ All migrated shell scripts should route API calls through `ww_curl` instead of o
 
 ### Phase 1 — constants and cleanup
 
-Export shared constants from `src/core/config.ts`:
+- [ ] Export shared constants from `src/core/config.ts`:
 
 | Constant | Value | Currently duplicated in |
 |---|---|---|
@@ -295,7 +271,8 @@ Export shared constants from `src/core/config.ts`:
 | `INSTANCE_PID_FILE` | `"control.pid"` | `instance-discovery.ts`, `app-controller.ts`, `control-api.ts` |
 | `INSTANCE_DISCOVERY_FILE` | `"discovery.json"` | `instance-discovery.ts`, `app-controller.ts` (×2), `control-api.ts` |
 
-Update all consumers to import from `src/core/config.ts`. Remove local filename constants from CLI/discovery/control-api codepaths.
+- [ ] Update all consumers to import from `src/core/config.ts`
+- [ ] Remove local filename constants from CLI/discovery/control-api codepaths
 
 Goal:
 
@@ -305,15 +282,15 @@ Goal:
 
 ### Phase 2 — add `wibwob resolve`
 
-Implement a dedicated resolver command in the CLI.
+- [ ] Implement a dedicated resolver command in the CLI
 
 Requirements:
 
-- reuse `instance-discovery.ts`
-- do not parse `wibwob instances` internally
-- support plain output and `--json`
-- support `-i/--instance`
-- deterministic exit behavior
+- [ ] Reuse `instance-discovery.ts`
+- [ ] Do not parse `wibwob instances` internally
+- [ ] Support plain output and `--json`
+- [ ] Support `-i/--instance`
+- [ ] Deterministic exit behavior
 
 Recommended exit semantics:
 
@@ -321,7 +298,7 @@ Recommended exit semantics:
 - `1`: no resolvable target
 - `2`: ambiguous target, explicit selector required
 
-Diagnostics should be clear and short. Example:
+- [ ] Implement clear, short diagnostics. Example:
 
 ```text
 Multiple instances running: dev, main
@@ -330,15 +307,15 @@ Use: wibwob resolve -i <label>
 
 ### Phase 3 — rewrite `runtime-env.sh`
 
-Replace manifest-based resolution with resolver-first logic.
+- [ ] Replace manifest-based resolution with resolver-first logic
 
 Requirements:
 
-- preserve `WIBWOB_API`
-- preserve `WIBWOB_INSTANCE`
-- honor `CONTROL_API_PORT`
-- call `wibwob resolve` when envs do not fully resolve the target
-- add one curl helper for socket/http dispatch
+- [ ] Preserve `WIBWOB_API`
+- [ ] Preserve `WIBWOB_INSTANCE`
+- [ ] Honor `CONTROL_API_PORT`
+- [ ] Call `wibwob resolve` when envs do not fully resolve the target
+- [ ] Add one curl helper for socket/http dispatch
 
 The shell layer should become thinner, not smarter.
 
@@ -346,11 +323,11 @@ The shell layer should become thinner, not smarter.
 
 Priority order:
 
-1. actively broken parse scripts
-2. scripts already sourcing `runtime-env.sh`
-3. scripts with hardcoded local ports
-4. scripts walking stale instance paths
-5. scripts and docs still referencing `WW_API`
+1. [ ] Actively broken parse scripts
+2. [ ] Scripts already sourcing `runtime-env.sh`
+3. [ ] Scripts with hardcoded local ports
+4. [ ] Scripts walking stale instance paths
+5. [ ] Scripts and docs still referencing `WW_API`
 
 Migration rule:
 
@@ -448,11 +425,11 @@ These tables are the authoritative migration inventory for shell-side instance r
 
 Once shell consumers are migrated:
 
-- remove manifest reads from shell resolution
-- remove manifest reads from CLI resolution
-- remove `WW_API` support from shell and CLI resolution
-- migrate remaining `WW_API` references in scripts/docs to `WIBWOB_API`
-- remove manifest writes only after no required consumer remains
+- [ ] Remove manifest reads from shell resolution
+- [ ] Remove manifest reads from CLI resolution
+- [ ] Remove `WW_API` support from shell and CLI resolution
+- [ ] Migrate remaining `WW_API` references in scripts/docs to `WIBWOB_API`
+- [ ] Remove manifest writes only after no required consumer remains
 
 The manifest should not remain in the resolution critical path.
 
@@ -483,7 +460,7 @@ Examples of cleanup-bearing or child-process-bearing surfaces already in tree:
 
 ### Required hardening
 
-Add one bounded shutdown path for all exit modes:
+- [ ] Add one bounded shutdown path for all exit modes:
 
 - `app.quit`
 - `SIGINT`
@@ -493,14 +470,14 @@ Add one bounded shutdown path for all exit modes:
 
 That shutdown path should:
 
-1. guard against re-entry
-2. close menus / overlays that might interfere with orderly teardown
-3. close all open windows through `windowManager.closeWindow(...)` so `frame.cleanup` runs
-4. stop control API transport and remove socket / pid sidecars
-5. stop runtime stats and other app-owned background services
-6. destroy Blessed screen / shell chrome
-7. exit the process only after the bounded cleanup sequence completes
-8. if cleanup stalls, force exit after a short timeout rather than hanging forever
+1. [ ] Guard against re-entry
+2. [ ] Close menus / overlays that might interfere with orderly teardown
+3. [ ] Close all open windows through `windowManager.closeWindow(...)` so `frame.cleanup` runs
+4. [ ] Stop control API transport and remove socket / pid sidecars
+5. [ ] Stop runtime stats and other app-owned background services
+6. [ ] Destroy Blessed screen / shell chrome
+7. [ ] Exit the process only after the bounded cleanup sequence completes
+8. [ ] If cleanup stalls, force exit after a short timeout rather than hanging forever
 
 Design rule:
 
@@ -545,7 +522,7 @@ These are deferred because they add complexity without being necessary to restor
 
 ## Acceptance criteria
 
-AC-1: Single local instance resolves to its unix socket.
+- [ ] **AC-1:** Single local instance resolves to its unix socket.
 
 Test:
 
@@ -558,7 +535,7 @@ Expected:
 - exit `0`
 - stdout is a socket path
 
-AC-2: Two local instances with no selector fail loudly.
+- [ ] **AC-2:** Two local instances with no selector fail loudly.
 
 Test:
 
@@ -571,7 +548,7 @@ Expected:
 - exit `2`
 - stderr instructs the caller to use `-i`
 
-AC-3: Two local instances with selector resolve deterministically.
+- [ ] **AC-3:** Two local instances with selector resolve deterministically.
 
 Test:
 
@@ -585,7 +562,7 @@ Expected:
 - JSON `kind` is `"unix"`
 - JSON target points to the `main` instance socket
 
-AC-4: `WIBWOB_INSTANCE=main` causes runtime-env-backed scripts to target `main`.
+- [ ] **AC-4:** `WIBWOB_INSTANCE=main` causes runtime-env-backed scripts to target `main`.
 
 Test:
 
@@ -595,7 +572,7 @@ Expected:
 
 - visible effect occurs on `main`, not the other instance
 
-AC-5: `WIBWOB_API` bypasses local discovery.
+- [ ] **AC-5:** `WIBWOB_API` bypasses local discovery.
 
 Test:
 
@@ -608,7 +585,7 @@ Expected:
 - exit `0`
 - stdout is exactly that URL
 
-AC-6: `CONTROL_API_PORT` works for deploy/container contexts.
+- [ ] **AC-6:** `CONTROL_API_PORT` works for deploy/container contexts.
 
 Test:
 
@@ -621,7 +598,7 @@ Expected:
 - exit `0`
 - stdout is `http://127.0.0.1:8099`
 
-AC-8: Dead sockets are ignored.
+- [ ] **AC-8:** Dead sockets are ignored.
 
 Test:
 
@@ -631,7 +608,7 @@ Expected:
 
 - resolver does not return stale targets
 
-AC-9: Polling scripts stop scraping `wibwob health` text.
+- [ ] **AC-9:** Polling scripts stop scraping `wibwob health` text.
 
 Test:
 
@@ -642,7 +619,7 @@ Expected:
 
 - no awk/grep dependency on human health output
 
-AC-10: Manifest removal does not break shell resolution.
+- [ ] **AC-10:** Manifest removal does not break shell resolution.
 
 Test:
 
@@ -652,7 +629,7 @@ Expected:
 
 - migrated scripts still resolve instances correctly
 
-AC-11: Normal quit runs window cleanup before process exit.
+- [ ] **AC-11:** Normal quit runs window cleanup before process exit.
 
 Test:
 
@@ -665,7 +642,7 @@ Expected:
 - no child worker/player/browser helper processes remain from that instance
 - no stale control socket / PID sidecars remain
 
-AC-12: Signal-based quit uses the same bounded shutdown path.
+- [ ] **AC-12:** Signal-based quit uses the same bounded shutdown path.
 
 Test:
 
@@ -677,7 +654,7 @@ Expected:
 - same cleanup behavior as `app.quit`
 - no orphaned instance sidecars from a normal signal stop
 
-AC-13: Cleanup scripts are fallback-only after a normal quit.
+- [ ] **AC-13:** Cleanup scripts are fallback-only after a normal quit.
 
 Test:
 
@@ -695,12 +672,12 @@ Expected:
 
 Minimum evidence:
 
-- `wibwob resolve --json` output from a single-instance case
-- one ambiguity failure with two live instances and no selector
-- one success case with `-i main`
-- one runtime-env-backed script visually verified against the intended instance
-- one normal quit case showing no leftover sidecars
-- one normal quit case with a cleanup-bearing window type showing no orphan child process
+- [ ] `wibwob resolve --json` output from a single-instance case
+- [ ] One ambiguity failure with two live instances and no selector
+- [ ] One success case with `-i main`
+- [ ] One runtime-env-backed script visually verified against the intended instance
+- [ ] One normal quit case showing no leftover sidecars
+- [ ] One normal quit case with a cleanup-bearing window type showing no orphan child process
 
 Visual verification matters. API success alone is not proof that the correct instance was targeted.
 
@@ -713,6 +690,65 @@ Visual verification matters. API success alone is not proof that the correct ins
 - one CLI subprocess per shell invocation is acceptable for v1
 - `WIBWOB_API` is the only supported explicit URL override after migration
 - if subprocess cost later becomes a practical bottleneck, symlink aliases can be reconsidered separately
+
+---
+
+## Testing strategy
+
+Every check below must pass before merge. Run in order — later checks depend on earlier ones.
+
+### Unit: resolver logic (no running instance needed)
+
+- [ ] `findAliveInstances()` returns empty array when no sockets exist
+- [ ] `findAliveInstances()` skips stale sockets (dead PID)
+- [ ] `findAliveInstanceBySelector()` matches by label, display id, and full instance id
+- [ ] `findAliveInstanceBySelector()` returns null on no match
+- [ ] Shared constants (`INSTANCE_SOCKET_FILE`, `INSTANCE_PID_FILE`, `INSTANCE_DISCOVERY_FILE`) are importable from `src/core/config.ts` and no duplicates remain in consuming files
+
+### CLI: `wibwob resolve` output contract
+
+- [ ] `wibwob resolve` with one live instance → exit 0, stdout is a socket path, no trailing newline noise
+- [ ] `wibwob resolve --json` with one live instance → exit 0, valid JSON, `kind` is `"unix"`, `target` is socket path
+- [ ] `wibwob resolve` with zero instances → exit 1, stderr says "No WibWob-DOS instances running"
+- [ ] `wibwob resolve` with two+ instances and no selector → exit 2, stderr lists labels and instructs `-i`
+- [ ] `wibwob resolve -i <label>` with two+ instances → exit 0, correct instance returned
+- [ ] `wibwob resolve -i nonexistent` → exit 1, stderr says selector not found
+- [ ] `WIBWOB_API=http://127.0.0.1:19099 wibwob resolve` → exit 0, stdout is exactly that URL
+- [ ] `WIBWOB_API=http://127.0.0.1:19099 wibwob resolve --json` → exit 0, `kind` is `"http"`
+- [ ] `CONTROL_API_PORT=8099 wibwob resolve` → exit 0, stdout is `http://127.0.0.1:8099`
+
+### Shell: `runtime-env.sh` contract
+
+- [ ] `ww_resolve_api` returns socket path when one instance alive
+- [ ] `ww_resolve_api` returns env URL when `WIBWOB_API` set
+- [ ] `ww_resolve_api` returns HTTP URL when `CONTROL_API_PORT` set
+- [ ] `ww_resolve_api` fails non-zero on ambiguity
+- [ ] `ww_curl /health` succeeds against a live instance (socket transport)
+- [ ] `ww_curl /health` succeeds when `WIBWOB_API` points to HTTP target
+- [ ] `ww_curl` with no `/path` argument → non-zero exit, usage error on stderr
+- [ ] No remaining reads of `control-manifest.json` in `runtime-env.sh`
+
+### Migration: script-by-script smoke
+
+- [ ] Each "broken parse" script (`wait-for.sh`, `calibrate.sh`, `restart-wibwob.sh`) runs without awk/grep on CLI text output
+- [ ] Each "already sourcing runtime-env.sh" script inherits the new resolution without changes beyond the source
+- [ ] Each hardcoded-port script uses `ww_curl` or `ww_resolve_api` instead of literal `8099`/`8100`
+- [ ] Each stale-path script (`dvd-screensaver*.sh`, `dvd-wib-to-wob.sh`) no longer references `scratch/instances/`
+- [ ] `scripts/testing/ci-cli-test.sh` still works with `WW_API` until Phase 5 retires it
+
+### Shutdown: process lifecycle
+
+- [ ] `app.quit` with cleanup-bearing windows → no orphan child processes, no stale socket/pid
+- [ ] `SIGINT` → same cleanup as `app.quit`
+- [ ] `SIGTERM` → same cleanup as `app.quit`
+- [ ] `wibwob clean` after normal quit → reports clean state
+- [ ] Re-entry guard: rapid double-quit does not crash or hang
+
+### Visual verification (manual, screenshot evidence)
+
+- [ ] Single instance: migrated script visibly hits the right instance
+- [ ] Two instances + `WIBWOB_INSTANCE=<label>`: effect occurs on the named instance, not the other
+- [ ] Two instances + no selector: script fails loudly, does not silently target wrong instance
 
 ---
 
