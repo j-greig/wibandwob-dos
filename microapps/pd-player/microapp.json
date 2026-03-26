@@ -1,0 +1,20 @@
+{
+  "name": "pd-player",
+  "version": "0.1.0",
+  "description": "Pure Data patch player and editor — parse .pd files, render DSP graphs, build patches",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.pd-player",
+    "title": "Pd Player",
+    "description": "Pure Data (Max/MSP predecessor) patch player. Load, play, and create .pd patches with an ASCII patch editor.",
+    "persist": true,
+    "multiInstance": false,
+    "menu": [
+      { "category": "applications", "order": 36, "label": "Pd Player" }
+    ],
+    "palette": { "order": 56, "label": "Pure Data Player" },
+    "agent": true,
+    "api": true
+  }
+}

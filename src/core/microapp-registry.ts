@@ -38,6 +38,7 @@ const REGISTRY: Record<string, MicroappTier> = {
   "wibwob.starfield":          "beta",
   "wibwob.sy2chronicles":      "beta",
   "wibwob.tr808":              "beta",
+  "wibwob.pd-player":          "beta",
   "wibwob.wiretext":           "beta",
   "wibwob.zine":               "core",
   "wibwob.terrarium":          "beta",
