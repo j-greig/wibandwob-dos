@@ -277,6 +277,9 @@ export class WindowManager implements WindowFacade {
       this.focusWindowInternal(record);
     });
     frame.on("mousedown", (data) => {
+      if (this.dragState || this.resizeState) {
+        return;
+      }
       this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
@@ -299,6 +302,9 @@ export class WindowManager implements WindowFacade {
       }
     });
     titleBar.on("mousedown", (data) => {
+      if (this.dragState || this.resizeState) {
+        return;
+      }
       this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
@@ -307,12 +313,18 @@ export class WindowManager implements WindowFacade {
       this.startDrag(record, data);
     });
     body.on("mousedown", (data) => {
+      if (this.dragState || this.resizeState) {
+        return;
+      }
       this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
       }
     });
     resizeGrip.on("mousedown", (data) => {
+      if (this.dragState || this.resizeState) {
+        return;
+      }
       this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
