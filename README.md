@@ -266,6 +266,9 @@ See `ARCHITECTURE.md` for the full guide. Example modules by complexity:
 
 Theme files live in `src/core/theme/` (built-in) and `microapps/` (external). Use `theme.cycle` or `theme.set` via command palette or API.
 
+<img width="2850" height="2240" alt="image" src="https://github.com/user-attachments/assets/d55f8fa5-35a7-4b77-8ba8-53b015688f50" />
+
+
 ---
 
 ## Project Structure
@@ -300,8 +303,4 @@ Every window exposes machine-readable semantic state via `describeState()` — t
 - [chafa](https://hpjansson.org/chafa/) (optional — for image-to-ASCII in the browser)
 - [figlet](http://www.figlet.org/) (optional — for fancy heading rendering)
 
----
-
-## License
-
-MIT
+<img width="3196" height="2134" alt="image" src="https://github.com/user-attachments/assets/784107a0-6b9a-4af4-b02b-87248be7ebc7" />
