@@ -20,6 +20,8 @@ An AI agent (Wib & Wob — a dual-voiced symbient) coinhabits the desktop as a n
 
 It is not a chat wrapper with a pretty face. It is a shared space.
 
+<img width="2880" height="1800" alt="image" src="https://github.com/user-attachments/assets/ee82de46-c26d-4f27-a1cd-d3113e89508b" />
+
 ## Why does this exist?
 
 WibWob-DOS started as an experiment: what if an AI agent wasn't a sidebar or a chat bubble, but a full co-inhabitant of the same operating system as a human? Same windows, same menus, same desktop. Equal access.
